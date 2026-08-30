@@ -1,12 +1,15 @@
+import 'react-native-get-random-values';
+
 import { Figtree_400Regular, Figtree_500Medium, Figtree_600SemiBold } from '@expo-google-fonts/figtree';
 import { Newsreader_300Light, Newsreader_400Regular, Newsreader_500Medium } from '@expo-google-fonts/newsreader';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { useFonts } from 'expo-font';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
+import { initDatabase } from '@/lib/db';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -44,14 +47,21 @@ export default function RootLayout() {
     Figtree_500Medium,
     Figtree_600SemiBold,
   });
+  const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
-    if (fontsLoaded) {
+    initDatabase()
+      .then(() => setDbReady(true))
+      .catch((error) => console.error('Failed to initialize database', error));
+  }, []);
+
+  useEffect(() => {
+    if (fontsLoaded && dbReady) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, dbReady]);
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || !dbReady) {
     return null;
   }
 
