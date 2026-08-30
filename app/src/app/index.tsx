@@ -1,10 +1,12 @@
+import { router } from 'expo-router';
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CircleCard } from '@/components/circle-card';
 import { PrimaryButton } from '@/components/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 
 export default function CircleListScreen() {
   return (
@@ -15,15 +17,13 @@ export default function CircleListScreen() {
         </ThemedText>
         <ThemedText type="circleListHeader">Circles</ThemedText>
 
-        <ThemedView type="surface" style={styles.emptyState}>
-          <ThemedText type="cardTitle">No circles yet</ThemedText>
-          <ThemedText type="captionFeed" themeColor="secondary">
-            A circle is a private group — only the people you invite can see what&apos;s shared
-            inside it.
-          </ThemedText>
-        </ThemedView>
+        <CircleCard name="Nana's House" memberCount={9} onPress={() => router.push('/feed')} />
 
-        <PrimaryButton label="New circle" style={styles.pinnedButton} />
+        <PrimaryButton
+          label="New circle"
+          onPress={() => router.push('/circle/new')}
+          style={styles.pinnedButton}
+        />
       </SafeAreaView>
     </ThemedView>
   );
@@ -41,11 +41,6 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     marginBottom: 2,
-  },
-  emptyState: {
-    borderRadius: Radius.circleCard,
-    padding: Spacing.screenPadding,
-    gap: 8,
   },
   pinnedButton: {
     position: 'absolute',

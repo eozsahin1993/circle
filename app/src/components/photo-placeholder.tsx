@@ -7,10 +7,10 @@ import { Colors } from '@/constants/theme';
  * Stand-in for real photo content — diagonal hatch on `surface`. Every image
  * in the app is a placeholder until media upload/decrypt lands.
  */
-export function PhotoPlaceholder({ style, ...rest }: ViewProps) {
+export function PhotoPlaceholder({ style, children, ...rest }: ViewProps) {
   return (
     <View style={[styles.container, style]} {...rest}>
-      <Svg width="100%" height="100%">
+      <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
         <Defs>
           <Pattern
             id="hatch"
@@ -24,6 +24,7 @@ export function PhotoPlaceholder({ style, ...rest }: ViewProps) {
         </Defs>
         <Rect width="100%" height="100%" fill="url(#hatch)" />
       </Svg>
+      {children}
     </View>
   );
 }

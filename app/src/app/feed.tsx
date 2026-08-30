@@ -1,6 +1,7 @@
 import { FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CircleHeader } from '@/components/circle-header';
 import { PostCard, type Post } from '@/components/post-card';
 import { Spacing } from '@/constants/theme';
 import { ThemedView } from '@/components/themed-view';
@@ -29,6 +30,10 @@ export default function FeedScreen() {
           data={POSTS}
           keyExtractor={(post) => post.id}
           renderItem={({ item }) => <PostCard post={item} />}
+          ListHeaderComponent={
+            <CircleHeader name="Nana's House" memberCount={9} />
+          }
+          ListHeaderComponentStyle={styles.header}
           ItemSeparatorComponent={() => <ThemedView style={{ height: Spacing.gapBetweenPosts }} />}
         />
       </SafeAreaView>
@@ -42,5 +47,10 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  header: {
+    paddingHorizontal: Spacing.screenPadding,
+    paddingTop: 6,
+    paddingBottom: Spacing.gapBetweenPosts,
   },
 });
