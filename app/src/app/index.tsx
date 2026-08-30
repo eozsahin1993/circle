@@ -1,29 +1,45 @@
 import { router } from 'expo-router';
-import { StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CircleCard } from '@/components/circle-card';
+import { PhotoPlaceholder } from '@/components/photo-placeholder';
 import { PrimaryButton } from '@/components/primary-button';
+import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 
-export default function CircleListScreen() {
+export default function WelcomeScreen() {
+  const insets = useSafeAreaInsets();
+
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedText type="eyebrow" style={styles.eyebrow}>
+      <PhotoPlaceholder style={styles.photo}>
+        <ThemedText type="eyebrow" style={{ paddingTop: insets.top + 8, paddingLeft: Spacing.screenPadding }}>
+          Photo — Grandmother&apos;s kitchen, 1994
+        </ThemedText>
+      </PhotoPlaceholder>
+
+      <SafeAreaView edges={['bottom']} style={styles.content}>
+        <ThemedText type="eyebrow" themeColor="accentBright">
           Hearth
         </ThemedText>
-        <ThemedText type="circleListHeader">Circles</ThemedText>
+        <ThemedText type="onboardingHeadline">Keep the pictures where the people are.</ThemedText>
+        <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
+          Small circles. One shared feed. Photos live on the phones of the people in the circle —
+          not on a company&apos;s servers.
+        </ThemedText>
 
-        <CircleCard name="Nana's House" memberCount={9} onPress={() => router.push('/feed')} />
+        <View style={styles.actions}>
+          <PrimaryButton label="Set up a profile" onPress={() => router.push('/circles')} />
+          <SecondaryButton label="I already have an account" onPress={() => router.push('/circles')} />
+        </View>
 
-        <PrimaryButton
-          label="New circle"
-          onPress={() => router.push('/circle/new')}
-          style={styles.pinnedButton}
-        />
+        <Pressable style={styles.footer}>
+          <ThemedText type="meta" themeColor="muted">
+            How the privacy works
+          </ThemedText>
+        </Pressable>
       </SafeAreaView>
     </ThemedView>
   );
@@ -33,24 +49,24 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  safeArea: {
+  photo: {
+    flex: 1.1,
+  },
+  content: {
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: Spacing.topPadUnderStatusBar,
+    justifyContent: 'center',
     gap: Spacing.cardListGap,
   },
-  eyebrow: {
-    marginBottom: 2,
+  body: {
+    marginTop: -4,
   },
-  pinnedButton: {
-    position: 'absolute',
-    left: Spacing.screenPadding,
-    right: Spacing.screenPadding,
-    bottom: Spacing.pinnedButtonFromBottom,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 30,
-    elevation: 10,
+  actions: {
+    gap: 12,
+    marginTop: 8,
+  },
+  footer: {
+    alignSelf: 'center',
+    paddingVertical: 8,
   },
 });
