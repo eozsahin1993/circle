@@ -75,6 +75,7 @@ export const Type = {
   screenTitle: { fontFamily: Fonts.serifLight, fontSize: 30, lineHeight: 30 * 1.1 },
   cardTitle: { fontFamily: Fonts.serif, fontSize: 21, lineHeight: 21 * 1.15 },
   captionDetail: { fontFamily: Fonts.serif, fontSize: 16.5, lineHeight: 16.5 * 1.5 },
+  postAuthor: { fontFamily: Fonts.sansMedium, fontSize: 16, lineHeight: 16 * 1.3 },
   captionFeed: { fontFamily: Fonts.sans, fontSize: 15, lineHeight: 15 * 1.5 },
   comment: { fontFamily: Fonts.sans, fontSize: 14, lineHeight: 14 * 1.5 },
   buttonLabel: { fontFamily: Fonts.sansSemiBold, fontSize: 15, lineHeight: 15 * 1.2 },

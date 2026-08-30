@@ -16,6 +16,7 @@ const defaultColor: Record<ThemedTextType, ThemeColor> = {
   circleListHeader: 'text',
   screenTitle: 'text',
   cardTitle: 'text',
+  postAuthor: 'text',
   captionDetail: 'body',
   captionFeed: 'body',
   comment: 'secondary',
