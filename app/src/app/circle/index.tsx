@@ -36,10 +36,11 @@ export default function CircleListScreen() {
               getCircleMembers(circle.id),
               getCirclePosts(circle.id),
             ]);
+            const coverBytes = circle.picture ?? posts[0]?.photo;
             return {
               ...circle,
               memberCount: members.length,
-              photoUri: posts[0] ? bytesToDataUri(posts[0].photo) : undefined,
+              photoUri: coverBytes ? bytesToDataUri(coverBytes) : undefined,
             };
           }),
         );
@@ -89,7 +90,7 @@ export default function CircleListScreen() {
         )}
 
         <FabButton
-          icon="+"
+          icon="plus"
           onPress={() => router.push('/circle/new')}
           style={styles.fab}
         />

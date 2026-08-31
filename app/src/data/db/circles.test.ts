@@ -9,6 +9,7 @@ function makeCircle(overrides: Partial<{ id: string; name: string; createdAt: nu
   return {
     id: generateUUID(),
     name: 'Nana’s House',
+    picture: null,
     createdAt: Date.now(),
     leftAt: null,
     ...overrides,

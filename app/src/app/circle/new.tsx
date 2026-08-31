@@ -28,7 +28,7 @@ export default function NewCircleScreen() {
     setCreating(true);
     setError(null);
     try {
-      const circle = await createCircle({ name: name.trim() });
+      const circle = await createCircle({ name: name.trim(), picture: cover?.bytes });
       router.replace({ pathname: '/feed', params: { circleId: circle.id } });
     } catch (err) {
       console.error('Failed to create circle', err);

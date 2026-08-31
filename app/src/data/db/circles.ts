@@ -1,9 +1,14 @@
 import { and, asc, eq, isNull } from 'drizzle-orm';
 
+import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
 import { circles } from '@/data/db/schema';
 
 export type Circle = typeof circles.$inferSelect;
+
+function normalizeCircle(circle: Circle): Circle {
+  return { ...circle, picture: normalizeBlob(circle.picture) };
+}
 
 export async function insertCircle(circle: Circle): Promise<void> {
   await db.insert(circles).values(circle);
@@ -11,12 +16,13 @@ export async function insertCircle(circle: Circle): Promise<void> {
 
 export async function getCircle(id: string): Promise<Circle | null> {
   const rows = await db.select().from(circles).where(eq(circles.id, id));
-  return rows[0] ?? null;
+  return rows[0] ? normalizeCircle(rows[0]) : null;
 }
 
 /** Circles this device is still an active member of — excludes ones it's left. */
-export function getAllCircles(): Promise<Circle[]> {
-  return db.select().from(circles).where(isNull(circles.leftAt)).orderBy(asc(circles.createdAt));
+export async function getAllCircles(): Promise<Circle[]> {
+  const rows = await db.select().from(circles).where(isNull(circles.leftAt)).orderBy(asc(circles.createdAt));
+  return rows.map(normalizeCircle);
 }
 
 export async function updateCircleName(id: string, name: string): Promise<void> {

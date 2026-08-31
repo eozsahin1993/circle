@@ -1,8 +1,10 @@
+import { Feather } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { AvatarStack } from '@/components/avatar-stack';
 import { BackButton } from '@/components/back-button';
 import { ThemedText } from '@/components/themed-text';
+import { Radius, Tints } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export type CircleHeaderProps = {
   name: string;
@@ -12,6 +14,8 @@ export type CircleHeaderProps = {
 };
 
 export function CircleHeader({ name, memberCount, onPressDetails }: CircleHeaderProps) {
+  const theme = useTheme();
+
   return (
     <View style={styles.row}>
       <View style={styles.back}>
@@ -21,12 +25,12 @@ export function CircleHeader({ name, memberCount, onPressDetails }: CircleHeader
       <Pressable style={styles.titles} onPress={onPressDetails}>
         <ThemedText type="screenTitle">{name}</ThemedText>
         <ThemedText type="meta" themeColor="muted">
-          {memberCount} people · tap for details
+          {memberCount} people
         </ThemedText>
       </Pressable>
 
-      <Pressable onPress={onPressDetails}>
-        <AvatarStack count={memberCount} />
+      <Pressable style={styles.detailsButton} onPress={onPressDetails} hitSlop={8}>
+        <Feather name="more-horizontal" size={18} color={theme.secondary} />
       </Pressable>
     </View>
   );
@@ -45,5 +49,14 @@ const styles = StyleSheet.create({
   titles: {
     flex: 1,
     gap: 4,
+  },
+  detailsButton: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Tints.secondaryButtonBorder,
   },
 });

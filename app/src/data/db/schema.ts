@@ -4,6 +4,8 @@ import { blob, check, index, integer, primaryKey, sqliteTable, text, uniqueIndex
 export const circles = sqliteTable('circles', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  /** Cover photo picked on creation, if any — separate from any post's photo. */
+  picture: blob('picture').$type<Uint8Array>(),
   createdAt: integer('created_at').notNull(),
   /** Set when this device leaves the circle — kept (not deleted) so already-synced posts stay as a local archive. */
   leftAt: integer('left_at'),

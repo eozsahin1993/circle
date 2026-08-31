@@ -17,6 +17,8 @@ export type Reaction = {
 export type Post = {
   id: string;
   authorName: string;
+  /** Data URI of the author's profile picture, when it's known — otherwise the hatch placeholder shows. */
+  authorPhotoUri?: string;
   timestamp: string;
   /** Data URI of the actual photo, when it's known — otherwise the hatch placeholder shows. */
   photoUri?: string;
@@ -30,7 +32,7 @@ export function PostCard({ post }: { post: Post }) {
   return (
     <ThemedView style={styles.card}>
       <View style={styles.header}>
-        <Avatar />
+        <Avatar uri={post.authorPhotoUri} />
         <View>
           <ThemedText type="postAuthor">{post.authorName}</ThemedText>
           <ThemedText type="meta" themeColor="muted">

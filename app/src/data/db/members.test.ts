@@ -15,7 +15,7 @@ import {
 beforeAll(() => initDatabase());
 
 async function makeCircle() {
-  const circle = { id: generateUUID(), name: 'Test Circle', createdAt: Date.now(), leftAt: null };
+  const circle = { id: generateUUID(), name: 'Test Circle', picture: null, createdAt: Date.now(), leftAt: null };
   await insertCircle(circle);
   return circle;
 }

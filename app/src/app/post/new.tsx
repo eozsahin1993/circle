@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -55,9 +56,7 @@ export default function NewPostScreen() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.back}>
           <Pressable hitSlop={12} onPress={() => router.back()}>
-            <ThemedText type="cardTitle" themeColor="secondary">
-              ✕
-            </ThemedText>
+            <Feather name="x" size={22} color={Colors.dark.secondary} />
           </Pressable>
         </View>
 

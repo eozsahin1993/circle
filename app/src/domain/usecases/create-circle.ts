@@ -6,6 +6,8 @@ import { saveCircleIdentity, saveCircleSecret } from '@/services/keystore';
 
 export type CreateCircleInput = {
   name: string;
+  /** Cover photo picked on the create screen, if any. */
+  picture?: Uint8Array;
 };
 
 /**
@@ -26,7 +28,13 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
   await saveCircleIdentity(circleId, { ...identity, memberId });
   await saveCircleSecret(circleId, secret);
 
-  await insertCircle({ id: circleId, name: input.name, createdAt: now, leftAt: null });
+  await insertCircle({
+    id: circleId,
+    name: input.name,
+    picture: input.picture ?? null,
+    createdAt: now,
+    leftAt: null,
+  });
 
   const profile = await getProfile();
   await insertMember({

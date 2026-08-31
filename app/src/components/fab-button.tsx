@@ -1,11 +1,12 @@
+import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, Text, type PressableProps } from 'react-native';
+import { Pressable, StyleSheet, type PressableProps } from 'react-native';
 
-import { Colors, Fonts } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 
 export type FabButtonProps = PressableProps & {
-  /** Single glyph shown in the button, e.g. "+". */
-  icon: string;
+  /** Feather icon name, e.g. "plus". */
+  icon: React.ComponentProps<typeof Feather>['name'];
   size?: number;
 };
 
@@ -23,7 +24,7 @@ export function FabButton({ icon, size = 60, style, ...rest }: FabButtonProps) {
             { width: size, height: size, borderRadius: size / 2 },
             pressed && styles.pressed,
           ]}>
-          <Text style={styles.icon}>{icon}</Text>
+          <Feather name={icon} size={size * 0.42} color={Colors.dark.accentLabel} />
         </LinearGradient>
       )}
     </Pressable>
@@ -42,10 +43,5 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
-  },
-  icon: {
-    fontFamily: Fonts.sansMedium,
-    fontSize: 28,
-    color: Colors.dark.accentLabel,
   },
 });
