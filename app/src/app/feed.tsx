@@ -1,4 +1,5 @@
-import { router } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -7,46 +8,59 @@ import { FabButton } from '@/components/fab-button';
 import { PostCard, type Post } from '@/components/post-card';
 import { Spacing } from '@/constants/theme';
 import { ThemedView } from '@/components/themed-view';
+import { getCircle, getCircleMembers, getCirclePosts, getProfile } from '@/data/db';
+import { bytesToDataUri } from '@/services/image';
 
-const POSTS: Post[] = [
-  {
-    id: '1',
-    authorName: 'Marcus',
-    timestamp: 'Yesterday, 7:14pm',
-    photoLabel: 'Photo — Kitchen table, 1998',
-    caption: "Nana in the kitchen she refused to remodel. Found this in the drawer with the batteries.",
-    reactions: [
-      { emoji: '❤️', count: 9, reactedByMe: true },
-      { emoji: '🥺', count: 4 },
-      { emoji: '🙏', count: 3 },
-    ],
-    commentCount: 3,
-  },
-  {
-    id: '2',
-    authorName: 'Priya',
-    timestamp: 'Tuesday, 3:02pm',
-    photoLabel: 'Photo — Backyard, summer 2003',
-    caption: "The sprinkler that ruined every family photo for a decade. Miss that thing.",
-    reactions: [
-      { emoji: '😂', count: 6, reactedByMe: true },
-      { emoji: '❤️', count: 2 },
-    ],
-    commentCount: 1,
-  },
-];
+function formatTimestamp(ms: number): string {
+  const date = new Date(ms);
+  const day = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return `${day}, ${time}`;
+}
 
 export default function FeedScreen() {
+  const { circleId } = useLocalSearchParams<{ circleId: string }>();
+  const [circleName, setCircleName] = useState('');
+  const [memberCount, setMemberCount] = useState(0);
+  const [posts, setPosts] = useState<Post[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!circleId) return;
+
+      Promise.all([
+        getCircle(circleId),
+        getCircleMembers(circleId),
+        getCirclePosts(circleId),
+        getProfile(),
+      ]).then(([circle, members, circlePosts, profile]) => {
+        setCircleName(circle?.name ?? '');
+        setMemberCount(members.length);
+        setPosts(
+          circlePosts.map((post) => ({
+            id: post.id,
+            authorName: profile?.name || 'You',
+            timestamp: formatTimestamp(post.createdAt),
+            photoUri: bytesToDataUri(post.photo),
+            caption: post.caption,
+            reactions: [],
+            commentCount: 0,
+          })),
+        );
+      });
+    }, [circleId]),
+  );
+
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
         <FlatList
-          data={POSTS}
+          data={posts}
           keyExtractor={(post) => post.id}
           renderItem={({ item }) => <PostCard post={item} />}
           ListHeaderComponent={
             <ThemedView style={styles.header}>
-              <CircleHeader name="Nana's House" memberCount={9} />
+              <CircleHeader name={circleName} memberCount={memberCount} />
             </ThemedView>
           }
           stickyHeaderIndices={[0]}
@@ -55,7 +69,7 @@ export default function FeedScreen() {
         />
         <FabButton
           icon="+"
-          onPress={() => router.push('/post/new')}
+          onPress={() => router.push({ pathname: '/post/new', params: { circleId } })}
           style={styles.fab}
         />
       </SafeAreaView>

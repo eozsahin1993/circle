@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, TextInput, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,16 +9,45 @@ import { PrimaryButton } from '@/components/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Fonts, PhotoAspect, Radius, Spacing, Tints } from '@/constants/theme';
+import { getCircle, getCircleMembers } from '@/data/db';
+import { createPost } from '@/domain/usecases/create-post';
 import { pickAndCompressImage, type CompressedImage } from '@/services/image';
 
 export default function NewPostScreen() {
+  const { circleId } = useLocalSearchParams<{ circleId: string }>();
+  const [circleName, setCircleName] = useState('');
+  const [memberCount, setMemberCount] = useState(0);
   const [picture, setPicture] = useState<CompressedImage | null>(null);
   const [caption, setCaption] = useState('');
   const [addToAlbum, setAddToAlbum] = useState(true);
+  const [posting, setPosting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!circleId) return;
+    Promise.all([getCircle(circleId), getCircleMembers(circleId)]).then(([circle, members]) => {
+      setCircleName(circle?.name ?? '');
+      setMemberCount(members.length);
+    });
+  }, [circleId]);
 
   async function handlePickPhoto() {
     const picked = await pickAndCompressImage();
     if (picked) setPicture(picked);
+  }
+
+  async function handlePost() {
+    if (!picture || !circleId) return;
+    setPosting(true);
+    setError(null);
+    try {
+      await createPost({ circleId, caption: caption.trim(), photo: picture.bytes });
+      router.back();
+    } catch (err) {
+      console.error('Failed to create post', err);
+      setError("Couldn't post — try again.");
+      setPosting(false);
+    }
   }
 
   return (
@@ -35,10 +64,10 @@ export default function NewPostScreen() {
         <ThemedText type="screenTitle">Create a post</ThemedText>
 
         <View style={styles.postingToRow}>
-          <ThemedText type="postAuthor">Nana&apos;s House</ThemedText>
+          <ThemedText type="postAuthor">{circleName}</ThemedText>
           <ThemedText type="meta" themeColor="muted">
             {' '}
-            · 9 people can see it, nobody else
+            · {memberCount} people can see it, nobody else
           </ThemedText>
         </View>
 
@@ -81,9 +110,16 @@ export default function NewPostScreen() {
             </View>
           </ScrollView>
 
+          {error ? (
+            <ThemedText type="captionFeed" themeColor="accent" style={styles.error}>
+              {error}
+            </ThemedText>
+          ) : null}
+
           <PrimaryButton
-            label="Post to Nana's House"
-            disabled={!picture}
+            label={`Post to ${circleName}`}
+            disabled={!picture || posting}
+            onPress={handlePost}
             style={styles.postButton}
           />
         </KeyboardAvoidingView>
@@ -149,6 +185,9 @@ const styles = StyleSheet.create({
   albumText: {
     flex: 1,
     gap: 4,
+  },
+  error: {
+    textAlign: 'center',
   },
   postButton: {
     marginTop: Spacing.cardListGap,

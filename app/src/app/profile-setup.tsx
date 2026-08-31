@@ -16,6 +16,7 @@ export default function ProfileSetupScreen() {
   const [name, setName] = useState('');
   const [picture, setPicture] = useState<CompressedImage | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleAddPicture() {
     const picked = await pickAndCompressImage();
@@ -24,8 +25,15 @@ export default function ProfileSetupScreen() {
 
   async function handleContinue() {
     setSaving(true);
-    await completeProfileSetup({ name: name.trim(), picture: picture?.bytes ?? null });
-    router.push('/circles');
+    setError(null);
+    try {
+      await completeProfileSetup({ name: name.trim(), picture: picture?.bytes ?? null });
+      router.push('/circle');
+    } catch (err) {
+      console.error('Failed to save profile', err);
+      setError("Couldn't save your profile — try again.");
+      setSaving(false);
+    }
   }
 
   return (
@@ -64,6 +72,12 @@ export default function ProfileSetupScreen() {
               style={styles.input}
             />
           </ScrollView>
+
+          {error ? (
+            <ThemedText type="captionFeed" themeColor="accent" style={styles.error}>
+              {error}
+            </ThemedText>
+          ) : null}
 
           <PrimaryButton
             label={name.trim() ? 'Continue' : 'Add your name to continue'}
@@ -126,5 +140,8 @@ const styles = StyleSheet.create({
   },
   continueButton: {
     marginTop: Spacing.cardListGap,
+  },
+  error: {
+    textAlign: 'center',
   },
 });

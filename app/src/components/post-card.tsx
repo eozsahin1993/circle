@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
@@ -17,7 +18,9 @@ export type Post = {
   id: string;
   authorName: string;
   timestamp: string;
-  photoLabel: string;
+  /** Data URI of the actual photo, when it's known — otherwise the hatch placeholder shows. */
+  photoUri?: string;
+  photoLabel?: string;
   caption: string;
   reactions: Reaction[];
   commentCount: number;
@@ -37,10 +40,16 @@ export function PostCard({ post }: { post: Post }) {
       </View>
 
       <View style={styles.photoWrap}>
-        <PhotoPlaceholder style={{ aspectRatio: PhotoAspect.post }} />
-        <ThemedText type="eyebrow" style={styles.photoLabel}>
-          {post.photoLabel}
-        </ThemedText>
+        {post.photoUri ? (
+          <Image source={{ uri: post.photoUri }} style={styles.photo} contentFit="cover" />
+        ) : (
+          <PhotoPlaceholder style={styles.photo} />
+        )}
+        {post.photoLabel ? (
+          <ThemedText type="eyebrow" style={styles.photoLabel}>
+            {post.photoLabel}
+          </ThemedText>
+        ) : null}
       </View>
 
       <ThemedText type="captionFeed" style={styles.caption}>
@@ -74,6 +83,9 @@ const styles = StyleSheet.create({
   },
   photoWrap: {
     justifyContent: 'flex-end',
+  },
+  photo: {
+    aspectRatio: PhotoAspect.post,
   },
   photoLabel: {
     position: 'absolute',

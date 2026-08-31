@@ -5,22 +5,35 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
 import { CircleCard } from '@/components/circle-card';
-import { PrimaryButton } from '@/components/primary-button';
+import { FabButton } from '@/components/fab-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { getProfile } from '@/data/db';
+import { getAllCircles, getCircleMembers, getProfile, type Circle } from '@/data/db';
 import { bytesToDataUri } from '@/services/image';
+
+type CircleListItem = Circle & { memberCount: number };
 
 export default function CircleListScreen() {
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
+  const [circles, setCircles] = useState<CircleListItem[]>([]);
 
-  // Re-check on every focus, not just mount — picture may have just
-  // changed on the profile screen this screen returns to.
+  // Re-check on every focus, not just mount — picture/circles may have just
+  // changed on a screen this one returns to (profile, new circle, a post).
   useFocusEffect(
     useCallback(() => {
       getProfile().then((profile) => {
         setAvatarUri(profile?.picture ? bytesToDataUri(profile.picture) : undefined);
+      });
+
+      getAllCircles().then(async (allCircles) => {
+        const withCounts = await Promise.all(
+          allCircles.map(async (circle) => ({
+            ...circle,
+            memberCount: (await getCircleMembers(circle.id)).length,
+          })),
+        );
+        setCircles(withCounts);
       });
     }, []),
   );
@@ -33,7 +46,7 @@ export default function CircleListScreen() {
             <ThemedText type="eyebrow" style={styles.eyebrow}>
               Hearth
             </ThemedText>
-            <ThemedText type="circleListHeader">Circles</ThemedText>
+            <ThemedText type="circleListHeader">Your Circles</ThemedText>
           </View>
 
           <Pressable onPress={() => router.push('/profile-setup')}>
@@ -41,12 +54,19 @@ export default function CircleListScreen() {
           </Pressable>
         </View>
 
-        <CircleCard name="Nana's House" memberCount={9} onPress={() => router.push('/feed')} />
+        {circles.map((circle) => (
+          <CircleCard
+            key={circle.id}
+            name={circle.name}
+            memberCount={circle.memberCount}
+            onPress={() => router.push({ pathname: '/feed', params: { circleId: circle.id } })}
+          />
+        ))}
 
-        <PrimaryButton
-          label="New circle"
+        <FabButton
+          icon="+"
           onPress={() => router.push('/circle/new')}
-          style={styles.pinnedButton}
+          style={styles.fab}
         />
       </SafeAreaView>
     </ThemedView>
@@ -71,15 +91,9 @@ const styles = StyleSheet.create({
   eyebrow: {
     marginBottom: 2,
   },
-  pinnedButton: {
+  fab: {
     position: 'absolute',
-    left: Spacing.screenPadding,
     right: Spacing.screenPadding,
     bottom: Spacing.pinnedButtonFromBottom,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 30,
-    elevation: 10,
   },
 });

@@ -27,7 +27,7 @@ export default function WelcomeScreen() {
   }
 
   if (hasProfile) {
-    return <Redirect href="/circles" />;
+    return <Redirect href="/circle" />;
   }
 
   return (
@@ -50,7 +50,7 @@ export default function WelcomeScreen() {
 
         <View style={styles.actions}>
           <PrimaryButton label="Set up a profile" onPress={() => router.push('/profile-setup')} />
-          <SecondaryButton label="I already have an account" onPress={() => router.push('/circles')} />
+          <SecondaryButton label="I already have an account" onPress={() => router.push('/circle')} />
         </View>
 
         <Pressable style={styles.footer}>

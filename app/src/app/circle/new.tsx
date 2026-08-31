@@ -1,3 +1,5 @@
+import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,9 +10,32 @@ import { PrimaryButton } from '@/components/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Fonts, PhotoAspect, Radius, Spacing, Tints } from '@/constants/theme';
+import { createCircle } from '@/domain/usecases/create-circle';
+import { pickAndCompressImage, type CompressedImage } from '@/services/image';
 
 export default function NewCircleScreen() {
   const [name, setName] = useState('');
+  const [cover, setCover] = useState<CompressedImage | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handlePickCover() {
+    const picked = await pickAndCompressImage();
+    if (picked) setCover(picked);
+  }
+
+  async function handleCreate() {
+    setCreating(true);
+    setError(null);
+    try {
+      const circle = await createCircle({ name: name.trim() });
+      router.replace({ pathname: '/feed', params: { circleId: circle.id } });
+    } catch (err) {
+      console.error('Failed to create circle', err);
+      setError("Couldn't create the circle — try again.");
+      setCreating(false);
+    }
+  }
 
   return (
     <ThemedView style={styles.screen}>
@@ -36,12 +61,16 @@ export default function NewCircleScreen() {
             <ThemedText type="eyebrow" style={styles.coverLabel}>
               Cover
             </ThemedText>
-            <Pressable>
-              <PhotoPlaceholder style={styles.cover}>
-                <ThemedText type="eyebrow" style={styles.coverOverlay}>
-                  Tap to choose a photo
-                </ThemedText>
-              </PhotoPlaceholder>
+            <Pressable onPress={handlePickCover}>
+              {cover ? (
+                <Image source={{ uri: cover.uri }} style={styles.cover} contentFit="cover" />
+              ) : (
+                <PhotoPlaceholder style={styles.cover}>
+                  <ThemedText type="eyebrow" style={styles.coverOverlay}>
+                    Tap to choose a photo
+                  </ThemedText>
+                </PhotoPlaceholder>
+              )}
             </Pressable>
           </View>
 
@@ -55,7 +84,17 @@ export default function NewCircleScreen() {
             </ThemedText>
           </ThemedView>
 
-          <PrimaryButton label="Create and invite people" disabled={!name.trim()} />
+          {error ? (
+            <ThemedText type="captionFeed" themeColor="accent" style={styles.error}>
+              {error}
+            </ThemedText>
+          ) : null}
+
+          <PrimaryButton
+            label="Create and invite people"
+            disabled={!name.trim() || creating}
+            onPress={handleCreate}
+          />
 
           <ThemedText type="meta" themeColor="faint" style={styles.footnote}>
             Who can invite, and what happens to the photos over time, is in the circle&apos;s
@@ -118,6 +157,9 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.sansMedium,
   },
   footnote: {
+    textAlign: 'center',
+  },
+  error: {
     textAlign: 'center',
   },
 });
