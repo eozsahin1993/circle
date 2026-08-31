@@ -2,6 +2,7 @@ import 'react-native-get-random-values';
 
 import { Figtree_400Regular, Figtree_500Medium, Figtree_600SemiBold } from '@expo-google-fonts/figtree';
 import { Newsreader_300Light, Newsreader_400Regular, Newsreader_500Medium } from '@expo-google-fonts/newsreader';
+import { Buffer } from 'buffer';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { useEffect, useState } from 'react';
@@ -10,6 +11,13 @@ import { useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import { initDatabase } from '@/data/db';
+
+// drizzle-orm's default sqlite blob column (posts.photo, circleMembers.picture,
+// deviceProfile.picture) calls the global `Buffer` directly with no existence
+// check — present in Node/Jest, absent from Hermes on-device, so every blob
+// read/write throws `ReferenceError: Property 'Buffer' doesn't exist` without
+// this polyfill.
+global.Buffer = global.Buffer ?? Buffer;
 
 SplashScreen.preventAutoHideAsync();
 
