@@ -1,4 +1,4 @@
-import { generateCircleId } from '@/lib/crypto';
+import { generateUUID } from '@/lib/crypto';
 import { initDatabase } from '@/lib/db';
 import { deleteCircle, getAllCircles, getCircle, insertCircle, updateCircleName } from '@/lib/db/circles';
 import { getMemberByPublicKey, insertMember } from '@/lib/db/members';
@@ -7,7 +7,7 @@ beforeAll(() => initDatabase());
 
 function makeCircle(overrides: Partial<{ id: string; name: string; createdAt: number }> = {}) {
   return {
-    id: generateCircleId(),
+    id: generateUUID(),
     name: 'Nana’s House',
     createdAt: Date.now(),
     ...overrides,
@@ -23,7 +23,7 @@ describe('circles CRUD', () => {
   });
 
   test('getCircle returns null for an unknown id', async () => {
-    await expect(getCircle(generateCircleId())).resolves.toBeNull();
+    await expect(getCircle(generateUUID())).resolves.toBeNull();
   });
 
   test('getAllCircles returns every inserted circle, ordered by createdAt', async () => {

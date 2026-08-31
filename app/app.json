@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "private-photos",
-    "slug": "private-photos",
+    "name": "Circle",
+    "slug": "circle",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "privatephotos",
+    "scheme": "circle",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"

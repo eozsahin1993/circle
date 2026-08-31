@@ -7,4 +7,5 @@ export async function initDatabase(): Promise<void> {
 
 export * from '@/lib/db/circles';
 export * from '@/lib/db/members';
+export * from '@/lib/db/posts';
 export * from '@/lib/db/profile';

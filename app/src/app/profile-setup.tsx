@@ -9,10 +9,8 @@ import { PrimaryButton } from '@/components/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Fonts, Radius, Spacing, Tints } from '@/constants/theme';
-import { generateSeedPhrase, seedPhraseToEntropy } from '@/lib/crypto';
-import { saveProfile } from '@/lib/db';
 import { pickAndCompressImage, type CompressedImage } from '@/lib/image';
-import { getMasterSeed, saveMasterSeed } from '@/lib/keystore';
+import { completeProfileSetup } from '@/lib/onboarding';
 
 export default function ProfileSetupScreen() {
   const [name, setName] = useState('');
@@ -26,19 +24,7 @@ export default function ProfileSetupScreen() {
 
   async function handleContinue() {
     setSaving(true);
-    const now = Date.now();
-    await saveProfile({ name: name.trim(), picture: picture?.bytes ?? null, createdAt: now, updatedAt: now });
-    // Silent for now — no reveal/backup screen. Keychain-only until a
-    // deliberate manual-backup design (QR or otherwise) gets built later.
-    // Only generate a new seed if one doesn't already exist — Keychain
-    // survives a same-device reinstall even though device_profile (SQLite)
-    // doesn't, so this screen can be reached again with a real seed still
-    // sitting in Keychain. Overwriting it here would silently orphan every
-    // circle tied to the original one.
-    const existingSeed = await getMasterSeed();
-    if (!existingSeed) {
-      await saveMasterSeed(seedPhraseToEntropy(generateSeedPhrase()));
-    }
+    await completeProfileSetup({ name: name.trim(), picture: picture?.bytes ?? null });
     router.push('/circles');
   }
 

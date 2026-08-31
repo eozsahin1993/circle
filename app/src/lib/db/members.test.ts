@@ -1,4 +1,4 @@
-import { generateCircleId, generateMemberId } from '@/lib/crypto';
+import { generateUUID } from '@/lib/crypto';
 import { initDatabase } from '@/lib/db';
 import { insertCircle } from '@/lib/db/circles';
 import {
@@ -13,7 +13,7 @@ import {
 beforeAll(() => initDatabase());
 
 async function makeCircle() {
-  const circle = { id: generateCircleId(), name: 'Test Circle', createdAt: Date.now() };
+  const circle = { id: generateUUID(), name: 'Test Circle', createdAt: Date.now() };
   await insertCircle(circle);
   return circle;
 }
@@ -21,8 +21,8 @@ async function makeCircle() {
 function makeMember(circleId: string, overrides: Partial<{ name: string; joinedAt: number }> = {}) {
   return {
     circleId,
-    publicKey: `pk-${generateMemberId()}`,
-    memberId: generateMemberId(),
+    publicKey: `pk-${generateUUID()}`,
+    memberId: generateUUID(),
     name: overrides.name ?? 'Grandma',
     picture: null,
     joinedAt: overrides.joinedAt ?? Date.now(),
@@ -51,7 +51,7 @@ describe('members CRUD', () => {
     const member = makeMember(circle.id);
     await insertMember(member);
 
-    await expect(insertMember({ ...member, memberId: generateMemberId() })).rejects.toThrow();
+    await expect(insertMember({ ...member, memberId: generateUUID() })).rejects.toThrow();
   });
 
   test('getCircleMembers returns every member of a circle, ordered by joinedAt', async () => {

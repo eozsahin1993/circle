@@ -6,7 +6,7 @@ import type { Keypair } from '@/lib/crypto';
 /**
  * A device's full local identity for one circle: the Ed25519 keypair, plus
  * the self-generated `memberId` it uses to reference itself in posts (see
- * `generateMemberId()` in crypto.ts). Bundled together so signing and
+ * `generateUUID()` in crypto.ts). Bundled together so signing and
  * posting need exactly one fast local read — no SQLite round-trip to find
  * "which roster row is me" every time you post.
  */
