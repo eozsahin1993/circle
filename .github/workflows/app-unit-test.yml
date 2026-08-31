@@ -1,0 +1,30 @@
+name: App Unit Tests
+
+on:
+  push:
+    branches: [main]
+    paths: ['app/**']
+  pull_request:
+    branches: [main]
+    paths: ['app/**']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npx jest --ci
