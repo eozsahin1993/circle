@@ -11,6 +11,7 @@ import { PrivacyNotice } from '@/components/privacy-notice';
 import { Spacing } from '@/constants/theme';
 import { ThemedView } from '@/components/themed-view';
 import { getCircle, getCircleMembers, getCirclePosts, getProfile } from '@/data/db';
+import { getReactionsForPost, toggleReaction } from '@/domain/usecases/react-to-post';
 import { bytesToDataUri } from '@/services/image';
 
 function formatTimestamp(ms: number): string {
@@ -41,25 +42,37 @@ export default function FeedScreen() {
         getCircleMembers(circleId),
         getCirclePosts(circleId),
         getProfile(),
-      ]).then(([circle, members, circlePosts, profile]) => {
+      ]).then(async ([circle, members, circlePosts, profile]) => {
         setCircleName(circle?.name ?? '');
         setMemberCount(members.length);
         const authorPhotoUri = profile?.picture ? bytesToDataUri(profile.picture) : undefined;
+
+        const reactionsByPost = await Promise.all(
+          circlePosts.map((post) => getReactionsForPost(circleId, post.id)),
+        );
+
         setPosts(
-          circlePosts.map((post) => ({
+          circlePosts.map((post, index) => ({
             id: post.id,
             authorName: profile?.name || 'You',
             authorPhotoUri,
             timestamp: formatTimestamp(post.createdAt),
             photoUri: bytesToDataUri(post.photo),
             caption: post.caption,
-            reactions: [],
+            reactions: reactionsByPost[index],
             commentCount: 0,
           })),
         );
       });
     }, [circleId]),
   );
+
+  async function handleToggleReaction(postId: string, emoji: string) {
+    if (!circleId) return;
+    await toggleReaction(circleId, postId, emoji);
+    const reactions = await getReactionsForPost(circleId, postId);
+    setPosts((current) => current.map((post) => (post.id === postId ? { ...post, reactions } : post)));
+  }
 
   const rows: FeedRow[] = [{ kind: 'privacy' }, ...posts.map((post) => ({ kind: 'post' as const, post }))];
 
@@ -73,7 +86,7 @@ export default function FeedScreen() {
             item.kind === 'privacy' ? (
               <PrivacyNotice onPress={() => setShowPrivacyInfo(true)} />
             ) : (
-              <PostCard post={item.post} />
+              <PostCard post={item.post} onToggleReaction={(emoji) => handleToggleReaction(item.post.id, emoji)} />
             )
           }
           ListHeaderComponent={

@@ -1,9 +1,11 @@
 import { Image } from 'expo-image';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
 import { ReactionChip } from '@/components/reaction-chip';
+import { ReactionPicker } from '@/components/reaction-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { PhotoAspect, Spacing } from '@/constants/theme';
@@ -28,7 +30,19 @@ export type Post = {
   commentCount: number;
 };
 
-export function PostCard({ post }: { post: Post }) {
+export type PostCardProps = {
+  post: Post;
+  onToggleReaction?: (emoji: string) => void;
+};
+
+export function PostCard({ post, onToggleReaction }: PostCardProps) {
+  const [showPicker, setShowPicker] = useState(false);
+
+  function handleSelect(emoji: string) {
+    onToggleReaction?.(emoji);
+    setShowPicker(false);
+  }
+
   return (
     <ThemedView style={styles.card}>
       <View style={styles.header}>
@@ -62,12 +76,21 @@ export function PostCard({ post }: { post: Post }) {
         {post.reactions.map((reaction) => (
           <ReactionChip
             key={reaction.emoji}
-            label={`${reaction.emoji}  ${reaction.count}`}
+            emoji={reaction.emoji}
+            label={String(reaction.count)}
             reacted={reaction.reactedByMe}
+            onPress={() => onToggleReaction?.(reaction.emoji)}
           />
         ))}
+        <ReactionChip label="+" onPress={() => setShowPicker((v) => !v)} />
         <ReactionChip label={`${post.commentCount} comments`} />
       </View>
+
+      {showPicker ? (
+        <View style={styles.picker}>
+          <ReactionPicker onSelect={handleSelect} />
+        </View>
+      ) : null}
     </ThemedView>
   );
 }
@@ -105,5 +128,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.screenPadding,
     paddingTop: 12,
     paddingBottom: 4,
+  },
+  picker: {
+    paddingHorizontal: Spacing.screenPadding,
+    paddingBottom: 12,
   },
 });

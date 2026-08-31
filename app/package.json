@@ -12,6 +12,7 @@
     "@scure/bip39": "^2.4.0",
     "buffer": "^6.0.3",
     "drizzle-orm": "^0.45.2",
+    "emoji-regex": "^10.6.0",
     "expo": "~57.0.18",
     "expo-constants": "~57.0.16",
     "expo-crypto": "~57.0.2",

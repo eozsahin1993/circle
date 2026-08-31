@@ -70,3 +70,34 @@ export const posts = sqliteTable(
   },
   (t) => [index('posts_circle_id').on(t.circleId)]
 );
+
+export const postReactions = sqliteTable(
+  'post_reactions',
+  {
+    postId: text('post_id')
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    /**
+     * The reacting member's compact self-reference (see `memberId` on
+     * circleMembers) — not their public key. A reaction is exactly the
+     * "member self-assigns a reference to their own action" case that
+     * field exists for; it doesn't need cryptographic verification the
+     * way a post signature would.
+     */
+    memberId: text('member_id').notNull(),
+    /**
+     * One grapheme cluster (a single emoji, however many UTF-16 code
+     * units that takes for ZWJ sequences/skin tones/flags) — not
+     * validated at the schema level; callers are responsible for that.
+     */
+    emoji: text('emoji').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [
+    // One row per (post, member, emoji) — reacting again with the same
+    // emoji is a toggle-off (delete the row), not a duplicate; the same
+    // member can still hold several different emoji on one post.
+    primaryKey({ columns: [t.postId, t.memberId, t.emoji] }),
+    index('post_reactions_post_id').on(t.postId),
+  ]
+);
