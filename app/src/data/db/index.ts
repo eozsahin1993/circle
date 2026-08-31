@@ -1,4 +1,4 @@
-import { runMigrations } from '@/data/db/migrations';
+import { runMigrations } from '@/data/db/migrations/run';
 
 /** Brings the database up to the latest schema. Call once at app startup. */
 export async function initDatabase(): Promise<void> {

@@ -1,19 +1,10 @@
+import { and, asc, eq } from 'drizzle-orm';
+
 import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
+import { circleMembers } from '@/data/db/schema';
 
-export type Member = {
-  circleId: string;
-  publicKey: string;
-  memberId: string;
-  name: string;
-  picture: Uint8Array | null;
-  joinedAt: number;
-};
-
-const MEMBER_COLUMNS = `
-  circle_id AS circleId, public_key AS publicKey, member_id AS memberId,
-  name, picture, joined_at AS joinedAt
-`;
+export type Member = typeof circleMembers.$inferSelect;
 
 function normalizeMember(member: Member): Member {
   return { ...member, picture: normalizeBlob(member.picture) };
@@ -26,44 +17,34 @@ function normalizeMember(member: Member): Member {
  * with zero coordination.
  */
 export async function insertMember(member: Member): Promise<void> {
-  await db.runAsync(
-    `INSERT INTO circle_members (circle_id, public_key, member_id, name, picture, joined_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    member.circleId,
-    member.publicKey,
-    member.memberId,
-    member.name,
-    member.picture,
-    member.joinedAt,
-  );
+  await db.insert(circleMembers).values(member);
 }
 
 /** Looks up a member by their public key — used to verify a post's signature. */
 export async function getMemberByPublicKey(circleId: string, publicKey: string): Promise<Member | null> {
-  const member = await db.getFirstAsync<Member>(
-    `SELECT ${MEMBER_COLUMNS} FROM circle_members WHERE circle_id = ? AND public_key = ?`,
-    circleId,
-    publicKey,
-  );
-  return member ? normalizeMember(member) : null;
+  const rows = await db
+    .select()
+    .from(circleMembers)
+    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.publicKey, publicKey)));
+  return rows[0] ? normalizeMember(rows[0]) : null;
 }
 
 /** Looks up a member by their compact member ID — resolves a post's key reference. */
 export async function getMemberByMemberId(circleId: string, memberId: string): Promise<Member | null> {
-  const member = await db.getFirstAsync<Member>(
-    `SELECT ${MEMBER_COLUMNS} FROM circle_members WHERE circle_id = ? AND member_id = ?`,
-    circleId,
-    memberId,
-  );
-  return member ? normalizeMember(member) : null;
+  const rows = await db
+    .select()
+    .from(circleMembers)
+    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.memberId, memberId)));
+  return rows[0] ? normalizeMember(rows[0]) : null;
 }
 
 /** Returns every member of a circle, in join order — this is the roster. */
 export async function getCircleMembers(circleId: string): Promise<Member[]> {
-  const members = await db.getAllAsync<Member>(
-    `SELECT ${MEMBER_COLUMNS} FROM circle_members WHERE circle_id = ? ORDER BY joined_at`,
-    circleId,
-  );
+  const members = await db
+    .select()
+    .from(circleMembers)
+    .where(eq(circleMembers.circleId, circleId))
+    .orderBy(asc(circleMembers.joinedAt));
   return members.map(normalizeMember);
 }
 
@@ -72,20 +53,15 @@ export async function updateMemberProfile(
   publicKey: string,
   profile: { name: string; picture: Uint8Array | null },
 ): Promise<void> {
-  await db.runAsync(
-    'UPDATE circle_members SET name = ?, picture = ? WHERE circle_id = ? AND public_key = ?',
-    profile.name,
-    profile.picture,
-    circleId,
-    publicKey,
-  );
+  await db
+    .update(circleMembers)
+    .set(profile)
+    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.publicKey, publicKey)));
 }
 
 /** Removes a member from a circle's roster (e.g. after a kick + rotation). */
 export async function deleteMember(circleId: string, publicKey: string): Promise<void> {
-  await db.runAsync(
-    'DELETE FROM circle_members WHERE circle_id = ? AND public_key = ?',
-    circleId,
-    publicKey,
-  );
+  await db
+    .delete(circleMembers)
+    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.publicKey, publicKey)));
 }

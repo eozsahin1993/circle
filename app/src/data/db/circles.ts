@@ -1,35 +1,28 @@
+import { asc, eq } from 'drizzle-orm';
+
 import { db } from '@/data/db/connection';
+import { circles } from '@/data/db/schema';
 
-export type Circle = {
-  id: string;
-  name: string;
-  createdAt: number;
-};
-
-const CIRCLE_COLUMNS = `id, name, created_at AS createdAt`;
+export type Circle = typeof circles.$inferSelect;
 
 export async function insertCircle(circle: Circle): Promise<void> {
-  await db.runAsync(
-    'INSERT INTO circles (id, name, created_at) VALUES (?, ?, ?)',
-    circle.id,
-    circle.name,
-    circle.createdAt,
-  );
+  await db.insert(circles).values(circle);
 }
 
-export function getCircle(id: string): Promise<Circle | null> {
-  return db.getFirstAsync<Circle>(`SELECT ${CIRCLE_COLUMNS} FROM circles WHERE id = ?`, id);
+export async function getCircle(id: string): Promise<Circle | null> {
+  const rows = await db.select().from(circles).where(eq(circles.id, id));
+  return rows[0] ?? null;
 }
 
 export function getAllCircles(): Promise<Circle[]> {
-  return db.getAllAsync<Circle>(`SELECT ${CIRCLE_COLUMNS} FROM circles ORDER BY created_at`);
+  return db.select().from(circles).orderBy(asc(circles.createdAt));
 }
 
 export async function updateCircleName(id: string, name: string): Promise<void> {
-  await db.runAsync('UPDATE circles SET name = ? WHERE id = ?', name, id);
+  await db.update(circles).set({ name }).where(eq(circles.id, id));
 }
 
 /** Deletes a circle and, via ON DELETE CASCADE, its entire roster with it. */
 export async function deleteCircle(id: string): Promise<void> {
-  await db.runAsync('DELETE FROM circles WHERE id = ?', id);
+  await db.delete(circles).where(eq(circles.id, id));
 }

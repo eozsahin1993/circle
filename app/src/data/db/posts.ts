@@ -1,29 +1,17 @@
+import { desc, eq } from 'drizzle-orm';
+
 import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
+import { posts } from '@/data/db/schema';
 
-export type Post = {
-  id: string;
-  circleId: string;
-  caption: string;
-  photo: Uint8Array;
-  createdAt: number;
-};
-
-const POST_COLUMNS = `id, circle_id AS circleId, caption, photo, created_at AS createdAt`;
+export type Post = typeof posts.$inferSelect;
 
 function normalizePost(post: Post): Post {
   return { ...post, photo: normalizeBlob(post.photo) as Uint8Array };
 }
 
 export async function insertPost(post: Post): Promise<void> {
-  await db.runAsync(
-    'INSERT INTO posts (id, circle_id, caption, photo, created_at) VALUES (?, ?, ?, ?, ?)',
-    post.id,
-    post.circleId,
-    post.caption,
-    post.photo,
-    post.createdAt,
-  );
+  await db.insert(posts).values(post);
 }
 
 /**
@@ -38,9 +26,6 @@ export async function insertPost(post: Post): Promise<void> {
  * still works as-is once posts can come from more than one device.
  */
 export async function getCirclePosts(circleId: string): Promise<Post[]> {
-  const posts = await db.getAllAsync<Post>(
-    `SELECT ${POST_COLUMNS} FROM posts WHERE circle_id = ? ORDER BY created_at DESC`,
-    circleId,
-  );
-  return posts.map(normalizePost);
+  const rows = await db.select().from(posts).where(eq(posts.circleId, circleId)).orderBy(desc(posts.createdAt));
+  return rows.map(normalizePost);
 }
