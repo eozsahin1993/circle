@@ -65,3 +65,29 @@ export async function pickAndCompressImage(): Promise<CompressedImage | null> {
   const uri = await pickImage();
   return uri ? compressImage(uri) : null;
 }
+
+const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let result = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b1 = bytes[i];
+    const b2 = bytes[i + 1];
+    const b3 = bytes[i + 2];
+    result += BASE64_CHARS[b1 >> 2];
+    result += BASE64_CHARS[((b1 & 0x03) << 4) | (b2 === undefined ? 0 : b2 >> 4)];
+    result += b2 === undefined ? '=' : BASE64_CHARS[((b2 & 0x0f) << 2) | (b3 === undefined ? 0 : b3 >> 6)];
+    result += b3 === undefined ? '=' : BASE64_CHARS[b3 & 0x3f];
+  }
+  return result;
+}
+
+/**
+ * Turns stored picture bytes (e.g. `device_profile.picture`) into a URI
+ * `<Image>` can render directly. Only worth it for one-off renders like a
+ * single avatar — for a scrolling list of many photos, decode-per-render
+ * is real overhead a stored file URI avoids (see `CompressedImage.uri`).
+ */
+export function bytesToDataUri(bytes: Uint8Array, mimeType = 'image/jpeg'): string {
+  return `data:${mimeType};base64,${bytesToBase64(bytes)}`;
+}

@@ -1,4 +1,5 @@
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,9 +9,26 @@ import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { getProfile } from '@/lib/db';
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
+  // null = still checking. Runs once per launch; _layout.tsx already
+  // guarantees the database is ready before this screen ever mounts.
+  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    getProfile().then((profile) => setHasProfile(profile !== null));
+  }, []);
+
+  if (hasProfile === null) {
+    // Avoids a flash of the Welcome screen for returning users while we check.
+    return <ThemedView style={styles.screen} />;
+  }
+
+  if (hasProfile) {
+    return <Redirect href="/circles" />;
+  }
 
   return (
     <ThemedView style={styles.screen}>

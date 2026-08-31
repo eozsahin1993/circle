@@ -12,7 +12,7 @@ import { Colors, Fonts, Radius, Spacing, Tints } from '@/constants/theme';
 import { generateSeedPhrase, seedPhraseToEntropy } from '@/lib/crypto';
 import { saveProfile } from '@/lib/db';
 import { pickAndCompressImage, type CompressedImage } from '@/lib/image';
-import { saveMasterSeed } from '@/lib/keystore';
+import { getMasterSeed, saveMasterSeed } from '@/lib/keystore';
 
 export default function ProfileSetupScreen() {
   const [name, setName] = useState('');
@@ -30,7 +30,15 @@ export default function ProfileSetupScreen() {
     await saveProfile({ name: name.trim(), picture: picture?.bytes ?? null, createdAt: now, updatedAt: now });
     // Silent for now — no reveal/backup screen. Keychain-only until a
     // deliberate manual-backup design (QR or otherwise) gets built later.
-    await saveMasterSeed(seedPhraseToEntropy(generateSeedPhrase()));
+    // Only generate a new seed if one doesn't already exist — Keychain
+    // survives a same-device reinstall even though device_profile (SQLite)
+    // doesn't, so this screen can be reached again with a real seed still
+    // sitting in Keychain. Overwriting it here would silently orphan every
+    // circle tied to the original one.
+    const existingSeed = await getMasterSeed();
+    if (!existingSeed) {
+      await saveMasterSeed(seedPhraseToEntropy(generateSeedPhrase()));
+    }
     router.push('/circles');
   }
 
