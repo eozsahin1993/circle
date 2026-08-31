@@ -1,6 +1,6 @@
-import { generateSeedPhrase, seedPhraseToEntropy } from '@/lib/crypto';
-import { saveProfile } from '@/lib/db';
-import { getMasterSeed, saveMasterSeed } from '@/lib/keystore';
+import { generateSeedPhrase, seedPhraseToEntropy } from '@/services/crypto';
+import { saveProfile } from '@/data/db';
+import { getMasterSeed, saveMasterSeed } from '@/services/keystore';
 
 export type ProfileInput = {
   name: string;

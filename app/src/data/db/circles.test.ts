@@ -1,7 +1,7 @@
-import { generateUUID } from '@/lib/crypto';
-import { initDatabase } from '@/lib/db';
-import { deleteCircle, getAllCircles, getCircle, insertCircle, updateCircleName } from '@/lib/db/circles';
-import { getMemberByPublicKey, insertMember } from '@/lib/db/members';
+import { generateUUID } from '@/services/crypto';
+import { initDatabase } from '@/data/db';
+import { deleteCircle, getAllCircles, getCircle, insertCircle, updateCircleName } from '@/data/db/circles';
+import { getMemberByPublicKey, insertMember } from '@/data/db/members';
 
 beforeAll(() => initDatabase());
 

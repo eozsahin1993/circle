@@ -1,5 +1,5 @@
-import { initDatabase } from '@/lib/db';
-import { getProfile, saveProfile } from '@/lib/db/profile';
+import { initDatabase } from '@/data/db';
+import { getProfile, saveProfile } from '@/data/db/profile';
 
 beforeAll(() => initDatabase());
 

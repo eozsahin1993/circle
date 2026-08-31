@@ -9,8 +9,8 @@ import { PrimaryButton } from '@/components/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { getProfile } from '@/lib/db';
-import { bytesToDataUri } from '@/lib/image';
+import { getProfile } from '@/data/db';
+import { bytesToDataUri } from '@/services/image';
 
 export default function CircleListScreen() {
   const [avatarUri, setAvatarUri] = useState<string | undefined>();

@@ -9,7 +9,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
-import { initDatabase } from '@/lib/db';
+import { initDatabase } from '@/data/db';
 
 SplashScreen.preventAutoHideAsync();
 

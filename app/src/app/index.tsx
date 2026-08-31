@@ -9,7 +9,7 @@ import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { getProfile } from '@/lib/db';
+import { getProfile } from '@/data/db';
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();

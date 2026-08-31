@@ -1,6 +1,6 @@
-import { generateUUID } from '@/lib/crypto';
-import { initDatabase } from '@/lib/db';
-import { insertCircle } from '@/lib/db/circles';
+import { generateUUID } from '@/services/crypto';
+import { initDatabase } from '@/data/db';
+import { insertCircle } from '@/data/db/circles';
 import {
   deleteMember,
   getCircleMembers,
@@ -8,7 +8,7 @@ import {
   getMemberByPublicKey,
   insertMember,
   updateMemberProfile,
-} from '@/lib/db/members';
+} from '@/data/db/members';
 
 beforeAll(() => initDatabase());
 

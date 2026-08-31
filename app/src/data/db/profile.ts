@@ -1,5 +1,5 @@
-import { normalizeBlob } from '@/lib/db/blob';
-import { db } from '@/lib/db/connection';
+import { normalizeBlob } from '@/data/db/blob';
+import { db } from '@/data/db/connection';
 
 export type Profile = {
   name: string;

@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
-import type { Keypair } from '@/lib/crypto';
+import type { Keypair } from '@/services/crypto';
 
 /**
  * A device's full local identity for one circle: the Ed25519 keypair, plus

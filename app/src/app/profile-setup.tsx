@@ -9,8 +9,8 @@ import { PrimaryButton } from '@/components/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Fonts, Radius, Spacing, Tints } from '@/constants/theme';
-import { pickAndCompressImage, type CompressedImage } from '@/lib/image';
-import { completeProfileSetup } from '@/lib/onboarding';
+import { pickAndCompressImage, type CompressedImage } from '@/services/image';
+import { completeProfileSetup } from '@/domain/usecases/onboarding';
 
 export default function ProfileSetupScreen() {
   const [name, setName] = useState('');

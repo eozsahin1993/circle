@@ -1,7 +1,7 @@
-import { db } from '@/lib/db/connection';
-import { sql as migration001 } from '@/lib/db/migrations/001_circles';
-import { sql as migration002 } from '@/lib/db/migrations/002_profile';
-import { sql as migration003 } from '@/lib/db/migrations/003_posts';
+import { db } from '@/data/db/connection';
+import { sql as migration001 } from '@/data/db/migrations/001_circles';
+import { sql as migration002 } from '@/data/db/migrations/002_profile';
+import { sql as migration003 } from '@/data/db/migrations/003_posts';
 
 /**
  * Ordered schema migrations — one file per entry, numbered so filenames

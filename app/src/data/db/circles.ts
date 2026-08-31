@@ -1,4 +1,4 @@
-import { db } from '@/lib/db/connection';
+import { db } from '@/data/db/connection';
 
 export type Circle = {
   id: string;
