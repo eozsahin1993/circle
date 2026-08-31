@@ -58,3 +58,21 @@ export async function deleteCircleKeys(circleId: string): Promise<void> {
   await SecureStore.deleteItemAsync(identityStorageKey(circleId));
   await SecureStore.deleteItemAsync(secretStorageKey(circleId));
 }
+
+const MASTER_SEED_KEY = 'master_seed';
+
+/**
+ * Persists the device's one master seed (the 16 bytes behind the 12-word
+ * recovery phrase). Singleton, not per-circle — every circle's keypair is
+ * later derived from this plus an index, so it deserves at least as much
+ * protection as any individual circle's key, arguably more.
+ */
+export async function saveMasterSeed(seed: Uint8Array): Promise<void> {
+  await SecureStore.setItemAsync(MASTER_SEED_KEY, bytesToHex(seed));
+}
+
+/** Reads the master seed back, or null before onboarding has generated one. */
+export async function getMasterSeed(): Promise<Uint8Array | null> {
+  const raw = await SecureStore.getItemAsync(MASTER_SEED_KEY);
+  return raw ? hexToBytes(raw) : null;
+}

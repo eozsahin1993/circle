@@ -1,5 +1,6 @@
 import { db } from '@/lib/db/connection';
 import { sql as migration001 } from '@/lib/db/migrations/001_circles';
+import { sql as migration002 } from '@/lib/db/migrations/002_profile';
 
 /**
  * Ordered schema migrations — one file per entry, numbered so filenames
@@ -7,7 +8,10 @@ import { sql as migration001 } from '@/lib/db/migrations/001_circles';
  * via PRAGMA user_version. Append new files here; never edit one that's
  * already applied to a real device.
  */
-const migrations: string[] = [migration001];
+const migrations: string[] = [
+  migration001,
+  migration002,
+];
 
 let migrationsPromise: Promise<void> | null = null;
 

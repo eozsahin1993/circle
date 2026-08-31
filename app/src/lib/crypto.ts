@@ -1,6 +1,11 @@
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { bytesToHex, concatBytes, randomBytes } from '@noble/curves/utils.js';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js';
+import { generateMnemonic, mnemonicToEntropy } from '@scure/bip39';
+import { wordlist } from '@scure/bip39/wordlists/english.js';
+
+/** 128 bits of entropy — the standard tier, same security level as AES-128. */
+const SEED_STRENGTH_BITS = 128;
 
 const NONCE_LENGTH = 24;
 const ID_LENGTH = 16;
@@ -29,6 +34,29 @@ export function generateCircleId(): string {
  */
 export function generateMemberId(): string {
   return generateId();
+}
+
+/**
+ * Generates a fresh 12-word recovery phrase (128 bits of entropy). This is
+ * the device's one master seed — persisted locally (never sent anywhere,
+ * never shown in the UI today) so future circles can derive their keys
+ * from it without asking the user to retype it every time. A manual
+ * backup/reveal path (words, QR, or otherwise) is deliberately deferred —
+ * see the account-recovery design notes in project memory.
+ */
+export function generateSeedPhrase(): string {
+  return generateMnemonic(wordlist, SEED_STRENGTH_BITS);
+}
+
+/**
+ * Recovers the raw 16-byte entropy behind a seed phrase — either the one
+ * just generated (to persist it) or one a user typed back in during
+ * recovery. Throws if the words or checksum aren't a valid BIP39 phrase,
+ * which catches most transcription mistakes immediately rather than
+ * silently deriving the wrong keys.
+ */
+export function seedPhraseToEntropy(phrase: string): Uint8Array {
+  return mnemonicToEntropy(phrase, wordlist);
 }
 
 export type Keypair = {
