@@ -10,8 +10,8 @@ import { Image } from 'react-native';
  * matters far more than quality percentage for file size, since nobody
  * views a photo at full camera resolution on a phone screen anyway.
  */
-const MAX_DIMENSION = 1440;
-const JPEG_QUALITY = 0.8;
+const MAX_DIMENSION = 1080;
+const JPEG_QUALITY = 0.65;
 
 /** Opens the system image picker. Returns the picked file's local URI, or null if cancelled. */
 export async function pickImage(): Promise<string | null> {
