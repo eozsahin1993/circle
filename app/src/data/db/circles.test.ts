@@ -1,7 +1,7 @@
 import { generateUUID } from '@/services/crypto';
 import { initDatabase } from '@/data/db';
 import { deleteCircle, getAllCircles, getCircle, insertCircle, updateCircleName } from '@/data/db/circles';
-import { getMemberByPublicKey, insertMember } from '@/data/db/members';
+import { getMemberByPublicKey, insertMember, MemberRoles } from '@/data/db/members';
 
 beforeAll(() => initDatabase());
 
@@ -10,6 +10,7 @@ function makeCircle(overrides: Partial<{ id: string; name: string; createdAt: nu
     id: generateUUID(),
     name: 'Nana’s House',
     createdAt: Date.now(),
+    leftAt: null,
     ...overrides,
   };
 }
@@ -62,6 +63,7 @@ describe('circles CRUD', () => {
       circleId: circle.id,
       publicKey: 'aa'.repeat(32),
       memberId: 'bb'.repeat(16),
+      role: MemberRoles.member,
       name: 'Grandma',
       picture: null,
       joinedAt: Date.now(),

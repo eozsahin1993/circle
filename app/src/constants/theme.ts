@@ -12,6 +12,7 @@ export const Colors = {
     accent: '#C08A2E',
     accentBright: '#DCA645',
     accentLabel: '#17120C',
+    danger: '#D97A6E',
     text: '#F4EDE2',
     body: '#D8CDBE',
     secondary: '#BEB2A2',
@@ -25,6 +26,7 @@ export const Colors = {
     accent: '#A6552F',
     accentBright: '#A6552F',
     accentLabel: '#FFFFFF',
+    danger: '#B8503F',
     text: '#231A11',
     body: '#3A2C1D',
     secondary: '#3A2C1D',
@@ -55,6 +57,7 @@ export const Tints = {
   chipReactedBorder: 'rgba(192,138,46,0.45)',
   privacyWashBg: 'rgba(192,138,46,0.09)',
   privacyWashBorder: 'rgba(192,138,46,0.22)',
+  dangerWashBorder: 'rgba(217,122,110,0.35)',
   secondaryButtonBorder: 'rgba(245,239,230,0.2)',
 } as const;
 

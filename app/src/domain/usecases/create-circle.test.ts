@@ -1,5 +1,4 @@
-import { initDatabase } from '@/data/db';
-import { getAllCircles, getCircleMembers } from '@/data/db';
+import { getAllCircles, getCircleMembers, initDatabase } from '@/data/db';
 import { createCircle } from '@/domain/usecases/create-circle';
 import { createPost } from '@/domain/usecases/create-post';
 import { getCirclePosts } from '@/data/db/posts';
@@ -14,6 +13,7 @@ test('createCircle inserts a circle and makes this device its first member', asy
 
   const members = await getCircleMembers(id);
   expect(members).toHaveLength(1);
+  expect(members[0].role).toBe('admin');
 });
 
 test('createCircle then createPost end to end matches what the feed screen reads back', async () => {

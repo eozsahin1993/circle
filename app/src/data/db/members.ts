@@ -6,6 +6,15 @@ import { circleMembers } from '@/data/db/schema';
 
 export type Member = typeof circleMembers.$inferSelect;
 
+/** The two roles a member can hold — see `role` on `circleMembers` in schema.ts. */
+export type MemberRole = Member['role'];
+
+/** Named values for `MemberRole`, so call sites never hand-type the raw strings. */
+export const MemberRoles: Record<MemberRole, MemberRole> = {
+  admin: 'admin',
+  member: 'member',
+};
+
 function normalizeMember(member: Member): Member {
   return { ...member, picture: normalizeBlob(member.picture) };
 }

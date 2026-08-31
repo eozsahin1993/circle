@@ -7,26 +7,27 @@ import { ThemedText } from '@/components/themed-text';
 export type CircleHeaderProps = {
   name: string;
   memberCount: number;
-  onPressPrivacy?: () => void;
+  /** Opens the circle's Details sheet — members, invite, settings. */
+  onPressDetails?: () => void;
 };
 
-export function CircleHeader({ name, memberCount, onPressPrivacy }: CircleHeaderProps) {
+export function CircleHeader({ name, memberCount, onPressDetails }: CircleHeaderProps) {
   return (
     <View style={styles.row}>
       <View style={styles.back}>
         <BackButton />
       </View>
 
-      <View style={styles.titles}>
+      <Pressable style={styles.titles} onPress={onPressDetails}>
         <ThemedText type="screenTitle">{name}</ThemedText>
-        <Pressable onPress={onPressPrivacy}>
-          <ThemedText type="meta" themeColor="muted">
-            {memberCount} people · tap for privacy detail
-          </ThemedText>
-        </Pressable>
-      </View>
+        <ThemedText type="meta" themeColor="muted">
+          {memberCount} people · tap for details
+        </ThemedText>
+      </Pressable>
 
-      <AvatarStack count={memberCount} />
+      <Pressable onPress={onPressDetails}>
+        <AvatarStack count={memberCount} />
+      </Pressable>
     </View>
   );
 }

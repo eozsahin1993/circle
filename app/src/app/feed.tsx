@@ -60,7 +60,11 @@ export default function FeedScreen() {
           renderItem={({ item }) => <PostCard post={item} />}
           ListHeaderComponent={
             <ThemedView style={styles.header}>
-              <CircleHeader name={circleName} memberCount={memberCount} />
+              <CircleHeader
+                name={circleName}
+                memberCount={memberCount}
+                onPressDetails={() => router.push({ pathname: '/circle/details', params: { circleId } })}
+              />
             </ThemedView>
           }
           stickyHeaderIndices={[0]}

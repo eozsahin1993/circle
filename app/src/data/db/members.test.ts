@@ -7,22 +7,28 @@ import {
   getMemberByMemberId,
   getMemberByPublicKey,
   insertMember,
+  MemberRole,
+  MemberRoles,
   updateMemberProfile,
 } from '@/data/db/members';
 
 beforeAll(() => initDatabase());
 
 async function makeCircle() {
-  const circle = { id: generateUUID(), name: 'Test Circle', createdAt: Date.now() };
+  const circle = { id: generateUUID(), name: 'Test Circle', createdAt: Date.now(), leftAt: null };
   await insertCircle(circle);
   return circle;
 }
 
-function makeMember(circleId: string, overrides: Partial<{ name: string; joinedAt: number }> = {}) {
+function makeMember(
+  circleId: string,
+  overrides: Partial<{ name: string; role: MemberRole; joinedAt: number }> = {},
+) {
   return {
     circleId,
     publicKey: `pk-${generateUUID()}`,
     memberId: generateUUID(),
+    role: overrides.role ?? MemberRoles.member,
     name: overrides.name ?? 'Grandma',
     picture: null,
     joinedAt: overrides.joinedAt ?? Date.now(),

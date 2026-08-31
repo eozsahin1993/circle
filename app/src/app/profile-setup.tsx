@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,7 +9,8 @@ import { PrimaryButton } from '@/components/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Fonts, Radius, Spacing, Tints } from '@/constants/theme';
-import { pickAndCompressImage, type CompressedImage } from '@/services/image';
+import { getProfile } from '@/data/db';
+import { bytesToDataUri, pickAndCompressImage, type CompressedImage } from '@/services/image';
 import { completeProfileSetup } from '@/domain/usecases/onboarding';
 
 export default function ProfileSetupScreen() {
@@ -17,6 +18,19 @@ export default function ProfileSetupScreen() {
   const [picture, setPicture] = useState<CompressedImage | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Reused for editing an existing profile, not just first-time setup —
+  // load whatever's already saved so this doesn't look like a blank form
+  // for someone who's already told us who they are.
+  useEffect(() => {
+    getProfile().then((profile) => {
+      if (!profile) return;
+      setName(profile.name);
+      if (profile.picture) {
+        setPicture({ uri: bytesToDataUri(profile.picture), bytes: profile.picture });
+      }
+    });
+  }, []);
 
   async function handleAddPicture() {
     const picked = await pickAndCompressImage();

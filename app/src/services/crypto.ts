@@ -33,7 +33,7 @@ export function generateUUID(): string {
  * never shown in the UI today) so future circles can derive their keys
  * from it without asking the user to retype it every time. A manual
  * backup/reveal path (words, QR, or otherwise) is deliberately deferred —
- * see the account-recovery design notes in project memory.
+ * not designed yet, nothing to point to for it.
  */
 export function generateSeedPhrase(): string {
   return generateMnemonic(wordlist, SEED_STRENGTH_BITS);
@@ -54,6 +54,27 @@ export type Keypair = {
   publicKey: Uint8Array;
   secretKey: Uint8Array;
 };
+
+/**
+ * Digits 1-9 plus A-Z minus I/L/O — drops the pairs most often misread
+ * (0/O, 1/I/L) when handwritten or read aloud. Exactly 32 symbols so each
+ * one maps to 5 bits of a random byte with zero modulo bias (256 / 32 = 8).
+ */
+const INVITE_CODE_ALPHABET = '123456789ABCDEFGHJKMNPQRSTUVWXYZ';
+
+/**
+ * Generates a circle invite code: 12 random characters from a
+ * confusion-resistant alphabet, grouped for readability (`XXXX-XXXX-XXXX`).
+ * 60 bits of entropy — short enough to read aloud or type by hand, unlike
+ * a full UUID, while still being infeasible to guess within an invite's
+ * short lifetime. The same string backs both the shareable link and the
+ * QR code — there's only ever one secret here, just two presentations of it.
+ */
+export function generateInviteCode(): string {
+  const bytes = randomBytes(12);
+  const chars = Array.from(bytes, (byte) => INVITE_CODE_ALPHABET[byte % INVITE_CODE_ALPHABET.length]);
+  return [chars.slice(0, 4), chars.slice(4, 8), chars.slice(8, 12)].map((group) => group.join('')).join('-');
+}
 
 /**
  * Generates a fresh Ed25519 identity keypair. Call this once per circle —

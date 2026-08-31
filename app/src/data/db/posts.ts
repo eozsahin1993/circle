@@ -19,10 +19,11 @@ export async function insertPost(post: Post): Promise<void> {
  *
  * Sorts by `created_at`, which is only safe while every post comes from
  * this one device. Once multi-device sync exists, wall-clock time from
- * different devices isn't a trustworthy shared order (see the HLC-ordering
- * notes in project memory) — either this query needs to sort by an HLC
- * column instead, or the sync engine resolves that during merge and keeps
- * writing a correctly-ordered value into `created_at`. Don't assume this
+ * different devices isn't a trustworthy shared order — see `server/DESIGN.md`
+ * (the "one append-only, epoch-indexed log per circle" section). The
+ * relay assigns each log entry's order at append time, so once sync
+ * exists, ordering should come from that server-assigned sequence, not
+ * from comparing `created_at` across devices. Don't assume this query
  * still works as-is once posts can come from more than one device.
  */
 export async function getCirclePosts(circleId: string): Promise<Post[]> {

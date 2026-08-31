@@ -5,18 +5,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
 import { CircleCard } from '@/components/circle-card';
+import { EmptyCirclesIcon } from '@/components/empty-circles-icon';
 import { FabButton } from '@/components/fab-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { getAllCircles, getCircleMembers, getProfile, type Circle } from '@/data/db';
+import { getAllCircles, getCircleMembers, getCirclePosts, getProfile, type Circle } from '@/data/db';
 import { bytesToDataUri } from '@/services/image';
 
-type CircleListItem = Circle & { memberCount: number };
+type CircleListItem = Circle & { memberCount: number; photoUri?: string };
 
 export default function CircleListScreen() {
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
   const [circles, setCircles] = useState<CircleListItem[]>([]);
+  // Avoids flashing the empty state before the first load resolves.
+  const [loaded, setLoaded] = useState(false);
 
   // Re-check on every focus, not just mount — picture/circles may have just
   // changed on a screen this one returns to (profile, new circle, a post).
@@ -28,12 +31,20 @@ export default function CircleListScreen() {
 
       getAllCircles().then(async (allCircles) => {
         const withCounts = await Promise.all(
-          allCircles.map(async (circle) => ({
-            ...circle,
-            memberCount: (await getCircleMembers(circle.id)).length,
-          })),
+          allCircles.map(async (circle) => {
+            const [members, posts] = await Promise.all([
+              getCircleMembers(circle.id),
+              getCirclePosts(circle.id),
+            ]);
+            return {
+              ...circle,
+              memberCount: members.length,
+              photoUri: posts[0] ? bytesToDataUri(posts[0].photo) : undefined,
+            };
+          }),
         );
         setCircles(withCounts);
+        setLoaded(true);
       });
     }, []),
   );
@@ -54,14 +65,28 @@ export default function CircleListScreen() {
           </Pressable>
         </View>
 
-        {circles.map((circle) => (
-          <CircleCard
-            key={circle.id}
-            name={circle.name}
-            memberCount={circle.memberCount}
-            onPress={() => router.push({ pathname: '/feed', params: { circleId: circle.id } })}
-          />
-        ))}
+        {loaded && circles.length === 0 ? (
+          <View style={styles.empty}>
+            <EmptyCirclesIcon />
+            <ThemedText type="screenTitle" style={styles.emptyTitle}>
+              No circles yet
+            </ThemedText>
+            <ThemedText type="captionFeed" themeColor="muted" style={styles.emptyBody}>
+              Create one to share memories with the people in it — or join with a key someone sent
+              you.
+            </ThemedText>
+          </View>
+        ) : (
+          circles.map((circle) => (
+            <CircleCard
+              key={circle.id}
+              name={circle.name}
+              memberCount={circle.memberCount}
+              photoUri={circle.photoUri}
+              onPress={() => router.push({ pathname: '/feed', params: { circleId: circle.id } })}
+            />
+          ))
+        )}
 
         <FabButton
           icon="+"
@@ -90,6 +115,19 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     marginBottom: 2,
+  },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.screenPadding,
+    gap: Spacing.cardListGap,
+  },
+  emptyTitle: {
+    textAlign: 'center',
+  },
+  emptyBody: {
+    textAlign: 'center',
   },
   fab: {
     position: 'absolute',
