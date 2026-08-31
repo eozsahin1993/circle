@@ -43,6 +43,13 @@
       "when": 1788207612733,
       "tag": "0005_rare_professor_monster",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788210860155,
+      "tag": "0006_wandering_hardball",
+      "breakpoints": true
     }
   ]
 }

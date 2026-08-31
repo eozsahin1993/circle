@@ -6,6 +6,7 @@ export async function initDatabase(): Promise<void> {
 }
 
 export * from '@/data/db/circles';
+export * from '@/data/db/comments';
 export * from '@/data/db/invites';
 export * from '@/data/db/members';
 export * from '@/data/db/posts';

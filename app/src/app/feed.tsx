@@ -10,7 +10,8 @@ import { PrivacyInfoModal } from '@/components/privacy-info-modal';
 import { PrivacyNotice } from '@/components/privacy-notice';
 import { Spacing } from '@/constants/theme';
 import { ThemedView } from '@/components/themed-view';
-import { getCircle, getCircleMembers, getCirclePosts, getProfile } from '@/data/db';
+import { getCircle, getCircleMembers, getCirclePosts, getPostComments, getProfile } from '@/data/db';
+import { addComment } from '@/domain/usecases/comment-on-post';
 import { getReactionsForPost, toggleReaction } from '@/domain/usecases/react-to-post';
 import { bytesToDataUri } from '@/services/image';
 
@@ -47,9 +48,10 @@ export default function FeedScreen() {
         setMemberCount(members.length);
         const authorPhotoUri = profile?.picture ? bytesToDataUri(profile.picture) : undefined;
 
-        const reactionsByPost = await Promise.all(
-          circlePosts.map((post) => getReactionsForPost(circleId, post.id)),
-        );
+        const [reactionsByPost, commentsByPost] = await Promise.all([
+          Promise.all(circlePosts.map((post) => getReactionsForPost(circleId, post.id))),
+          Promise.all(circlePosts.map((post) => getPostComments(post.id))),
+        ]);
 
         setPosts(
           circlePosts.map((post, index) => ({
@@ -60,7 +62,7 @@ export default function FeedScreen() {
             photoUri: bytesToDataUri(post.photo),
             caption: post.caption,
             reactions: reactionsByPost[index],
-            commentCount: 0,
+            comments: commentsByPost[index],
           })),
         );
       });
@@ -72,6 +74,13 @@ export default function FeedScreen() {
     await toggleReaction(circleId, postId, emoji);
     const reactions = await getReactionsForPost(circleId, postId);
     setPosts((current) => current.map((post) => (post.id === postId ? { ...post, reactions } : post)));
+  }
+
+  async function handleAddComment(postId: string, body: string) {
+    if (!circleId) return;
+    await addComment(circleId, postId, body);
+    const comments = await getPostComments(postId);
+    setPosts((current) => current.map((post) => (post.id === postId ? { ...post, comments } : post)));
   }
 
   const rows: FeedRow[] = [{ kind: 'privacy' }, ...posts.map((post) => ({ kind: 'post' as const, post }))];
@@ -86,7 +95,11 @@ export default function FeedScreen() {
             item.kind === 'privacy' ? (
               <PrivacyNotice onPress={() => setShowPrivacyInfo(true)} />
             ) : (
-              <PostCard post={item.post} onToggleReaction={(emoji) => handleToggleReaction(item.post.id, emoji)} />
+              <PostCard
+                post={item.post}
+                onToggleReaction={(emoji) => handleToggleReaction(item.post.id, emoji)}
+                onAddComment={(body) => handleAddComment(item.post.id, body)}
+              />
             )
           }
           ListHeaderComponent={

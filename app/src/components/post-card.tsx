@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
+import { type CommentItem, PostComments } from '@/components/post-comments';
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
 import { ReactionChip } from '@/components/reaction-chip';
 import { ReactionPicker } from '@/components/reaction-picker';
@@ -27,16 +28,18 @@ export type Post = {
   photoLabel?: string;
   caption: string;
   reactions: Reaction[];
-  commentCount: number;
+  comments: CommentItem[];
 };
 
 export type PostCardProps = {
   post: Post;
   onToggleReaction?: (emoji: string) => void;
+  onAddComment?: (body: string) => void;
 };
 
-export function PostCard({ post, onToggleReaction }: PostCardProps) {
+export function PostCard({ post, onToggleReaction, onAddComment }: PostCardProps) {
   const [showPicker, setShowPicker] = useState(false);
+  const [showComments, setShowComments] = useState(false);
 
   function handleSelect(emoji: string) {
     onToggleReaction?.(emoji);
@@ -83,12 +86,21 @@ export function PostCard({ post, onToggleReaction }: PostCardProps) {
           />
         ))}
         <ReactionChip label="+" onPress={() => setShowPicker((v) => !v)} />
-        <ReactionChip label={`${post.commentCount} comments`} />
+        <ReactionChip
+          label={`${post.comments.length} comment${post.comments.length === 1 ? '' : 's'}`}
+          onPress={() => setShowComments((v) => !v)}
+        />
       </View>
 
       {showPicker ? (
         <View style={styles.picker}>
           <ReactionPicker onSelect={handleSelect} />
+        </View>
+      ) : null}
+
+      {showComments ? (
+        <View style={styles.comments}>
+          <PostComments comments={post.comments} onSubmit={(body) => onAddComment?.(body)} />
         </View>
       ) : null}
     </ThemedView>
@@ -130,6 +142,10 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   picker: {
+    paddingHorizontal: Spacing.screenPadding,
+    paddingBottom: 12,
+  },
+  comments: {
     paddingHorizontal: Spacing.screenPadding,
     paddingBottom: 12,
   },

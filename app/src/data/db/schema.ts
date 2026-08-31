@@ -101,3 +101,26 @@ export const postReactions = sqliteTable(
     index('post_reactions_post_id').on(t.postId),
   ]
 );
+
+export const postComments = sqliteTable(
+  'post_comments',
+  {
+    id: text('id').primaryKey(),
+    postId: text('post_id')
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    /** Compact self-reference, same as postReactions.memberId — see that column's comment. */
+    memberId: text('member_id').notNull(),
+    /**
+     * The author's display name at the moment they commented, copied
+     * here rather than joined from circleMembers — same denormalization
+     * circleMembers itself already uses for its own name/picture. Avoids
+     * an N+1 lookup per comment, and means a later name change doesn't
+     * retroactively rewrite what old comments show.
+     */
+    authorName: text('author_name').notNull(),
+    body: text('body').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('post_comments_post_id').on(t.postId)]
+);
