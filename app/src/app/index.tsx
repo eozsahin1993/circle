@@ -4,8 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
-import { PrimaryButton } from '@/components/primary-button';
-import { SecondaryButton } from '@/components/secondary-button';
+import { SocialSignInButton } from '@/components/social-sign-in-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -49,8 +48,10 @@ export default function WelcomeScreen() {
         </ThemedText>
 
         <View style={styles.actions}>
-          <PrimaryButton label="Set up a profile" onPress={() => router.push('/profile-setup')} />
-          <SecondaryButton label="I already have an account" onPress={() => router.push('/circle')} />
+          {/* Apple/Google identity, not wired up yet — both continue straight
+              into local profile setup until real sign-in lands. */}
+          <SocialSignInButton provider="apple" onPress={() => router.push('/profile-setup')} />
+          <SocialSignInButton provider="google" onPress={() => router.push('/profile-setup')} />
         </View>
 
         <Pressable style={styles.footer}>
