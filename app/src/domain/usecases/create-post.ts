@@ -1,6 +1,7 @@
 import { encryptJSON, generateUUID } from '@/services/crypto';
 import { getCircleSecret } from '@/services/keystore';
 import { insertPostAndEnqueue, OutboxStatuses } from '@/data/db';
+import { drainOutbox } from '@/domain/usecases/sync-circle';
 
 export type CreatePostInput = {
   circleId: string;
@@ -9,12 +10,16 @@ export type CreatePostInput = {
 };
 
 /**
- * Creates a post and queues it for sync in one local, offline-safe step.
- * Actually pushing the queued entry to the relay is a separate concern
- * (the outbox drain, triggered independently) — this always succeeds
- * without network access. The outbox row's encryptedMeta is built and
- * encrypted right here, once — see the comment on `encryptedMeta` in
- * schema.ts for why the drain step must never re-derive it later.
+ * Creates a post and queues it for sync in one local, offline-safe step
+ * that always succeeds without network access — the outbox row's
+ * encryptedMeta is built and encrypted right here, once (see the comment
+ * on `encryptedMeta` in schema.ts for why the drain step must never
+ * re-derive it later). Triggers a drain afterward, but doesn't wait on
+ * or fail because of it: a stuck or failed push must never make posting
+ * itself feel broken, since the whole point of the outbox is that they're
+ * independent. The drain is also naturally retried the next time
+ * anything calls it (app resume, another post, pull-to-refresh, ...), so
+ * a failure here isn't a lost opportunity, just a deferred one.
  */
 export async function createPost(input: CreatePostInput): Promise<void> {
   const secret = await getCircleSecret(input.circleId);
@@ -41,4 +46,6 @@ export async function createPost(input: CreatePostInput): Promise<void> {
       encryptedMeta,
     }
   );
+
+  drainOutbox(input.circleId).catch((err) => console.error('Failed to drain outbox', err));
 }

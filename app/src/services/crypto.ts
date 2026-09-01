@@ -1,6 +1,7 @@
 import { ed25519 } from '@noble/curves/ed25519.js';
-import { concatBytes, randomBytes } from '@noble/curves/utils.js';
+import { bytesToHex, concatBytes, randomBytes } from '@noble/curves/utils.js';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { generateMnemonic, mnemonicToEntropy } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { randomUUID } from 'expo-crypto';
@@ -93,6 +94,19 @@ export function generateIdentity(): Keypair {
  */
 export function generateCircleSecret(): Uint8Array {
   return randomBytes(32);
+}
+
+const CIRCLE_LOG_ID_DOMAIN = new TextEncoder().encode('circle-log');
+
+/**
+ * Derives the opaque, relay-visible ID for a circle's log —
+ * `sha256('circle-log' || circle_secret)`, hex-encoded. The relay only
+ * ever sees this derived ID, never the secret itself; domain-separated so
+ * it can never collide with some other hash this same secret might get
+ * used to derive later (e.g. a future push tag).
+ */
+export function deriveCircleLogId(secret: Uint8Array): string {
+  return bytesToHex(sha256(concatBytes(CIRCLE_LOG_ID_DOMAIN, secret)));
 }
 
 /**

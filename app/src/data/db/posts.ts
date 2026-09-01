@@ -14,6 +14,11 @@ export async function insertPost(post: Post): Promise<void> {
   await db.insert(posts).values(post);
 }
 
+export async function getPost(id: string): Promise<Post | null> {
+  const rows = await db.select().from(posts).where(eq(posts.id, id));
+  return rows[0] ? normalizePost(rows[0]) : null;
+}
+
 /**
  * Returns every post in a circle, newest first — this is the feed.
  *

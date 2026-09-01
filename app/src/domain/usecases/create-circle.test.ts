@@ -1,9 +1,13 @@
+jest.mock('@/domain/usecases/sync-circle');
+
 import { getAllCircles, getCircleMembers, initDatabase } from '@/data/db';
 import { createCircle } from '@/domain/usecases/create-circle';
 import { createPost } from '@/domain/usecases/create-post';
+import { drainOutbox } from '@/domain/usecases/sync-circle';
 import { getCirclePosts } from '@/data/db/posts';
 
 beforeAll(() => initDatabase());
+beforeEach(() => (drainOutbox as jest.Mock).mockResolvedValue(undefined));
 
 test('createCircle inserts a circle and makes this device its first member', async () => {
   const { id } = await createCircle({ name: "Nana's House" });
