@@ -9,8 +9,8 @@ Not built: the pull side (`pullCircle`, a local `circleLog` mirror table),
 invites/roles/kick actually syncing through the relay (today these are
 local-only — see `app/src/domain/usecases/invite-to-circle.ts` etc.), push
 notifications (section 2 below is a full design, zero implementation), and
-phone-number auth (its own section below, same status: designed, not
-started).
+the client-side onboarding UI for email auth (server-side API is built —
+see "Email auth" below).
 
 The relay's core property: it is blind. It never sees plaintext content, and
 it's designed so it can infer as little as possible about circle membership,
@@ -233,7 +233,7 @@ Reserved for private, per-individual exchanges — not circle content.
   `app/src/domain/usecases/create-circle.ts`), and promoting others later
   is a small, separate, not-yet-built action.
 
-## Phone-number auth (designed, not yet started)
+## Email auth (partially built)
 
 Not about content — content stays E2E encrypted regardless. This is about
 closing the one real gap the blind design leaves open: nothing currently
@@ -241,29 +241,63 @@ stops unauthenticated spam against the relay itself (fabricate a random
 circleLogId, hit the append endpoint forever, run up real infra cost). A
 free-to-mint identity (a keypair, generated locally, same as any circle
 identity) doesn't raise the bar against that — the fix has to impose real
-cost on registering, same reason every major app requiring this property
-lands on phone verification specifically.
+cost on registering.
 
-- **OTP flow**: app sends phone number → server sends SMS OTP (Twilio/SNS
-  or similar) → user confirms → server computes a `deviceId` and discards
-  the raw number immediately, never persisting it, never logging it.
-- **`deviceId = HMAC(masterKey, phoneNumber)`, not a plain hash.** Phone
-  numbers are low-entropy (~billions of possibilities) — a plain hash is
+**Email, not phone — reversed after building the phone version first.**
+The original design (and a first full implementation) used phone-number
+OTP, on the reasoning that every major app requiring this property lands
+on phone verification specifically. That fell apart on a regulatory wall,
+not a technical one: sending OTP SMS to most countries (Turkey, Ireland,
+Spain, and most of the EU) requires registering an alphanumeric sender ID
+with the destination country's telecom regulator, and that registration
+requires a certificate of incorporation — a registered business entity.
+This is true of every SMS provider (confirmed for both AWS SNS and
+Twilio), since it's the regulator's requirement, not the vendor's. For a
+solo, pre-incorporation project, several target countries (Turkey
+specifically has no long-code fallback either) are simply unreachable via
+SMS OTP. Email OTP has none of this — no per-country registration, no
+business-entity requirement, works identically everywhere. The scarce-
+resource/abuse-prevention property email provides is weaker than phone's
+(free email addresses are easier to mint than phone numbers), but the
+primary threat here is scripted infra abuse, not sophisticated multi-
+identity abuse — see the concurrency-cap/budget-alert mitigation below,
+which is the actual backstop either way.
+
+- **OTP flow**: app sends email address → server emails an OTP (via AWS
+  SES — see delivery choice below) → user confirms → server computes a
+  `deviceId` and discards the raw address immediately, never persisting
+  it, never logging it.
+- **`deviceId = HMAC(derivedKey, email)`, not a plain hash.** Email
+  addresses are low-entropy (guessable/dictionary-able) — a plain hash is
   trivially reversible by precomputing the whole space. Keying it closes
   that, but only if the key never leaves the server: a key embedded in
   the client app is extractable by anyone motivated to look, which makes
   client-side hashing no safer than an unkeyed hash against a real
   attacker.
-- **One master key, purpose-specific keys derived from it** (`derive(masterKey,
-  "phone-hmac")`, `derive(masterKey, "push-token-decrypt")`, etc.) — same
-  hierarchical-key pattern the app's own `generateSeedPhrase()`/
+- **Email delivery: AWS SES, not a third-party API (Resend, Postmark,
+  etc.).** SES is cheaper at any volume beyond a token free tier ($0.10
+  per 1,000 emails flat, no minimum — third-party APIs compared were
+  4-20x more expensive past their free tiers), and — more importantly for
+  the key-management story below — needs no stored credential at all.
+  Auth is the Lambda's own IAM role (`ses:SendEmail`), standard AWS
+  SigV4 signing, not an API key that has to be generated, stored, and
+  protected. Every third-party alternative considered needs exactly that
+  extra secret; SES makes the question disappear.
+- **One KMS-protected root secret, purpose-specific keys derived from it
+  app-side via HKDF** (`derive(rootSecret, "email-hmac")`, later
+  `derive(rootSecret, "push-token-decrypt")`, etc. as new purposes show
+  up) — same hierarchical-key pattern the app's own `generateSeedPhrase()`/
   `saveMasterSeed()` already intends for circle keys, just applied
-  server-side. One-way in one direction only: master → derived is cheap
-  and intended (that's the whole point), derived → master or derived →
-  sibling-derived is computationally infeasible with a proper KDF
-  (HMAC/HKDF). Cheaper to operate than one key per feature (KMS bills
-  per-key, no free tier), and a leaked derived key doesn't expose the
-  master or any other purpose's key.
+  server-side. One-way in one direction only: root → derived is cheap and
+  intended (that's the whole point), derived → root or derived →
+  sibling-derived is computationally infeasible with a proper KDF (HKDF).
+  Only one thing is ever KMS-encrypted (`server/provision/kms.tf`'s
+  `random_id.root_secret`) regardless of how many purposes exist —
+  cheaper to operate than one KMS-encrypted secret per feature (KMS
+  bills per-key, no free tier), and a leaked derived key doesn't expose
+  the root secret or any other purpose's key. `internal/crypto` is the one
+  place this derivation happens; nothing else is allowed to compute a
+  purpose key by hand.
 - **Even the operator's own code shouldn't read the master key** — the
   actual protection needed is against the operator's *normal* code path
   (or a compromised Lambda), not just external attackers, since the

@@ -12,13 +12,24 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	awskms "github.com/aws/aws-sdk-go-v2/service/kms"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 
-	"circle-relay/internal/adapters/dynamodb"
-	"circle-relay/internal/adapters/s3"
 	"circle-relay/internal/api"
+	"circle-relay/internal/api/auth/oidcverify"
 	"circle-relay/internal/config"
+	kmssecrets "circle-relay/internal/secrets/kms"
+	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
+	blobs3 "circle-relay/internal/storage/blobstore/s3"
+	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
+)
+
+const (
+	googleIssuer  = "https://accounts.google.com"
+	googleJWKSURL = "https://www.googleapis.com/oauth2/v3/certs"
+	appleIssuer   = "https://appleid.apple.com"
+	appleJWKSURL  = "https://appleid.apple.com/auth/keys"
 )
 
 func main() {
@@ -30,10 +41,18 @@ func main() {
 		log.Fatalf("failed to load AWS config: %v", err)
 	}
 
-	logStore := dynamodb.NewLogStore(awsdynamodb.NewFromConfig(awsCfg), cfg.TableName, cfg.LogRetentionDays)
-	blobStore := s3.NewBlobStore(awss3.NewFromConfig(awsCfg), cfg.BucketName, cfg.MaxBlobSize)
+	logStore := logdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.TableName, cfg.LogRetentionDays)
+	blobStore := blobs3.New(awss3.NewFromConfig(awsCfg), cfg.BucketName, cfg.MaxBlobSize)
 
-	mux := api.NewRouter(logStore, blobStore)
+	authStore := authdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.DevicesTableName)
+	secretStore, err := kmssecrets.New(awskms.NewFromConfig(awsCfg), cfg.RootSecretCiphertext)
+	if err != nil {
+		log.Fatalf("failed to construct root secret store: %v", err)
+	}
+	googleVerifier := oidcverify.New(googleIssuer, googleJWKSURL, cfg.GoogleClientIDs)
+	appleVerifier := oidcverify.New(appleIssuer, appleJWKSURL, cfg.AppleClientIDs)
+
+	mux := api.NewRouter(logStore, blobStore, authStore, secretStore, googleVerifier, appleVerifier)
 
 	// NewV2, not New: provision/lambda_url.tf fronts this with a Lambda
 	// Function URL, which uses the same v2.0 Lambda payload format as an

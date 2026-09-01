@@ -1,6 +1,8 @@
-// Package ports defines the interfaces domain logic depends on. Nothing
-// storage- or runtime-specific is allowed to leak past this package.
-package ports
+// Package logstore defines the interface domain logic depends on for the
+// append-only per-circle log — implementations live in subpackages, one
+// per backing technology (see logstore/dynamodb). Nothing storage- or
+// runtime-specific is allowed to leak past this package.
+package logstore
 
 import "context"
 
@@ -30,14 +32,14 @@ type CommitResult struct {
 	ReceivedAt int64
 }
 
-// LogStore is storage for the append-only per-circle log. CommitEntry is
-// the one write path that must be atomic — a plain, backend-agnostic
+// Store is storage for the append-only per-circle log. CommitEntry is the
+// one write path that must be atomic — a plain, backend-agnostic
 // signature (no DynamoDB types), but each adapter is expected to use its
 // backend's real transaction primitive underneath (DynamoDB:
 // TransactWriteItems; Postgres: a SQL transaction; etc.) rather than
 // faking atomicity by composing smaller calls, which is what forced this
 // package to reason about partial-failure orderings the first time around.
-type LogStore interface {
+type Store interface {
 	// CommitEntry atomically assigns the next epoch for circleLogID,
 	// writes encryptedMeta against it, and records entryID as having
 	// produced it. entryID is the client's own id for whatever it's

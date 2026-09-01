@@ -1,0 +1,132 @@
+package google_test
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+
+	"circle-relay/internal/api/auth/google"
+	"circle-relay/internal/api/auth/oidcverify"
+	"circle-relay/internal/testsupport"
+)
+
+func TestService_SignIn_ValidTokenIssuesASession(t *testing.T) {
+	ctx := context.Background()
+	provider := testsupport.NewFakeOIDCProvider(t, "https://accounts.google.com")
+	authStore := testsupport.NewAuthStore(t)
+	svc := &google.Service{
+		Secrets:   testsupport.NewSecretStore(t),
+		AuthStore: authStore,
+		Verifier:  oidcverify.New(provider.Issuer, provider.JWKSURL, []string{testsupport.TestGoogleClientID}),
+	}
+
+	email := testsupport.UniqueEmail(t)
+	idToken := provider.SignToken(t, jwt.MapClaims{
+		"iss":            provider.Issuer,
+		"aud":            testsupport.TestGoogleClientID,
+		"email":          email,
+		"email_verified": true,
+		"exp":            time.Now().Add(time.Hour).Unix(),
+	})
+
+	token, err := svc.SignIn(ctx, idToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token == "" {
+		t.Fatal("expected a non-empty token")
+	}
+
+	session, err := authStore.GetSession(ctx, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if session == nil {
+		t.Fatal("expected the issued token to resolve to a session")
+	}
+}
+
+func TestService_SignIn_SameEmailTwiceResolvesToTheSameDevice(t *testing.T) {
+	ctx := context.Background()
+	provider := testsupport.NewFakeOIDCProvider(t, "https://accounts.google.com")
+	authStore := testsupport.NewAuthStore(t)
+	svc := &google.Service{
+		Secrets:   testsupport.NewSecretStore(t),
+		AuthStore: authStore,
+		Verifier:  oidcverify.New(provider.Issuer, provider.JWKSURL, []string{testsupport.TestGoogleClientID}),
+	}
+
+	email := testsupport.UniqueEmail(t)
+	claims := func() jwt.MapClaims {
+		return jwt.MapClaims{
+			"iss":            provider.Issuer,
+			"aud":            testsupport.TestGoogleClientID,
+			"email":          email,
+			"email_verified": true,
+			"exp":            time.Now().Add(time.Hour).Unix(),
+		}
+	}
+
+	token1, err := svc.SignIn(ctx, provider.SignToken(t, claims()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	token2, err := svc.SignIn(ctx, provider.SignToken(t, claims()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token1 == token2 {
+		t.Fatal("expected a fresh token on each sign-in, got the same one twice")
+	}
+
+	session1, err := authStore.GetSession(ctx, token1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session2, err := authStore.GetSession(ctx, token2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if session1.DeviceID != session2.DeviceID {
+		t.Fatalf("expected both sign-ins for the same email to resolve to the same deviceId, got %q and %q",
+			session1.DeviceID, session2.DeviceID)
+	}
+}
+
+func TestService_SignIn_InvalidTokenIsRejected(t *testing.T) {
+	ctx := context.Background()
+	provider := testsupport.NewFakeOIDCProvider(t, "https://accounts.google.com")
+	svc := &google.Service{
+		Secrets:   testsupport.NewSecretStore(t),
+		AuthStore: testsupport.NewAuthStore(t),
+		Verifier:  oidcverify.New(provider.Issuer, provider.JWKSURL, []string{testsupport.TestGoogleClientID}),
+	}
+
+	if _, err := svc.SignIn(ctx, "not-a-real-token"); err == nil {
+		t.Fatal("expected an error for a garbage token")
+	}
+}
+
+func TestService_SignIn_UnverifiedEmailIsRejected(t *testing.T) {
+	ctx := context.Background()
+	provider := testsupport.NewFakeOIDCProvider(t, "https://accounts.google.com")
+	svc := &google.Service{
+		Secrets:   testsupport.NewSecretStore(t),
+		AuthStore: testsupport.NewAuthStore(t),
+		Verifier:  oidcverify.New(provider.Issuer, provider.JWKSURL, []string{testsupport.TestGoogleClientID}),
+	}
+
+	idToken := provider.SignToken(t, jwt.MapClaims{
+		"iss":            provider.Issuer,
+		"aud":            testsupport.TestGoogleClientID,
+		"email":          testsupport.UniqueEmail(t),
+		"email_verified": false,
+		"exp":            time.Now().Add(time.Hour).Unix(),
+	})
+
+	if _, err := svc.SignIn(ctx, idToken); err == nil {
+		t.Fatal("expected an error for an unverified email")
+	}
+}

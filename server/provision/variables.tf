@@ -25,3 +25,13 @@ variable "max_blob_size_bytes" {
   type        = number
   default     = 2097152 # 2 MiB
 }
+
+variable "google_client_ids" {
+  description = "Accepted 'aud' values for Google Sign-In ID tokens — one per platform (iOS, Android, Web) registered in Google Cloud Console. No default: every deployment needs its own real client IDs."
+  type        = list(string)
+}
+
+variable "apple_client_ids" {
+  description = "Accepted 'aud' values for Sign in with Apple ID tokens — typically the app's iOS bundle ID, plus a Services ID if a web/Android flow is ever added. No default: every deployment needs its own real client IDs."
+  type        = list(string)
+}

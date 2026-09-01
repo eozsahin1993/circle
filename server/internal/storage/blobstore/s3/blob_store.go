@@ -1,4 +1,4 @@
-// Package s3 implements ports.BlobStore against a single S3 bucket, using
+// Package s3 implements blobstore.Store against a single S3 bucket, using
 // presigned URLs so ciphertext bytes never pass through Lambda — see
 // server/DESIGN.md.
 package s3
@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"circle-relay/internal/ports"
+	"circle-relay/internal/storage/blobstore"
 )
 
 const (
@@ -35,20 +35,20 @@ const (
 	blobContentType = "application/octet-stream"
 )
 
-type BlobStore struct {
+type Store struct {
 	presignClient *s3.PresignClient
 	bucketName    string
 	maxBlobSize   int64
 }
 
-func NewBlobStore(client *s3.Client, bucketName string, maxBlobSize int64) *BlobStore {
+func New(client *s3.Client, bucketName string, maxBlobSize int64) *Store {
 	if maxBlobSize <= 0 {
 		maxBlobSize = DefaultMaxBlobSize
 	}
-	return &BlobStore{presignClient: s3.NewPresignClient(client), bucketName: bucketName, maxBlobSize: maxBlobSize}
+	return &Store{presignClient: s3.NewPresignClient(client), bucketName: bucketName, maxBlobSize: maxBlobSize}
 }
 
-var _ ports.BlobStore = (*BlobStore)(nil)
+var _ blobstore.Store = (*Store)(nil)
 
 // GetUploadTarget signs a POST policy with a content-length-range
 // condition and a pinned Content-Type, so S3 itself rejects an oversized
@@ -56,27 +56,27 @@ var _ ports.BlobStore = (*BlobStore)(nil)
 // to check or clean it up. Unlike Key, ContentType on PutObjectInput isn't
 // picked up by PresignPostObject on its own (verified: it neither adds a
 // policy condition nor a Fields entry) — both have to be added explicitly.
-func (b *BlobStore) GetUploadTarget(ctx context.Context, circleLogID string, epoch int64) (ports.UploadTarget, error) {
-	req, err := b.presignClient.PresignPostObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(b.bucketName),
+func (s *Store) GetUploadTarget(ctx context.Context, circleLogID string, epoch int64) (blobstore.UploadTarget, error) {
+	req, err := s.presignClient.PresignPostObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(s.bucketName),
 		Key:    aws.String(blobKey(circleLogID, epoch)),
 	}, func(o *s3.PresignPostOptions) {
 		o.Expires = uploadURLTTL
 		o.Conditions = []any{
-			[]any{"content-length-range", 1, b.maxBlobSize},
+			[]any{"content-length-range", 1, s.maxBlobSize},
 			map[string]any{"Content-Type": blobContentType},
 		}
 	})
 	if err != nil {
-		return ports.UploadTarget{}, err
+		return blobstore.UploadTarget{}, err
 	}
 	req.Values["Content-Type"] = blobContentType
-	return ports.UploadTarget{URL: req.URL, Fields: req.Values}, nil
+	return blobstore.UploadTarget{URL: req.URL, Fields: req.Values}, nil
 }
 
-func (b *BlobStore) GetDownloadURL(ctx context.Context, circleLogID string, epoch int64) (string, error) {
-	req, err := b.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(b.bucketName),
+func (s *Store) GetDownloadURL(ctx context.Context, circleLogID string, epoch int64) (string, error) {
+	req, err := s.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucketName),
 		Key:    aws.String(blobKey(circleLogID, epoch)),
 	}, s3.WithPresignExpires(downloadURLTTL))
 	if err != nil {

@@ -50,6 +50,31 @@ data "aws_iam_policy_document" "lambda_storage_access" {
     ]
     resources = ["${module.storage.bucket_arn}/*"]
   }
+
+  # Separate statement, separate resource list from DynamoDBAccess above —
+  # the devices table is a genuinely different table, not the circle-log
+  # one (see devices_table.tf).
+  statement {
+    sid = "DevicesTableAccess"
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:DeleteItem",
+      "dynamodb:TransactWriteItems",
+    ]
+    resources = [aws_dynamodb_table.devices.arn]
+  }
+
+  statement {
+    sid       = "KMSAccess"
+    actions   = ["kms:Decrypt"]
+    resources = [aws_kms_key.master.arn]
+  }
+
+  # No IAM statement for Google/Apple sign-in verification — internal/
+  # oidcverify fetches each provider's JWKS over plain outbound HTTPS,
+  # which needs no AWS permission at all (the Lambda has internet egress
+  # by default outside a VPC).
 }
 
 resource "aws_iam_role_policy" "lambda_storage_access" {
@@ -77,10 +102,14 @@ resource "aws_lambda_function" "relay" {
 
   environment {
     variables = {
-      TABLE_NAME          = module.storage.table_name
-      BUCKET_NAME         = module.storage.bucket_name
-      LOG_RETENTION_DAYS  = tostring(var.log_retention_days)
-      MAX_BLOB_SIZE_BYTES = tostring(var.max_blob_size_bytes)
+      TABLE_NAME             = module.storage.table_name
+      BUCKET_NAME            = module.storage.bucket_name
+      DEVICES_TABLE_NAME     = aws_dynamodb_table.devices.name
+      ROOT_SECRET_CIPHERTEXT = data.aws_kms_ciphertext.root_secret.ciphertext_blob
+      GOOGLE_CLIENT_IDS      = join(",", var.google_client_ids)
+      APPLE_CLIENT_IDS       = join(",", var.apple_client_ids)
+      LOG_RETENTION_DAYS     = tostring(var.log_retention_days)
+      MAX_BLOB_SIZE_BYTES    = tostring(var.max_blob_size_bytes)
     }
   }
 }

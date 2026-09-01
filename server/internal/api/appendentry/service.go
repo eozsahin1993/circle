@@ -1,29 +1,30 @@
 // Package appendentry is the vertical slice for POST
 // /circles/{circleLogId}/entries: its own service, HTTP handler, and route
-// registration. Storage (ports.LogStore, ports.BlobStore) is a shared
+// registration. Storage (logstore.Store, blobstore.Store) is a shared
 // component injected in, not owned by this package.
 package appendentry
 
 import (
 	"context"
 
-	"circle-relay/internal/ports"
+	"circle-relay/internal/storage/blobstore"
+	"circle-relay/internal/storage/logstore"
 )
 
 // Result is what a successful (or idempotently-retried) append hands back.
 type Result struct {
 	Epoch      int64
 	ReceivedAt int64
-	Upload     ports.UploadTarget
+	Upload     blobstore.UploadTarget
 }
 
 type Service struct {
-	LogStore  ports.LogStore
-	BlobStore ports.BlobStore
+	LogStore  logstore.Store
+	BlobStore blobstore.Store
 }
 
 // Append commits the entry, then hands back an upload target —
-// unconditionally (see ports.BlobStore), even though this pass only ever
+// unconditionally (see blobstore.Store), even though this pass only ever
 // produces entryType "post" entries which always have one. Retention is
 // enforced by the store's own TTL, not here — nothing to trim.
 func (s *Service) Append(ctx context.Context, circleLogID, entryID string, encryptedMeta []byte) (Result, error) {

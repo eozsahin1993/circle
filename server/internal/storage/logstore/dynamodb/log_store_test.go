@@ -11,11 +11,11 @@ import (
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"circle-relay/internal/ports"
+	"circle-relay/internal/storage/logstore"
 	"circle-relay/internal/testsupport"
 )
 
-// Sort-key formats duplicated from keys.go (unexported, and this is an
+// Sort-key formats duplicated from log_store.go (unexported, and this is an
 // external _test package) — epoch#<12-digit zero-padded> and idem#<id>.
 // Only the two things these tests need to reach directly: reading a raw
 // item's expiresAt, and deleting an item to simulate what DynamoDB's
@@ -67,7 +67,7 @@ func TestLogStore_CommitEntry_ConcurrentDuplicatesConvergeToSameEpoch(t *testing
 	logStore := testsupport.NewLogStore(t, 0)
 
 	const concurrency = 10
-	results := make([]ports.CommitResult, concurrency)
+	results := make([]logstore.CommitResult, concurrency)
 	errs := make([]error, concurrency)
 
 	var wg sync.WaitGroup

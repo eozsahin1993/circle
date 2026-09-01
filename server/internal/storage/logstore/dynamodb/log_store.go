@@ -1,4 +1,4 @@
-// Package dynamodb implements ports.LogStore against a single DynamoDB
+// Package dynamodb implements logstore.Store against a single DynamoDB
 // table.
 package dynamodb
 
@@ -13,7 +13,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"circle-relay/internal/ports"
+	"circle-relay/internal/storage/dynamoutil"
+	"circle-relay/internal/storage/logstore"
 )
 
 // DefaultLogRetentionDays is configurable per server/DESIGN.md. Eviction
@@ -21,20 +22,47 @@ import (
 // value only controls what `expiresAt` gets written as at commit time.
 const DefaultLogRetentionDays = 14
 
-type LogStore struct {
+// Single-table design: PK = circleLogId, SK distinguishes item kinds.
+// Sort keys share one attribute (DynamoDB requires a uniform type per
+// table), so epoch is represented as a zero-padded string to preserve
+// numeric ordering lexicographically — the standard trick for mixing
+// numeric ordering into a string sort key.
+const (
+	counterSK  = "#counter"
+	epochWidth = 12 // supports up to 999,999,999,999 entries per circle — generous past any real use.
+)
+
+func epochSK(epoch int64) string {
+	return fmt.Sprintf("epoch#%0*d", epochWidth, epoch)
+}
+
+// epochSKUpperBound sorts after any real epoch key, for range queries.
+func epochSKUpperBound() string {
+	max := ""
+	for i := 0; i < epochWidth; i++ {
+		max += "9"
+	}
+	return "epoch#" + max
+}
+
+func idemSK(entryID string) string {
+	return "idem#" + entryID
+}
+
+type Store struct {
 	client           *dynamodb.Client
 	tableName        string
 	retentionSeconds int64
 }
 
-func NewLogStore(client *dynamodb.Client, tableName string, logRetentionDays int64) *LogStore {
+func New(client *dynamodb.Client, tableName string, logRetentionDays int64) *Store {
 	if logRetentionDays <= 0 {
 		logRetentionDays = DefaultLogRetentionDays
 	}
-	return &LogStore{client: client, tableName: tableName, retentionSeconds: logRetentionDays * 24 * 60 * 60}
+	return &Store{client: client, tableName: tableName, retentionSeconds: logRetentionDays * 24 * 60 * 60}
 }
 
-var _ ports.LogStore = (*LogStore)(nil)
+var _ logstore.Store = (*Store)(nil)
 
 // CommitEntry assigns an epoch, then writes the log entry and the
 // idempotency marker in one TransactWriteItems call — both happen or
@@ -48,20 +76,20 @@ var _ ports.LogStore = (*LogStore)(nil)
 // independently by DynamoDB's TTL sweep once the table's TTL attribute is
 // enabled (see provision/modules/storage/dynamodb.tf) — no application
 // code deletes anything.
-func (s *LogStore) CommitEntry(ctx context.Context, circleLogID, entryID string, encryptedMeta []byte) (ports.CommitResult, error) {
+func (s *Store) CommitEntry(ctx context.Context, circleLogID, entryID string, encryptedMeta []byte) (logstore.CommitResult, error) {
 	// Consistent read first: a pure retry of an already-committed entryID
 	// returns here without ever touching the counter.
 	if existing, err := s.lookupIdempotencyMarker(ctx, circleLogID, entryID); err != nil {
-		return ports.CommitResult{}, err
+		return logstore.CommitResult{}, err
 	} else if existing != nil {
 		return *existing, nil
 	}
 
 	epoch, err := s.nextEpochAtomically(ctx, circleLogID)
 	if err != nil {
-		return ports.CommitResult{}, err
+		return logstore.CommitResult{}, err
 	}
-	receivedAt := nowMillis()
+	receivedAt := dynamoutil.NowMillis()
 	expiresAt := receivedAt/1000 + s.retentionSeconds
 
 	_, err = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
@@ -70,12 +98,12 @@ func (s *LogStore) CommitEntry(ctx context.Context, circleLogID, entryID string,
 				Put: &types.Put{
 					TableName: aws.String(s.tableName),
 					Item: map[string]types.AttributeValue{
-						pkAttr:          &types.AttributeValueMemberS{Value: circleLogID},
-						skAttr:          &types.AttributeValueMemberS{Value: epochSK(epoch)},
-						"epoch":         &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
-						"encryptedMeta": &types.AttributeValueMemberB{Value: encryptedMeta},
-						"receivedAt":    &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
-						"expiresAt":     &types.AttributeValueMemberN{Value: strconv.FormatInt(expiresAt, 10)},
+						dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: circleLogID},
+						dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: epochSK(epoch)},
+						"epoch":           &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
+						"encryptedMeta":   &types.AttributeValueMemberB{Value: encryptedMeta},
+						"receivedAt":      &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
+						"expiresAt":       &types.AttributeValueMemberN{Value: strconv.FormatInt(expiresAt, 10)},
 					},
 				},
 			},
@@ -83,19 +111,19 @@ func (s *LogStore) CommitEntry(ctx context.Context, circleLogID, entryID string,
 				Put: &types.Put{
 					TableName: aws.String(s.tableName),
 					Item: map[string]types.AttributeValue{
-						pkAttr:       &types.AttributeValueMemberS{Value: circleLogID},
-						skAttr:       &types.AttributeValueMemberS{Value: idemSK(entryID)},
-						"epoch":      &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
-						"receivedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
-						"expiresAt":  &types.AttributeValueMemberN{Value: strconv.FormatInt(expiresAt, 10)},
+						dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: circleLogID},
+						dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: idemSK(entryID)},
+						"epoch":           &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
+						"receivedAt":      &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
+						"expiresAt":       &types.AttributeValueMemberN{Value: strconv.FormatInt(expiresAt, 10)},
 					},
-					ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%s)", pkAttr)),
+					ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%s)", dynamoutil.PKAttr)),
 				},
 			},
 		},
 	})
 	if err == nil {
-		return ports.CommitResult{Epoch: epoch, ReceivedAt: receivedAt}, nil
+		return logstore.CommitResult{Epoch: epoch, ReceivedAt: receivedAt}, nil
 	}
 
 	// Someone else already committed this entryID — look up what they
@@ -106,15 +134,15 @@ func (s *LogStore) CommitEntry(ctx context.Context, circleLogID, entryID string,
 			return *existing, nil
 		}
 	}
-	return ports.CommitResult{}, err
+	return logstore.CommitResult{}, err
 }
 
-func (s *LogStore) nextEpochAtomically(ctx context.Context, circleLogID string) (int64, error) {
+func (s *Store) nextEpochAtomically(ctx context.Context, circleLogID string) (int64, error) {
 	out, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
-			pkAttr: &types.AttributeValueMemberS{Value: circleLogID},
-			skAttr: &types.AttributeValueMemberS{Value: counterSK},
+			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: circleLogID},
+			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: counterSK},
 		},
 		UpdateExpression: aws.String("ADD #counter :one"),
 		ExpressionAttributeNames: map[string]string{
@@ -128,15 +156,15 @@ func (s *LogStore) nextEpochAtomically(ctx context.Context, circleLogID string) 
 	if err != nil {
 		return 0, err
 	}
-	return attrInt(out.Attributes, "counter")
+	return dynamoutil.AttrInt(out.Attributes, "counter")
 }
 
-func (s *LogStore) lookupIdempotencyMarker(ctx context.Context, circleLogID, entryID string) (*ports.CommitResult, error) {
+func (s *Store) lookupIdempotencyMarker(ctx context.Context, circleLogID, entryID string) (*logstore.CommitResult, error) {
 	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
-			pkAttr: &types.AttributeValueMemberS{Value: circleLogID},
-			skAttr: &types.AttributeValueMemberS{Value: idemSK(entryID)},
+			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: circleLogID},
+			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: idemSK(entryID)},
 		},
 		ConsistentRead: aws.Bool(true),
 	})
@@ -146,39 +174,39 @@ func (s *LogStore) lookupIdempotencyMarker(ctx context.Context, circleLogID, ent
 	if out.Item == nil {
 		return nil, nil
 	}
-	epoch, err := attrInt(out.Item, "epoch")
+	epoch, err := dynamoutil.AttrInt(out.Item, "epoch")
 	if err != nil {
 		return nil, err
 	}
-	receivedAt, err := attrInt(out.Item, "receivedAt")
+	receivedAt, err := dynamoutil.AttrInt(out.Item, "receivedAt")
 	if err != nil {
 		return nil, err
 	}
-	return &ports.CommitResult{Epoch: epoch, ReceivedAt: receivedAt}, nil
+	return &logstore.CommitResult{Epoch: epoch, ReceivedAt: receivedAt}, nil
 }
 
-func (s *LogStore) Read(ctx context.Context, circleLogID string, since int64) (ports.FetchSinceResult, error) {
+func (s *Store) Read(ctx context.Context, circleLogID string, since int64) (logstore.FetchSinceResult, error) {
 	counterOut, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
-			pkAttr: &types.AttributeValueMemberS{Value: circleLogID},
-			skAttr: &types.AttributeValueMemberS{Value: counterSK},
+			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: circleLogID},
+			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: counterSK},
 		},
 	})
 	if err != nil {
-		return ports.FetchSinceResult{}, err
+		return logstore.FetchSinceResult{}, err
 	}
 	if counterOut.Item == nil {
-		return ports.FetchSinceResult{Entries: []ports.LogEntry{}}, nil
+		return logstore.FetchSinceResult{Entries: []logstore.LogEntry{}}, nil
 	}
-	latestEpoch, err := attrInt(counterOut.Item, "counter")
+	latestEpoch, err := dynamoutil.AttrInt(counterOut.Item, "counter")
 	if err != nil {
-		return ports.FetchSinceResult{}, err
+		return logstore.FetchSinceResult{}, err
 	}
 
 	oldestAvailableEpoch, err := s.oldestAvailableEpoch(ctx, circleLogID)
 	if err != nil {
-		return ports.FetchSinceResult{}, err
+		return logstore.FetchSinceResult{}, err
 	}
 
 	lowerBound := since
@@ -188,7 +216,7 @@ func (s *LogStore) Read(ctx context.Context, circleLogID string, since int64) (p
 
 	queryOut, err := s.client.Query(ctx, &dynamodb.QueryInput{
 		TableName:              aws.String(s.tableName),
-		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :pk AND %s BETWEEN :lower AND :upper", pkAttr, skAttr)),
+		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :pk AND %s BETWEEN :lower AND :upper", dynamoutil.PKAttr, dynamoutil.SKAttr)),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":pk":    &types.AttributeValueMemberS{Value: circleLogID},
 			":lower": &types.AttributeValueMemberS{Value: epochSK(lowerBound + 1)},
@@ -197,28 +225,28 @@ func (s *LogStore) Read(ctx context.Context, circleLogID string, since int64) (p
 		ScanIndexForward: aws.Bool(true),
 	})
 	if err != nil {
-		return ports.FetchSinceResult{}, err
+		return logstore.FetchSinceResult{}, err
 	}
 
-	entries := make([]ports.LogEntry, 0, len(queryOut.Items))
+	entries := make([]logstore.LogEntry, 0, len(queryOut.Items))
 	for _, item := range queryOut.Items {
-		epoch, err := attrInt(item, "epoch")
+		epoch, err := dynamoutil.AttrInt(item, "epoch")
 		if err != nil {
-			return ports.FetchSinceResult{}, err
+			return logstore.FetchSinceResult{}, err
 		}
-		receivedAt, err := attrInt(item, "receivedAt")
+		receivedAt, err := dynamoutil.AttrInt(item, "receivedAt")
 		if err != nil {
-			return ports.FetchSinceResult{}, err
+			return logstore.FetchSinceResult{}, err
 		}
 		blobAttr, ok := item["encryptedMeta"].(*types.AttributeValueMemberB)
 		if !ok {
-			return ports.FetchSinceResult{}, fmt.Errorf("entry at epoch %d missing encryptedMeta", epoch)
+			return logstore.FetchSinceResult{}, fmt.Errorf("entry at epoch %d missing encryptedMeta", epoch)
 		}
-		entries = append(entries, ports.LogEntry{Epoch: epoch, EncryptedMeta: blobAttr.Value, ReceivedAt: receivedAt})
+		entries = append(entries, logstore.LogEntry{Epoch: epoch, EncryptedMeta: blobAttr.Value, ReceivedAt: receivedAt})
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Epoch < entries[j].Epoch })
 
-	return ports.FetchSinceResult{
+	return logstore.FetchSinceResult{
 		Entries:              entries,
 		LatestEpoch:          latestEpoch,
 		OldestAvailableEpoch: oldestAvailableEpoch,
@@ -250,10 +278,10 @@ func (s *LogStore) Read(ctx context.Context, circleLogID string, since int64) (p
 // operator action, not a routine one. If/when that changes, know this
 // before treating LOG_RETENTION_DAYS as freely adjustable in both
 // directions.
-func (s *LogStore) oldestAvailableEpoch(ctx context.Context, circleLogID string) (int64, error) {
+func (s *Store) oldestAvailableEpoch(ctx context.Context, circleLogID string) (int64, error) {
 	out, err := s.client.Query(ctx, &dynamodb.QueryInput{
 		TableName:              aws.String(s.tableName),
-		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :pk AND %s BETWEEN :lower AND :upper", pkAttr, skAttr)),
+		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :pk AND %s BETWEEN :lower AND :upper", dynamoutil.PKAttr, dynamoutil.SKAttr)),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":pk":    &types.AttributeValueMemberS{Value: circleLogID},
 			":lower": &types.AttributeValueMemberS{Value: epochSK(1)},
@@ -268,5 +296,5 @@ func (s *LogStore) oldestAvailableEpoch(ctx context.Context, circleLogID string)
 	if len(out.Items) == 0 {
 		return 0, nil // nothing survives (or nothing was ever committed)
 	}
-	return attrInt(out.Items[0], "epoch")
+	return dynamoutil.AttrInt(out.Items[0], "epoch")
 }

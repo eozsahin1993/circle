@@ -5,11 +5,11 @@ package getblob
 import (
 	"context"
 
-	"circle-relay/internal/ports"
+	"circle-relay/internal/storage/blobstore"
 )
 
 type Service struct {
-	BlobStore ports.BlobStore
+	BlobStore blobstore.Store
 }
 
 func (s *Service) DownloadURL(ctx context.Context, circleLogID string, epoch int64) (string, error) {

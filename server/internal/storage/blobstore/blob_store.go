@@ -1,4 +1,8 @@
-package ports
+// Package blobstore defines the interface domain logic depends on for blob
+// storage — implementations live in subpackages, one per backing
+// technology (see blobstore/s3). Nothing storage- or runtime-specific is
+// allowed to leak past this package.
+package blobstore
 
 import "context"
 
@@ -11,13 +15,13 @@ type UploadTarget struct {
 	Fields map[string]string
 }
 
-// BlobStore is storage for the (large, encrypted) blob behind one log
-// entry. Presigned URLs generated here always succeed and cost nothing to
-// hand out — they're pure local signing, not a network call — so callers
-// are never expected to check "does this entry actually have a blob"
-// first; see server/DESIGN.md's "deciding whether to fetch a blob is
-// entirely client-side" note.
-type BlobStore interface {
+// Store is storage for the (large, encrypted) blob behind one log entry.
+// Presigned URLs generated here always succeed and cost nothing to hand
+// out — they're pure local signing, not a network call — so callers are
+// never expected to check "does this entry actually have a blob" first;
+// see server/DESIGN.md's "deciding whether to fetch a blob is entirely
+// client-side" note.
+type Store interface {
 	// GetUploadTarget returns a short-lived presigned POST the client can
 	// send ciphertext bytes to for this exact entry, capped at the
 	// store's configured max blob size.

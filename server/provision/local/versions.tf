@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 }
 
@@ -25,5 +29,6 @@ provider "aws" {
   endpoints {
     dynamodb = "http://localhost:4566"
     s3       = "http://localhost:4566"
+    kms      = "http://localhost:4566"
   }
 }

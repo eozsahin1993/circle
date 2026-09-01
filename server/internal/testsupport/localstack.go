@@ -1,11 +1,15 @@
 // Package testsupport wires the real adapters (not fakes) to a LocalStack
-// instance at localhost:4566, so tests exercise actual DynamoDB/S3 wire
+// instance at localhost:4566, so tests exercise actual DynamoDB/S3/KMS wire
 // behavior. Not a _test.go file — a regular package imported by other
-// packages' tests, per Go convention for shared test helpers.
+// packages' tests, per Go convention for shared test helpers. Google/Apple
+// sign-in verification isn't exercised against LocalStack at all — there's
+// nothing to emulate (no AWS service involved), so internal/oidcverify's
+// own tests use a locally-generated key pair instead.
 package testsupport
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"sync"
@@ -17,18 +21,25 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	awskms "github.com/aws/aws-sdk-go-v2/service/kms"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
-	"circle-relay/internal/adapters/dynamodb"
-	"circle-relay/internal/adapters/s3"
-	"circle-relay/internal/ports"
+	"circle-relay/internal/secrets"
+	kmssecrets "circle-relay/internal/secrets/kms"
+	"circle-relay/internal/storage/authstore"
+	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
+	"circle-relay/internal/storage/blobstore"
+	blobs3 "circle-relay/internal/storage/blobstore/s3"
+	"circle-relay/internal/storage/logstore"
+	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
 )
 
 const (
 	localstackEndpoint = "http://localhost:4566"
 	tableName          = "test-circle-log"
 	bucketName         = "test-circle-blobs"
+	devicesTableName   = "test-devices"
 )
 
 var (
@@ -37,7 +48,18 @@ var (
 
 	bucketOnce sync.Once
 	bucketErr  error
+
+	devicesTableOnce sync.Once
+	devicesTableErr  error
+
+	kmsKeyOnce sync.Once
+	kmsKeyErr  error
+	kmsKeyID   string
 )
+
+// testRootSecret is the fixed plaintext NewSecretStore encrypts — content
+// doesn't matter, only that it's stable and non-empty.
+var testRootSecret = []byte("test-only-root-secret")
 
 // UniqueCircleID returns a circleLogID guaranteed not to collide with data
 // left behind by a previous test run — the shared test table isn't wiped
@@ -46,6 +68,22 @@ var (
 func UniqueCircleID(t testing.TB) string {
 	t.Helper()
 	return fmt.Sprintf("%s-%d", t.Name(), time.Now().UnixNano())
+}
+
+// UniqueEmail returns a fake-but-uniquely-formatted email address, for
+// the same reason UniqueCircleID exists — the shared devices table isn't
+// wiped between test runs.
+func UniqueEmail(t testing.TB) string {
+	t.Helper()
+	return fmt.Sprintf("test-%d@example.com", time.Now().UnixNano())
+}
+
+// UniqueEmailHMAC returns an opaque string standing in for a real emailHmac
+// — for adapter-level AuthStore tests that only care about key uniqueness,
+// not about how a real emailHmac is derived.
+func UniqueEmailHMAC(t testing.TB) string {
+	t.Helper()
+	return fmt.Sprintf("emailhmac-%s-%d", t.Name(), time.Now().UnixNano())
 }
 
 func loadConfig(t testing.TB) aws.Config {
@@ -64,7 +102,7 @@ func loadConfig(t testing.TB) aws.Config {
 // creating the test table once per test binary run (shared across tests —
 // safe because tests use distinct circleLogID values). Skips the test if
 // LocalStack isn't reachable.
-func NewLogStore(t testing.TB, logRetentionDays int64) ports.LogStore {
+func NewLogStore(t testing.TB, logRetentionDays int64) logstore.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
@@ -75,7 +113,7 @@ func NewLogStore(t testing.TB, logRetentionDays int64) ports.LogStore {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", tableErr)
 	}
 
-	return dynamodb.NewLogStore(client, tableName, logRetentionDays)
+	return logdynamodb.New(client, tableName, logRetentionDays)
 }
 
 // RawDynamoDBClient returns the same client + table name NewLogStore uses,
@@ -99,7 +137,7 @@ func RawDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 
 // NewBlobStore returns a real s3-backed BlobStore against LocalStack,
 // creating the test bucket once per test binary run.
-func NewBlobStore(t testing.TB) ports.BlobStore {
+func NewBlobStore(t testing.TB) blobstore.Store {
 	t.Helper()
 	client := awss3.NewFromConfig(loadConfig(t), func(o *awss3.Options) {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
@@ -111,7 +149,88 @@ func NewBlobStore(t testing.TB) ports.BlobStore {
 		t.Skipf("LocalStack S3 not reachable, skipping: %v", bucketErr)
 	}
 
-	return s3.NewBlobStore(client, bucketName, 0)
+	return blobs3.New(client, bucketName, 0)
+}
+
+// NewAuthStore returns a real dynamodb-backed AuthStore against LocalStack,
+// creating the devices table once per test binary run — same
+// sync.Once-guarded create-if-not-exists pattern as NewLogStore, against a
+// genuinely separate table (see server/DESIGN.md's "Email auth" section:
+// not circle-scoped data, doesn't belong in the circle-log table).
+func NewAuthStore(t testing.TB) authstore.Store {
+	t.Helper()
+	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
+		o.BaseEndpoint = aws.String(localstackEndpoint)
+	})
+
+	devicesTableOnce.Do(func() { devicesTableErr = createDevicesTable(client) })
+	if devicesTableErr != nil {
+		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", devicesTableErr)
+	}
+
+	return authdynamodb.New(client, devicesTableName)
+}
+
+// NewSecretStore returns a real kms-backed secrets.Store against
+// LocalStack — a genuine KMS key, a genuine Encrypt of a fixed test
+// secret, and a genuine Decrypt round trip through internal/secrets/kms,
+// not a fake.
+func NewSecretStore(t testing.TB) secrets.Store {
+	t.Helper()
+	client := awskms.NewFromConfig(loadConfig(t), func(o *awskms.Options) {
+		o.BaseEndpoint = aws.String(localstackEndpoint)
+	})
+
+	kmsKeyOnce.Do(func() {
+		out, err := client.CreateKey(context.Background(), &awskms.CreateKeyInput{})
+		if err != nil {
+			kmsKeyErr = err
+			return
+		}
+		kmsKeyID = aws.ToString(out.KeyMetadata.KeyId)
+	})
+	if kmsKeyErr != nil {
+		t.Skipf("LocalStack KMS not reachable, skipping: %v", kmsKeyErr)
+	}
+
+	encrypted, err := client.Encrypt(context.Background(), &awskms.EncryptInput{
+		KeyId:     aws.String(kmsKeyID),
+		Plaintext: testRootSecret,
+	})
+	if err != nil {
+		t.Fatalf("failed to encrypt test root secret: %v", err)
+	}
+
+	store, err := kmssecrets.New(client, base64.StdEncoding.EncodeToString(encrypted.CiphertextBlob))
+	if err != nil {
+		t.Fatalf("failed to construct SecretStore: %v", err)
+	}
+	return store
+}
+
+func createDevicesTable(client *awsdynamodb.Client) error {
+	ctx := context.Background()
+	_, err := client.CreateTable(ctx, &awsdynamodb.CreateTableInput{
+		TableName:   aws.String(devicesTableName),
+		BillingMode: ddbtypes.BillingModePayPerRequest,
+		KeySchema: []ddbtypes.KeySchemaElement{
+			{AttributeName: aws.String("pk"), KeyType: ddbtypes.KeyTypeHash},
+			{AttributeName: aws.String("sk"), KeyType: ddbtypes.KeyTypeRange},
+		},
+		AttributeDefinitions: []ddbtypes.AttributeDefinition{
+			{AttributeName: aws.String("pk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
+			{AttributeName: aws.String("sk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
+		},
+	})
+	if err != nil {
+		var inUse *ddbtypes.ResourceInUseException
+		if errors.As(err, &inUse) {
+			return nil // already created by an earlier test package's run
+		}
+		return err
+	}
+	waiter := awsdynamodb.NewTableExistsWaiter(client)
+	return waiter.Wait(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(devicesTableName)}, 30*time.Second)
 }
 
 func createTable(client *awsdynamodb.Client) error {

@@ -14,13 +14,12 @@ import (
 	"strings"
 	"testing"
 
-	"circle-relay/internal/api"
 	"circle-relay/internal/testsupport"
 )
 
 func TestEndToEnd_AppendThenFetchThenDownload(t *testing.T) {
 	circleLogID := testsupport.UniqueCircleID(t)
-	mux := api.NewRouter(testsupport.NewLogStore(t, 0), testsupport.NewBlobStore(t))
+	mux := testsupport.NewRouter(t)
 	server := httptest.NewServer(mux)
 	defer server.Close()
 

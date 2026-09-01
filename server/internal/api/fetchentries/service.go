@@ -5,13 +5,13 @@ package fetchentries
 import (
 	"context"
 
-	"circle-relay/internal/ports"
+	"circle-relay/internal/storage/logstore"
 )
 
 type Service struct {
-	LogStore ports.LogStore
+	LogStore logstore.Store
 }
 
-func (s *Service) Fetch(ctx context.Context, circleLogID string, since int64) (ports.FetchSinceResult, error) {
+func (s *Service) Fetch(ctx context.Context, circleLogID string, since int64) (logstore.FetchSinceResult, error) {
 	return s.LogStore.Read(ctx, circleLogID, since)
 }
