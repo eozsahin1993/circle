@@ -67,6 +67,10 @@ func (s *LogStore) CommitEntry(ctx context.Context, circleLogID, entryID string,
 						"epoch":         &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
 						"encryptedMeta": &types.AttributeValueMemberB{Value: encryptedMeta},
 						"receivedAt":    &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
+						// Duplicated onto the log entry (already known server-side,
+						// already stored in the idem item's own sort key) so Trim
+						// can clean up the matching idempotency marker.
+						"entryID": &types.AttributeValueMemberS{Value: entryID},
 					},
 				},
 			},
@@ -242,11 +246,27 @@ func (s *LogStore) Trim(ctx context.Context, circleLogID string) error {
 	}
 
 	for epoch := oldestAvailable; epoch <= cutoff; epoch++ {
-		if _, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		out, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 			TableName: aws.String(s.tableName),
 			Key: map[string]types.AttributeValue{
 				pkAttr: &types.AttributeValueMemberS{Value: circleLogID},
 				skAttr: &types.AttributeValueMemberS{Value: epochSK(epoch)},
+			},
+			ReturnValues: types.ReturnValueAllOld,
+		})
+		if err != nil {
+			return err
+		}
+
+		entryID, ok := attrString(out.Attributes, "entryID")
+		if !ok {
+			continue // pre-existing item from before entryID was recorded; nothing to clean up
+		}
+		if _, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+			TableName: aws.String(s.tableName),
+			Key: map[string]types.AttributeValue{
+				pkAttr: &types.AttributeValueMemberS{Value: circleLogID},
+				skAttr: &types.AttributeValueMemberS{Value: idemSK(entryID)},
 			},
 		}); err != nil {
 			return err

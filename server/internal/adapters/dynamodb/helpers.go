@@ -28,3 +28,18 @@ func attrInt(item map[string]types.AttributeValue, key string) (int64, error) {
 	}
 	return value, nil
 }
+
+// attrString reads a DynamoDB String attribute out of an item, reporting
+// whether it was present (rather than erroring) — callers that treat a
+// missing attribute as a legitimate, skippable case want a bool, not an err.
+func attrString(item map[string]types.AttributeValue, key string) (string, bool) {
+	attr, ok := item[key]
+	if !ok {
+		return "", false
+	}
+	s, ok := attr.(*types.AttributeValueMemberS)
+	if !ok {
+		return "", false
+	}
+	return s.Value, true
+}

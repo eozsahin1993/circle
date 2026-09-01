@@ -79,3 +79,49 @@ func TestLogStore_Trim_DeletesEntriesBeyondRingBufferSize(t *testing.T) {
 		t.Fatalf("expected surviving entries to start at epoch %d, got %d", wantOldest, result.Entries[0].Epoch)
 	}
 }
+
+func TestLogStore_Trim_DeletesIdempotencyMarkersForTrimmedEntriesOnly(t *testing.T) {
+	ctx := context.Background()
+	circleLogID := testsupport.UniqueCircleID(t)
+	const ringBufferSize = 3
+	logStore := testsupport.NewLogStore(t, ringBufferSize)
+
+	const numEntries = 5
+	var original []ports.CommitResult
+	for i := range numEntries {
+		commit, err := logStore.CommitEntry(ctx, circleLogID, fmt.Sprintf("post-%d", i), []byte("ciphertext"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		original = append(original, commit)
+	}
+
+	if err := logStore.Trim(ctx, circleLogID); err != nil {
+		t.Fatal(err)
+	}
+
+	// The first numEntries-ringBufferSize entries got trimmed: their idem
+	// markers should be gone, so retrying with the same entryID is treated
+	// as a brand-new commit and gets assigned a fresh epoch.
+	for i := 0; i < numEntries-ringBufferSize; i++ {
+		retry, err := logStore.CommitEntry(ctx, circleLogID, fmt.Sprintf("post-%d", i), []byte("ciphertext"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if retry.Epoch == original[i].Epoch {
+			t.Fatalf("post-%d: expected retry after trim to get a new epoch (idem marker should be deleted), still got original epoch %d", i, original[i].Epoch)
+		}
+	}
+
+	// The last ringBufferSize entries survived the trim: their idem markers
+	// must still make retries converge to the original epoch.
+	for i := numEntries - ringBufferSize; i < numEntries; i++ {
+		retry, err := logStore.CommitEntry(ctx, circleLogID, fmt.Sprintf("post-%d", i), []byte("ciphertext"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if retry != original[i] {
+			t.Fatalf("post-%d: expected retry to converge to original commit %+v, got %+v", i, original[i], retry)
+		}
+	}
+}
