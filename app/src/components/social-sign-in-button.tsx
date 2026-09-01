@@ -41,14 +41,20 @@ function GoogleLogo() {
  * app's usual outlined-button look instead of Google's own filled style,
  * to sit next to the Apple button without one looking like an afterthought.
  */
-export function SocialSignInButton({ provider, ...rest }: SocialSignInButtonProps) {
+export function SocialSignInButton({ provider, disabled, ...rest }: SocialSignInButtonProps) {
   const theme = useTheme();
   const isApple = provider === 'apple';
 
   return (
-    <Pressable {...rest}>
+    <Pressable disabled={disabled} {...rest}>
       {({ pressed }) => (
-        <View style={[styles.button, isApple ? styles.apple : styles.google, pressed && styles.pressed]}>
+        <View
+          style={[
+            styles.button,
+            isApple ? styles.apple : styles.google,
+            pressed && styles.pressed,
+            disabled && styles.disabled,
+          ]}>
           {isApple ? <AntDesign name="apple" size={18} color="#000000" /> : <GoogleLogo />}
           <ThemedText type="buttonLabel" style={isApple ? styles.appleLabel : { color: theme.text }}>
             Continue with {isApple ? 'Apple' : 'Google'}
@@ -81,5 +87,8 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
+  },
+  disabled: {
+    opacity: 0.5,
   },
 });

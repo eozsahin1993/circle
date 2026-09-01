@@ -2,6 +2,7 @@ package google
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"circle-relay/internal/httputil"
@@ -32,6 +33,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	token, err := h.Service.SignIn(r.Context(), req.IDToken)
 	if err != nil {
+		// Client gets a generic 401; real reason is server-side only.
+		log.Printf("google sign-in failed: %v", err)
 		httputil.WriteError(w, http.StatusUnauthorized, "invalid Google sign-in")
 		return
 	}

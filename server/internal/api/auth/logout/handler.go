@@ -2,7 +2,6 @@ package logout
 
 import (
 	"net/http"
-	"strings"
 
 	"circle-relay/internal/httputil"
 )
@@ -16,7 +15,7 @@ type Handler struct {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	token, ok := bearerToken(r)
+	token, ok := httputil.BearerToken(r)
 	if !ok {
 		httputil.WriteError(w, http.StatusBadRequest, "missing bearer token")
 		return
@@ -32,17 +31,4 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// elsewhere in this codebase, and it matches DeleteSession's own
 	// idempotent semantics.
 	httputil.WriteJSON(w, http.StatusOK, response{OK: true})
-}
-
-func bearerToken(r *http.Request) (string, bool) {
-	const prefix = "Bearer "
-	header := r.Header.Get("Authorization")
-	if !strings.HasPrefix(header, prefix) {
-		return "", false
-	}
-	token := strings.TrimPrefix(header, prefix)
-	if token == "" {
-		return "", false
-	}
-	return token, true
 }

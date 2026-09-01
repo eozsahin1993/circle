@@ -11,9 +11,15 @@ jest.mock('expo-file-system', () => ({
   UploadType: { MULTIPART: 1, BINARY_CONTENT: 0 },
 }));
 
+const mockGetAuthToken = jest.fn();
+jest.mock('@/services/keystore', () => ({
+  getAuthToken: () => mockGetAuthToken(),
+}));
+
 import { appendEntry, fetchEntries, uploadBlob } from '@/services/relay';
 
 const RELAY_URL = 'http://localhost:8080';
+const AUTH_TOKEN = 'test-session-token';
 
 beforeAll(() => {
   process.env.EXPO_PUBLIC_RELAY_URL = RELAY_URL;
@@ -22,6 +28,7 @@ beforeAll(() => {
 beforeEach(() => {
   global.fetch = jest.fn();
   jest.clearAllMocks();
+  mockGetAuthToken.mockResolvedValue(AUTH_TOKEN);
 });
 
 function jsonResponse(body: unknown, ok = true, status = 200) {
@@ -40,6 +47,7 @@ describe('appendEntry', () => {
     const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
     expect(url).toBe(`${RELAY_URL}/v1/circles/circle-a/entries`);
     expect(init.method).toBe('POST');
+    expect(init.headers.Authorization).toBe(`Bearer ${AUTH_TOKEN}`);
     expect(JSON.parse(init.body)).toEqual({ entryId: 'post-1', encryptedMeta: Buffer.from([1, 2, 3]).toString('base64') });
   });
 
@@ -47,6 +55,13 @@ describe('appendEntry', () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 500));
 
     await expect(appendEntry('circle-a', 'post-1', new Uint8Array([1]))).rejects.toThrow();
+  });
+
+  test('throws without calling fetch when there is no stored session', async () => {
+    mockGetAuthToken.mockResolvedValue(null);
+
+    await expect(appendEntry('circle-a', 'post-1', new Uint8Array([1]))).rejects.toThrow('Not signed in.');
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });
 
@@ -59,7 +74,9 @@ describe('fetchEntries', () => {
 
     const result = await fetchEntries('circle-a', 0);
 
-    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe(`${RELAY_URL}/v1/circles/circle-a/entries?since=0`);
+    const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toBe(`${RELAY_URL}/v1/circles/circle-a/entries?since=0`);
+    expect(init.headers.Authorization).toBe(`Bearer ${AUTH_TOKEN}`);
     expect(result.entries).toEqual([{ epoch: 1, encryptedMeta: new Uint8Array([9, 9, 9]), receivedAt: 111 }]);
     expect(result.latestEpoch).toBe(1);
     expect(result.oldestAvailableEpoch).toBe(1);

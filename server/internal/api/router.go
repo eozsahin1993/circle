@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"circle-relay/internal/api/appendentry"
+	"circle-relay/internal/api/auth"
 	"circle-relay/internal/api/auth/apple"
 	"circle-relay/internal/api/auth/google"
 	"circle-relay/internal/api/auth/logout"
@@ -48,9 +49,13 @@ func newV1Mux(
 ) *http.ServeMux {
 	mux := http.NewServeMux()
 
-	appendentry.Register(mux, &appendentry.Service{LogStore: logStore, BlobStore: blobStore})
-	fetchentries.Register(mux, &fetchentries.Service{LogStore: logStore})
-	getblob.Register(mux, &getblob.Service{BlobStore: blobStore})
+	// Grouped under one sub-mux so RequireSession wraps all three at once.
+	circleMux := http.NewServeMux()
+	appendentry.Register(circleMux, &appendentry.Service{LogStore: logStore, BlobStore: blobStore})
+	fetchentries.Register(circleMux, &fetchentries.Service{LogStore: logStore})
+	getblob.Register(circleMux, &getblob.Service{BlobStore: blobStore})
+	mux.Handle("/circles/", auth.RequireSession(authStore, circleMux))
+
 	google.Register(mux, &google.Service{Secrets: secretStore, AuthStore: authStore, Verifier: googleVerifier})
 	apple.Register(mux, &apple.Service{Secrets: secretStore, AuthStore: authStore, Verifier: appleVerifier})
 	logout.Register(mux, &logout.Service{AuthStore: authStore})

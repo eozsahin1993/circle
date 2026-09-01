@@ -1,6 +1,9 @@
 # Secrets
 .env
 
+# Compiled binary from `go build ./cmd/server` — regenerate with `go run`/`go build`.
+/server
+
 # Compiled Lambda artifact — regenerate with provision/build.sh
 provision/build/
 

@@ -6,6 +6,7 @@ package httputil
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 )
 
 func WriteJSON(w http.ResponseWriter, status int, body any) {
@@ -16,4 +17,18 @@ func WriteJSON(w http.ResponseWriter, status int, body any) {
 
 func WriteError(w http.ResponseWriter, status int, message string) {
 	WriteJSON(w, status, map[string]string{"error": message})
+}
+
+// BearerToken extracts the token from an "Authorization: Bearer <token>" header.
+func BearerToken(r *http.Request) (string, bool) {
+	const prefix = "Bearer "
+	header := r.Header.Get("Authorization")
+	if !strings.HasPrefix(header, prefix) {
+		return "", false
+	}
+	token := strings.TrimPrefix(header, prefix)
+	if token == "" {
+		return "", false
+	}
+	return token, true
 }

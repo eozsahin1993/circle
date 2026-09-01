@@ -17,19 +17,39 @@ import (
 	"circle-relay/internal/testsupport"
 )
 
+// authedRequest sets the bearer token circle content routes now require —
+// http.Post/http.Get can't set headers, so this replaces them here.
+func authedRequest(t *testing.T, method, url, token, body string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(method, url, strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp
+}
+
 func TestEndToEnd_AppendThenFetchThenDownload(t *testing.T) {
 	circleLogID := testsupport.UniqueCircleID(t)
-	mux := testsupport.NewRouter(t)
+	mux, google, _ := testsupport.NewRouterWithAuth(t)
 	server := httptest.NewServer(mux)
 	defer server.Close()
+
+	claims := validClaims(testsupport.UniqueEmail(t), testsupport.TestGoogleClientID)
+	claims["iss"] = google.Issuer
+	token := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
 
 	plaintext := "caption and photo bytes, pretend-encrypted"
 	body := `{"entryId":"post-1","encryptedMeta":"` + base64.StdEncoding.EncodeToString([]byte(plaintext)) + `"}`
 
-	appendResp, err := http.Post(server.URL+"/v1/circles/"+circleLogID+"/entries", "application/json", strings.NewReader(body))
-	if err != nil {
-		t.Fatal(err)
-	}
+	appendResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+circleLogID+"/entries", token, body)
 	defer appendResp.Body.Close()
 	if appendResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 from append, got %d", appendResp.StatusCode)
@@ -51,10 +71,7 @@ func TestEndToEnd_AppendThenFetchThenDownload(t *testing.T) {
 		t.Fatalf("expected upload fields' key to be %s, got %q", wantSuffix, appendBody.Upload.Fields["key"])
 	}
 
-	fetchResp, err := http.Get(server.URL + "/v1/circles/" + circleLogID + "/entries?since=0")
-	if err != nil {
-		t.Fatal(err)
-	}
+	fetchResp := authedRequest(t, http.MethodGet, server.URL+"/v1/circles/"+circleLogID+"/entries?since=0", token, "")
 	defer fetchResp.Body.Close()
 	if fetchResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 from fetch, got %d", fetchResp.StatusCode)
@@ -86,20 +103,19 @@ func TestEndToEnd_AppendThenFetchThenDownload(t *testing.T) {
 		t.Fatalf("expected latestEpoch %d, got %d", appendBody.Epoch, fetchBody.LatestEpoch)
 	}
 
-	// The blob endpoint should redirect (302) to a download URL — the
-	// http.Client follows the redirect by default, ending up at the real
-	// S3-via-LocalStack destination, which 404s (nothing was ever
-	// "uploaded" in this test — appending only reserves the slot, upload
-	// is a separate step the client does directly against S3 as a
-	// presigned POST using the append response's upload target). That
-	// 404 is expected here, not a failure of this handler: what's under
-	// test is that a redirect happens at all, and to the right place.
+	// Should redirect (302) to a presigned S3 URL, not follow it — nothing
+	// was actually uploaded in this test, only the append call happened.
+	blobReq, err := http.NewRequest(http.MethodGet, server.URL+"/v1/circles/"+circleLogID+"/entries/"+strconv.FormatInt(appendBody.Epoch, 10)+"/blob", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blobReq.Header.Set("Authorization", "Bearer "+token)
 	client := &http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
-	blobResp, err := client.Get(server.URL + "/v1/circles/" + circleLogID + "/entries/" + strconv.FormatInt(appendBody.Epoch, 10) + "/blob")
+	blobResp, err := client.Do(blobReq)
 	if err != nil {
 		t.Fatal(err)
 	}

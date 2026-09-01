@@ -2,6 +2,7 @@ import { Buffer } from 'buffer';
 import { File, Paths, UploadType } from 'expo-file-system';
 
 import { generateUUID } from '@/services/crypto';
+import { getAuthToken } from '@/services/keystore';
 
 /**
  * Thin fetch-based client for the relay's three endpoints — see
@@ -39,9 +40,27 @@ function baseUrl(): string {
   return url;
 }
 
+/**
+ * fetch, with the stored session token attached — every circle-log route
+ * requires one now (see server's auth.RequireSession). Sign-in itself
+ * doesn't go through this (that's how you get a token in the first
+ * place); logout takes its token as a parameter instead, since it revokes
+ * a specific token rather than "whatever's currently stored."
+ */
+async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const token = await getAuthToken();
+  if (!token) {
+    throw new Error('Not signed in.');
+  }
+  return fetch(`${baseUrl()}${path}`, {
+    ...init,
+    headers: { ...init.headers, Authorization: `Bearer ${token}` },
+  });
+}
+
 /** Appends one entry to a circle's log — POST /v1/circles/{circleLogId}/entries. */
 export async function appendEntry(circleLogId: string, entryId: string, encryptedMeta: Uint8Array): Promise<AppendResult> {
-  const response = await fetch(`${baseUrl()}/v1/circles/${circleLogId}/entries`, {
+  const response = await authorizedFetch(`/v1/circles/${circleLogId}/entries`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ entryId, encryptedMeta: Buffer.from(encryptedMeta).toString('base64') }),
@@ -55,7 +74,7 @@ export async function appendEntry(circleLogId: string, entryId: string, encrypte
 
 /** Fetches every entry after `since` — GET /v1/circles/{circleLogId}/entries?since=. */
 export async function fetchEntries(circleLogId: string, since: number): Promise<FetchEntriesResult> {
-  const response = await fetch(`${baseUrl()}/v1/circles/${circleLogId}/entries?since=${since}`);
+  const response = await authorizedFetch(`/v1/circles/${circleLogId}/entries?since=${since}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch entries: ${response.status}`);
   }
@@ -90,5 +109,39 @@ export async function uploadBlob(target: UploadTarget, bytes: Uint8Array): Promi
     }
   } finally {
     file.delete();
+  }
+}
+
+/**
+ * Exchanges a provider ID token for a relay bearer session token — POST
+ * /v1/auth/google or /v1/auth/apple. See server/internal/api/authgoogle
+ * and authapple: the relay verifies idToken against the provider's own
+ * signing keys itself, this call doesn't trust anything client-side about
+ * the token's contents.
+ */
+async function signIn(provider: 'google' | 'apple', idToken: string): Promise<string> {
+  const response = await fetch(`${baseUrl()}/v1/auth/${provider}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+  });
+  if (!response.ok) {
+    throw new Error(`${provider} sign-in failed: ${response.status}`);
+  }
+  const body = await response.json();
+  return body.token;
+}
+
+export const signInWithGoogle = (idToken: string) => signIn('google', idToken);
+export const signInWithApple = (idToken: string) => signIn('apple', idToken);
+
+/** Revokes a bearer session token — POST /v1/auth/logout. Idempotent, same as the endpoint itself. */
+export async function logout(token: string): Promise<void> {
+  const response = await fetch(`${baseUrl()}/v1/auth/logout`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error(`Logout failed: ${response.status}`);
   }
 }
