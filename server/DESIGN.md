@@ -1,10 +1,16 @@
 # Relay server design
 
-Status: **not built**. This documents the architecture decided in design
-discussion, so it survives past a chat transcript. The `app/` codebase
-currently only implements the local, single-device pieces (circles, posts,
-members, roles, invite *creation*) — everything below involving cross-device
-sync, push, or redemption does not exist yet.
+Status: **partially built**. This documents the architecture decided in
+design discussion, so it survives past a chat transcript. What actually
+exists: the relay server itself (`server/`, Go — append/fetch/blob for a
+generic per-circle log) and the app's outbox + push-to-relay half of sync
+(`app/src/domain/usecases/sync-circle.ts`'s `drainOutbox`, posts only).
+Not built: the pull side (`pullCircle`, a local `circleLog` mirror table),
+invites/roles/kick actually syncing through the relay (today these are
+local-only — see `app/src/domain/usecases/invite-to-circle.ts` etc.), push
+notifications (section 2 below is a full design, zero implementation), and
+phone-number auth (its own section below, same status: designed, not
+started).
 
 The relay's core property: it is blind. It never sees plaintext content, and
 it's designed so it can infer as little as possible about circle membership,
@@ -80,25 +86,78 @@ clustered in the same short window can hint that they're connected, even
 without revealing who. Known, not fully closeable (Signal only partially
 mitigates the equivalent), not worth blocking on for v1.
 
-## 2. Push notifications: thin, per-member, identity-sensitive
+## 2. Push notifications: rich, but the relay never knows why
 
-- Push is a wake-up nudge, never a payload channel. It carries no data —
-  just "your circle moved past your epoch, go sync." The device pulls the
-  actual log delta itself afterward.
-- Relay holds one deliberate non-blind table: `routing tag → push token`.
-  No names, no PII, no member list — just two opaque values.
-- Routing tag = `HMAC(circle_secret, memberId)`, **per member**, not shared
-  — unlike the log id. This matters specifically because push tokens are
-  durable and tied to one real device; letting the relay link the *same*
-  tag across multiple circles would let it correlate one person's presence
-  across otherwise-unrelated groups. The log id doesn't carry that risk
-  (no token attached to it), which is why it's allowed to be shared while
-  the push tag isn't.
-- Group "broadcast" is never a single push — it's N individual per-member
-  push deliveries, one per derived tag, so the relay can't cluster them
-  into "these N belong to one circle."
+Superseded an earlier thin/data-only design (push carries nothing, device
+just wakes and syncs). Decided against: a silent-only push can't show
+"Sarah posted in Family Circle" the way competitors do, and push
+UX is table-stakes for adoption — but getting there without leaking
+plaintext circle names/identities to the relay needs a few pieces
+together, not one.
+
+- **Routing ID, not a durable per-member tag.** Each device generates a
+  fresh **random** (not derived) routing ID per circle — same
+  don't-reuse-across-circles principle as `generateIdentity()`. Random
+  rather than `HMAC(circle_secret, memberId)` specifically so the ID
+  carries zero brute-forceable structure — nothing to reverse even if the
+  derivation scheme is public.
+- **Two different lifetimes for two different things:**
+  - `routingId → realPushToken`: a real, durable, relay-held table,
+    registered by each device independently of any circle. On its own it
+    reveals nothing about circle membership — just "opaque ID reaches this
+    device." One row per device, updated in place on token rotation, so a
+    device's many per-circle routing IDs never need updating individually.
+  - `circleLogId → [routingIds]`: **never stored**. It already exists
+    durably, but encrypted — inside the roster, which syncs through the
+    same append-only log as posts (routing IDs just ride along as one more
+    encrypted roster field). The relay only ever sees the plaintext list
+    *ephemerally*, supplied by the poster's device (which decrypted its
+    own roster) as a parameter on the append request, used once to
+    trigger fanout, never written down. No standing, queryable
+    circle-to-routing-ID table exists anywhere.
+- **Fanout is per-target, not a single group push** — same reasoning as
+  before: N individual dispatches so the relay can't cluster them into
+  "these belong to one circle" from the send pattern alone.
+- **The relay constructs nothing from real data.** It sends either a
+  minimal wake signal or the entry's existing ciphertext — never a
+  server-assembled string built from plaintext circle name / poster
+  identity, which would mean sending both to the relay on every post.
+  Instead: **iOS Notification Service Extension** / **Android FCM data
+  message → `onMessageReceived`** — both let the *device* intercept the
+  push before display, decrypt with the circle secret it already holds,
+  and construct the real notification text itself. Same mechanism Signal
+  uses. If decryption fails (bogus routing ID, corrupted payload, wrong
+  circle), fall back to nothing shown, logged locally only — never a
+  broken/generic notification, never anything sent back to the relay.
+- **Abuse case, and why it's mostly self-limiting:** the relay trusts
+  whatever routing-ID list a poster supplies — it can't independently
+  verify the claimed IDs are legitimate members of that circle without
+  reintroducing the standing membership table this design avoids. But a
+  bogus/malicious list can't produce a *meaningful* notification either
+  way — decryption fails on the recipient's device (attacker doesn't have
+  the circle secret), so the worst case is a dropped or generic
+  fallback, not real spam content. Same encryption that protects content
+  gates spam value, for free. Residual, cheap mitigations if it's ever
+  worth tightening: cap notify-targets per request, rate-limit triggers
+  per routing ID (a plain counter, no circle context attached).
+- The real, complete fix — the relay cryptographically verifies "this
+  poster shares a circle with this routing ID" without learning which
+  circle or who — is a zero-knowledge group-membership proof (what
+  Signal's Groups v2 does for a related problem). Named here as the
+  ceiling, not something to build now; disproportionate engineering for
+  this project's current stage and stakes.
+- **Timing correlation via APNs/FCM's own delivery analytics is a real,
+  unclosable side channel**, independent of anything the relay's own
+  infrastructure does. Whoever's registered as the app's developer has
+  legitimate access to Apple/Google's own push delivery dashboards, and
+  could infer "these tokens got notified together" from timing alone.
+  Nothing here (routing IDs, enclaves, ZK proofs) touches this — it lives
+  entirely in the platforms' own systems. Jitter/delay per-recipient
+  dispatch raises the cost of correlating it, doesn't eliminate it.
+  Accepted, same category as the log-id activity/cluster-size leak above:
+  known, not fully closeable, not worth blocking on.
 - True peer-to-peer push isn't achievable on iOS/Android — platform
-  constraint, not a design choice. Has to go through APNs/FCM.
+  constraint, not a design choice. Has to go through APNs/FCM either way.
 
 ## 3. Mailbox: ephemeral, one-shot, for things that truly aren't shared
 
@@ -174,14 +233,96 @@ Reserved for private, per-individual exchanges — not circle content.
   `app/src/domain/usecases/create-circle.ts`), and promoting others later
   is a small, separate, not-yet-built action.
 
+## Phone-number auth (designed, not yet started)
+
+Not about content — content stays E2E encrypted regardless. This is about
+closing the one real gap the blind design leaves open: nothing currently
+stops unauthenticated spam against the relay itself (fabricate a random
+circleLogId, hit the append endpoint forever, run up real infra cost). A
+free-to-mint identity (a keypair, generated locally, same as any circle
+identity) doesn't raise the bar against that — the fix has to impose real
+cost on registering, same reason every major app requiring this property
+lands on phone verification specifically.
+
+- **OTP flow**: app sends phone number → server sends SMS OTP (Twilio/SNS
+  or similar) → user confirms → server computes a `deviceId` and discards
+  the raw number immediately, never persisting it, never logging it.
+- **`deviceId = HMAC(masterKey, phoneNumber)`, not a plain hash.** Phone
+  numbers are low-entropy (~billions of possibilities) — a plain hash is
+  trivially reversible by precomputing the whole space. Keying it closes
+  that, but only if the key never leaves the server: a key embedded in
+  the client app is extractable by anyone motivated to look, which makes
+  client-side hashing no safer than an unkeyed hash against a real
+  attacker.
+- **One master key, purpose-specific keys derived from it** (`derive(masterKey,
+  "phone-hmac")`, `derive(masterKey, "push-token-decrypt")`, etc.) — same
+  hierarchical-key pattern the app's own `generateSeedPhrase()`/
+  `saveMasterSeed()` already intends for circle keys, just applied
+  server-side. One-way in one direction only: master → derived is cheap
+  and intended (that's the whole point), derived → master or derived →
+  sibling-derived is computationally infeasible with a proper KDF
+  (HMAC/HKDF). Cheaper to operate than one key per feature (KMS bills
+  per-key, no free tier), and a leaked derived key doesn't expose the
+  master or any other purpose's key.
+- **Even the operator's own code shouldn't read the master key** — the
+  actual protection needed is against the operator's *normal* code path
+  (or a compromised Lambda), not just external attackers, since the
+  operator otherwise has unrestricted plaintext access to anything a
+  key merely "at rest encrypts." Real fix: an attestation-gated KMS key
+  (AWS Nitro Enclaves) — KMS releases the key only to a process that
+  cryptographically proves, via hardware attestation, it's running the
+  exact published, unmodified code. Same technique Signal uses for
+  contact discovery (SGX/Nitro), applied here to phone-HMAC derivation
+  and push-token decrypt-and-send specifically — not the entire request
+  path, which would balloon the trusted boundary for no reason.
+- **Honest ceiling, not a loophole to pretend away**: the operator
+  typically retains rights to edit the KMS key policy itself, so
+  "can't bypass attestation to decrypt directly" doesn't mean "can never
+  get the data," it means "can't get it silently" — changing the policy
+  is a visible, auditable action (more so with the server already open
+  source), not an invisible one. Full protection against the operator
+  needs the policy-edit right itself given up permanently, which isn't
+  realistic for a solo-maintained project without losing the ability to
+  operate your own infrastructure. This is the actual, practical ceiling
+  for anything short of Signal's org-scale, multi-party-governance model
+  — worth being honest about rather than overselling the enclave as
+  absolute.
+- **Trust model for this app's real audience isn't the same problem
+  Signal solves anyway.** Signal's enclave apparatus targets strangers
+  who need institutional trust with no personal relationship to fall
+  back on. This app's initial audience — family, close friends — starts
+  from a place of already trusting the person building it. The blind
+  content design alone is already a stronger privacy story than most
+  mainstream apps; the enclave-grade "protect against the operator too"
+  layer is worth building deliberately, later, once real user count and
+  stakes justify the engineering — not a prerequisite before the core
+  product works.
+- Env vars are **not** a substitute for any of this — a Lambda env var is
+  readable by any normal code running in that function, no attestation
+  gate at all. Fine for values the server is *supposed* to read freely
+  (`TABLE_NAME`, `BUCKET_NAME`, already env vars); wrong for anything
+  meant to be hidden from the server's own normal code path.
+- Abuse mitigation that doesn't need any of the above: cheap infra-level
+  bounding, not identity-based prevention — a Lambda reserved-concurrency
+  cap plus an AWS Budgets alert. Identity-based defenses don't actually
+  stop a scripted attacker here, since minting a new device identity is
+  free and instant either way; the concurrency cap + budget alert turns
+  "could cost millions" into "costs a bounded, known ceiling and I get
+  paged," regardless of how many fake identities are involved.
+
 ## Explicitly rejected
 
-- **Contact discovery / search.** Would require collecting phone numbers
-  (this app deliberately collects neither) and a real server-side directory
-  — a categorically bigger and more sensitive piece of infrastructure than
-  a blind relay, and it directly undermines `generateIdentity()`'s own
-  purpose (fresh per-circle keys specifically to prevent cross-circle
-  identity correlation).
+- **Contact discovery / search.** Would require a real server-side
+  directory matching uploaded contact lists against registered users — a
+  categorically bigger, more sensitive piece of infrastructure than
+  phone-verified auth alone (that's self-registration; this is uploading
+  *other people's* phone numbers who never consented to anything). The
+  privacy-preserving version of this specifically needs Signal's
+  SGX/Nitro-enclave-based Contact Discovery Service, not a bolt-on. Stays
+  rejected independent of the phone-auth decision above — simply picking
+  someone from local contacts to send them an invite link via the native
+  share sheet needs none of this (no server involvement at all) and
+  isn't part of this rejection.
 - **Any-admin invite approval.** See Invites section above — real plumbing
   cost for a speculative benefit that already has a free workaround.
 - **Circle-level (shared) mailbox for content delivery.** Superseded by the
