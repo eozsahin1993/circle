@@ -102,6 +102,50 @@ export const postReactions = sqliteTable(
   ]
 );
 
+/**
+ * Strict local ordering for locally-created content awaiting push to the
+ * relay — see server/DESIGN.md. `sequenceNum` (not `createdAt`) is what
+ * `drainOutbox` pushes in order: a DB-assigned autoincrement is gap-free
+ * and unambiguous by construction, where comparing timestamps across
+ * (eventually several) locally-originated entry types would not be.
+ * `epoch` stays null until the relay confirms the push; entryType is
+ * 'post' only for now but kept generic since comments/reactions will
+ * eventually queue through here too.
+ */
+export const outbox = sqliteTable(
+  'outbox',
+  {
+    sequenceNum: integer('sequence_num').primaryKey({ autoIncrement: true }),
+    circleId: text('circle_id')
+      .notNull()
+      .references(() => circles.id, { onDelete: 'cascade' }),
+    entryType: text('entry_type', { enum: ['post'] }).notNull(),
+    localId: text('local_id').notNull(),
+    /**
+     * The exact ciphertext `drainOutbox` will POST as-is — built and
+     * encrypted once, at enqueue time, not re-derived from `posts` when
+     * the push actually happens. Two reasons that matters: a retry must
+     * send byte-for-byte the same thing it did the first time (the
+     * relay's idempotency is keyed on entryId, not payload — if a retry's
+     * bytes differed, the relay would silently keep the first attempt's
+     * content and drop the retry's), and a locally-created row can be
+     * queued for a while before it actually goes out, during which
+     * `posts` itself could in principle change under it.
+     */
+    encryptedMeta: blob('encrypted_meta').$type<Uint8Array>().notNull(),
+    /**
+     * Decoupled from `epoch` on purpose: today the two always move
+     * together (pending -> synced, right when epoch is first set), but a
+     * separate status leaves room for a later 'failed' state — a
+     * permanently-failed push and a not-yet-attempted one would otherwise
+     * both just look like `epoch IS NULL`, with no way to tell them apart.
+     */
+    status: text('status', { enum: ['pending', 'synced'] }).notNull(),
+    epoch: integer('epoch'),
+  },
+  (t) => [index('outbox_circle_id').on(t.circleId)]
+);
+
 export const postComments = sqliteTable(
   'post_comments',
   {

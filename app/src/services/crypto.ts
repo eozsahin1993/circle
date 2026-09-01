@@ -108,6 +108,16 @@ export function encrypt(plaintext: Uint8Array, secret: Uint8Array): Uint8Array {
 }
 
 /**
+ * Encrypts a JSON-serializable value under the circle's shared secret —
+ * the shape every relay log entry's envelope takes (see
+ * server/DESIGN.md). A thin convenience over `encrypt` for structured
+ * data instead of raw bytes.
+ */
+export function encryptJSON(value: unknown, secret: Uint8Array): Uint8Array {
+  return encrypt(new TextEncoder().encode(JSON.stringify(value)), secret);
+}
+
+/**
  * Decrypts what `encrypt` produced: splits the leading nonce back off,
  * then decrypts the rest. Throws if the ciphertext was tampered with or
  * `secret` doesn't match what it was encrypted under.
