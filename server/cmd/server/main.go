@@ -30,7 +30,8 @@ func main() {
 	}
 
 	logStore := dynamodb.NewLogStore(awsdynamodb.NewFromConfig(awsCfg), cfg.TableName, cfg.RingBufferSize)
-	blobStore := s3.NewBlobStore(awss3.NewFromConfig(awsCfg), cfg.BucketName)
+	s3Client := awss3.NewFromConfig(awsCfg, func(o *awss3.Options) { o.UsePathStyle = cfg.S3ForcePathStyle })
+	blobStore := s3.NewBlobStore(s3Client, cfg.BucketName)
 
 	mux := api.NewRouter(logStore, blobStore)
 

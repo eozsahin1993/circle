@@ -5,10 +5,12 @@
 provision/build/
 
 # Terraform local state and provider cache — no remote backend configured
-# yet (see versions.tf), so these stay machine-local. The .lock.hcl file
-# is NOT ignored — that one is meant to be committed.
-provision/.terraform/
-provision/*.tfstate
-provision/*.tfstate.*
-provision/crash.log
-provision/*.tfvars
+# yet (see versions.tf), so these stay machine-local. Matches both
+# provision/ and provision/local/ (each is its own root config with its
+# own state). The .lock.hcl files are NOT ignored — those are meant to be
+# committed.
+provision/**/.terraform/
+provision/**/*.tfstate
+provision/**/*.tfstate.*
+provision/**/crash.log
+provision/**/*.tfvars

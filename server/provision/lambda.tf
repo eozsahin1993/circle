@@ -19,7 +19,7 @@ data "aws_iam_policy_document" "lambda_assume_role" {
 }
 
 resource "aws_iam_role" "lambda" {
-  name               = "${var.name_prefix}-lambda"
+  name               = "${local.name_prefix}-lambda"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 }
 
@@ -40,7 +40,7 @@ data "aws_iam_policy_document" "lambda_storage_access" {
       "dynamodb:Query",
       "dynamodb:TransactWriteItems",
     ]
-    resources = [aws_dynamodb_table.circle_log.arn]
+    resources = [module.storage.table_arn]
   }
 
   statement {
@@ -49,18 +49,18 @@ data "aws_iam_policy_document" "lambda_storage_access" {
       "s3:PutObject",
       "s3:GetObject",
     ]
-    resources = ["${aws_s3_bucket.circle_blobs.arn}/*"]
+    resources = ["${module.storage.bucket_arn}/*"]
   }
 }
 
 resource "aws_iam_role_policy" "lambda_storage_access" {
-  name   = "${var.name_prefix}-storage-access"
+  name   = "${local.name_prefix}-storage-access"
   role   = aws_iam_role.lambda.id
   policy = data.aws_iam_policy_document.lambda_storage_access.json
 }
 
 resource "aws_lambda_function" "relay" {
-  function_name = "${var.name_prefix}-relay"
+  function_name = "${local.name_prefix}-relay"
   role          = aws_iam_role.lambda.arn
 
   filename         = data.archive_file.lambda.output_path
@@ -78,8 +78,8 @@ resource "aws_lambda_function" "relay" {
 
   environment {
     variables = {
-      TABLE_NAME       = aws_dynamodb_table.circle_log.name
-      BUCKET_NAME      = aws_s3_bucket.circle_blobs.id
+      TABLE_NAME       = module.storage.table_name
+      BUCKET_NAME      = module.storage.bucket_name
       RING_BUFFER_SIZE = tostring(var.ring_buffer_size)
     }
   }

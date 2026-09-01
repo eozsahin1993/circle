@@ -4,9 +4,9 @@ output "api_endpoint" {
 }
 
 output "table_name" {
-  value = aws_dynamodb_table.circle_log.name
+  value = module.storage.table_name
 }
 
 output "bucket_name" {
-  value = aws_s3_bucket.circle_blobs.id
+  value = module.storage.bucket_name
 }

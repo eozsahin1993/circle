@@ -4,10 +4,14 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
-variable "name_prefix" {
-  description = "Prefix applied to every named resource, so multiple environments (dev/prod) can coexist in one account without colliding."
+variable "env" {
+  description = "Environment name, folded into every resource's name (e.g. circle-relay-prod-circle-log) so multiple environments can coexist in one account without colliding."
   type        = string
-  default     = "circle-relay"
+  default     = "prod"
+}
+
+locals {
+  name_prefix = "circle-relay-${var.env}"
 }
 
 variable "ring_buffer_size" {

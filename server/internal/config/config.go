@@ -20,6 +20,11 @@ type Config struct {
 	RingBufferSize int64
 	// Port is only used by cmd/server (cmd/lambda doesn't listen on a port).
 	Port string
+	// S3ForcePathStyle is only ever true for local testing against
+	// LocalStack, which doesn't resolve virtual-hosted-style bucket
+	// subdomains (bucket.host) the way real S3 does. Real AWS always uses
+	// the default (false) — never set this in a deployed environment.
+	S3ForcePathStyle bool
 }
 
 // Load reads every setting from the environment, once, at startup. Fails
@@ -28,10 +33,11 @@ type Config struct {
 // limp along with a zero value.
 func Load() Config {
 	return Config{
-		TableName:      mustEnv("TABLE_NAME"),
-		BucketName:     mustEnv("BUCKET_NAME"),
-		RingBufferSize: intEnv("RING_BUFFER_SIZE", 0),
-		Port:           envOr("PORT", "8080"),
+		TableName:        mustEnv("TABLE_NAME"),
+		BucketName:       mustEnv("BUCKET_NAME"),
+		RingBufferSize:   intEnv("RING_BUFFER_SIZE", 0),
+		Port:             envOr("PORT", "8080"),
+		S3ForcePathStyle: envOr("S3_FORCE_PATH_STYLE", "false") == "true",
 	}
 }
 

@@ -1,9 +1,9 @@
 # One route, not one per endpoint: the Lambda's own net/http.ServeMux
-# (server/internal/app) already does the real routing internally, so API
+# (server/internal/api) already does the real routing internally, so API
 # Gateway's job is just "forward everything to the one function" — a
 # single $default catch-all route rather than three explicit ones.
 resource "aws_apigatewayv2_api" "relay" {
-  name          = "${var.name_prefix}-api"
+  name          = "${local.name_prefix}-api"
   protocol_type = "HTTP"
 }
 
