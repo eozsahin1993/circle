@@ -36,7 +36,6 @@ data "aws_iam_policy_document" "lambda_storage_access" {
     actions = [
       "dynamodb:GetItem",
       "dynamodb:UpdateItem",
-      "dynamodb:DeleteItem",
       "dynamodb:Query",
       "dynamodb:TransactWriteItems",
     ]
@@ -80,7 +79,7 @@ resource "aws_lambda_function" "relay" {
     variables = {
       TABLE_NAME          = module.storage.table_name
       BUCKET_NAME         = module.storage.bucket_name
-      RING_BUFFER_SIZE    = tostring(var.ring_buffer_size)
+      LOG_RETENTION_DAYS  = tostring(var.log_retention_days)
       MAX_BLOB_SIZE_BYTES = tostring(var.max_blob_size_bytes)
     }
   }

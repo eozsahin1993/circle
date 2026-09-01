@@ -14,10 +14,12 @@ import (
 type Config struct {
 	TableName  string
 	BucketName string
-	// RingBufferSize is passed straight to dynamodb.NewLogStore — see
-	// server/DESIGN.md and provision/variables.tf's ring_buffer_size. 0
-	// means "use the adapter's own default".
-	RingBufferSize int64
+	// LogRetentionDays is passed straight to dynamodb.NewLogStore — see
+	// server/DESIGN.md and provision/variables.tf's log_retention_days. 0
+	// means "use the adapter's own default". Eviction itself is DynamoDB's
+	// native TTL (see provision/modules/storage/dynamodb.tf), not this
+	// process — this only controls what expiresAt gets written as.
+	LogRetentionDays int64
 	// MaxBlobSize is passed straight to s3.NewBlobStore — see
 	// server/DESIGN.md and provision/variables.tf's max_blob_size_bytes. 0
 	// means "use the adapter's own default".
@@ -39,7 +41,7 @@ func Load() Config {
 	return Config{
 		TableName:        mustEnv("TABLE_NAME"),
 		BucketName:       mustEnv("BUCKET_NAME"),
-		RingBufferSize:   intEnv("RING_BUFFER_SIZE", 0),
+		LogRetentionDays: intEnv("LOG_RETENTION_DAYS", 0),
 		MaxBlobSize:      intEnv("MAX_BLOB_SIZE_BYTES", 0),
 		Port:             envOr("PORT", "8080"),
 		S3ForcePathStyle: envOr("S3_FORCE_PATH_STYLE", "false") == "true",

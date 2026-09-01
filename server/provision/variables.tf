@@ -14,10 +14,10 @@ locals {
   name_prefix = "circle-relay-${var.env}"
 }
 
-variable "ring_buffer_size" {
-  description = "Max log entries retained per circle before the oldest get trimmed — see server/DESIGN.md. A single tunable constant, not expected to need per-environment overrides, but exposed here rather than hardcoded in Go so it can be changed without a rebuild."
+variable "log_retention_days" {
+  description = "How long a circle's log entries (and their blobs) are kept before AWS evicts them — DynamoDB TTL for the log, an S3 lifecycle rule for blobs — see server/DESIGN.md. Safe to raise anytime; lowering it needs care (see log_store.go's oldestAvailableEpoch doc comment) — start conservative, not aggressive. Exposed here rather than hardcoded so it can be changed without a rebuild."
   type        = number
-  default     = 2000
+  default     = 14
 }
 
 variable "max_blob_size_bytes" {

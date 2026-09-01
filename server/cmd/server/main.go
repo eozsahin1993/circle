@@ -29,7 +29,7 @@ func main() {
 		log.Fatalf("failed to load AWS config: %v", err)
 	}
 
-	logStore := dynamodb.NewLogStore(awsdynamodb.NewFromConfig(awsCfg), cfg.TableName, cfg.RingBufferSize)
+	logStore := dynamodb.NewLogStore(awsdynamodb.NewFromConfig(awsCfg), cfg.TableName, cfg.LogRetentionDays)
 	s3Client := awss3.NewFromConfig(awsCfg, func(o *awss3.Options) { o.UsePathStyle = cfg.S3ForcePathStyle })
 	blobStore := s3.NewBlobStore(s3Client, cfg.BucketName, cfg.MaxBlobSize)
 

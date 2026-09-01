@@ -16,7 +16,7 @@ type FetchSinceResult struct {
 	// Entries strictly after Since, oldest first.
 	Entries []LogEntry
 	// LatestEpoch may be higher than the highest entry returned — some
-	// may have been ring-buffer trimmed.
+	// may have aged out under the store's retention policy (TTL).
 	LatestEpoch int64
 	// OldestAvailableEpoch: a caller behind this point can't catch up
 	// incrementally anymore.
@@ -47,9 +47,7 @@ type LogStore interface {
 	// so a retry is always safe.
 	CommitEntry(ctx context.Context, circleLogID, entryID string, encryptedMeta []byte) (CommitResult, error)
 
+	// Read never deletes anything — retention is enforced by the store's
+	// own backing mechanism (e.g. DynamoDB TTL), not by application code.
 	Read(ctx context.Context, circleLogID string, since int64) (FetchSinceResult, error)
-
-	// Trim enforces the ring buffer cap — best-effort, not required to be
-	// atomic with CommitEntry.
-	Trim(ctx context.Context, circleLogID string) error
 }

@@ -22,16 +22,15 @@ type Service struct {
 	BlobStore ports.BlobStore
 }
 
-// Append commits the entry, then always trims (cheap no-op when nothing's
-// over the ring buffer cap) and hands back an upload target — unconditionally
-// (see ports.BlobStore), even though this pass only ever produces
-// entryType "post" entries which always have one.
+// Append commits the entry, then hands back an upload target —
+// unconditionally (see ports.BlobStore), even though this pass only ever
+// produces entryType "post" entries which always have one. Retention is
+// enforced by the store's own TTL, not here — nothing to trim.
 func (s *Service) Append(ctx context.Context, circleLogID, entryID string, encryptedMeta []byte) (Result, error) {
 	commit, err := s.LogStore.CommitEntry(ctx, circleLogID, entryID, encryptedMeta)
 	if err != nil {
 		return Result{}, err
 	}
-	_ = s.LogStore.Trim(ctx, circleLogID) // best-effort, see server/DESIGN.md
 
 	upload, err := s.BlobStore.GetUploadTarget(ctx, circleLogID, commit.Epoch)
 	if err != nil {

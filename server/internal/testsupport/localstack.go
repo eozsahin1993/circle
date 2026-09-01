@@ -64,7 +64,7 @@ func loadConfig(t testing.TB) aws.Config {
 // creating the test table once per test binary run (shared across tests —
 // safe because tests use distinct circleLogID values). Skips the test if
 // LocalStack isn't reachable.
-func NewLogStore(t testing.TB, ringBufferSize int64) ports.LogStore {
+func NewLogStore(t testing.TB, logRetentionDays int64) ports.LogStore {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
@@ -75,7 +75,26 @@ func NewLogStore(t testing.TB, ringBufferSize int64) ports.LogStore {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", tableErr)
 	}
 
-	return dynamodb.NewLogStore(client, tableName, ringBufferSize)
+	return dynamodb.NewLogStore(client, tableName, logRetentionDays)
+}
+
+// RawDynamoDBClient returns the same client + table name NewLogStore uses,
+// for tests that need to inspect raw item attributes (e.g. expiresAt) or
+// delete an item directly to simulate what DynamoDB's background TTL
+// sweep would eventually do — sweep timing itself isn't something a fast
+// unit test can exercise for real.
+func RawDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
+	t.Helper()
+	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
+		o.BaseEndpoint = aws.String(localstackEndpoint)
+	})
+
+	tableOnce.Do(func() { tableErr = createTable(client) })
+	if tableErr != nil {
+		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", tableErr)
+	}
+
+	return client, tableName
 }
 
 // NewBlobStore returns a real s3-backed BlobStore against LocalStack,

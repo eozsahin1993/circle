@@ -30,7 +30,7 @@ func main() {
 		log.Fatalf("failed to load AWS config: %v", err)
 	}
 
-	logStore := dynamodb.NewLogStore(awsdynamodb.NewFromConfig(awsCfg), cfg.TableName, cfg.RingBufferSize)
+	logStore := dynamodb.NewLogStore(awsdynamodb.NewFromConfig(awsCfg), cfg.TableName, cfg.LogRetentionDays)
 	blobStore := s3.NewBlobStore(awss3.NewFromConfig(awsCfg), cfg.BucketName, cfg.MaxBlobSize)
 
 	mux := api.NewRouter(logStore, blobStore)

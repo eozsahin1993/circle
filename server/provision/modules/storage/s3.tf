@@ -30,3 +30,22 @@ resource "aws_s3_bucket_cors_configuration" "circle_blobs" {
     max_age_seconds = 3000
   }
 }
+
+# Same retention window as the DynamoDB log's TTL (see dynamodb.tf) — a
+# blob shouldn't outlive the log entry that points to it, and this is the
+# dominant cost driver (photos, not log metadata), so it's the one that
+# actually matters for keeping storage bounded rather than growing forever.
+resource "aws_s3_bucket_lifecycle_configuration" "circle_blobs" {
+  bucket = aws_s3_bucket.circle_blobs.id
+
+  rule {
+    id     = "expire-blobs"
+    status = "Enabled"
+
+    filter {}
+
+    expiration {
+      days = var.log_retention_days
+    }
+  }
+}

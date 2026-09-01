@@ -16,20 +16,22 @@ import (
 	"circle-relay/internal/ports"
 )
 
-// DefaultRingBufferSize is configurable per server/DESIGN.md.
-const DefaultRingBufferSize = 2000
+// DefaultLogRetentionDays is configurable per server/DESIGN.md. Eviction
+// itself is DynamoDB's native TTL feature, not application code — this
+// value only controls what `expiresAt` gets written as at commit time.
+const DefaultLogRetentionDays = 14
 
 type LogStore struct {
-	client         *dynamodb.Client
-	tableName      string
-	ringBufferSize int64
+	client           *dynamodb.Client
+	tableName        string
+	retentionSeconds int64
 }
 
-func NewLogStore(client *dynamodb.Client, tableName string, ringBufferSize int64) *LogStore {
-	if ringBufferSize <= 0 {
-		ringBufferSize = DefaultRingBufferSize
+func NewLogStore(client *dynamodb.Client, tableName string, logRetentionDays int64) *LogStore {
+	if logRetentionDays <= 0 {
+		logRetentionDays = DefaultLogRetentionDays
 	}
-	return &LogStore{client: client, tableName: tableName, ringBufferSize: ringBufferSize}
+	return &LogStore{client: client, tableName: tableName, retentionSeconds: logRetentionDays * 24 * 60 * 60}
 }
 
 var _ ports.LogStore = (*LogStore)(nil)
@@ -38,9 +40,14 @@ var _ ports.LogStore = (*LogStore)(nil)
 // idempotency marker in one TransactWriteItems call — both happen or
 // neither does. The epoch assignment itself is a separate, non-
 // transactional counter bump; if the transaction that follows fails, that
-// epoch just goes unused (a harmless gap, same as ring-buffer trimming
-// already produces), which is a fine trade for keeping "content written"
-// and "idempotency recorded" atomically linked.
+// epoch just goes unused (a harmless gap — same as an entry aging out
+// under TTL, from a client's perspective), which is a fine trade for
+// keeping "content written" and "idempotency recorded" atomically linked.
+//
+// Both items carry their own `expiresAt` (epoch seconds) and are deleted
+// independently by DynamoDB's TTL sweep once the table's TTL attribute is
+// enabled (see provision/modules/storage/dynamodb.tf) — no application
+// code deletes anything.
 func (s *LogStore) CommitEntry(ctx context.Context, circleLogID, entryID string, encryptedMeta []byte) (ports.CommitResult, error) {
 	// Consistent read first: a pure retry of an already-committed entryID
 	// returns here without ever touching the counter.
@@ -55,6 +62,7 @@ func (s *LogStore) CommitEntry(ctx context.Context, circleLogID, entryID string,
 		return ports.CommitResult{}, err
 	}
 	receivedAt := nowMillis()
+	expiresAt := receivedAt/1000 + s.retentionSeconds
 
 	_, err = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
 		TransactItems: []types.TransactWriteItem{
@@ -67,10 +75,7 @@ func (s *LogStore) CommitEntry(ctx context.Context, circleLogID, entryID string,
 						"epoch":         &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
 						"encryptedMeta": &types.AttributeValueMemberB{Value: encryptedMeta},
 						"receivedAt":    &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
-						// Duplicated onto the log entry (already known server-side,
-						// already stored in the idem item's own sort key) so Trim
-						// can clean up the matching idempotency marker.
-						"entryID": &types.AttributeValueMemberS{Value: entryID},
+						"expiresAt":     &types.AttributeValueMemberN{Value: strconv.FormatInt(expiresAt, 10)},
 					},
 				},
 			},
@@ -82,6 +87,7 @@ func (s *LogStore) CommitEntry(ctx context.Context, circleLogID, entryID string,
 						skAttr:       &types.AttributeValueMemberS{Value: idemSK(entryID)},
 						"epoch":      &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
 						"receivedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
+						"expiresAt":  &types.AttributeValueMemberN{Value: strconv.FormatInt(expiresAt, 10)},
 					},
 					ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%s)", pkAttr)),
 				},
@@ -110,7 +116,7 @@ func (s *LogStore) nextEpochAtomically(ctx context.Context, circleLogID string) 
 			pkAttr: &types.AttributeValueMemberS{Value: circleLogID},
 			skAttr: &types.AttributeValueMemberS{Value: counterSK},
 		},
-		UpdateExpression: aws.String("ADD #counter :one SET oldestAvailableEpoch = if_not_exists(oldestAvailableEpoch, :one)"),
+		UpdateExpression: aws.String("ADD #counter :one"),
 		ExpressionAttributeNames: map[string]string{
 			"#counter": "counter",
 		},
@@ -169,7 +175,8 @@ func (s *LogStore) Read(ctx context.Context, circleLogID string, since int64) (p
 	if err != nil {
 		return ports.FetchSinceResult{}, err
 	}
-	oldestAvailableEpoch, err := attrInt(counterOut.Item, "oldestAvailableEpoch")
+
+	oldestAvailableEpoch, err := s.oldestAvailableEpoch(ctx, circleLogID)
 	if err != nil {
 		return ports.FetchSinceResult{}, err
 	}
@@ -218,71 +225,48 @@ func (s *LogStore) Read(ctx context.Context, circleLogID string, since int64) (p
 	}, nil
 }
 
-// Trim deletes entries past the retention window and advances
-// oldestAvailableEpoch. Best-effort: not atomic with anything else.
-func (s *LogStore) Trim(ctx context.Context, circleLogID string) error {
-	counterOut, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(s.tableName),
-		Key: map[string]types.AttributeValue{
-			pkAttr: &types.AttributeValueMemberS{Value: circleLogID},
-			skAttr: &types.AttributeValueMemberS{Value: counterSK},
-		},
-	})
-	if err != nil || counterOut.Item == nil {
-		return err
-	}
-	latestEpoch, err := attrInt(counterOut.Item, "counter")
-	if err != nil {
-		return err
-	}
-	oldestAvailable, err := attrInt(counterOut.Item, "oldestAvailableEpoch")
-	if err != nil {
-		return err
-	}
-
-	cutoff := latestEpoch - s.ringBufferSize
-	if cutoff < oldestAvailable {
-		return nil
-	}
-
-	for epoch := oldestAvailable; epoch <= cutoff; epoch++ {
-		out, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-			TableName: aws.String(s.tableName),
-			Key: map[string]types.AttributeValue{
-				pkAttr: &types.AttributeValueMemberS{Value: circleLogID},
-				skAttr: &types.AttributeValueMemberS{Value: epochSK(epoch)},
-			},
-			ReturnValues: types.ReturnValueAllOld,
-		})
-		if err != nil {
-			return err
-		}
-
-		entryID, ok := attrString(out.Attributes, "entryID")
-		if !ok {
-			continue // pre-existing item from before entryID was recorded; nothing to clean up
-		}
-		if _, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-			TableName: aws.String(s.tableName),
-			Key: map[string]types.AttributeValue{
-				pkAttr: &types.AttributeValueMemberS{Value: circleLogID},
-				skAttr: &types.AttributeValueMemberS{Value: idemSK(entryID)},
-			},
-		}); err != nil {
-			return err
-		}
-	}
-
-	_, err = s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName: aws.String(s.tableName),
-		Key: map[string]types.AttributeValue{
-			pkAttr: &types.AttributeValueMemberS{Value: circleLogID},
-			skAttr: &types.AttributeValueMemberS{Value: counterSK},
-		},
-		UpdateExpression: aws.String("SET oldestAvailableEpoch = :newOldest"),
+// oldestAvailableEpoch finds the epoch of the oldest log entry that
+// currently physically exists for circleLogID — computed live, on every
+// read, rather than tracked in bookkeeping the way a manual trim would.
+// TTL deletion is best-effort ("typically within 48 hours of expiration"
+// per AWS's own docs, not instant), so this can occasionally lag a bit
+// behind the true retention cutoff — an item just past its own expiresAt
+// but not yet swept still counts as "available" here. That slack is
+// small relative to a multi-day/week retention window and is the
+// deliberate trade for not running any custom deletion code at all.
+//
+// This as a single scalar cutoff is only a *complete* gap signal when
+// expiresAt is monotonic in epoch — true as long as LOG_RETENTION_DAYS
+// stays constant or only increases, since a later entry then always
+// expires no earlier than an older one. Decreasing it breaks that: an
+// entry written just after the decrease gets the new, shorter window
+// immediately, so it can expire before an older entry that's still
+// riding out its longer, pre-change expiresAt — a real hole in the
+// *middle* of the epoch range, for roughly the length of the old
+// retention window, that this single "oldest surviving epoch" value
+// won't reflect (a caller past it would look caught up while still
+// missing that hole). Not fixed here: nothing downstream reads this yet
+// (no client-side pull/catch-up path exists), and it's a rare, deliberate
+// operator action, not a routine one. If/when that changes, know this
+// before treating LOG_RETENTION_DAYS as freely adjustable in both
+// directions.
+func (s *LogStore) oldestAvailableEpoch(ctx context.Context, circleLogID string) (int64, error) {
+	out, err := s.client.Query(ctx, &dynamodb.QueryInput{
+		TableName:              aws.String(s.tableName),
+		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :pk AND %s BETWEEN :lower AND :upper", pkAttr, skAttr)),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":newOldest": &types.AttributeValueMemberN{Value: strconv.FormatInt(cutoff+1, 10)},
+			":pk":    &types.AttributeValueMemberS{Value: circleLogID},
+			":lower": &types.AttributeValueMemberS{Value: epochSK(1)},
+			":upper": &types.AttributeValueMemberS{Value: epochSKUpperBound()},
 		},
+		ScanIndexForward: aws.Bool(true),
+		Limit:            aws.Int32(1),
 	})
-	return err
+	if err != nil {
+		return 0, err
+	}
+	if len(out.Items) == 0 {
+		return 0, nil // nothing survives (or nothing was ever committed)
+	}
+	return attrInt(out.Items[0], "epoch")
 }

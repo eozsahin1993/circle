@@ -3,12 +3,63 @@ package dynamodb_test
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"testing"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"circle-relay/internal/ports"
 	"circle-relay/internal/testsupport"
 )
+
+// Sort-key formats duplicated from keys.go (unexported, and this is an
+// external _test package) — epoch#<12-digit zero-padded> and idem#<id>.
+// Only the two things these tests need to reach directly: reading a raw
+// item's expiresAt, and deleting an item to simulate what DynamoDB's
+// background TTL sweep would eventually do for real (sweep timing itself
+// isn't something a fast unit test can exercise).
+func epochSortKey(epoch int64) string {
+	return fmt.Sprintf("epoch#%012d", epoch)
+}
+
+func idemSortKey(entryID string) string {
+	return "idem#" + entryID
+}
+
+func getRawItem(t *testing.T, client *awsdynamodb.Client, table, pk, sk string) map[string]types.AttributeValue {
+	t.Helper()
+	out, err := client.GetItem(context.Background(), &awsdynamodb.GetItemInput{
+		TableName: aws.String(table),
+		Key: map[string]types.AttributeValue{
+			"pk": &types.AttributeValueMemberS{Value: pk},
+			"sk": &types.AttributeValueMemberS{Value: sk},
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to read raw item: %v", err)
+	}
+	if out.Item == nil {
+		t.Fatalf("expected item at pk=%s sk=%s to exist", pk, sk)
+	}
+	return out.Item
+}
+
+func deleteRawItem(t *testing.T, client *awsdynamodb.Client, table, pk, sk string) {
+	t.Helper()
+	_, err := client.DeleteItem(context.Background(), &awsdynamodb.DeleteItemInput{
+		TableName: aws.String(table),
+		Key: map[string]types.AttributeValue{
+			"pk": &types.AttributeValueMemberS{Value: pk},
+			"sk": &types.AttributeValueMemberS{Value: sk},
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to delete raw item (simulating TTL sweep): %v", err)
+	}
+}
 
 func TestLogStore_CommitEntry_ConcurrentDuplicatesConvergeToSameEpoch(t *testing.T) {
 	ctx := context.Background()
@@ -43,14 +94,44 @@ func TestLogStore_CommitEntry_ConcurrentDuplicatesConvergeToSameEpoch(t *testing
 	}
 }
 
-func TestLogStore_Trim_DeletesEntriesBeyondRingBufferSize(t *testing.T) {
+func TestLogStore_CommitEntry_WritesExpiresAtFromRetentionWindow(t *testing.T) {
 	ctx := context.Background()
 	circleLogID := testsupport.UniqueCircleID(t)
-	const ringBufferSize = 3
-	logStore := testsupport.NewLogStore(t, ringBufferSize)
+	const retentionDays = 7
+	logStore := testsupport.NewLogStore(t, retentionDays)
+	client, table := testsupport.RawDynamoDBClient(t)
 
+	commit, err := logStore.CommitEntry(ctx, circleLogID, "post-1", []byte("ciphertext"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantExpiresAt := commit.ReceivedAt/1000 + retentionDays*24*60*60
+
+	entryItem := getRawItem(t, client, table, circleLogID, epochSortKey(commit.Epoch))
+	if got := mustAttrInt(t, entryItem, "expiresAt"); got != wantExpiresAt {
+		t.Fatalf("log entry expiresAt = %d, want %d", got, wantExpiresAt)
+	}
+
+	idemItem := getRawItem(t, client, table, circleLogID, idemSortKey("post-1"))
+	if got := mustAttrInt(t, idemItem, "expiresAt"); got != wantExpiresAt {
+		t.Fatalf("idempotency marker expiresAt = %d, want %d", got, wantExpiresAt)
+	}
+}
+
+// DynamoDB's TTL sweep isn't something a fast unit test can wait on for
+// real (AWS documents it as best-effort, not instant) — this simulates
+// the outcome of a sweep having already run (deleting the item directly)
+// and asserts Read()/CommitEntry() react correctly to what's actually
+// left in the table, the same way they would after a real sweep.
+func TestLogStore_Read_OldestAvailableEpochReflectsWhatSurvivedEviction(t *testing.T) {
+	ctx := context.Background()
+	circleLogID := testsupport.UniqueCircleID(t)
+	logStore := testsupport.NewLogStore(t, 0)
+	client, table := testsupport.RawDynamoDBClient(t)
+
+	const numEntries = 5
 	var epochs []int64
-	for i := range 5 {
+	for i := range numEntries {
 		commit, err := logStore.CommitEntry(ctx, circleLogID, fmt.Sprintf("post-%d", i), []byte("ciphertext"))
 		if err != nil {
 			t.Fatal(err)
@@ -58,8 +139,9 @@ func TestLogStore_Trim_DeletesEntriesBeyondRingBufferSize(t *testing.T) {
 		epochs = append(epochs, commit.Epoch)
 	}
 
-	if err := logStore.Trim(ctx, circleLogID); err != nil {
-		t.Fatal(err)
+	// Simulate TTL having already evicted the two oldest entries.
+	for _, epoch := range epochs[:2] {
+		deleteRawItem(t, client, table, circleLogID, epochSortKey(epoch))
 	}
 
 	result, err := logStore.Read(ctx, circleLogID, 0)
@@ -67,61 +149,63 @@ func TestLogStore_Trim_DeletesEntriesBeyondRingBufferSize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(result.Entries) != ringBufferSize {
-		t.Fatalf("expected %d entries to remain after trim, got %d", ringBufferSize, len(result.Entries))
-	}
-
-	wantOldest := epochs[len(epochs)-ringBufferSize]
+	wantOldest := epochs[2]
 	if result.OldestAvailableEpoch != wantOldest {
 		t.Fatalf("expected oldestAvailableEpoch %d, got %d", wantOldest, result.OldestAvailableEpoch)
 	}
-	if result.Entries[0].Epoch != wantOldest {
-		t.Fatalf("expected surviving entries to start at epoch %d, got %d", wantOldest, result.Entries[0].Epoch)
+	if len(result.Entries) != numEntries-2 || result.Entries[0].Epoch != wantOldest {
+		t.Fatalf("expected surviving entries to start at epoch %d, got %v", wantOldest, result.Entries)
 	}
 }
 
-func TestLogStore_Trim_DeletesIdempotencyMarkersForTrimmedEntriesOnly(t *testing.T) {
+func TestLogStore_CommitEntry_RetryAfterIdempotencyMarkerEvictionGetsNewEpoch(t *testing.T) {
 	ctx := context.Background()
 	circleLogID := testsupport.UniqueCircleID(t)
-	const ringBufferSize = 3
-	logStore := testsupport.NewLogStore(t, ringBufferSize)
+	logStore := testsupport.NewLogStore(t, 0)
+	client, table := testsupport.RawDynamoDBClient(t)
 
-	const numEntries = 5
-	var original []ports.CommitResult
-	for i := range numEntries {
-		commit, err := logStore.CommitEntry(ctx, circleLogID, fmt.Sprintf("post-%d", i), []byte("ciphertext"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		original = append(original, commit)
-	}
-
-	if err := logStore.Trim(ctx, circleLogID); err != nil {
+	original, err := logStore.CommitEntry(ctx, circleLogID, "post-1", []byte("ciphertext"))
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	// The first numEntries-ringBufferSize entries got trimmed: their idem
-	// markers should be gone, so retrying with the same entryID is treated
-	// as a brand-new commit and gets assigned a fresh epoch.
-	for i := 0; i < numEntries-ringBufferSize; i++ {
-		retry, err := logStore.CommitEntry(ctx, circleLogID, fmt.Sprintf("post-%d", i), []byte("ciphertext"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if retry.Epoch == original[i].Epoch {
-			t.Fatalf("post-%d: expected retry after trim to get a new epoch (idem marker should be deleted), still got original epoch %d", i, original[i].Epoch)
-		}
+	// A still-present idempotency marker makes a retry converge, same as
+	// before TTL existed.
+	retry, err := logStore.CommitEntry(ctx, circleLogID, "post-1", []byte("ciphertext"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if retry != original {
+		t.Fatalf("expected retry to converge to original commit %+v, got %+v", original, retry)
 	}
 
-	// The last ringBufferSize entries survived the trim: their idem markers
-	// must still make retries converge to the original epoch.
-	for i := numEntries - ringBufferSize; i < numEntries; i++ {
-		retry, err := logStore.CommitEntry(ctx, circleLogID, fmt.Sprintf("post-%d", i), []byte("ciphertext"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if retry != original[i] {
-			t.Fatalf("post-%d: expected retry to converge to original commit %+v, got %+v", i, original[i], retry)
-		}
+	// Simulate TTL having evicted just the idempotency marker (its own
+	// independent expiresAt, unrelated to the log entry's) — a retry now
+	// has nothing to converge to, so it's treated as a brand-new commit.
+	deleteRawItem(t, client, table, circleLogID, idemSortKey("post-1"))
+
+	afterEviction, err := logStore.CommitEntry(ctx, circleLogID, "post-1", []byte("ciphertext"))
+	if err != nil {
+		t.Fatal(err)
 	}
+	if afterEviction.Epoch == original.Epoch {
+		t.Fatalf("expected retry after idempotency marker eviction to get a new epoch, still got original epoch %d", original.Epoch)
+	}
+}
+
+func mustAttrInt(t *testing.T, item map[string]types.AttributeValue, key string) int64 {
+	t.Helper()
+	attr, ok := item[key]
+	if !ok {
+		t.Fatalf("missing attribute %q", key)
+	}
+	n, ok := attr.(*types.AttributeValueMemberN)
+	if !ok {
+		t.Fatalf("attribute %q is not a number", key)
+	}
+	value, err := strconv.ParseInt(n.Value, 10, 64)
+	if err != nil {
+		t.Fatalf("attribute %q is not a valid integer: %v", key, err)
+	}
+	return value
 }
