@@ -19,3 +19,9 @@ variable "ring_buffer_size" {
   type        = number
   default     = 2000
 }
+
+variable "max_blob_size_bytes" {
+  description = "Max ciphertext size accepted per blob upload — enforced by S3 itself via a signed content-length-range policy condition, not by the relay. The client's own compression pipeline (app/src/services/image.ts) produces photos well under this default; the cap exists to bound worst-case storage/cost."
+  type        = number
+  default     = 2097152 # 2 MiB
+}

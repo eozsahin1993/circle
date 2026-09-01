@@ -31,12 +31,13 @@ func main() {
 	}
 
 	logStore := dynamodb.NewLogStore(awsdynamodb.NewFromConfig(awsCfg), cfg.TableName, cfg.RingBufferSize)
-	blobStore := s3.NewBlobStore(awss3.NewFromConfig(awsCfg), cfg.BucketName)
+	blobStore := s3.NewBlobStore(awss3.NewFromConfig(awsCfg), cfg.BucketName, cfg.MaxBlobSize)
 
 	mux := api.NewRouter(logStore, blobStore)
 
-	// NewV2, not New: provision/api_gateway.tf fronts this with an API
-	// Gateway HTTP API, which uses the v2.0 Lambda payload format.
+	// NewV2, not New: provision/lambda_url.tf fronts this with a Lambda
+	// Function URL, which uses the same v2.0 Lambda payload format as an
+	// API Gateway HTTP API.
 	adapter := httpadapter.NewV2(mux)
 	lambda.Start(adapter.ProxyWithContext)
 }

@@ -15,10 +15,15 @@ type request struct {
 	EncryptedMeta string `json:"encryptedMeta"`
 }
 
+type uploadResponse struct {
+	URL    string            `json:"url"`
+	Fields map[string]string `json:"fields"`
+}
+
 type response struct {
-	Epoch      int64  `json:"epoch"`
-	ReceivedAt int64  `json:"receivedAt"`
-	UploadURL  string `json:"uploadUrl"`
+	Epoch      int64          `json:"epoch"`
+	ReceivedAt int64          `json:"receivedAt"`
+	Upload     uploadResponse `json:"upload"`
 }
 
 type Handler struct {
@@ -53,6 +58,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	httputil.WriteJSON(w, http.StatusOK, response{
 		Epoch:      result.Epoch,
 		ReceivedAt: result.ReceivedAt,
-		UploadURL:  result.UploadURL,
+		Upload:     uploadResponse{URL: result.Upload.URL, Fields: result.Upload.Fields},
 	})
 }

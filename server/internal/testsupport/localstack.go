@@ -92,7 +92,7 @@ func NewBlobStore(t testing.TB) ports.BlobStore {
 		t.Skipf("LocalStack S3 not reachable, skipping: %v", bucketErr)
 	}
 
-	return s3.NewBlobStore(client, bucketName)
+	return s3.NewBlobStore(client, bucketName, 0)
 }
 
 func createTable(client *awsdynamodb.Client) error {

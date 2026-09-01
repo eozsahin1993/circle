@@ -1,6 +1,6 @@
 output "api_endpoint" {
   description = "Base URL the app's src/services/relay.ts should point at."
-  value       = aws_apigatewayv2_stage.default.invoke_url
+  value       = aws_lambda_function_url.relay.function_url
 }
 
 output "table_name" {

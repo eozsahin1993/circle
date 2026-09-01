@@ -37,16 +37,19 @@ func TestEndToEnd_AppendThenFetchThenDownload(t *testing.T) {
 	}
 
 	var appendBody struct {
-		Epoch      int64  `json:"epoch"`
-		ReceivedAt int64  `json:"receivedAt"`
-		UploadURL  string `json:"uploadUrl"`
+		Epoch      int64 `json:"epoch"`
+		ReceivedAt int64 `json:"receivedAt"`
+		Upload     struct {
+			URL    string            `json:"url"`
+			Fields map[string]string `json:"fields"`
+		} `json:"upload"`
 	}
 	if err := json.NewDecoder(appendResp.Body).Decode(&appendBody); err != nil {
 		t.Fatal(err)
 	}
 	wantSuffix := circleLogID + "/" + strconv.FormatInt(appendBody.Epoch, 10)
-	if !strings.Contains(appendBody.UploadURL, wantSuffix) {
-		t.Fatalf("expected upload URL to reference %s, got %q", wantSuffix, appendBody.UploadURL)
+	if appendBody.Upload.Fields["key"] != wantSuffix {
+		t.Fatalf("expected upload fields' key to be %s, got %q", wantSuffix, appendBody.Upload.Fields["key"])
 	}
 
 	fetchResp, err := http.Get(server.URL + "/v1/circles/" + circleLogID + "/entries?since=0")
@@ -88,10 +91,10 @@ func TestEndToEnd_AppendThenFetchThenDownload(t *testing.T) {
 	// http.Client follows the redirect by default, ending up at the real
 	// S3-via-LocalStack destination, which 404s (nothing was ever
 	// "uploaded" in this test — appending only reserves the slot, upload
-	// is a separate step the client does directly against the URL from
-	// the append response). That 404 is expected here, not a failure of
-	// this handler: what's under test is that a redirect happens at all,
-	// and to the right place.
+	// is a separate step the client does directly against S3 as a
+	// presigned POST using the append response's upload target). That
+	// 404 is expected here, not a failure of this handler: what's under
+	// test is that a redirect happens at all, and to the right place.
 	client := &http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse

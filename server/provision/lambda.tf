@@ -78,9 +78,10 @@ resource "aws_lambda_function" "relay" {
 
   environment {
     variables = {
-      TABLE_NAME       = module.storage.table_name
-      BUCKET_NAME      = module.storage.bucket_name
-      RING_BUFFER_SIZE = tostring(var.ring_buffer_size)
+      TABLE_NAME          = module.storage.table_name
+      BUCKET_NAME         = module.storage.bucket_name
+      RING_BUFFER_SIZE    = tostring(var.ring_buffer_size)
+      MAX_BLOB_SIZE_BYTES = tostring(var.max_blob_size_bytes)
     }
   }
 }

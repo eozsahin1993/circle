@@ -3,14 +3,13 @@ package appendentry_test
 import (
 	"context"
 	"strconv"
-	"strings"
 	"testing"
 
 	"circle-relay/internal/api/appendentry"
 	"circle-relay/internal/testsupport"
 )
 
-func TestService_Append_ReturnsUploadURLDerivedFromEpoch(t *testing.T) {
+func TestService_Append_ReturnsUploadTargetDerivedFromEpoch(t *testing.T) {
 	ctx := context.Background()
 	circleLogID := testsupport.UniqueCircleID(t)
 	service := &appendentry.Service{
@@ -23,9 +22,12 @@ func TestService_Append_ReturnsUploadURLDerivedFromEpoch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	wantSuffix := circleLogID + "/" + strconv.FormatInt(result.Epoch, 10)
-	if !strings.Contains(result.UploadURL, wantSuffix) {
-		t.Fatalf("expected upload URL to reference %s, got %q", wantSuffix, result.UploadURL)
+	if result.Upload.URL == "" {
+		t.Fatal("expected a non-empty upload URL")
+	}
+	wantKey := circleLogID + "/" + strconv.FormatInt(result.Epoch, 10)
+	if result.Upload.Fields["key"] != wantKey {
+		t.Fatalf("expected upload fields' key to be %s, got %q", wantKey, result.Upload.Fields["key"])
 	}
 }
 

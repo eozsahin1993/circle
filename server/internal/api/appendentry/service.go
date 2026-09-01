@@ -14,7 +14,7 @@ import (
 type Result struct {
 	Epoch      int64
 	ReceivedAt int64
-	UploadURL  string
+	Upload     ports.UploadTarget
 }
 
 type Service struct {
@@ -23,7 +23,7 @@ type Service struct {
 }
 
 // Append commits the entry, then always trims (cheap no-op when nothing's
-// over the ring buffer cap) and hands back an upload URL — unconditionally
+// over the ring buffer cap) and hands back an upload target — unconditionally
 // (see ports.BlobStore), even though this pass only ever produces
 // entryType "post" entries which always have one.
 func (s *Service) Append(ctx context.Context, circleLogID, entryID string, encryptedMeta []byte) (Result, error) {
@@ -33,10 +33,10 @@ func (s *Service) Append(ctx context.Context, circleLogID, entryID string, encry
 	}
 	_ = s.LogStore.Trim(ctx, circleLogID) // best-effort, see server/DESIGN.md
 
-	uploadURL, err := s.BlobStore.GetUploadURL(ctx, circleLogID, commit.Epoch)
+	upload, err := s.BlobStore.GetUploadTarget(ctx, circleLogID, commit.Epoch)
 	if err != nil {
 		return Result{}, err
 	}
 
-	return Result{Epoch: commit.Epoch, ReceivedAt: commit.ReceivedAt, UploadURL: uploadURL}, nil
+	return Result{Epoch: commit.Epoch, ReceivedAt: commit.ReceivedAt, Upload: upload}, nil
 }

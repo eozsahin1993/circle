@@ -18,6 +18,10 @@ type Config struct {
 	// server/DESIGN.md and provision/variables.tf's ring_buffer_size. 0
 	// means "use the adapter's own default".
 	RingBufferSize int64
+	// MaxBlobSize is passed straight to s3.NewBlobStore — see
+	// server/DESIGN.md and provision/variables.tf's max_blob_size_bytes. 0
+	// means "use the adapter's own default".
+	MaxBlobSize int64
 	// Port is only used by cmd/server (cmd/lambda doesn't listen on a port).
 	Port string
 	// S3ForcePathStyle is only ever true for local testing against
@@ -36,6 +40,7 @@ func Load() Config {
 		TableName:        mustEnv("TABLE_NAME"),
 		BucketName:       mustEnv("BUCKET_NAME"),
 		RingBufferSize:   intEnv("RING_BUFFER_SIZE", 0),
+		MaxBlobSize:      intEnv("MAX_BLOB_SIZE_BYTES", 0),
 		Port:             envOr("PORT", "8080"),
 		S3ForcePathStyle: envOr("S3_FORCE_PATH_STYLE", "false") == "true",
 	}
