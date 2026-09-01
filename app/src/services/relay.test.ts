@@ -1,3 +1,16 @@
+const mockFile = {
+  create: jest.fn(),
+  write: jest.fn(),
+  delete: jest.fn(),
+  upload: jest.fn(),
+};
+
+jest.mock('expo-file-system', () => ({
+  File: jest.fn(() => mockFile),
+  Paths: { cache: 'mock-cache-dir' },
+  UploadType: { MULTIPART: 1, BINARY_CONTENT: 0 },
+}));
+
 import { appendEntry, fetchEntries, uploadBlob } from '@/services/relay';
 
 const RELAY_URL = 'http://localhost:8080';
@@ -8,6 +21,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   global.fetch = jest.fn();
+  jest.clearAllMocks();
 });
 
 function jsonResponse(body: unknown, ok = true, status = 200) {
@@ -59,20 +73,26 @@ describe('fetchEntries', () => {
 });
 
 describe('uploadBlob', () => {
-  test('POSTs the upload target’s fields plus the bytes as form data', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, status: 200 } as Response);
+  test('writes the bytes to a temp file, then uploads it with the target’s fields as multipart parameters', async () => {
+    mockFile.upload.mockResolvedValue({ status: 200, body: '', headers: {} });
+    const fields = { key: 'circle-a/3', 'Content-Type': 'application/octet-stream' };
+    const bytes = new Uint8Array([1, 2, 3]);
 
-    await uploadBlob({ url: 'https://s3/bucket', fields: { key: 'circle-a/3', 'Content-Type': 'application/octet-stream' } }, new Uint8Array([1, 2, 3]));
+    await uploadBlob({ url: 'https://s3/bucket', fields }, bytes);
 
-    const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(mockFile.create).toHaveBeenCalledWith({ overwrite: true });
+    expect(mockFile.write).toHaveBeenCalledWith(bytes);
+    const [url, options] = mockFile.upload.mock.calls[0];
     expect(url).toBe('https://s3/bucket');
-    expect(init.method).toBe('POST');
-    expect(init.body).toBeInstanceOf(FormData);
+    expect(options).toMatchObject({ fieldName: 'file', parameters: fields });
+    expect(mockFile.delete).toHaveBeenCalled();
   });
 
-  test('throws when the upload is rejected', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 403 } as Response);
+  test('throws when the upload is rejected, and still cleans up the temp file', async () => {
+    mockFile.upload.mockResolvedValue({ status: 403, body: '', headers: {} });
 
     await expect(uploadBlob({ url: 'https://s3/bucket', fields: {} }, new Uint8Array([1]))).rejects.toThrow();
+
+    expect(mockFile.delete).toHaveBeenCalled();
   });
 });

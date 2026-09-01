@@ -1,4 +1,7 @@
 import { Buffer } from 'buffer';
+import { File, Paths, UploadType } from 'expo-file-system';
+
+import { generateUUID } from '@/services/crypto';
 
 /**
  * Thin fetch-based client for the relay's three endpoints — see
@@ -71,23 +74,21 @@ export async function fetchEntries(circleLogId: string, since: number): Promise<
 /**
  * Uploads ciphertext bytes straight to S3 using the presigned POST target
  * an `appendEntry` response handed back — never touches the relay itself.
- * Standard React Native fetch/FormData/Blob upload pattern; unverified
- * against a real device or simulator in this session (no way to drive
- * the app end-to-end here — see server/DESIGN.md for the upload target's
- * shape and provision/local for a way to test the relay side manually).
  */
 export async function uploadBlob(target: UploadTarget, bytes: Uint8Array): Promise<void> {
-  const form = new FormData();
-  for (const [key, value] of Object.entries(target.fields)) {
-    form.append(key, value);
-  }
-  // Uint8Array is generic over ArrayBufferLike (could in principle be
-  // SharedArrayBuffer-backed) but BlobPart wants a concrete ArrayBuffer —
-  // always true at runtime here, this is only a type-level mismatch.
-  form.append('file', new Blob([bytes as BlobPart]));
-
-  const response = await fetch(target.url, { method: 'POST', body: form });
-  if (!response.ok) {
-    throw new Error(`Failed to upload blob: ${response.status}`);
+  const file = new File(Paths.cache, `upload-${generateUUID()}`);
+  file.create({ overwrite: true });
+  file.write(bytes);
+  try {
+    const result = await file.upload(target.url, {
+      uploadType: UploadType.MULTIPART,
+      fieldName: 'file',
+      parameters: target.fields,
+    });
+    if (result.status < 200 || result.status >= 300) {
+      throw new Error(`Failed to upload blob: ${result.status} ${result.body}`);
+    }
+  } finally {
+    file.delete();
   }
 }
