@@ -61,7 +61,7 @@ export default function CircleListScreen() {
             <ThemedText type="circleListHeader">Your Circles</ThemedText>
           </View>
 
-          <Pressable onPress={() => router.push('/profile-setup')}>
+          <Pressable onPress={() => router.push('/account')}>
             <Avatar size={44} uri={avatarUri} />
           </Pressable>
         </View>
