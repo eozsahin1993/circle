@@ -7,6 +7,7 @@ on:
   pull_request:
     branches: [main]
     paths: ['server/**']
+  workflow_dispatch:
 
 jobs:
   test:
