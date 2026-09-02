@@ -1,4 +1,4 @@
-CREATE TABLE `outbox` (
+CREATE TABLE IF NOT EXISTS `outbox` (
 	`sequence_num` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`circle_id` text NOT NULL,
 	`entry_type` text NOT NULL,
@@ -9,4 +9,4 @@ CREATE TABLE `outbox` (
 	FOREIGN KEY (`circle_id`) REFERENCES `circles`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `outbox_circle_id` ON `outbox` (`circle_id`);
+CREATE INDEX IF NOT EXISTS `outbox_circle_id` ON `outbox` (`circle_id`);

@@ -1,4 +1,4 @@
-CREATE TABLE `post_reactions` (
+CREATE TABLE IF NOT EXISTS `post_reactions` (
 	`post_id` text NOT NULL,
 	`member_id` text NOT NULL,
 	`emoji` text NOT NULL,
@@ -7,4 +7,4 @@ CREATE TABLE `post_reactions` (
 	FOREIGN KEY (`post_id`) REFERENCES `posts`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `post_reactions_post_id` ON `post_reactions` (`post_id`);
+CREATE INDEX IF NOT EXISTS `post_reactions_post_id` ON `post_reactions` (`post_id`);

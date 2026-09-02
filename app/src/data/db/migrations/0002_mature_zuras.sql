@@ -1,4 +1,4 @@
-CREATE TABLE `circle_invites` (
+CREATE TABLE IF NOT EXISTS `circle_invites` (
 	`code` text PRIMARY KEY NOT NULL,
 	`circle_id` text NOT NULL,
 	`created_by_public_key` text NOT NULL,
@@ -8,4 +8,4 @@ CREATE TABLE `circle_invites` (
 	FOREIGN KEY (`circle_id`) REFERENCES `circles`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `circle_invites_circle_id` ON `circle_invites` (`circle_id`);
+CREATE INDEX IF NOT EXISTS `circle_invites_circle_id` ON `circle_invites` (`circle_id`);

@@ -1,4 +1,4 @@
-CREATE TABLE `pending_join_requests` (
+CREATE TABLE IF NOT EXISTS `pending_join_requests` (
 	`id` text PRIMARY KEY NOT NULL,
 	`invite_code` text NOT NULL,
 	`circle_name` text NOT NULL,

@@ -1,4 +1,4 @@
-CREATE TABLE `circle_members` (
+CREATE TABLE IF NOT EXISTS `circle_members` (
 	`circle_id` text NOT NULL,
 	`public_key` text NOT NULL,
 	`member_id` text NOT NULL,
@@ -9,14 +9,14 @@ CREATE TABLE `circle_members` (
 	FOREIGN KEY (`circle_id`) REFERENCES `circles`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `circle_members_member_id` ON `circle_members` (`circle_id`,`member_id`);--> statement-breakpoint
-CREATE TABLE `circles` (
+CREATE UNIQUE INDEX IF NOT EXISTS `circle_members_member_id` ON `circle_members` (`circle_id`,`member_id`);--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS `circles` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE `device_profile` (
+CREATE TABLE IF NOT EXISTS `device_profile` (
 	`id` integer PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
 	`picture` blob,
@@ -25,7 +25,7 @@ CREATE TABLE `device_profile` (
 	CONSTRAINT "device_profile_id_check" CHECK("device_profile"."id" = 0)
 );
 --> statement-breakpoint
-CREATE TABLE `posts` (
+CREATE TABLE IF NOT EXISTS `posts` (
 	`id` text PRIMARY KEY NOT NULL,
 	`circle_id` text NOT NULL,
 	`caption` text NOT NULL,
@@ -34,4 +34,4 @@ CREATE TABLE `posts` (
 	FOREIGN KEY (`circle_id`) REFERENCES `circles`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `posts_circle_id` ON `posts` (`circle_id`);
+CREATE INDEX IF NOT EXISTS `posts_circle_id` ON `posts` (`circle_id`);
