@@ -1,27 +1,24 @@
-# Standard KMS envelope encryption for the app's single root secret — see
-# server/DESIGN.md's "Email auth" section. This is a first pass only:
-# decrypt once via kms:Decrypt at cold start, cache in memory for the
-# process lifetime (internal/adapters/kms). Not the attestation-gated
-# enclave the design calls out as deferred, later work.
-#
-# Only ever ONE secret is KMS-encrypted, regardless of how many purposes
-# need a key (today just email-HMAC) — every purpose-specific key is
-# derived from this one root secret via HKDF (internal/kdf), app-side, not
-# provisioned as its own KMS-encrypted secret. See internal/kdf's doc
-# comment.
+# Master key, kept standing by for whatever needs real secret-at-rest
+# protection next — planned use: encrypting push notification provider
+# credentials (APNs auth key, FCM service account key) once that gets
+# built. Not currently used by the app itself: it originally also backed a
+# KMS-encrypted "root secret" that internal/crypto derived an email-HMAC
+# key from (see server/DESIGN.md's "Email auth" section), but that whole
+# path was dead code — real auth ended up keyed on the OIDC `sub` claim
+# directly, not email — and got removed along with internal/secrets and
+# internal/crypto. Still used for sessions/accounts table SSE (see
+# sessions_table.tf/accounts_table.tf) in the meantime.
 resource "aws_kms_key" "master" {
-  description         = "${local.name_prefix} master key — root secret envelope encryption, sessions/accounts tables SSE"
+  description         = "${local.name_prefix} master key — sessions/accounts tables SSE, reserved for future secret encryption"
   enable_key_rotation = true
-}
 
-resource "random_id" "root_secret" {
-  byte_length = 32
-}
-
-# Encrypted once, at apply time — the resulting ciphertext blob is safe to
-# sit in a plain Lambda env var (ROOT_SECRET_CIPHERTEXT): useless without
-# the KMS key that encrypted it.
-data "aws_kms_ciphertext" "root_secret" {
-  key_id    = aws_kms_key.master.key_id
-  plaintext = random_id.root_secret.b64_std
+  # Everything encrypted under this key — the sessions/accounts tables'
+  # SSE today, whatever gets KMS-encrypted here later — is permanently
+  # unreadable if it's ever destroyed. This only guards against
+  # Terraform-driven destruction (a bad apply/destroy); someone manually
+  # scheduling deletion in the AWS console bypasses it entirely — that's
+  # an IAM policy concern, not something Terraform can enforce from here.
+  lifecycle {
+    prevent_destroy = true
+  }
 }

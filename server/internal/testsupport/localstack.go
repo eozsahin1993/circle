@@ -9,7 +9,6 @@ package testsupport
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"sync"
@@ -21,12 +20,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	awskms "github.com/aws/aws-sdk-go-v2/service/kms"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
-	"circle-relay/internal/secrets"
-	kmssecrets "circle-relay/internal/secrets/kms"
 	"circle-relay/internal/storage/authstore"
 	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
 	"circle-relay/internal/storage/blobstore"
@@ -63,15 +59,7 @@ var (
 
 	inviteTableOnce sync.Once
 	inviteTableErr  error
-
-	kmsKeyOnce sync.Once
-	kmsKeyErr  error
-	kmsKeyID   string
 )
-
-// testRootSecret is the fixed plaintext NewSecretStore encrypts — content
-// doesn't matter, only that it's stable and non-empty.
-var testRootSecret = []byte("test-only-root-secret")
 
 // UniqueCircleID returns a circleLogID guaranteed not to collide with data
 // left behind by a previous test run — the shared test table isn't wiped
@@ -246,43 +234,6 @@ func RawInviteDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 	}
 
 	return client, inviteTableName
-}
-
-// NewSecretStore returns a real kms-backed secrets.Store against
-// LocalStack — a genuine KMS key, a genuine Encrypt of a fixed test
-// secret, and a genuine Decrypt round trip through internal/secrets/kms,
-// not a fake.
-func NewSecretStore(t testing.TB) secrets.Store {
-	t.Helper()
-	client := awskms.NewFromConfig(loadConfig(t), func(o *awskms.Options) {
-		o.BaseEndpoint = aws.String(localstackEndpoint)
-	})
-
-	kmsKeyOnce.Do(func() {
-		out, err := client.CreateKey(context.Background(), &awskms.CreateKeyInput{})
-		if err != nil {
-			kmsKeyErr = err
-			return
-		}
-		kmsKeyID = aws.ToString(out.KeyMetadata.KeyId)
-	})
-	if kmsKeyErr != nil {
-		t.Skipf("LocalStack KMS not reachable, skipping: %v", kmsKeyErr)
-	}
-
-	encrypted, err := client.Encrypt(context.Background(), &awskms.EncryptInput{
-		KeyId:     aws.String(kmsKeyID),
-		Plaintext: testRootSecret,
-	})
-	if err != nil {
-		t.Fatalf("failed to encrypt test root secret: %v", err)
-	}
-
-	store, err := kmssecrets.New(client, base64.StdEncoding.EncodeToString(encrypted.CiphertextBlob))
-	if err != nil {
-		t.Fatalf("failed to construct SecretStore: %v", err)
-	}
-	return store
 }
 
 func createSessionsTable(client *awsdynamodb.Client) error {

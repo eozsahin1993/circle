@@ -27,11 +27,6 @@ type Config struct {
 	// server/INVITE_FLOW.md and
 	// server/provision/modules/storage/dynamodb.tf's invites resource.
 	InviteTableName string
-	// RootSecretCiphertext is the base64 KMS ciphertext blob for the app's
-	// single root secret — see internal/adapters/kms, internal/kdf, and
-	// server/provision/kms.tf. Safe as a plain env var: useless without the
-	// KMS key that encrypted it.
-	RootSecretCiphertext string
 	// GoogleClientIDIOS/Android/Web are the accepted "aud" values for
 	// Google Sign-In ID tokens, one per platform client registered in
 	// Google Cloud Console — named per-platform (mirroring app/.env.local's
@@ -83,7 +78,6 @@ func Load() Config {
 		SessionsTableName:     mustEnv("SESSIONS_TABLE_NAME"),
 		AccountsTableName:     mustEnv("ACCOUNTS_TABLE_NAME"),
 		InviteTableName:       mustEnv("INVITE_TABLE_NAME"),
-		RootSecretCiphertext:  mustEnv("ROOT_SECRET_CIPHERTEXT"),
 		GoogleClientIDIOS:     envOr("GOOGLE_CLIENT_ID_IOS", ""),
 		GoogleClientIDAndroid: envOr("GOOGLE_CLIENT_ID_ANDROID", ""),
 		GoogleClientIDWeb:     envOr("GOOGLE_CLIENT_ID_WEB", ""),

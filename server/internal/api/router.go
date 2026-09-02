@@ -18,7 +18,6 @@ import (
 	"circle-relay/internal/api/fetchentries"
 	"circle-relay/internal/api/getblob"
 	"circle-relay/internal/api/invite"
-	"circle-relay/internal/secrets"
 	"circle-relay/internal/storage/authstore"
 	"circle-relay/internal/storage/blobstore"
 	"circle-relay/internal/storage/invitestore"
@@ -30,14 +29,13 @@ func NewRouter(
 	logStore logstore.Store,
 	blobStore blobstore.Store,
 	authStore authstore.Store,
-	secretStore secrets.Store,
 	manifestStore manifeststore.Store,
 	inviteStore invitestore.Store,
 	googleVerifier *oidcverify.Verifier,
 	appleVerifier *oidcverify.Verifier,
 ) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.Handle("/v1/", http.StripPrefix("/v1", newV1Mux(logStore, blobStore, authStore, secretStore, manifestStore, inviteStore, googleVerifier, appleVerifier)))
+	mux.Handle("/v1/", http.StripPrefix("/v1", newV1Mux(logStore, blobStore, authStore, manifestStore, inviteStore, googleVerifier, appleVerifier)))
 	return mux
 }
 
@@ -49,7 +47,6 @@ func newV1Mux(
 	logStore logstore.Store,
 	blobStore blobstore.Store,
 	authStore authstore.Store,
-	secretStore secrets.Store,
 	manifestStore manifeststore.Store,
 	inviteStore invitestore.Store,
 	googleVerifier *oidcverify.Verifier,

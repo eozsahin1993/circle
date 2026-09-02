@@ -134,7 +134,6 @@ resource "aws_lambda_function" "relay" {
       SESSIONS_TABLE_NAME      = aws_dynamodb_table.sessions.name
       ACCOUNTS_TABLE_NAME      = aws_dynamodb_table.accounts.name
       INVITE_TABLE_NAME        = module.storage.invite_table_name
-      ROOT_SECRET_CIPHERTEXT   = data.aws_kms_ciphertext.root_secret.ciphertext_blob
       GOOGLE_CLIENT_ID_IOS     = var.google_client_id_ios
       GOOGLE_CLIENT_ID_ANDROID = var.google_client_id_android
       GOOGLE_CLIENT_ID_WEB     = var.google_client_id_web

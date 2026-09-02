@@ -165,11 +165,22 @@ handshake beyond sharing a tag.
 ## Running locally
 
 ```
+docker run -d --name localstack -p 4566:4566 -e SERVICES=dynamodb,s3,kms localstack/localstack:4.4.0
 cd provision/local && terraform init && terraform apply   # provisions LocalStack tables/bucket/KMS key
 cd ../..
 cp .env.example .env   # fill in values from `terraform output` above
 export $(cat .env | xargs) && go run ./cmd/server   # see .env.example — Go doesn't load .env itself
 ```
+
+**Pin LocalStack to exactly `4.4.0`** (the last version usable without a
+LocalStack account/auth token — 2026.03.0 and later require one even for
+free-tier services like S3/DynamoDB). Don't drop back to the `3.8` line
+either: its S3 provider has a real bug in presigned-POST handling —
+even a byte-for-byte correct multipart request against a
+`content-length-range` + `Content-Type` policy comes back `AccessDenied`
+(confirmed directly, not a client-side issue), and separately its S3
+lifecycle-configuration API hangs until Terraform times out. Both are
+fixed in `4.4.0`.
 
 `go test ./...` runs against the same LocalStack instance (`testsupport`
 creates tables lazily on first use, shared across test packages — see its

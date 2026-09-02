@@ -8,9 +8,8 @@ generic per-circle log) and the app's outbox + push-to-relay half of sync
 Not built: the pull side (`pullCircle`, a local `circleLog` mirror table),
 roles/kick actually syncing through the relay (today these are local-only
 — see `app/src/domain/usecases/circle/invite-to-circle.ts` etc.), push
-notifications (section 2 below is a full design, zero implementation), the
-client-side onboarding UI for email auth (server-side API is built — see
-"Email auth" below), and account recovery (see that section below — the
+notifications (section 2 below is a full design, zero implementation), and
+account recovery (see that section below — the
 master seed exists and is already framed in the UI as the way back into
 your circles, but nothing today actually makes that true yet). Invites
 are the one exception to "local-only": the full invite/join handshake
@@ -241,7 +240,37 @@ Reserved for private, per-individual exchanges — not circle content.
   `app/src/domain/usecases/create-circle.ts`), and promoting others later
   is a small, separate, not-yet-built action.
 
-## Email auth (partially built)
+## Email auth (superseded)
+
+**Status update: not what actually shipped.** Auth ended up landing on
+Google/Apple Sign-In (OIDC, keyed on the provider's `sub` claim) instead of
+the email-OTP flow this section designed — see the git history around
+"Switch relay auth from phone/SMS OTP to Google/Apple sign-in." The
+specific mechanism below (`EmailHMAC`, the KMS-encrypted root secret,
+`internal/crypto`'s HKDF derivation) was removed from the codebase as dead
+code — zero call sites, no `/v1/auth/email`-shaped endpoint ever existed.
+`server/provision/kms.tf`'s KMS key itself was kept (not the root secret it
+used to protect) — reserved for whatever future secret genuinely needs
+KMS-grade protection, push notification provider credentials being the
+likely next case.
+
+Left below as historical reasoning, most of which still has real value
+(the SES-vs-third-party tradeoff, the attestation-gated-enclave discussion,
+the abuse-mitigation section) — but treat the mechanism itself as gone, not
+current.
+
+**Open question this doesn't actually resolve**: the core problem this
+section set out to solve — "nothing stops unauthenticated spam against the
+relay itself, since a free-to-mint identity doesn't raise the bar" — may
+well still be open under Google/Apple auth. A free Gmail account is roughly
+as cheap and scriptable to mint as anything email-OTP would have gated on;
+switching identity providers isn't obviously the same thing as imposing
+real registration cost. Worth a fresh look at whether `RequireSession`
+alone (valid Google/Apple session, no other check) actually closes this
+gap, or whether the abuse-mitigation ideas below (concurrency cap, budget
+alert, per-account rate limiting — all **still not provisioned**) are more
+load-bearing than they were assumed to be when phone/email OTP was still
+the plan.
 
 Not about content — content stays E2E encrypted regardless. This is about
 closing the one real gap the blind design leaves open: nothing currently
