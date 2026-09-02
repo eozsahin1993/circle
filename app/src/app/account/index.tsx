@@ -13,6 +13,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing, Tints } from '@/constants/theme';
 import { getProfile, type Profile } from '@/data/db';
+import { signOut } from '@/domain/usecases/sign-in';
 import { useAppSettings } from '@/hooks/use-app-settings';
 import { useTheme } from '@/hooks/use-theme';
 import { bytesToDataUri } from '@/services/image';
@@ -37,12 +38,35 @@ export default function AccountScreen() {
   const { settings, updateSettings } = useAppSettings();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [privacyVisible, setPrivacyVisible] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       getProfile().then(setProfile);
     }, []),
   );
+
+  function handleSignOut() {
+    Alert.alert(
+      'Sign out?',
+      'Your circles and photos stay on this device — signing back in picks up right where you left off.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          onPress: async () => {
+            setSigningOut(true);
+            try {
+              await signOut();
+              router.replace('/');
+            } finally {
+              setSigningOut(false);
+            }
+          },
+        },
+      ],
+    );
+  }
 
   return (
     <ThemedView style={styles.screen}>
@@ -185,6 +209,12 @@ export default function AccountScreen() {
               </Pressable>
             </ThemedView>
           </View>
+
+          <Pressable style={styles.signOutRow} onPress={handleSignOut} disabled={signingOut}>
+            <ThemedText type="postAuthor" themeColor="accent">
+              {signingOut ? 'Signing out…' : 'Sign out'}
+            </ThemedText>
+          </Pressable>
         </ScrollView>
       </SafeAreaView>
 
@@ -336,5 +366,9 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
     marginRight: 12,
+  },
+  signOutRow: {
+    alignItems: 'center',
+    paddingVertical: 14,
   },
 });

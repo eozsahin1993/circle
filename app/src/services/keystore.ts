@@ -77,6 +77,10 @@ export async function getMasterSeed(): Promise<Uint8Array | null> {
   return raw ? hexToBytes(raw) : null;
 }
 
+// TODO(erase-device): a deleteMasterSeed() belongs here once the separate
+// "Erase this device" action (see sign-in.ts's signOut doc comment) is
+// actually built — left out for now rather than sitting unused.
+
 const AUTH_TOKEN_KEY = 'auth_token';
 
 /**

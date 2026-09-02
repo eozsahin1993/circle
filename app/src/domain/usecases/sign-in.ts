@@ -1,20 +1,68 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from '@react-native-google-signin/google-signin';
+import { Platform } from 'react-native';
 
-import { saveAuthToken } from '@/services/keystore';
-import { signInWithApple as relaySignInWithApple, signInWithGoogle as relaySignInWithGoogle } from '@/services/relay';
+import { deleteAuthToken, getAuthToken, saveAuthToken } from '@/services/keystore';
+import {
+  logout as relayLogout,
+  signInWithApple as relaySignInWithApple,
+  signInWithGoogle as relaySignInWithGoogle,
+} from '@/services/relay';
 
 export type SignInOutcome = 'success' | 'cancelled';
 
+let googleConfigured = false;
+
 /**
- * Exchanges a Google ID token for a relay session and persists it. Takes
- * the token rather than running the whole flow itself, unlike
- * signInWithApple below — expo-auth-session's Google prompt is a React
- * hook and can't be called from a plain function, so getting the token is
- * necessarily the caller's job (see hooks/use-google-sign-in.ts).
+ * GoogleSignin.configure() only needs to run once per process — lazy and
+ * memoized here rather than at module scope, so a build missing the env
+ * vars doesn't throw on import, only when sign-in is actually attempted.
  */
-export async function signInWithGoogle(idToken: string): Promise<void> {
-  const token = await relaySignInWithGoogle(idToken);
-  await saveAuthToken(token);
+function ensureGoogleConfigured(): void {
+  if (googleConfigured) return;
+  const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+  const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+  if (!webClientId) {
+    // Required on every platform, not just iOS — the native SDK only
+    // populates idToken in the response if webClientId is set, regardless
+    // of which platform client actually drove the sign-in UI.
+    throw new Error("Google sign-in isn't configured on this build yet.");
+  }
+  GoogleSignin.configure({ iosClientId, webClientId });
+  googleConfigured = true;
+}
+
+/**
+ * Runs the entire native Google sign-in flow — same shape as
+ * signInWithApple below, now that @react-native-google-signin/google-signin
+ * (a plain async function, not a React hook the way expo-auth-session's
+ * Google prompt was) makes that possible.
+ */
+export async function signInWithGoogle(): Promise<SignInOutcome> {
+  ensureGoogleConfigured();
+
+  try {
+    // Play Services availability only matters on Android — iOS has no
+    // equivalent concept, and the native module doesn't require the check.
+    if (Platform.OS === 'android') {
+      await GoogleSignin.hasPlayServices();
+    }
+    const response = await GoogleSignin.signIn();
+    if (!isSuccessResponse(response)) return 'cancelled';
+
+    const idToken = response.data.idToken;
+    if (!idToken) {
+      throw new Error("Google didn't return an ID token — try again.");
+    }
+    const token = await relaySignInWithGoogle(idToken);
+    await saveAuthToken(token);
+    return 'success';
+  } catch (err) {
+    if (isErrorWithCode(err) && err.code === statusCodes.SIGN_IN_CANCELLED) {
+      return 'cancelled';
+    }
+    throw err;
+  }
 }
 
 /**
@@ -44,4 +92,39 @@ export async function signInWithApple(): Promise<SignInOutcome> {
   const token = await relaySignInWithApple(credential.identityToken);
   await saveAuthToken(token);
   return 'success';
+}
+
+/**
+ * Revokes the current session server-side and clears the locally stored
+ * token. Deliberately *doesn't* touch circle keys, the master seed, or any
+ * local circle/post data — relay auth and local circle content are
+ * decoupled by design (the relay is blind to circles entirely), so
+ * signing out is meant to be low-stakes and reversible: sign back in and
+ * everything local is exactly as you left it. The server revoke is
+ * best-effort — offline or relay-down doesn't block signing out locally.
+ *
+ * TODO(erase-device): a *separate*, clearly-destructive "Erase this
+ * device" action still needs building — wipe every circle_identity_/
+ * circle_secret_ Keychain entry, the master seed, and all local
+ * circle/post/etc. data. Do NOT fold that into signOut() again; it was
+ * tried and reverted because it silently destroyed the only copy of the
+ * master seed with no safety net. That action needs to force the user
+ * through the recovery-phrase reveal (account/recovery.tsx) and confirm
+ * they've saved it *before* proceeding — and even then, recovery only
+ * restores access on *this* device if the phrase was actually written
+ * down somewhere durable; there's no server-side backup of it (see
+ * DESIGN.md discussion on why a naive password-protected server backup
+ * is a real security regression, and what Signal-style attested-hardware
+ * rate-limiting would take to do this properly).
+ */
+export async function signOut(): Promise<void> {
+  const token = await getAuthToken();
+  if (token) {
+    try {
+      await relayLogout(token);
+    } catch (err) {
+      console.error('Failed to revoke session server-side', err);
+    }
+  }
+  await deleteAuthToken();
 }

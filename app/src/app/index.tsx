@@ -1,6 +1,5 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Redirect, router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,13 +10,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { getProfile } from '@/data/db';
-import { signInWithApple } from '@/domain/usecases/sign-in';
-import { useGoogleSignIn } from '@/hooks/use-google-sign-in';
-
-// Required once, at module scope, so a browser-based auth session (Google)
-// actually resolves its promise when the app is foregrounded again after
-// the redirect — see https://docs.expo.dev/versions/v57.0.0/sdk/auth-session/.
-WebBrowser.maybeCompleteAuthSession();
+import { signInWithApple, signInWithGoogle } from '@/domain/usecases/sign-in';
+import { getAuthToken } from '@/services/keystore';
 
 type Provider = 'apple' | 'google';
 
@@ -26,14 +20,23 @@ export default function WelcomeScreen() {
   // null = still checking. Runs once per launch; _layout.tsx already
   // guarantees the database is ready before this screen ever mounts.
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
+  // Local profile data and the relay session are deliberately independent
+  // (see sign-in.ts's signOut doc comment) — skipping straight to /circle
+  // needs *both*, not just a local profile. Signing out clears the
+  // session but not local data, so without this check a signed-out
+  // returning user would get redirected straight past this screen and
+  // never see the sign-in buttons at all.
+  const [hasSession, setHasSession] = useState<boolean | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const google = useGoogleSignIn();
-
   useEffect(() => {
     getProfile().then((profile) => setHasProfile(profile !== null));
+  }, []);
+
+  useEffect(() => {
+    getAuthToken().then((token) => setHasSession(token !== null));
   }, []);
 
   useEffect(() => {
@@ -47,8 +50,11 @@ export default function WelcomeScreen() {
     setError(null);
     setBusyProvider(provider);
     try {
-      const outcome = provider === 'google' ? await google.signIn() : await signInWithApple();
-      if (outcome === 'success') router.push('/profile-setup');
+      const outcome = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
+      // A returning device (local profile already exists — e.g. this was
+      // just a re-auth after signing out) has nothing new to fill in;
+      // only a genuinely first-time sign-in needs profile-setup.
+      if (outcome === 'success') router.push(hasProfile ? '/circle' : '/profile-setup');
     } catch (err) {
       console.error(`${provider} sign-in failed`, err);
       setError(err instanceof Error ? err.message : `Couldn't sign in with ${provider} — try again.`);
@@ -57,12 +63,12 @@ export default function WelcomeScreen() {
     }
   }
 
-  if (hasProfile === null) {
+  if (hasProfile === null || hasSession === null) {
     // Avoids a flash of the Welcome screen for returning users while we check.
     return <ThemedView style={styles.screen} />;
   }
 
-  if (hasProfile) {
+  if (hasProfile && hasSession) {
     return <Redirect href="/circle" />;
   }
 
