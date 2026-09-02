@@ -13,3 +13,4 @@ export * from '@/data/db/outbox';
 export * from '@/data/db/posts';
 export * from '@/data/db/profile';
 export * from '@/data/db/reactions';
+export * from '@/data/db/reset';

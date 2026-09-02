@@ -77,6 +77,11 @@ export async function getMasterSeed(): Promise<Uint8Array | null> {
   return raw ? hexToBytes(raw) : null;
 }
 
+/** Removes the master seed — used only by the __DEV__-only local reset tool, see domain/usecases/dev-reset.ts. */
+export async function deleteMasterSeed(): Promise<void> {
+  await SecureStore.deleteItemAsync(MASTER_SEED_KEY);
+}
+
 // TODO(erase-device): a deleteMasterSeed() belongs here once the separate
 // "Erase this device" action (see sign-in.ts's signOut doc comment) is
 // actually built — left out for now rather than sitting unused.

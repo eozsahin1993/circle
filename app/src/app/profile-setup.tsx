@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,11 +10,21 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Fonts, Radius, Spacing, Tints } from '@/constants/theme';
 import { getProfile } from '@/data/db';
-import { bytesToDataUri, pickAndCompressImage, type CompressedImage } from '@/services/image';
+import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/services/image';
 import { completeProfileSetup } from '@/domain/usecases/onboarding';
 
 export default function ProfileSetupScreen() {
-  const [name, setName] = useState('');
+  // Only ever set by index.tsx, right after a first-time sign-in — see
+  // sign-in.ts's SignInResult. Used purely as initial state below, not
+  // re-read after that: this screen's own local edits always win once the
+  // user starts typing/picking, and the effect further down only applies
+  // suggestedPictureUrl once (empty deps), never overwriting a later
+  // manual picture change.
+  const { suggestedName, suggestedPictureUrl } = useLocalSearchParams<{
+    suggestedName?: string;
+    suggestedPictureUrl?: string;
+  }>();
+  const [name, setName] = useState(suggestedName ?? '');
   const [picture, setPicture] = useState<CompressedImage | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +41,16 @@ export default function ProfileSetupScreen() {
       }
     });
   }, []);
+
+  // First-time sign-in only (see above) — fetches once, silently gives up
+  // on failure (a network hiccup here shouldn't block profile setup; the
+  // user can still add a picture manually either way).
+  useEffect(() => {
+    if (!suggestedPictureUrl) return;
+    downloadAndCompressImage(suggestedPictureUrl)
+      .then(setPicture)
+      .catch((err) => console.error('Failed to fetch suggested profile picture', err));
+  }, [suggestedPictureUrl]);
 
   async function handleAddPicture() {
     const picked = await pickAndCompressImage();

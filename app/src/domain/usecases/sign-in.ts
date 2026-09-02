@@ -11,6 +11,21 @@ import {
 
 export type SignInOutcome = 'success' | 'cancelled';
 
+/**
+ * suggestedName/suggestedPictureUrl are purely a profile-setup UX
+ * convenience — never sent anywhere, just handed to the caller so it can
+ * pre-fill the form instead of asking someone to retype what their sign-in
+ * provider already told the device. Apple never provides a photo (Sign in
+ * with Apple has no picture concept at all); its name is only ever
+ * present on a person's very first authorization for this app, so it has
+ * to be captured right here or it's gone for good.
+ */
+export type SignInResult = {
+  outcome: SignInOutcome;
+  suggestedName?: string;
+  suggestedPictureUrl?: string;
+};
+
 let googleConfigured = false;
 
 /**
@@ -38,7 +53,7 @@ function ensureGoogleConfigured(): void {
  * (a plain async function, not a React hook the way expo-auth-session's
  * Google prompt was) makes that possible.
  */
-export async function signInWithGoogle(): Promise<SignInOutcome> {
+export async function signInWithGoogle(): Promise<SignInResult> {
   ensureGoogleConfigured();
 
   try {
@@ -48,7 +63,7 @@ export async function signInWithGoogle(): Promise<SignInOutcome> {
       await GoogleSignin.hasPlayServices();
     }
     const response = await GoogleSignin.signIn();
-    if (!isSuccessResponse(response)) return 'cancelled';
+    if (!isSuccessResponse(response)) return { outcome: 'cancelled' };
 
     const idToken = response.data.idToken;
     if (!idToken) {
@@ -56,10 +71,17 @@ export async function signInWithGoogle(): Promise<SignInOutcome> {
     }
     const token = await relaySignInWithGoogle(idToken);
     await saveAuthToken(token);
-    return 'success';
+    return {
+      outcome: 'success',
+      // .name is the combined display name — givenName/familyName are
+      // reportedly unreliable on iOS (often null there), so this is the
+      // one field actually worth relying on cross-platform.
+      suggestedName: response.data.user.name ?? undefined,
+      suggestedPictureUrl: response.data.user.photo ?? undefined,
+    };
   } catch (err) {
     if (isErrorWithCode(err) && err.code === statusCodes.SIGN_IN_CANCELLED) {
-      return 'cancelled';
+      return { outcome: 'cancelled' };
     }
     throw err;
   }
@@ -72,7 +94,7 @@ export async function signInWithGoogle(): Promise<SignInOutcome> {
  * AppleAuthenticationCredential's shape or expo-apple-authentication's
  * own cancel error code.
  */
-export async function signInWithApple(): Promise<SignInOutcome> {
+export async function signInWithApple(): Promise<SignInResult> {
   let credential;
   try {
     credential = await AppleAuthentication.signInAsync({
@@ -82,7 +104,7 @@ export async function signInWithApple(): Promise<SignInOutcome> {
       ],
     });
   } catch (err) {
-    if ((err as { code?: string }).code === 'ERR_REQUEST_CANCELED') return 'cancelled';
+    if ((err as { code?: string }).code === 'ERR_REQUEST_CANCELED') return { outcome: 'cancelled' };
     throw err;
   }
 
@@ -91,7 +113,9 @@ export async function signInWithApple(): Promise<SignInOutcome> {
   }
   const token = await relaySignInWithApple(credential.identityToken);
   await saveAuthToken(token);
-  return 'success';
+
+  const suggestedName = [credential.fullName?.givenName, credential.fullName?.familyName].filter(Boolean).join(' ');
+  return { outcome: 'success', suggestedName: suggestedName || undefined };
 }
 
 /**

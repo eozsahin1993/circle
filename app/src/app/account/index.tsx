@@ -13,6 +13,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing, Tints } from '@/constants/theme';
 import { getProfile, type Profile } from '@/data/db';
+import { resetLocalDataForTesting } from '@/domain/usecases/dev-reset';
 import { signOut } from '@/domain/usecases/sign-in';
 import { useAppSettings } from '@/hooks/use-app-settings';
 import { useTheme } from '@/hooks/use-theme';
@@ -39,12 +40,32 @@ export default function AccountScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [resettingDevData, setResettingDevData] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       getProfile().then(setProfile);
     }, []),
   );
+
+  function handleDevReset() {
+    Alert.alert('Reset all local data? (dev only)', 'Wipes every circle, key, and the master seed on this device. No undo.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reset',
+        style: 'destructive',
+        onPress: async () => {
+          setResettingDevData(true);
+          try {
+            await resetLocalDataForTesting();
+            router.replace('/');
+          } finally {
+            setResettingDevData(false);
+          }
+        },
+      },
+    ]);
+  }
 
   function handleSignOut() {
     Alert.alert(
@@ -215,6 +236,25 @@ export default function AccountScreen() {
               {signingOut ? 'Signing out…' : 'Sign out'}
             </ThemedText>
           </Pressable>
+
+          {__DEV__ ? (
+            <View style={styles.section}>
+              <ThemedText type="eyebrow" themeColor="muted" style={styles.sectionLabel}>
+                Developer
+              </ThemedText>
+              <ThemedView type="surface" style={[styles.card, styles.devCard]}>
+                <Pressable style={styles.devResetRow} onPress={handleDevReset} disabled={resettingDevData}>
+                  <ThemedText type="postAuthor" themeColor="accent">
+                    {resettingDevData ? 'Resetting…' : 'Reset all local data'}
+                  </ThemedText>
+                  <ThemedText type="meta" themeColor="muted">
+                    __DEV__ only — wipes circles, keys, and the master seed so you can test sign-in fresh
+                    without reinstalling.
+                  </ThemedText>
+                </Pressable>
+              </ThemedView>
+            </View>
+          ) : null}
         </ScrollView>
       </SafeAreaView>
 
@@ -369,6 +409,13 @@ const styles = StyleSheet.create({
   },
   signOutRow: {
     alignItems: 'center',
+    paddingVertical: 14,
+  },
+  devCard: {
+    borderColor: Colors.dark.accent,
+  },
+  devResetRow: {
+    gap: 2,
     paddingVertical: 14,
   },
 });

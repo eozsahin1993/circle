@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-import { File } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import { Image } from 'react-native';
 
 /**
@@ -64,6 +64,23 @@ export async function compressImage(uri: string): Promise<CompressedImage> {
 export async function pickAndCompressImage(): Promise<CompressedImage | null> {
   const uri = await pickImage();
   return uri ? compressImage(uri) : null;
+}
+
+/**
+ * Downloads a remote image (e.g. a sign-in provider's profile photo URL)
+ * and runs it through the exact same resize/compress pipeline as a picked
+ * one — same output shape, same on-device storage story, nothing about
+ * this photo's origin persists past this one fetch.
+ */
+export async function downloadAndCompressImage(url: string): Promise<CompressedImage> {
+  const destination = new Directory(Paths.cache, 'downloaded-profile-photos');
+  destination.create({ intermediates: true, idempotent: true });
+  const downloaded = await File.downloadFileAsync(url, destination);
+  try {
+    return await compressImage(downloaded.uri);
+  } finally {
+    downloaded.delete();
+  }
 }
 
 const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';

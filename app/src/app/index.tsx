@@ -1,7 +1,7 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Redirect, router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
@@ -10,7 +10,9 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { getProfile } from '@/data/db';
+import { completeProfileSetup } from '@/domain/usecases/onboarding';
 import { signInWithApple, signInWithGoogle } from '@/domain/usecases/sign-in';
+import { downloadAndCompressImage } from '@/services/image';
 import { getAuthToken } from '@/services/keystore';
 
 type Provider = 'apple' | 'google';
@@ -29,7 +31,6 @@ export default function WelcomeScreen() {
   const [hasSession, setHasSession] = useState<boolean | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getProfile().then((profile) => setHasProfile(profile !== null));
@@ -47,17 +48,51 @@ export default function WelcomeScreen() {
   }, []);
 
   async function handleSignIn(provider: Provider) {
-    setError(null);
     setBusyProvider(provider);
     try {
-      const outcome = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
+      const result = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
+      if (result.outcome !== 'success') return;
+
       // A returning device (local profile already exists — e.g. this was
-      // just a re-auth after signing out) has nothing new to fill in;
-      // only a genuinely first-time sign-in needs profile-setup.
-      if (outcome === 'success') router.push(hasProfile ? '/circle' : '/profile-setup');
+      // just a re-auth after signing out) has nothing new to fill in.
+      if (hasProfile) {
+        router.push('/circle');
+        return;
+      }
+
+      // Only skip profile-setup entirely when the provider gave us a
+      // *complete* profile — name and picture both. Apple never provides
+      // a picture at all, so this never applies to it; Google usually
+      // does, but a failed download falls through to the form below
+      // rather than silently leaving someone with no picture and no
+      // chance to add one.
+      if (result.suggestedName && result.suggestedPictureUrl) {
+        try {
+          const { bytes } = await downloadAndCompressImage(result.suggestedPictureUrl);
+          await completeProfileSetup({ name: result.suggestedName, picture: bytes });
+          router.push('/circle');
+          return;
+        } catch (err) {
+          console.error('Failed to auto-complete profile from sign-in', err);
+          // fall through to the pre-filled manual form below
+        }
+      }
+
+      router.push({
+        pathname: '/profile-setup',
+        params: { suggestedName: result.suggestedName ?? '', suggestedPictureUrl: result.suggestedPictureUrl ?? '' },
+      });
     } catch (err) {
       console.error(`${provider} sign-in failed`, err);
-      setError(err instanceof Error ? err.message : `Couldn't sign in with ${provider} — try again.`);
+      const providerLabel = provider === 'apple' ? 'Apple' : 'Google';
+      // Only suggest the other provider if it's actually on offer — Apple
+      // isn't available at all on this device (see appleAvailable above),
+      // so telling an Android user to "try Apple instead" would be wrong.
+      const otherLabel = provider === 'apple' ? 'Google' : appleAvailable ? 'Apple' : null;
+      Alert.alert(
+        'Sign-in failed',
+        `Couldn't sign in with ${providerLabel} — try again${otherLabel ? `, or try ${otherLabel} instead` : ''}.`,
+      );
     } finally {
       setBusyProvider(null);
     }
@@ -103,11 +138,6 @@ export default function WelcomeScreen() {
             disabled={busyProvider !== null}
             onPress={() => handleSignIn('google')}
           />
-          {error ? (
-            <ThemedText type="captionFeed" themeColor="accent" style={styles.error}>
-              {error}
-            </ThemedText>
-          ) : null}
         </View>
 
         <Pressable style={styles.footer}>
@@ -139,9 +169,6 @@ const styles = StyleSheet.create({
   actions: {
     gap: 12,
     marginTop: 8,
-  },
-  error: {
-    textAlign: 'center',
   },
   footer: {
     alignSelf: 'center',
