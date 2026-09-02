@@ -23,6 +23,12 @@ export async function pickImage(): Promise<string | null> {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     quality: 1,
+    // Automatic (the default) sometimes asks NSItemProvider for a
+    // representation the asset doesn't actually have — e.g. HEIC photos,
+    // Live Photos, and the iOS Simulator's seeded library — which throws
+    // FailedToReadImageException ("Cannot load representation of type
+    // public.png/jpeg"). Compatible always renders through UIImage instead.
+    preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
   });
 
   return result.canceled ? null : result.assets[0].uri;
