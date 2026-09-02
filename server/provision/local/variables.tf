@@ -5,5 +5,5 @@ variable "env" {
 }
 
 locals {
-  name_prefix = "circle-relay-${var.env}"
+  name_prefix = "circle-${var.env}"
 }

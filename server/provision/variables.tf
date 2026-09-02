@@ -5,13 +5,13 @@ variable "aws_region" {
 }
 
 variable "env" {
-  description = "Environment name, folded into every resource's name (e.g. circle-relay-prod-sync-log) so multiple environments can coexist in one account without colliding."
+  description = "Environment name, folded into every resource's name (e.g. circle-prod-sync-log) so multiple environments can coexist in one account without colliding."
   type        = string
   default     = "prod"
 }
 
 locals {
-  name_prefix = "circle-relay-${var.env}"
+  name_prefix = "circle-${var.env}"
 }
 
 variable "log_retention_days" {
