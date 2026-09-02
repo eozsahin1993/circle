@@ -49,8 +49,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to construct root secret store: %v", err)
 	}
-	googleVerifier := oidcverify.New(googleIssuer, googleJWKSURL, cfg.GoogleClientIDs)
-	appleVerifier := oidcverify.New(appleIssuer, appleJWKSURL, cfg.AppleClientIDs)
+	googleVerifier := oidcverify.New(googleIssuer, googleJWKSURL, nonEmpty(cfg.GoogleClientIDIOS, cfg.GoogleClientIDAndroid, cfg.GoogleClientIDWeb))
+	appleVerifier := oidcverify.New(appleIssuer, appleJWKSURL, nonEmpty(cfg.AppleClientIDIOS))
 
 	mux := api.NewRouter(logStore, blobStore, authStore, secretStore, googleVerifier, appleVerifier)
 
@@ -59,4 +59,17 @@ func main() {
 	// API Gateway HTTP API.
 	adapter := httpadapter.NewV2(mux)
 	lambda.Start(adapter.ProxyWithContext)
+}
+
+// nonEmpty drops any not-yet-configured platform client ID (config.go
+// leaves these as "" rather than requiring every platform up front) before
+// they reach oidcverify.New's accepted-audience set.
+func nonEmpty(values ...string) []string {
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		if v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }

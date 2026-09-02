@@ -26,12 +26,26 @@ variable "max_blob_size_bytes" {
   default     = 2097152 # 2 MiB
 }
 
-variable "google_client_ids" {
-  description = "Accepted 'aud' values for Google Sign-In ID tokens — one per platform (iOS, Android, Web) registered in Google Cloud Console. No default: every deployment needs its own real client IDs."
-  type        = list(string)
+variable "google_client_id_ios" {
+  description = "Accepted 'aud' value for Google Sign-In ID tokens from the iOS client registered in Google Cloud Console. Empty string if iOS sign-in isn't in use yet."
+  type        = string
+  default     = ""
 }
 
-variable "apple_client_ids" {
-  description = "Accepted 'aud' values for Sign in with Apple ID tokens — typically the app's iOS bundle ID, plus a Services ID if a web/Android flow is ever added. No default: every deployment needs its own real client IDs."
-  type        = list(string)
+variable "google_client_id_android" {
+  description = "Accepted 'aud' value for Google Sign-In ID tokens from the Android client registered in Google Cloud Console. Empty string if Android sign-in isn't in use yet."
+  type        = string
+  default     = ""
+}
+
+variable "google_client_id_web" {
+  description = "Accepted 'aud' value for Google Sign-In ID tokens from the Web client registered in Google Cloud Console. Empty string if web sign-in isn't in use yet."
+  type        = string
+  default     = ""
+}
+
+variable "apple_client_id_ios" {
+  description = "Accepted 'aud' value for Sign in with Apple ID tokens — the app's iOS bundle ID. A Services ID variable would join this if a web/Android Apple flow is ever added."
+  type        = string
+  default     = ""
 }

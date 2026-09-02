@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"strconv"
-	"strings"
 )
 
 type Config struct {
@@ -24,15 +23,20 @@ type Config struct {
 	// server/provision/kms.tf. Safe as a plain env var: useless without the
 	// KMS key that encrypted it.
 	RootSecretCiphertext string
-	// GoogleClientIDs are the accepted "aud" values for Google Sign-In ID
-	// tokens — one per platform (iOS, Android, Web), since native Google
-	// Sign-In issues tokens audienced to whichever client ID initiated the
-	// flow. Comma-separated in the env var.
-	GoogleClientIDs []string
-	// AppleClientIDs are the accepted "aud" values for Sign in with Apple
-	// ID tokens — typically the app's iOS bundle ID, plus a Services ID if
-	// a web/Android flow is ever added. Comma-separated in the env var.
-	AppleClientIDs []string
+	// GoogleClientIDIOS/Android/Web are the accepted "aud" values for
+	// Google Sign-In ID tokens, one per platform client registered in
+	// Google Cloud Console — named per-platform (mirroring app/.env.local's
+	// EXPO_PUBLIC_GOOGLE_*_CLIENT_ID) rather than one combined list, so a
+	// missing platform is an obviously-empty field instead of a silently
+	// wrong position in a comma list. Any of these may be empty if that
+	// platform isn't in use yet.
+	GoogleClientIDIOS     string
+	GoogleClientIDAndroid string
+	GoogleClientIDWeb     string
+	// AppleClientIDIOS is the accepted "aud" value for Sign in with Apple
+	// ID tokens — the app's iOS bundle ID. A Services ID would join this
+	// as a second named field if a web/Android Apple flow is ever added.
+	AppleClientIDIOS string
 	// LogRetentionDays is passed straight to dynamodb.NewLogStore — see
 	// server/DESIGN.md and provision/variables.tf's log_retention_days. 0
 	// means "use the adapter's own default". Eviction itself is DynamoDB's
@@ -58,16 +62,18 @@ type Config struct {
 // limp along with a zero value.
 func Load() Config {
 	return Config{
-		TableName:            mustEnv("TABLE_NAME"),
-		BucketName:           mustEnv("BUCKET_NAME"),
-		DevicesTableName:     mustEnv("DEVICES_TABLE_NAME"),
-		RootSecretCiphertext: mustEnv("ROOT_SECRET_CIPHERTEXT"),
-		GoogleClientIDs:      csvEnv("GOOGLE_CLIENT_IDS"),
-		AppleClientIDs:       csvEnv("APPLE_CLIENT_IDS"),
-		LogRetentionDays:     intEnv("LOG_RETENTION_DAYS", 0),
-		MaxBlobSize:          intEnv("MAX_BLOB_SIZE_BYTES", 0),
-		Port:                 envOr("PORT", "8080"),
-		S3ForcePathStyle:     envOr("S3_FORCE_PATH_STYLE", "false") == "true",
+		TableName:             mustEnv("TABLE_NAME"),
+		BucketName:            mustEnv("BUCKET_NAME"),
+		DevicesTableName:      mustEnv("DEVICES_TABLE_NAME"),
+		RootSecretCiphertext:  mustEnv("ROOT_SECRET_CIPHERTEXT"),
+		GoogleClientIDIOS:     envOr("GOOGLE_CLIENT_ID_IOS", ""),
+		GoogleClientIDAndroid: envOr("GOOGLE_CLIENT_ID_ANDROID", ""),
+		GoogleClientIDWeb:     envOr("GOOGLE_CLIENT_ID_WEB", ""),
+		AppleClientIDIOS:      envOr("APPLE_CLIENT_ID_IOS", ""),
+		LogRetentionDays:      intEnv("LOG_RETENTION_DAYS", 0),
+		MaxBlobSize:           intEnv("MAX_BLOB_SIZE_BYTES", 0),
+		Port:                  envOr("PORT", "8080"),
+		S3ForcePathStyle:      envOr("S3_FORCE_PATH_STYLE", "false") == "true",
 	}
 }
 
@@ -96,23 +102,4 @@ func intEnv(name string, fallback int64) int64 {
 		log.Fatalf("%s must be an integer, got %q", name, raw)
 	}
 	return value
-}
-
-// csvEnv splits a required, comma-separated env var into trimmed,
-// non-empty values — used for the two client-ID allowlists, which are
-// naturally multi-valued (one ID per platform) but still have no sane
-// zero-value default.
-func csvEnv(name string) []string {
-	raw := mustEnv(name)
-	parts := strings.Split(raw, ",")
-	values := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if trimmed := strings.TrimSpace(p); trimmed != "" {
-			values = append(values, trimmed)
-		}
-	}
-	if len(values) == 0 {
-		log.Fatalf("%s must contain at least one value", name)
-	}
-	return values
 }

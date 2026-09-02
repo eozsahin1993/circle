@@ -102,14 +102,16 @@ resource "aws_lambda_function" "relay" {
 
   environment {
     variables = {
-      TABLE_NAME             = module.storage.table_name
-      BUCKET_NAME            = module.storage.bucket_name
-      DEVICES_TABLE_NAME     = aws_dynamodb_table.devices.name
-      ROOT_SECRET_CIPHERTEXT = data.aws_kms_ciphertext.root_secret.ciphertext_blob
-      GOOGLE_CLIENT_IDS      = join(",", var.google_client_ids)
-      APPLE_CLIENT_IDS       = join(",", var.apple_client_ids)
-      LOG_RETENTION_DAYS     = tostring(var.log_retention_days)
-      MAX_BLOB_SIZE_BYTES    = tostring(var.max_blob_size_bytes)
+      TABLE_NAME               = module.storage.table_name
+      BUCKET_NAME              = module.storage.bucket_name
+      DEVICES_TABLE_NAME       = aws_dynamodb_table.devices.name
+      ROOT_SECRET_CIPHERTEXT   = data.aws_kms_ciphertext.root_secret.ciphertext_blob
+      GOOGLE_CLIENT_ID_IOS     = var.google_client_id_ios
+      GOOGLE_CLIENT_ID_ANDROID = var.google_client_id_android
+      GOOGLE_CLIENT_ID_WEB     = var.google_client_id_web
+      APPLE_CLIENT_ID_IOS      = var.apple_client_id_ios
+      LOG_RETENTION_DAYS       = tostring(var.log_retention_days)
+      MAX_BLOB_SIZE_BYTES      = tostring(var.max_blob_size_bytes)
     }
   }
 }
