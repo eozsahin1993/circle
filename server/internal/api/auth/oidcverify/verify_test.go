@@ -49,7 +49,7 @@ func testKey(t *testing.T) *rsa.PrivateKey {
 	return key
 }
 
-func TestVerifyAndGetClaims_ValidTokenReturnsSubAndEmail(t *testing.T) {
+func TestVerifyAndGetClaims_ValidTokenReturnsSub(t *testing.T) {
 	key := testKey(t)
 	token := signTestToken(t, key, baseClaims())
 
@@ -61,8 +61,24 @@ func TestVerifyAndGetClaims_ValidTokenReturnsSubAndEmail(t *testing.T) {
 	if claims.Sub != "user-1" {
 		t.Fatalf("expected sub user-1, got %q", claims.Sub)
 	}
-	if claims.Email != "person@example.com" {
-		t.Fatalf("expected person@example.com, got %q", claims.Email)
+}
+
+// Apple can omit the email claim on a given authorization — sign-in must
+// still succeed, since identity is keyed on sub alone.
+func TestVerifyAndGetClaims_MissingEmailIsAccepted(t *testing.T) {
+	key := testKey(t)
+	claims := baseClaims()
+	delete(claims, "email")
+	delete(claims, "email_verified")
+	token := signTestToken(t, key, claims)
+
+	got, err := verifyAndGetClaims(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
+		map[string]struct{}{"client-id-1": {}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Sub != "user-1" {
+		t.Fatalf("expected sub user-1, got %q", got.Sub)
 	}
 }
 
@@ -76,31 +92,6 @@ func TestVerifyAndGetClaims_MissingSubIsRejected(t *testing.T) {
 		map[string]struct{}{"client-id-1": {}})
 	if err == nil {
 		t.Fatal("expected an error for a token with no sub claim")
-	}
-}
-
-func TestVerifyAndGetClaims_AppleStyleStringEmailVerifiedIsAccepted(t *testing.T) {
-	key := testKey(t)
-	claims := baseClaims()
-	claims["email_verified"] = "true"
-	token := signTestToken(t, key, claims)
-
-	if _, err := verifyAndGetClaims(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
-		map[string]struct{}{"client-id-1": {}}); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestVerifyAndGetClaims_UnverifiedEmailIsRejected(t *testing.T) {
-	key := testKey(t)
-	claims := baseClaims()
-	claims["email_verified"] = false
-	token := signTestToken(t, key, claims)
-
-	_, err := verifyAndGetClaims(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
-		map[string]struct{}{"client-id-1": {}})
-	if err != ErrEmailNotVerified {
-		t.Fatalf("expected ErrEmailNotVerified, got %v", err)
 	}
 }
 

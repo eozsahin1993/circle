@@ -90,6 +90,33 @@ func TestEndToEnd_AppleSignIn(t *testing.T) {
 	}
 }
 
+// Apple can omit the email claim on a given authorization (a documented
+// quirk, not malformed input) — sign-in keys on sub alone, so this must
+// still succeed against the real router wiring, not just oidcverify's own
+// unit tests.
+func TestEndToEnd_AppleSignIn_MissingEmailStillSucceeds(t *testing.T) {
+	mux, _, apple := testsupport.NewRouterWithAuth(t)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	claims := jwt.MapClaims{
+		"iss": apple.Issuer,
+		"aud": testsupport.TestAppleClientID,
+		"sub": testsupport.UniqueAccountID(t),
+		"exp": time.Now().Add(time.Hour).Unix(),
+		"iat": time.Now().Unix(),
+	}
+	idToken := apple.SignToken(t, claims)
+
+	resp := postSignIn(t, server.URL, "/v1/auth/apple", idToken)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	if token := decodeToken(t, resp); token == "" {
+		t.Fatal("expected a non-empty token")
+	}
+}
+
 func TestEndToEnd_GoogleSignIn_WrongIssuerReturns401(t *testing.T) {
 	mux, google, _ := testsupport.NewRouterWithAuth(t)
 	server := httptest.NewServer(mux)

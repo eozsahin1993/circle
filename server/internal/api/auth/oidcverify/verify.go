@@ -12,21 +12,15 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// ErrEmailNotVerified means the provider itself didn't attest the email —
-// an OIDC token can legally carry an unverified email claim, and trusting
-// one here would defeat the entire point of using this as a registration
-// credential.
-var ErrEmailNotVerified = errors.New("oidcverify: email not verified")
-
 // Claims is what a verified token yields. Sub is the provider's own
 // permanent per-user identifier — required by the OIDC spec on every
-// token, unlike Email (scope-gated, and the value itself can change: a
-// user's account email, or an Apple private-relay address, at any time).
-// Callers should key identity on Sub, not Email — see server/DESIGN.md's
-// "Account recovery" section for why.
+// token. There's no Email here: identity is keyed on Sub alone (see
+// server/DESIGN.md's "Account recovery" section for why), and the email
+// claim isn't required by the OIDC spec — Apple in particular can omit it
+// on a given authorization, so gating sign-in on its presence rejected
+// otherwise-valid tokens for no functional reason.
 type Claims struct {
-	Sub   string
-	Email string
+	Sub string
 }
 
 // Verifier checks ID tokens from one OIDC provider (issuer) against its
@@ -53,7 +47,7 @@ func New(issuer, jwksURL string, audiences []string) *Verifier {
 }
 
 // VerifyAndGetClaims validates rawToken's signature, issuer, audience, and
-// expiry, then returns its Sub and verified Email.
+// expiry, then returns its Sub.
 func (v *Verifier) VerifyAndGetClaims(rawToken string) (Claims, error) {
 	return verifyAndGetClaims(rawToken, v.jwks.keyFunc, v.issuer, v.audiences)
 }
@@ -89,14 +83,7 @@ func verifyAndGetClaims(rawToken string, keyFunc jwt.Keyfunc, issuer string, aud
 		return Claims{}, errors.New("oidcverify: token has no sub claim")
 	}
 
-	email, _ := claims["email"].(string)
-	if email == "" {
-		return Claims{}, errors.New("oidcverify: token has no email claim")
-	}
-	if !emailVerifiedClaim(claims) {
-		return Claims{}, ErrEmailNotVerified
-	}
-	return Claims{Sub: sub, Email: email}, nil
+	return Claims{Sub: sub}, nil
 }
 
 // audienceAccepted checks the token's aud claim (a string or array of
@@ -120,19 +107,4 @@ func audienceAccepted(claims jwt.MapClaims, audiences map[string]struct{}) bool 
 		}
 	}
 	return false
-}
-
-// emailVerifiedClaim handles both representations providers actually send
-// in practice: Google sends a real JSON boolean, Apple sends the string
-// "true"/"false" — a documented quirk of Apple's identity tokens, not a
-// bug in this code.
-func emailVerifiedClaim(claims jwt.MapClaims) bool {
-	switch v := claims["email_verified"].(type) {
-	case bool:
-		return v
-	case string:
-		return v == "true"
-	default:
-		return false
-	}
 }

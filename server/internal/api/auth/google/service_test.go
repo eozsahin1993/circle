@@ -151,7 +151,9 @@ func TestService_SignIn_InvalidTokenIsRejected(t *testing.T) {
 	}
 }
 
-func TestService_SignIn_UnverifiedEmailIsRejected(t *testing.T) {
+// Apple can omit the email claim on a given authorization — sign-in keys
+// on sub alone, so this must still succeed.
+func TestService_SignIn_MissingEmailStillIssuesASession(t *testing.T) {
 	ctx := context.Background()
 	provider := testsupport.NewFakeOIDCProvider(t, "https://accounts.google.com")
 	svc := &google.Service{
@@ -160,15 +162,13 @@ func TestService_SignIn_UnverifiedEmailIsRejected(t *testing.T) {
 	}
 
 	idToken := provider.SignToken(t, jwt.MapClaims{
-		"iss":            provider.Issuer,
-		"aud":            testsupport.TestGoogleClientID,
-		"sub":            testsupport.UniqueAccountID(t),
-		"email":          testsupport.UniqueEmail(t),
-		"email_verified": false,
-		"exp":            time.Now().Add(time.Hour).Unix(),
+		"iss": provider.Issuer,
+		"aud": testsupport.TestGoogleClientID,
+		"sub": testsupport.UniqueAccountID(t),
+		"exp": time.Now().Add(time.Hour).Unix(),
 	})
 
-	if _, err := svc.SignIn(ctx, idToken); err == nil {
-		t.Fatal("expected an error for an unverified email")
+	if _, err := svc.SignIn(ctx, idToken); err != nil {
+		t.Fatal(err)
 	}
 }
