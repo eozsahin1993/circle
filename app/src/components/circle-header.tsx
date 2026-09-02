@@ -25,7 +25,7 @@ export function CircleHeader({ name, memberCount, onPressDetails }: CircleHeader
       <Pressable style={styles.titles} onPress={onPressDetails}>
         <ThemedText type="screenTitle">{name}</ThemedText>
         <ThemedText type="meta" themeColor="muted">
-          {memberCount} people
+          {memberCount} people. Tap for details
         </ThemedText>
       </Pressable>
 
