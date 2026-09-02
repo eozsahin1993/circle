@@ -98,6 +98,70 @@ was this exact field before a rename; it was never actually
 device-specific, just the account identifier under an earlier, more
 confusing name from when it was `emailHmac`.)
 
+## Identity model: four things that are easy to conflate
+
+This spans both sides (the relay only ever touches the first one), but it
+belongs in one place — the confusing part is exactly how these relate to
+*each other*, and that's lost if each piece is documented separately next
+to its own code.
+
+| | What it is | Derived from | Who needs it to match |
+|---|---|---|---|
+| **accountId** | `"google:<sub>"` / `"apple:<sub>"` | Provider's OIDC `sub` claim | The relay, for session lookup. See "Auth flow" above. |
+| **masterSeed** | 128 bits of entropy behind the 12-word recovery phrase | Random, generated once at onboarding (`generateSeedPhrase()`) | Nobody but your own devices — never leaves the client, never sent to the relay in any form. |
+| **circleId** | A local UUID | `generateUUID()`, freely chosen per circle | Only your own devices, across time (see below) — never other members. |
+| **circleLogId** | The relay-visible address for a circle's log | `sha256("circle-log" \|\| circleSecret)` | Every member — it's the one thing that *has* to match, since it's how independent devices agree on a relay address with zero coordination. |
+
+The relationship: your circle **identity keypair** is
+`deriveCircleIdentity(masterSeed, circleId)` — a pure function of your own
+seed and your own private label for the circle. Nobody else ever
+recomputes it; they only ever learn your public half by reading it out of
+the circle's roster, which syncs like any other content. So `circleId`
+only has one real job: staying *stable for your own account across a lost
+device*, which is exactly what the account-recovery manifest
+(`internal/storage/manifeststore`) exists to guarantee — it's a durable,
+client-encrypted list of the circleId values your account used, so a
+recovering device reproduces the *same* keypairs the rest of the circle
+already recognizes, instead of showing up as an unrecognized stranger.
+
+**How `circleId` and the secret get paired**: not by any derivation —
+`circleId` and the circle secret are two independently-random values with
+no mathematical relationship. They're linked purely by local storage: the
+moment a device obtains a circle's secret (generating it, for the
+founder; decrypting the mailbox's approval response, for a joiner), it's
+saved to Keychain keyed by that device's own `circleId`
+(`saveCircleSecret(circleId, secret)`) — before anything else happens.
+From then on, `circleId` is just the lookup key that gets the secret back
+out; the secret itself is what everything cryptographic (`circleLogId`,
+decrypting entries) actually derives from.
+
+**How you actually fetch a circle's content**: look up the secret via
+`circleId` (a plain local read, not a derivation), derive `circleLogId`
+from *that*, then `GET /v1/circles/{circleLogId}/entries?since=` — see
+`fetchEntries` (app-side) / `internal/api/fetchentries` (this repo).
+Concretely, this two-step chain is exactly what `drainOutbox` does on
+every sync:
+
+```ts
+const secret = await getCircleSecret(circleId);   // local lookup
+const circleLogId = deriveCircleLogId(secret);    // real derivation
+```
+
+Everything needed to read a circle comes from the secret alone once
+you've looked it up; the local `circleId` never itself talks to the
+relay, it only ever unlocks what's stored under it.
+
+**How you get the circle secret in the first place** (join-by-invite,
+design only — not built yet, see DESIGN.md's "Mailbox" section): the
+invite code itself carries no secret, just a lookup tag
+(`hash(invite_code)`). The requester generates a one-time keypair, posts
+a join request to that tag; the inviter encrypts the circle secret to the
+requester's one-time public key and posts the response to the same tag.
+Only the requester's matching private key can open it — the relay
+forwards ciphertext under an opaque tag either side can compute, never
+learning what's inside or that the two messages are related to the same
+handshake beyond sharing a tag.
+
 ## Running locally
 
 ```
