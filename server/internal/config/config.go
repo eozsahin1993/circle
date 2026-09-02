@@ -23,6 +23,10 @@ type Config struct {
 	// (today: the encrypted recovery manifest) — see
 	// server/provision/accounts_table.tf.
 	AccountsTableName string
+	// InviteTableName is the standalone invite/join-request table — see
+	// server/INVITE_FLOW.md and
+	// server/provision/modules/storage/dynamodb.tf's invites resource.
+	InviteTableName string
 	// RootSecretCiphertext is the base64 KMS ciphertext blob for the app's
 	// single root secret — see internal/adapters/kms, internal/kdf, and
 	// server/provision/kms.tf. Safe as a plain env var: useless without the
@@ -52,6 +56,13 @@ type Config struct {
 	// server/DESIGN.md and provision/variables.tf's max_blob_size_bytes. 0
 	// means "use the adapter's own default".
 	MaxBlobSize int64
+	// InviteRetentionDays is passed straight to invitedynamodb.New — see
+	// server/INVITE_FLOW.md and provision/variables.tf's
+	// invite_retention_days. 0 means "use the adapter's own default".
+	// Eviction itself is DynamoDB's native TTL
+	// (see provision/modules/storage/dynamodb.tf), not this process — this
+	// only controls what expiresAt gets written as.
+	InviteRetentionDays int64
 	// Port is only used by cmd/server (cmd/lambda doesn't listen on a port).
 	Port string
 	// S3ForcePathStyle is only ever true for local testing against
@@ -71,6 +82,7 @@ func Load() Config {
 		BucketName:            mustEnv("BUCKET_NAME"),
 		SessionsTableName:     mustEnv("SESSIONS_TABLE_NAME"),
 		AccountsTableName:     mustEnv("ACCOUNTS_TABLE_NAME"),
+		InviteTableName:       mustEnv("INVITE_TABLE_NAME"),
 		RootSecretCiphertext:  mustEnv("ROOT_SECRET_CIPHERTEXT"),
 		GoogleClientIDIOS:     envOr("GOOGLE_CLIENT_ID_IOS", ""),
 		GoogleClientIDAndroid: envOr("GOOGLE_CLIENT_ID_ANDROID", ""),
@@ -78,6 +90,7 @@ func Load() Config {
 		AppleClientIDIOS:      envOr("APPLE_CLIENT_ID_IOS", ""),
 		LogRetentionDays:      intEnv("LOG_RETENTION_DAYS", 0),
 		MaxBlobSize:           intEnv("MAX_BLOB_SIZE_BYTES", 0),
+		InviteRetentionDays:   intEnv("INVITE_RETENTION_DAYS", 0),
 		Port:                  envOr("PORT", "8080"),
 		S3ForcePathStyle:      envOr("S3_FORCE_PATH_STYLE", "false") == "true",
 	}

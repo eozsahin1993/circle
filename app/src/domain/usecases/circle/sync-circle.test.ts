@@ -4,8 +4,8 @@ import { encryptJSON, generateUUID } from '@/services/crypto';
 import { getCircleSecret, saveMasterSeed } from '@/services/keystore';
 import { appendEntry, uploadBlob } from '@/services/relay';
 import { getPendingOutboxEntries, initDatabase, insertPostAndEnqueue, OutboxStatuses, type Post } from '@/data/db';
-import { createCircle } from '@/domain/usecases/create-circle';
-import { drainOutbox } from '@/domain/usecases/sync-circle';
+import { createCircle } from '@/domain/usecases/circle/create-circle';
+import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 
 beforeAll(async () => {
   await initDatabase();

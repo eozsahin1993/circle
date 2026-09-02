@@ -23,6 +23,7 @@ func NewRouterWithAuth(t testing.TB) (mux *http.ServeMux, google, apple *FakeOID
 		NewAuthStore(t),
 		NewSecretStore(t),
 		NewManifestStore(t),
+		NewInviteStore(t, 0),
 		oidcverify.New(google.Issuer, google.JWKSURL, []string{TestGoogleClientID}),
 		oidcverify.New(apple.Issuer, apple.JWKSURL, []string{TestAppleClientID}),
 	)

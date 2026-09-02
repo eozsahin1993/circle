@@ -1,0 +1,194 @@
+import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
+
+import {
+  decrypt,
+  deriveInvitePreviewKey,
+  deriveInviteTag,
+  deriveJoinRequestKey,
+  encryptJSON,
+  generateInviteCode,
+  sealToPublicKey,
+  sign,
+} from '@/services/crypto';
+import { getCircle, getCurrentInvite, getMemberByPublicKey, insertInvite, MemberRoles, revokeInvite, type Invite } from '@/data/db';
+import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinApprovalPayload, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
+import { getCircleIdentity, getCircleSecret } from '@/services/keystore';
+import { listJoinRequests, putInvitePreview, putJoinApproval } from '@/services/mailbox-relay';
+
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Resolves this device's own public key + roster row for a circle, or null before it has an identity there. */
+async function getOwnMember(circleId: string) {
+  const identity = await getCircleIdentity(circleId);
+  if (!identity) return null;
+
+  const publicKey = bytesToHex(identity.publicKey);
+  const member = await getMemberByPublicKey(circleId, publicKey);
+  return member ? { publicKey, member } : null;
+}
+
+/** Whether this device is an admin of the circle — for screens to decide what to show, not just what to allow. */
+export async function isCircleAdmin(circleId: string): Promise<boolean> {
+  const own = await getOwnMember(circleId);
+  return own?.member.role === MemberRoles.admin;
+}
+
+/** Resolves this device's own public key in the circle, and confirms it's an admin. */
+async function requireAdminPublicKey(circleId: string): Promise<string> {
+  const own = await getOwnMember(circleId);
+  if (own?.member.role !== MemberRoles.admin) throw new Error("Only an admin can manage this circle's invite.");
+
+  return own.publicKey;
+}
+
+/**
+ * Writes the server-side `sk = "invite"` row (see server/INVITE_FLOW.md) —
+ * the circle's current name, encrypted under a key derived from the
+ * invite code alone, so anyone who taps the link can preview what they're
+ * about to join before requesting to. Not best-effort: an invite whose
+ * preview never lands is unjoinable, so a failure here should surface the
+ * same way any other invite-creation failure does.
+ */
+async function writeInvitePreview(code: string, circleName: string, createdByPublicKey: string): Promise<void> {
+  const payload: InvitePreviewPayload = { name: circleName, createdByPublicKey };
+  const key = deriveInvitePreviewKey(code);
+  await putInvitePreview(deriveInviteTag(code), encryptJSON(payload, key));
+}
+
+async function createInvite(circleId: string, createdByPublicKey: string): Promise<Invite> {
+  const circle = await getCircle(circleId);
+  if (!circle) throw new Error('Circle not found.');
+
+  const now = Date.now();
+  const invite: Invite = {
+    code: generateInviteCode(),
+    circleId,
+    createdByPublicKey,
+    createdAt: now,
+    expiresAt: now + INVITE_TTL_MS,
+    revokedAt: null,
+  };
+  await insertInvite(invite);
+  await writeInvitePreview(invite.code, circle.name, createdByPublicKey);
+  return invite;
+}
+
+/**
+ * Returns the circle's current, live invite — creating one if there isn't
+ * one yet, or the existing one has expired. Reused rather than minted
+ * fresh on every visit to the invite screen, so the code someone already
+ * shared keeps working.
+ */
+export async function getOrCreateInvite(circleId: string): Promise<Invite> {
+  const publicKey = await requireAdminPublicKey(circleId);
+
+  const current = await getCurrentInvite(circleId);
+  if (current && current.expiresAt > Date.now()) return current;
+
+  return createInvite(circleId, publicKey);
+}
+
+/**
+ * Revokes the circle's current invite (if any) and issues a fresh one —
+ * kills the old link/code for anyone still holding it, without touching
+ * members who already joined through it.
+ */
+export async function replaceInvite(circleId: string): Promise<Invite> {
+  const publicKey = await requireAdminPublicKey(circleId);
+
+  const current = await getCurrentInvite(circleId);
+  if (current) await revokeInvite(current.code);
+
+  return createInvite(circleId, publicKey);
+}
+
+/**
+ * Resolves the circle's current invite and confirms this device is
+ * specifically the invite's *creator* — deliberately not
+ * `requireAdminPublicKey`, which only checks circle-admin role. Per
+ * server/DESIGN.md's "Invites" section, approval is always the invite's
+ * specific creator, never "any admin" — an admin who didn't create this
+ * invite has no more context to judge a join request against than a
+ * stranger would. This is a client-side gate, same trust tier as
+ * everything else in this flow: the relay is blind and doesn't enforce
+ * it, so a device holding both the invite code and a valid session could
+ * still call the mailbox API directly, bypassing this check — same as it
+ * could always forge other locally-enforced conventions here (e.g. a
+ * requester's self-reported name).
+ */
+async function requireInviteCreatorPublicKey(circleId: string): Promise<{ publicKey: string; invite: Invite }> {
+  const own = await getOwnMember(circleId);
+  const invite = await getCurrentInvite(circleId);
+  if (!own || !invite || own.publicKey !== invite.createdByPublicKey) {
+    throw new Error("Only this invite's creator can see or approve its join requests.");
+  }
+  return { publicKey: own.publicKey, invite };
+}
+
+export type PendingRequest = { requesterId: string; selfReportedName: string };
+
+/**
+ * Lists join requests under the circle's current invite, decrypted enough
+ * to show an approval screen — the self-reported name only, per
+ * server/DESIGN.md ("not verified identity"). Silently skips any row that
+ * fails to decrypt (e.g. a stale row from a previous invite that happens
+ * to share a mailbox tag prefix) rather than failing the whole list.
+ */
+export async function discoverPendingRequests(circleId: string): Promise<PendingRequest[]> {
+  const { invite } = await requireInviteCreatorPublicKey(circleId);
+  const key = deriveJoinRequestKey(invite.code);
+
+  const requests = await listJoinRequests(deriveInviteTag(invite.code));
+  const pending: PendingRequest[] = [];
+  for (const request of requests) {
+    try {
+      const payload = JSON.parse(new TextDecoder().decode(decrypt(request.encryptedRequest, key))) as JoinRequestPayload;
+      pending.push({ requesterId: request.requesterId, selfReportedName: payload.selfReportedName });
+    } catch (err) {
+      console.error('Failed to decrypt a join request', err);
+    }
+  }
+  return pending;
+}
+
+/**
+ * Approves one pending join request: seals the circle secret + current
+ * name to the requester's own ephemeral public key (see
+ * `sealToPublicKey`), so only that specific requester can read it back.
+ *
+ * Also signs the approval with this device's own circle-identity secret
+ * key (the same keypair every post is already signed with) before
+ * sealing it. Without this, the seal alone isn't enough: anyone who knows
+ * the invite code and the circle secret — any existing member, not just
+ * this invite's creator — has everything needed to forge an equally
+ * valid-looking approval, since `requireInviteCreatorPublicKey` above is
+ * a client-side gate the relay can't enforce. The signature is what the
+ * requester actually checks (see `checkPendingJoinRequest`) against the
+ * `createdByPublicKey` it captured from the invite preview — binding
+ * trust to the one identity that's supposed to matter.
+ */
+export async function approveJoinRequest(circleId: string, requesterId: string): Promise<void> {
+  const { invite } = await requireInviteCreatorPublicKey(circleId);
+  const circle = await getCircle(circleId);
+  if (!circle) throw new Error('Circle not found.');
+
+  const inviteTag = deriveInviteTag(invite.code);
+  const requests = await listJoinRequests(inviteTag);
+  const request = requests.find((r) => r.requesterId === requesterId);
+  if (!request) throw new Error('That join request is no longer available.');
+
+  const requestKey = deriveJoinRequestKey(invite.code);
+  const { ephemeralPub } = JSON.parse(new TextDecoder().decode(decrypt(request.encryptedRequest, requestKey))) as JoinRequestPayload;
+
+  const secret = await getCircleSecret(circleId);
+  if (!secret) throw new Error('No circle secret on this device.');
+  const identity = await getCircleIdentity(circleId);
+  if (!identity) throw new Error('No circle identity on this device.');
+
+  const approval: JoinApprovalPayload = { secret: bytesToHex(secret), circleName: circle.name };
+  const signature = sign(new TextEncoder().encode(JSON.stringify(approval)), identity.secretKey);
+  const envelope: JoinApprovalEnvelope = { approval, signature: bytesToHex(signature) };
+
+  const sealed = sealToPublicKey(new TextEncoder().encode(JSON.stringify(envelope)), hexToBytes(ephemeralPub));
+  await putJoinApproval(inviteTag, requesterId, sealed);
+}

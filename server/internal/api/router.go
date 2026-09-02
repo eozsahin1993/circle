@@ -17,9 +17,11 @@ import (
 	"circle-relay/internal/api/auth/oidcverify"
 	"circle-relay/internal/api/fetchentries"
 	"circle-relay/internal/api/getblob"
+	"circle-relay/internal/api/invite"
 	"circle-relay/internal/secrets"
 	"circle-relay/internal/storage/authstore"
 	"circle-relay/internal/storage/blobstore"
+	"circle-relay/internal/storage/invitestore"
 	"circle-relay/internal/storage/logstore"
 	"circle-relay/internal/storage/manifeststore"
 )
@@ -30,11 +32,12 @@ func NewRouter(
 	authStore authstore.Store,
 	secretStore secrets.Store,
 	manifestStore manifeststore.Store,
+	inviteStore invitestore.Store,
 	googleVerifier *oidcverify.Verifier,
 	appleVerifier *oidcverify.Verifier,
 ) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.Handle("/v1/", http.StripPrefix("/v1", newV1Mux(logStore, blobStore, authStore, secretStore, manifestStore, googleVerifier, appleVerifier)))
+	mux.Handle("/v1/", http.StripPrefix("/v1", newV1Mux(logStore, blobStore, authStore, secretStore, manifestStore, inviteStore, googleVerifier, appleVerifier)))
 	return mux
 }
 
@@ -48,6 +51,7 @@ func newV1Mux(
 	authStore authstore.Store,
 	secretStore secrets.Store,
 	manifestStore manifeststore.Store,
+	inviteStore invitestore.Store,
 	googleVerifier *oidcverify.Verifier,
 	appleVerifier *oidcverify.Verifier,
 ) *http.ServeMux {
@@ -65,6 +69,16 @@ func newV1Mux(
 	accountMux := http.NewServeMux()
 	manifest.Register(accountMux, &manifest.Service{ManifestStore: manifestStore})
 	mux.Handle("/account/", auth.RequireSession(authStore, accountMux))
+
+	// Invite-tag-scoped, not circle- or account-scoped — its own sub-mux,
+	// same RequireSession wrapping as circleMux/accountMux above. Still
+	// requires a session: an unauthenticated caller can't hit any /invites/
+	// route, even though the routes themselves don't use the caller's
+	// accountID (see server/INVITE_FLOW.md — the relay never learns who's
+	// inviting whom).
+	invitesMux := http.NewServeMux()
+	invite.Register(invitesMux, &invite.Service{InviteStore: inviteStore})
+	mux.Handle("/invites/", auth.RequireSession(authStore, invitesMux))
 
 	google.Register(mux, &google.Service{AuthStore: authStore, Verifier: googleVerifier})
 	apple.Register(mux, &apple.Service{AuthStore: authStore, Verifier: appleVerifier})

@@ -119,7 +119,7 @@ export const outbox = sqliteTable(
     circleId: text('circle_id')
       .notNull()
       .references(() => circles.id, { onDelete: 'cascade' }),
-    entryType: text('entry_type', { enum: ['post'] }).notNull(),
+    entryType: text('entry_type', { enum: ['post', 'member_added'] }).notNull(),
     localId: text('local_id').notNull(),
     /**
      * The exact ciphertext `drainOutbox` will POST as-is — built and
@@ -145,6 +145,38 @@ export const outbox = sqliteTable(
   },
   (t) => [index('outbox_circle_id').on(t.circleId)]
 );
+
+/**
+ * One row per outstanding join request this device has submitted — lets a
+ * "pending for Family Circle" screen survive the app being closed and
+ * reopened before approval ever lands (see server/INVITE_FLOW.md, step 4).
+ * `id` is the requester-chosen id used both as the mailbox row's sort key
+ * suffix and as the Keychain key for the matching ephemeral secret key
+ * (see `keystore.ts`'s `savePendingJoinKeypair`) — the secret key itself
+ * never lives here. `status` is 'approved' only for the brief window
+ * between decrypting the approval and finishing local setup; the row is
+ * deleted entirely once that completes, so there's no long-lived "joined"
+ * state to track here.
+ */
+export const pendingJoinRequests = sqliteTable('pending_join_requests', {
+  id: text('id').primaryKey(),
+  inviteCode: text('invite_code').notNull(),
+  /** From the decrypted invite preview — shown on the pending screen without needing to re-fetch/re-decrypt it. */
+  circleName: text('circle_name').notNull(),
+  /**
+   * Also from the decrypted invite preview — the invite creator's own
+   * circle-identity public key (hex, Ed25519), kept locally so a later
+   * approval's signature can be verified against it without a second
+   * fetch. See `JoinApprovalEnvelope`'s doc comment for why this matters:
+   * without it, any existing member who knows the invite code could forge
+   * a working approval, not just this invite's actual creator.
+   */
+  createdByPublicKey: text('created_by_public_key').notNull(),
+  /** Hex-encoded X25519 public key; the matching secret key is in Keychain, never here. */
+  ephemeralPublicKey: text('ephemeral_public_key').notNull(),
+  submittedAt: integer('submitted_at').notNull(),
+  status: text('status', { enum: ['pending', 'approved'] }).notNull().default('pending'),
+});
 
 export const postComments = sqliteTable(
   'post_comments',

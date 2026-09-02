@@ -22,6 +22,7 @@ import (
 	kmssecrets "circle-relay/internal/secrets/kms"
 	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
 	blobs3 "circle-relay/internal/storage/blobstore/s3"
+	invitedynamodb "circle-relay/internal/storage/invitestore/dynamodb"
 	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
 	manifestdynamodb "circle-relay/internal/storage/manifeststore/dynamodb"
 )
@@ -48,6 +49,7 @@ func main() {
 
 	authStore := authdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.SessionsTableName)
 	manifestStore := manifestdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.AccountsTableName)
+	inviteStore := invitedynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.InviteTableName, cfg.InviteRetentionDays)
 	secretStore, err := kmssecrets.New(awskms.NewFromConfig(awsCfg), cfg.RootSecretCiphertext)
 	if err != nil {
 		log.Fatalf("failed to construct root secret store: %v", err)
@@ -55,7 +57,7 @@ func main() {
 	googleVerifier := oidcverify.New(googleIssuer, googleJWKSURL, nonEmpty(cfg.GoogleClientIDIOS, cfg.GoogleClientIDAndroid, cfg.GoogleClientIDWeb))
 	appleVerifier := oidcverify.New(appleIssuer, appleJWKSURL, nonEmpty(cfg.AppleClientIDIOS))
 
-	mux := api.NewRouter(logStore, blobStore, authStore, secretStore, manifestStore, googleVerifier, appleVerifier)
+	mux := api.NewRouter(logStore, blobStore, authStore, secretStore, manifestStore, inviteStore, googleVerifier, appleVerifier)
 
 	addr := ":" + cfg.Port
 	log.Printf("listening on %s", addr)

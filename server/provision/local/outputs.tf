@@ -18,6 +18,11 @@ output "accounts_table_name" {
   value       = aws_dynamodb_table.accounts.name
 }
 
+output "invite_table_name" {
+  description = "Set as INVITE_TABLE_NAME when running cmd/server against LocalStack."
+  value       = module.storage.invite_table_name
+}
+
 output "root_secret_ciphertext" {
   description = "Set as ROOT_SECRET_CIPHERTEXT when running cmd/server against LocalStack."
   value       = data.aws_kms_ciphertext.root_secret.ciphertext_blob

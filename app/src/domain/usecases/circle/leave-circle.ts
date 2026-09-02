@@ -1,6 +1,6 @@
 import { deleteCircle, markCircleLeft } from '@/data/db';
-import { syncAccountManifestBestEffort } from '@/domain/usecases/account-manifest';
-import { isCircleAdmin } from '@/domain/usecases/invite-to-circle';
+import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
+import { isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
 import { deleteCircleKeys } from '@/services/keystore';
 
 /**

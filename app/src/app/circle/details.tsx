@@ -10,8 +10,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing, Tints } from '@/constants/theme';
 import { getCircle, getCircleMembers, MemberRoles, type Circle, type Member } from '@/data/db';
-import { getOrCreateInvite, isCircleAdmin } from '@/domain/usecases/invite-to-circle';
-import { deleteCircleForEveryone, leaveCircle } from '@/domain/usecases/leave-circle';
+import { discoverPendingRequests, getOrCreateInvite, isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
+import { deleteCircleForEveryone, leaveCircle } from '@/domain/usecases/circle/leave-circle';
 
 function inviteLink(code: string): string {
   return `circle://join/${code}`;
@@ -28,6 +28,7 @@ export default function CircleDetailsScreen() {
   const [admin, setAdmin] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -39,6 +40,14 @@ export default function CircleDetailsScreen() {
           setAdmin(isAdmin);
         },
       );
+
+      // Only ever resolves non-empty for this invite's actual creator (see
+      // discoverPendingRequests's creator-only gate) — silently shows
+      // nothing for any other admin, same as circle/invite.tsx's own
+      // approval section.
+      discoverPendingRequests(circleId)
+        .then((requests) => setPendingCount(requests.length))
+        .catch(() => setPendingCount(0));
     }, [circleId]),
   );
 
@@ -121,10 +130,19 @@ export default function CircleDetailsScreen() {
                   {error}
                 </ThemedText>
               ) : null}
-              <ThemedText type="meta" themeColor="faint" style={styles.explainer}>
-                Sharing the key is the only way in. There is no directory, and nobody can request to
-                join.
-              </ThemedText>
+              {pendingCount > 0 ? (
+                <Pressable onPress={() => router.push({ pathname: '/circle/invite', params: { circleId } })}>
+                  <ThemedText type="captionFeed" themeColor="accentBright" style={styles.explainer}>
+                    {pendingCount === 1 ? '1 person is' : `${pendingCount} people are`} waiting for you to
+                    approve them
+                  </ThemedText>
+                </Pressable>
+              ) : (
+                <ThemedText type="meta" themeColor="faint" style={styles.explainer}>
+                  Sharing the key is the only way in — there is no directory. Anyone who has it can
+                  request to join, but you still have to approve them.
+                </ThemedText>
+              )}
             </View>
           ) : null}
 

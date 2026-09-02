@@ -2,7 +2,7 @@ import { bytesToHex } from '@noble/curves/utils.js';
 
 import { deriveCircleIdentity, generateCircleSecret, generateUUID } from '@/services/crypto';
 import { getProfile, insertCircle, insertMember, MemberRoles } from '@/data/db';
-import { syncAccountManifestBestEffort } from '@/domain/usecases/account-manifest';
+import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { getMasterSeed, saveCircleIdentity, saveCircleSecret } from '@/services/keystore';
 
 export type CreateCircleInput = {

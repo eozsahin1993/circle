@@ -1,10 +1,10 @@
-jest.mock('@/domain/usecases/sync-circle');
-jest.mock('@/domain/usecases/account-manifest');
+jest.mock('@/domain/usecases/circle/sync-circle');
+jest.mock('@/domain/usecases/account/account-manifest');
 
 import { getAllCircles, getCircleMembers, initDatabase } from '@/data/db';
-import { createCircle } from '@/domain/usecases/create-circle';
-import { createPost } from '@/domain/usecases/create-post';
-import { drainOutbox } from '@/domain/usecases/sync-circle';
+import { createCircle } from '@/domain/usecases/circle/create-circle';
+import { createPost } from '@/domain/usecases/post/create-post';
+import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { getCirclePosts } from '@/data/db/posts';
 import { saveMasterSeed } from '@/services/keystore';
 

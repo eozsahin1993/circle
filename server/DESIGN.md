@@ -6,13 +6,19 @@ exists: the relay server itself (`server/`, Go — append/fetch/blob for a
 generic per-circle log) and the app's outbox + push-to-relay half of sync
 (`app/src/domain/usecases/sync-circle.ts`'s `drainOutbox`, posts only).
 Not built: the pull side (`pullCircle`, a local `circleLog` mirror table),
-invites/roles/kick actually syncing through the relay (today these are
-local-only — see `app/src/domain/usecases/invite-to-circle.ts` etc.), push
+roles/kick actually syncing through the relay (today these are local-only
+— see `app/src/domain/usecases/circle/invite-to-circle.ts` etc.), push
 notifications (section 2 below is a full design, zero implementation), the
 client-side onboarding UI for email auth (server-side API is built — see
 "Email auth" below), and account recovery (see that section below — the
 master seed exists and is already framed in the UI as the way back into
-your circles, but nothing today actually makes that true yet).
+your circles, but nothing today actually makes that true yet). Invites
+are the one exception to "local-only": the full invite/join handshake
+(request, discover, approve, complete) now syncs through the relay's own
+mailbox-style table — see `server/INVITE_FLOW.md`, status **built**. A
+fresh joiner still sees no history until `pullCircle` exists, since
+getting the secret and pulling content are different problems (see that
+doc's "what this flow depends on" section).
 
 The relay's core property: it is blind. It never sees plaintext content, and
 it's designed so it can infer as little as possible about circle membership,

@@ -13,3 +13,11 @@ output "bucket_name" {
 output "bucket_arn" {
   value = aws_s3_bucket.circle_blobs.arn
 }
+
+output "invite_table_name" {
+  value = aws_dynamodb_table.invites.name
+}
+
+output "invite_table_arn" {
+  value = aws_dynamodb_table.invites.arn
+}

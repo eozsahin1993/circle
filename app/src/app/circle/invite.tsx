@@ -1,6 +1,6 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -11,7 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { getCircle } from '@/data/db';
-import { getOrCreateInvite, replaceInvite } from '@/domain/usecases/invite-to-circle';
+import { approveJoinRequest, discoverPendingRequests, getOrCreateInvite, replaceInvite, type PendingRequest } from '@/domain/usecases/circle/invite-to-circle';
 import type { Invite } from '@/data/db';
 
 function inviteLink(code: string): string {
@@ -31,6 +31,8 @@ export default function CircleInviteScreen() {
   const [showKey, setShowKey] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!circleId) return;
@@ -42,6 +44,34 @@ export default function CircleInviteScreen() {
         setError("Couldn't create an invite for this circle.");
       });
   }, [circleId]);
+
+  // Re-checked on every focus, not just mount — a request may have arrived
+  // while this screen wasn't open. Only ever populates for this invite's
+  // actual creator (see `discoverPendingRequests`'s creator-only gate) —
+  // for anyone else, including a fellow admin, this section simply stays
+  // empty rather than showing an error.
+  useFocusEffect(
+    useCallback(() => {
+      if (!circleId) return;
+      discoverPendingRequests(circleId)
+        .then(setPendingRequests)
+        .catch(() => setPendingRequests([]));
+    }, [circleId]),
+  );
+
+  async function handleApprove(requesterId: string) {
+    if (!circleId) return;
+    setApprovingId(requesterId);
+    try {
+      await approveJoinRequest(circleId, requesterId);
+      setPendingRequests((current) => current.filter((request) => request.requesterId !== requesterId));
+    } catch (err) {
+      console.error('Failed to approve join request', err);
+      Alert.alert("Couldn't approve", 'Try again in a moment.');
+    } finally {
+      setApprovingId(null);
+    }
+  }
 
   async function handleShare() {
     if (!invite) return;
@@ -124,6 +154,29 @@ export default function CircleInviteScreen() {
               </ThemedText>
             </>
           ) : null}
+
+          {pendingRequests.length > 0 ? (
+            <View style={styles.requestsSection}>
+              <ThemedText type="eyebrow" themeColor="muted">
+                Waiting to join
+              </ThemedText>
+              {pendingRequests.map((request) => (
+                <View key={request.requesterId} style={styles.requestRow}>
+                  <View style={styles.requestText}>
+                    <ThemedText type="cardTitle">{request.selfReportedName || 'Someone'}</ThemedText>
+                    <ThemedText type="meta" themeColor="muted">
+                      Used the key you created — not a verified identity.
+                    </ThemedText>
+                  </View>
+                  <SecondaryButton
+                    label={approvingId === request.requesterId ? 'Approving…' : 'Approve'}
+                    disabled={approvingId !== null}
+                    onPress={() => handleApprove(request.requesterId)}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -185,5 +238,18 @@ const styles = StyleSheet.create({
   },
   footnote: {
     textAlign: 'center',
+  },
+  requestsSection: {
+    marginTop: Spacing.cardListGap,
+    gap: 12,
+  },
+  requestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  requestText: {
+    flex: 1,
+    gap: 2,
   },
 });

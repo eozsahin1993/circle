@@ -1,7 +1,7 @@
 import { initDatabase } from '@/data/db';
 import { getProfile } from '@/data/db/profile';
 import { getMasterSeed } from '@/services/keystore';
-import { completeProfileSetup } from '@/domain/usecases/onboarding';
+import { completeProfileSetup } from '@/domain/usecases/account/onboarding';
 
 beforeAll(() => initDatabase());
 

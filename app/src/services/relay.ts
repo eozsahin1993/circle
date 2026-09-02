@@ -7,7 +7,7 @@ import { getAuthToken } from '@/services/keystore';
 /**
  * Thin fetch-based client for the relay's three endpoints — see
  * server/DESIGN.md and server/internal/api. No retry/queueing logic
- * here; that's `domain/usecases/sync-circle.ts`'s job. This module only
+ * here; that's `domain/usecases/circle/sync-circle.ts`'s job. This module only
  * knows how to talk to the wire, nothing about outbox/circleLog state.
  */
 
@@ -45,9 +45,11 @@ function baseUrl(): string {
  * requires one now (see server's auth.RequireSession). Sign-in itself
  * doesn't go through this (that's how you get a token in the first
  * place); logout takes its token as a parameter instead, since it revokes
- * a specific token rather than "whatever's currently stored."
+ * a specific token rather than "whatever's currently stored." Exported so
+ * other relay-facing modules (e.g. services/mailbox-relay.ts) can reuse
+ * the same session-attaching wrapper instead of duplicating it.
  */
-async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Response> {
+export async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const token = await getAuthToken();
   if (!token) {
     throw new Error('Not signed in.');

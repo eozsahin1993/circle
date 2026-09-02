@@ -31,6 +31,8 @@ import (
 	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
 	"circle-relay/internal/storage/blobstore"
 	blobs3 "circle-relay/internal/storage/blobstore/s3"
+	"circle-relay/internal/storage/invitestore"
+	invitedynamodb "circle-relay/internal/storage/invitestore/dynamodb"
 	"circle-relay/internal/storage/logstore"
 	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
 	"circle-relay/internal/storage/manifeststore"
@@ -43,6 +45,7 @@ const (
 	bucketName         = "test-circle-blobs"
 	sessionsTableName  = "test-sessions"
 	accountsTableName  = "test-accounts"
+	inviteTableName    = "test-invites"
 )
 
 var (
@@ -57,6 +60,9 @@ var (
 
 	accountsTableOnce sync.Once
 	accountsTableErr  error
+
+	inviteTableOnce sync.Once
+	inviteTableErr  error
 
 	kmsKeyOnce sync.Once
 	kmsKeyErr  error
@@ -90,6 +96,14 @@ func UniqueEmail(t testing.TB) string {
 func UniqueAccountID(t testing.TB) string {
 	t.Helper()
 	return fmt.Sprintf("account-%s-%d", t.Name(), time.Now().UnixNano())
+}
+
+// UniqueInviteTag returns an opaque string standing in for hash(invite_code)
+// — for adapter-level tests that only care about key uniqueness, not about
+// how a real invite tag is derived (see server/INVITE_FLOW.md).
+func UniqueInviteTag(t testing.TB) string {
+	t.Helper()
+	return fmt.Sprintf("invite-%s-%d", t.Name(), time.Now().UnixNano())
 }
 
 func loadConfig(t testing.TB) aws.Config {
@@ -195,6 +209,45 @@ func NewManifestStore(t testing.TB) manifeststore.Store {
 	return manifestdynamodb.New(client, accountsTableName)
 }
 
+// NewInviteStore returns a real dynamodb-backed invitestore.Store
+// against LocalStack, creating the test table once per test binary run —
+// composite pk/sk, same key shape as NewLogStore's table (see
+// server/provision/modules/storage/dynamodb.tf's invites resource), a
+// genuinely separate table from everything else. Takes a
+// retentionDays param for the same reason NewLogStore does: tests that
+// assert on the written expiresAt need a known, non-default window.
+func NewInviteStore(t testing.TB, retentionDays int64) invitestore.Store {
+	t.Helper()
+	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
+		o.BaseEndpoint = aws.String(localstackEndpoint)
+	})
+
+	inviteTableOnce.Do(func() { inviteTableErr = createInviteTable(client) })
+	if inviteTableErr != nil {
+		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", inviteTableErr)
+	}
+
+	return invitedynamodb.New(client, inviteTableName, retentionDays)
+}
+
+// RawInviteDynamoDBClient returns the same client + table name
+// NewInviteStore uses, for tests that need to inspect raw item
+// attributes (e.g. expiresAt) — same purpose as RawDynamoDBClient, against
+// the separate invites table.
+func RawInviteDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
+	t.Helper()
+	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
+		o.BaseEndpoint = aws.String(localstackEndpoint)
+	})
+
+	inviteTableOnce.Do(func() { inviteTableErr = createInviteTable(client) })
+	if inviteTableErr != nil {
+		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", inviteTableErr)
+	}
+
+	return client, inviteTableName
+}
+
 // NewSecretStore returns a real kms-backed secrets.Store against
 // LocalStack — a genuine KMS key, a genuine Encrypt of a fixed test
 // secret, and a genuine Decrypt round trip through internal/secrets/kms,
@@ -276,6 +329,31 @@ func createAccountsTable(client *awsdynamodb.Client) error {
 	}
 	waiter := awsdynamodb.NewTableExistsWaiter(client)
 	return waiter.Wait(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(accountsTableName)}, 30*time.Second)
+}
+
+func createInviteTable(client *awsdynamodb.Client) error {
+	ctx := context.Background()
+	_, err := client.CreateTable(ctx, &awsdynamodb.CreateTableInput{
+		TableName:   aws.String(inviteTableName),
+		BillingMode: ddbtypes.BillingModePayPerRequest,
+		KeySchema: []ddbtypes.KeySchemaElement{
+			{AttributeName: aws.String("pk"), KeyType: ddbtypes.KeyTypeHash},
+			{AttributeName: aws.String("sk"), KeyType: ddbtypes.KeyTypeRange},
+		},
+		AttributeDefinitions: []ddbtypes.AttributeDefinition{
+			{AttributeName: aws.String("pk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
+			{AttributeName: aws.String("sk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
+		},
+	})
+	if err != nil {
+		var inUse *ddbtypes.ResourceInUseException
+		if errors.As(err, &inUse) {
+			return nil // already created by an earlier test package's run
+		}
+		return err
+	}
+	waiter := awsdynamodb.NewTableExistsWaiter(client)
+	return waiter.Wait(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(inviteTableName)}, 30*time.Second)
 }
 
 func createTable(client *awsdynamodb.Client) error {

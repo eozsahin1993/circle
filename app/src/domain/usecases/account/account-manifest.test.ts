@@ -7,7 +7,7 @@ import {
   recordSignInProviderBestEffort,
   syncAccountManifest,
   syncAccountManifestBestEffort,
-} from '@/domain/usecases/account-manifest';
+} from '@/domain/usecases/account/account-manifest';
 import { getManifest, putManifest } from '@/services/relay';
 import { deleteMasterSeed, saveMasterSeed } from '@/services/keystore';
 

@@ -10,6 +10,7 @@ export * from '@/data/db/comments';
 export * from '@/data/db/invites';
 export * from '@/data/db/members';
 export * from '@/data/db/outbox';
+export * from '@/data/db/pending-join-requests';
 export * from '@/data/db/posts';
 export * from '@/data/db/profile';
 export * from '@/data/db/reactions';

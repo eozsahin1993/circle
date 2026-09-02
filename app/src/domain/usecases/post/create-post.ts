@@ -1,7 +1,7 @@
 import { encryptJSON, generateUUID } from '@/services/crypto';
 import { getCircleSecret } from '@/services/keystore';
 import { insertPostAndEnqueue, OutboxStatuses } from '@/data/db';
-import { drainOutbox } from '@/domain/usecases/sync-circle';
+import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 
 export type CreatePostInput = {
   circleId: string;

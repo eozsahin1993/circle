@@ -19,6 +19,10 @@ output "accounts_table_name" {
   value = aws_dynamodb_table.accounts.name
 }
 
+output "invite_table_name" {
+  value = module.storage.invite_table_name
+}
+
 output "root_secret_ciphertext" {
   value = data.aws_kms_ciphertext.root_secret.ciphertext_blob
 }

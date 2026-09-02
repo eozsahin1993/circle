@@ -8,11 +8,12 @@ import { FabButton } from '@/components/fab-button';
 import { PostCard, type Post } from '@/components/post-card';
 import { PrivacyInfoModal } from '@/components/privacy-info-modal';
 import { PrivacyNotice } from '@/components/privacy-notice';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
+import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { getCircle, getCircleMembers, getCirclePosts, getPostComments, getProfile } from '@/data/db';
-import { addComment } from '@/domain/usecases/comment-on-post';
-import { getReactionsForPost, toggleReaction } from '@/domain/usecases/react-to-post';
+import { addComment } from '@/domain/usecases/post/comment-on-post';
+import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
 import { bytesToDataUri } from '@/services/image';
 
 function formatTimestamp(ms: number): string {
@@ -25,10 +26,10 @@ function formatTimestamp(ms: number): string {
 // The privacy notice scrolls away with the feed — it's list content, not
 // part of the pinned nav header — so it rides along as row zero of `data`
 // rather than living inside `ListHeaderComponent`.
-type FeedRow = { kind: 'privacy' } | { kind: 'post'; post: Post };
+type FeedRow = { kind: 'privacy' } | { kind: 'just-joined' } | { kind: 'post'; post: Post };
 
 export default function FeedScreen() {
-  const { circleId } = useLocalSearchParams<{ circleId: string }>();
+  const { circleId, justJoined } = useLocalSearchParams<{ circleId: string; justJoined?: string }>();
   const [circleName, setCircleName] = useState('');
   const [memberCount, setMemberCount] = useState(0);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -83,25 +84,46 @@ export default function FeedScreen() {
     setPosts((current) => current.map((post) => (post.id === postId ? { ...post, comments } : post)));
   }
 
-  const rows: FeedRow[] = [{ kind: 'privacy' }, ...posts.map((post) => ({ kind: 'post' as const, post }))];
+  // A fresh joiner has the circle secret and roster access but no history
+  // yet — pullCircle (syncing an existing circle's past entries) doesn't
+  // exist yet (see server/INVITE_FLOW.md's "what this flow depends on
+  // that isn't built yet"). Honest about the gap rather than looking
+  // broken: only shows while the feed is actually empty, and disappears
+  // for good once any post shows up.
+  const showJustJoinedBanner = justJoined === '1' && posts.length === 0;
+
+  const rows: FeedRow[] = [
+    { kind: 'privacy' },
+    ...(showJustJoinedBanner ? [{ kind: 'just-joined' as const }] : []),
+    ...posts.map((post) => ({ kind: 'post' as const, post })),
+  ];
 
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
         <FlatList
           data={rows}
-          keyExtractor={(row) => (row.kind === 'privacy' ? 'privacy' : row.post.id)}
-          renderItem={({ item }) =>
-            item.kind === 'privacy' ? (
-              <PrivacyNotice onPress={() => setShowPrivacyInfo(true)} />
-            ) : (
+          keyExtractor={(row) => (row.kind === 'post' ? row.post.id : row.kind)}
+          renderItem={({ item }) => {
+            if (item.kind === 'privacy') return <PrivacyNotice onPress={() => setShowPrivacyInfo(true)} />;
+            if (item.kind === 'just-joined') {
+              return (
+                <ThemedView style={styles.justJoined} type="surface">
+                  <ThemedText type="cardTitle">You&apos;re in!</ThemedText>
+                  <ThemedText type="meta" themeColor="muted">
+                    Content will sync soon.
+                  </ThemedText>
+                </ThemedView>
+              );
+            }
+            return (
               <PostCard
                 post={item.post}
                 onToggleReaction={(emoji) => handleToggleReaction(item.post.id, emoji)}
                 onAddComment={(body) => handleAddComment(item.post.id, body)}
               />
-            )
-          }
+            );
+          }}
           ListHeaderComponent={
             <ThemedView style={styles.header}>
               <CircleHeader
@@ -141,6 +163,14 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingBottom: 100,
+  },
+  justJoined: {
+    marginHorizontal: Spacing.screenPadding,
+    marginTop: Spacing.gapBetweenPosts,
+    padding: 16,
+    borderRadius: Radius.panel,
+    alignItems: 'center',
+    gap: 2,
   },
   fab: {
     position: 'absolute',

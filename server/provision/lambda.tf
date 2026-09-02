@@ -76,6 +76,22 @@ data "aws_iam_policy_document" "lambda_storage_access" {
     resources = [aws_dynamodb_table.accounts.arn]
   }
 
+  # Also separate from every table above — its own table (see
+  # modules/storage/dynamodb.tf's invites resource). Matches
+  # invitestore.Store's method set exactly: no DeleteItem (nothing ever
+  # deletes a row — eviction is TTL-only) and no TransactWriteItems (unlike
+  # sync_log, nothing here needs cross-item atomicity).
+  statement {
+    sid = "InviteTableAccess"
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem",
+      "dynamodb:Query",
+    ]
+    resources = [module.storage.invite_table_arn]
+  }
+
   statement {
     sid       = "KMSAccess"
     actions   = ["kms:Decrypt"]
@@ -117,6 +133,7 @@ resource "aws_lambda_function" "relay" {
       BUCKET_NAME              = module.storage.bucket_name
       SESSIONS_TABLE_NAME      = aws_dynamodb_table.sessions.name
       ACCOUNTS_TABLE_NAME      = aws_dynamodb_table.accounts.name
+      INVITE_TABLE_NAME        = module.storage.invite_table_name
       ROOT_SECRET_CIPHERTEXT   = data.aws_kms_ciphertext.root_secret.ciphertext_blob
       GOOGLE_CLIENT_ID_IOS     = var.google_client_id_ios
       GOOGLE_CLIENT_ID_ANDROID = var.google_client_id_android
@@ -124,6 +141,7 @@ resource "aws_lambda_function" "relay" {
       APPLE_CLIENT_ID_IOS      = var.apple_client_id_ios
       LOG_RETENTION_DAYS       = tostring(var.log_retention_days)
       MAX_BLOB_SIZE_BYTES      = tostring(var.max_blob_size_bytes)
+      INVITE_RETENTION_DAYS    = tostring(var.invite_retention_days)
     }
   }
 }

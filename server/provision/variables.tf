@@ -20,6 +20,12 @@ variable "log_retention_days" {
   default     = 14
 }
 
+variable "invite_retention_days" {
+  description = "TTL window for invites-table rows (the invite row and each join-request row) — DynamoDB TTL, an expiresAt attribute set at write time — see server/INVITE_FLOW.md and internal/storage/invitestore/dynamodb. Matches the client's INVITE_TTL_MS default of 7 days."
+  type        = number
+  default     = 7
+}
+
 variable "max_blob_size_bytes" {
   description = "Max ciphertext size accepted per blob upload — enforced by S3 itself via a signed content-length-range policy condition, not by the relay. The client's own compression pipeline (app/src/services/image.ts) produces photos well under this default; the cap exists to bound worst-case storage/cost."
   type        = number

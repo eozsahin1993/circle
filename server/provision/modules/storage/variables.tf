@@ -8,3 +8,9 @@ variable "log_retention_days" {
   type        = number
   default     = 14
 }
+
+variable "invite_retention_days" {
+  description = "TTL window for invites-table rows (both the invite row and each join-request row) — see server/INVITE_FLOW.md and internal/storage/invitestore/dynamodb."
+  type        = number
+  default     = 7
+}

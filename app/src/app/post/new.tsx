@@ -11,7 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Fonts, PhotoAspect, Radius, Spacing, Tints } from '@/constants/theme';
 import { getCircle, getCircleMembers } from '@/data/db';
-import { createPost } from '@/domain/usecases/create-post';
+import { createPost } from '@/domain/usecases/post/create-post';
 import { pickAndCompressImage, type CompressedImage } from '@/services/image';
 
 export default function NewPostScreen() {

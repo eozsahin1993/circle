@@ -10,11 +10,12 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { getProfile } from '@/data/db';
-import { recordSignInProviderBestEffort } from '@/domain/usecases/account-manifest';
-import { completeProfileSetup } from '@/domain/usecases/onboarding';
-import { signInWithApple, signInWithGoogle } from '@/domain/usecases/sign-in';
+import { recordSignInProviderBestEffort } from '@/domain/usecases/account/account-manifest';
+import { completeProfileSetup } from '@/domain/usecases/account/onboarding';
+import { signInWithApple, signInWithGoogle } from '@/domain/usecases/account/sign-in';
 import { downloadAndCompressImage } from '@/services/image';
 import { getAuthToken } from '@/services/keystore';
+import { postAuthDestination } from '@/services/pending-deep-link';
 
 type Provider = 'apple' | 'google';
 
@@ -61,7 +62,7 @@ export default function WelcomeScreen() {
       // A returning device (local profile already exists — e.g. this was
       // just a re-auth after signing out) has nothing new to fill in.
       if (hasProfile) {
-        router.push('/circle');
+        router.push(await postAuthDestination());
         return;
       }
 
@@ -75,7 +76,7 @@ export default function WelcomeScreen() {
         try {
           const { bytes } = await downloadAndCompressImage(result.suggestedPictureUrl);
           await completeProfileSetup({ name: result.suggestedName, picture: bytes });
-          router.push('/circle');
+          router.push(await postAuthDestination());
           return;
         } catch (err) {
           console.error('Failed to auto-complete profile from sign-in', err);

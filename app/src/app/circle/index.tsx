@@ -9,8 +9,9 @@ import { EmptyCirclesIcon } from '@/components/empty-circles-icon';
 import { FabButton } from '@/components/fab-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { getAllCircles, getCircleMembers, getCirclePosts, getProfile, type Circle } from '@/data/db';
+import { Colors, Radius, Spacing } from '@/constants/theme';
+import { getAllCircles, getAllPendingJoinRequests, getCircleMembers, getCirclePosts, getProfile, type Circle, type PendingJoinRequest } from '@/data/db';
+import { checkPendingJoinRequest } from '@/domain/usecases/circle/join-circle';
 import { bytesToDataUri } from '@/services/image';
 
 type CircleListItem = Circle & { memberCount: number; photoUri?: string };
@@ -20,6 +21,7 @@ export default function CircleListScreen() {
   const [circles, setCircles] = useState<CircleListItem[]>([]);
   // Avoids flashing the empty state before the first load resolves.
   const [loaded, setLoaded] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<PendingJoinRequest[]>([]);
 
   // Re-check on every focus, not just mount — picture/circles may have just
   // changed on a screen this one returns to (profile, new circle, a post).
@@ -47,6 +49,20 @@ export default function CircleListScreen() {
         setCircles(withCounts);
         setLoaded(true);
       });
+
+      // Opportunistically completes a join even if the user never reopens
+      // /join/pending directly — same app-lifecycle-triggered polling as
+      // the rest of the invite flow (see server/INVITE_FLOW.md's goals).
+      getAllPendingJoinRequests().then((requests) => {
+        setPendingRequests(requests);
+        requests.forEach((request) => {
+          checkPendingJoinRequest(request.id)
+            .then((result) => {
+              if (result.joined) setPendingRequests((current) => current.filter((r) => r.id !== request.id));
+            })
+            .catch((err) => console.error('Failed to check a pending join request', err));
+        });
+      });
     }, []),
   );
 
@@ -66,7 +82,19 @@ export default function CircleListScreen() {
           </Pressable>
         </View>
 
-        {loaded && circles.length === 0 ? (
+        {pendingRequests.map((request) => (
+          <Pressable
+            key={request.id}
+            style={styles.pendingCard}
+            onPress={() => router.push({ pathname: '/join/pending', params: { requestId: request.id } })}>
+            <ThemedText type="meta" themeColor="muted">
+              Pending
+            </ThemedText>
+            <ThemedText type="cardTitle">{request.circleName}</ThemedText>
+          </Pressable>
+        ))}
+
+        {loaded && circles.length === 0 && pendingRequests.length === 0 ? (
           <View style={styles.empty}>
             <EmptyCirclesIcon />
             <ThemedText type="screenTitle" style={styles.emptyTitle}>
@@ -116,6 +144,14 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     marginBottom: 2,
+  },
+  pendingCard: {
+    padding: 16,
+    borderRadius: Radius.panel,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: Colors.dark.faintest,
+    gap: 2,
   },
   empty: {
     flex: 1,

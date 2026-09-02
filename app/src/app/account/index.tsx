@@ -14,7 +14,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing, Tints } from '@/constants/theme';
 import { getProfile, type Profile } from '@/data/db';
 import { resetLocalDataForTesting } from '@/domain/usecases/dev-reset';
-import { signOut } from '@/domain/usecases/sign-in';
+import { signOut } from '@/domain/usecases/account/sign-in';
 import { useAppSettings } from '@/hooks/use-app-settings';
 import { useTheme } from '@/hooks/use-theme';
 import { bytesToDataUri } from '@/services/image';

@@ -1,4 +1,4 @@
-import { ed25519 } from '@noble/curves/ed25519.js';
+import { ed25519, x25519 } from '@noble/curves/ed25519.js';
 import { bytesToHex, concatBytes, randomBytes } from '@noble/curves/utils.js';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js';
 import { hkdf } from '@noble/hashes/hkdf.js';
@@ -185,4 +185,96 @@ export function sign(message: Uint8Array, secretKey: Uint8Array): Uint8Array {
  */
 export function verify(signature: Uint8Array, message: Uint8Array, publicKey: Uint8Array): boolean {
   return ed25519.verify(signature, message, publicKey);
+}
+
+const INVITE_TAG_DOMAIN = new TextEncoder().encode('invite-tag');
+const INVITE_PREVIEW_KEY_DOMAIN = new TextEncoder().encode('invite-preview');
+const JOIN_REQUEST_KEY_DOMAIN = new TextEncoder().encode('join-request');
+const SEALED_BOX_KEY_DOMAIN = new TextEncoder().encode('join-approval-box');
+const X25519_PUBLIC_KEY_LENGTH = 32;
+
+/**
+ * Derives the relay-visible tag for an invite's mailbox row —
+ * `sha256('invite-tag' || invite_code)`, hex-encoded. Both the invite's
+ * creator and anyone holding the code compute this independently; same
+ * domain-separated-hash pattern as `deriveCircleLogId`.
+ */
+export function deriveInviteTag(inviteCode: string): string {
+  return bytesToHex(sha256(concatBytes(INVITE_TAG_DOMAIN, new TextEncoder().encode(inviteCode))));
+}
+
+/**
+ * `HKDF(invite_code, "invite-preview")` — the symmetric key that
+ * encrypts/decrypts an invite's preview row (circle name + cover
+ * thumbnail). Computable by both the creator and anyone holding the code;
+ * see server/INVITE_FLOW.md's "two encryption schemes" section.
+ */
+export function deriveInvitePreviewKey(inviteCode: string): Uint8Array {
+  return hkdf(sha256, new TextEncoder().encode(inviteCode), undefined, INVITE_PREVIEW_KEY_DOMAIN, 32);
+}
+
+/**
+ * `HKDF(invite_code, "join-request")` — the symmetric key that
+ * encrypts/decrypts a requester's `{ephemeralPub, selfReportedName}`
+ * payload. Same code-derived-key scheme as `deriveInvitePreviewKey`, a
+ * different purpose string so the two keys are unrelated.
+ */
+export function deriveJoinRequestKey(inviteCode: string): Uint8Array {
+  return hkdf(sha256, new TextEncoder().encode(inviteCode), undefined, JOIN_REQUEST_KEY_DOMAIN, 32);
+}
+
+/**
+ * Generates a fresh one-time X25519 keypair for a single handshake message
+ * — never reused, never persisted beyond that one exchange. Used for the
+ * asymmetric half of the invite flow (see `sealToPublicKey`), where a
+ * per-message keypair is what lets the recipient decrypt without ever
+ * needing to know the sender's identity in advance.
+ */
+export function generateEphemeralKeypair(): Keypair {
+  return x25519.keygen();
+}
+
+/**
+ * Derives the AEAD key for one sealed-box message from its ECDH shared
+ * secret. Binding both public keys into the HKDF info (not just the raw
+ * shared secret) is standard sealed-box practice — it ties the derived key
+ * to this specific sender/recipient pairing, the same way every other
+ * derived key in this file is domain-separated rather than using raw key
+ * material directly.
+ */
+function sealedBoxKey(sharedSecret: Uint8Array, senderPublicKey: Uint8Array, recipientPublicKey: Uint8Array): Uint8Array {
+  return hkdf(sha256, sharedSecret, undefined, concatBytes(SEALED_BOX_KEY_DOMAIN, senderPublicKey, recipientPublicKey), 32);
+}
+
+/**
+ * Seals `plaintext` to `recipientPublicKey` (X25519) — the asymmetric half
+ * of the invite flow, used only for the approval response (see
+ * server/INVITE_FLOW.md's "two encryption schemes" section). Generates a
+ * fresh one-time keypair for this message alone, ECDHs it against the
+ * recipient, derives an AEAD key from the shared secret via
+ * `sealedBoxKey`, then encrypts with the same `encrypt()` every other
+ * ciphertext in this file uses. The sender's ephemeral public key is
+ * prepended to the output, so the recipient can open this with nothing
+ * but their own secret key — no sender identity needs to be known in
+ * advance.
+ */
+export function sealToPublicKey(plaintext: Uint8Array, recipientPublicKey: Uint8Array): Uint8Array {
+  const ephemeral = x25519.keygen();
+  const shared = x25519.getSharedSecret(ephemeral.secretKey, recipientPublicKey);
+  const key = sealedBoxKey(shared, ephemeral.publicKey, recipientPublicKey);
+  return concatBytes(ephemeral.publicKey, encrypt(plaintext, key));
+}
+
+/**
+ * Opens what `sealToPublicKey` produced, using `recipientKeypair`'s own
+ * secret key — the only thing the recipient needs, since the sender's
+ * ephemeral public key travels inside `sealed` itself. Throws if `sealed`
+ * was tampered with or doesn't match `recipientKeypair`.
+ */
+export function openSealedBox(sealed: Uint8Array, recipientKeypair: Keypair): Uint8Array {
+  const senderPublicKey = sealed.subarray(0, X25519_PUBLIC_KEY_LENGTH);
+  const box = sealed.subarray(X25519_PUBLIC_KEY_LENGTH);
+  const shared = x25519.getSharedSecret(recipientKeypair.secretKey, senderPublicKey);
+  const key = sealedBoxKey(shared, senderPublicKey, x25519.getPublicKey(recipientKeypair.secretKey));
+  return decrypt(box, key);
 }

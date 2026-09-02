@@ -11,7 +11,8 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, Fonts, Radius, Spacing, Tints } from '@/constants/theme';
 import { getProfile } from '@/data/db';
 import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/services/image';
-import { completeProfileSetup } from '@/domain/usecases/onboarding';
+import { completeProfileSetup } from '@/domain/usecases/account/onboarding';
+import { postAuthDestination } from '@/services/pending-deep-link';
 
 export default function ProfileSetupScreen() {
   // Only ever set by index.tsx, right after a first-time sign-in — see
@@ -62,7 +63,7 @@ export default function ProfileSetupScreen() {
     setError(null);
     try {
       await completeProfileSetup({ name: name.trim(), picture: picture?.bytes ?? null });
-      router.push('/circle');
+      router.push(await postAuthDestination());
     } catch (err) {
       console.error('Failed to save profile', err);
       setError("Couldn't save your profile — try again.");
