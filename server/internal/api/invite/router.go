@@ -13,4 +13,5 @@ func Register(mux *http.ServeMux, service *Service) {
 	mux.Handle("GET /invites/{inviteTag}/requests", &ListRequestsHandler{Service: service})
 	mux.Handle("GET /invites/{inviteTag}/requests/{requesterId}", &GetRequestHandler{Service: service})
 	mux.Handle("PUT /invites/{inviteTag}/requests/{requesterId}/approval", &PutApprovalHandler{Service: service})
+	mux.Handle("DELETE /invites/{inviteTag}/requests/{requesterId}", &DeleteRequestHandler{Service: service})
 }

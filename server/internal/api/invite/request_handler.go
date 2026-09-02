@@ -169,3 +169,26 @@ func (h *PutApprovalHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	httputil.WriteJSON(w, http.StatusOK, putApprovalResponse{OK: true})
 }
+
+type deleteRequestResponse struct {
+	OK bool `json:"ok"`
+}
+
+type DeleteRequestHandler struct {
+	Service *Service
+}
+
+func (h *DeleteRequestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	inviteTag := r.PathValue("inviteTag")
+	requesterID := r.PathValue("requesterId")
+
+	if err := h.Service.DeleteRequest(r.Context(), inviteTag, requesterID); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to dismiss join request")
+		return
+	}
+
+	// Deliberately just {"ok": true} regardless of whether a row actually
+	// existed — same non-enumeration reasoning as logout, and matches
+	// DeleteJoinRequest's own idempotent semantics.
+	httputil.WriteJSON(w, http.StatusOK, deleteRequestResponse{OK: true})
+}

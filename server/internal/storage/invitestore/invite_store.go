@@ -62,4 +62,10 @@ type Store interface {
 	// doesn't exist — approving a request that was never made (or already
 	// aged out) is a caller error, not silently creating a fresh row.
 	ApproveJoinRequest(ctx context.Context, inviteTag, requesterID string, encryptedApproval []byte) error
+	// DeleteJoinRequest removes a requester's row — the invite's creator
+	// dismissing a request ("not now"), permanently, before it's ever
+	// approved. Idempotent: deleting an already-gone or already-expired
+	// row succeeds, doesn't error, same convention as authstore's
+	// DeleteSession.
+	DeleteJoinRequest(ctx context.Context, inviteTag, requesterID string) error
 }

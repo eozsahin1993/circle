@@ -95,3 +95,11 @@ export async function putJoinApproval(inviteTag: string, requesterId: string, en
     throw new Error(`Failed to approve join request: ${response.status}`);
   }
 }
+
+/** Dismisses a join request permanently ("not now") — DELETE /v1/invites/{inviteTag}/requests/{requesterId}. Creator-side. Idempotent. */
+export async function deleteJoinRequest(inviteTag: string, requesterId: string): Promise<void> {
+  const response = await authorizedFetch(`/v1/invites/${inviteTag}/requests/${requesterId}`, { method: 'DELETE' });
+  if (!response.ok) {
+    throw new Error(`Failed to dismiss join request: ${response.status}`);
+  }
+}

@@ -78,15 +78,17 @@ data "aws_iam_policy_document" "lambda_storage_access" {
 
   # Also separate from every table above — its own table (see
   # modules/storage/dynamodb.tf's invites resource). Matches
-  # invitestore.Store's method set exactly: no DeleteItem (nothing ever
-  # deletes a row — eviction is TTL-only) and no TransactWriteItems (unlike
-  # sync_log, nothing here needs cross-item atomicity).
+  # invitestore.Store's method set exactly. DeleteItem is for "not now"
+  # dismissal only — most rows still just age out under TTL. No
+  # TransactWriteItems (unlike sync_log, nothing here needs cross-item
+  # atomicity).
   statement {
     sid = "InviteTableAccess"
     actions = [
       "dynamodb:GetItem",
       "dynamodb:PutItem",
       "dynamodb:UpdateItem",
+      "dynamodb:DeleteItem",
       "dynamodb:Query",
     ]
     resources = [module.storage.invite_table_arn]

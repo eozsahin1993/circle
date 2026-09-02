@@ -51,3 +51,8 @@ func (s *Service) GetRequest(ctx context.Context, inviteTag, requesterID string)
 func (s *Service) PutApproval(ctx context.Context, inviteTag, requesterID string, encryptedApproval []byte) error {
 	return s.InviteStore.ApproveJoinRequest(ctx, inviteTag, requesterID, encryptedApproval)
 }
+
+// DeleteRequest removes a requester's row — "not now". Idempotent.
+func (s *Service) DeleteRequest(ctx context.Context, inviteTag, requesterID string) error {
+	return s.InviteStore.DeleteJoinRequest(ctx, inviteTag, requesterID)
+}

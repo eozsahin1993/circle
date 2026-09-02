@@ -193,6 +193,21 @@ func (s *Store) ApproveJoinRequest(ctx context.Context, inviteTag, requesterID s
 	return nil
 }
 
+// DeleteJoinRequest removes a requester's row immediately — "not now",
+// or responding to a suspected leak, without waiting out TTL. Deleting an
+// already-gone item is a no-op in DynamoDB, so this is safely callable
+// even for a row that doesn't exist or already expired.
+func (s *Store) DeleteJoinRequest(ctx context.Context, inviteTag, requesterID string) error {
+	_, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(s.tableName),
+		Key: map[string]types.AttributeValue{
+			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: inviteTag},
+			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: requestSK(requesterID)},
+		},
+	})
+	return err
+}
+
 func itemToJoinRequest(item map[string]types.AttributeValue) (invitestore.JoinRequest, error) {
 	requesterID, ok := dynamoutil.AttrString(item, "requesterId")
 	if !ok {

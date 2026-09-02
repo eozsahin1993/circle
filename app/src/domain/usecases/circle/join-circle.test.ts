@@ -1,16 +1,20 @@
 jest.mock('@/domain/usecases/circle/sync-circle');
 jest.mock('@/domain/usecases/account/account-manifest');
 jest.mock('@/services/mailbox-relay');
+jest.mock('@/services/image');
+
+import { Buffer } from 'buffer';
 
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
-import { getCircle, getCircleMembers, getPendingJoinRequest, initDatabase } from '@/data/db';
+import { getCircle, getCircleMembers, getPendingJoinRequest, initDatabase, saveProfile } from '@/data/db';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import { approveJoinRequest, getOrCreateInvite } from '@/domain/usecases/circle/invite-to-circle';
-import type { JoinApprovalEnvelope, JoinApprovalPayload } from '@/domain/usecases/circle/invite-payloads';
+import type { JoinApprovalEnvelope, JoinApprovalPayload, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
 import { checkPendingJoinRequest, requestToJoin } from '@/domain/usecases/circle/join-circle';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
-import { generateIdentity, sealToPublicKey, sign } from '@/services/crypto';
+import { decrypt, deriveJoinRequestKey, generateIdentity, sealToPublicKey, sign } from '@/services/crypto';
+import { compressToThumbnail } from '@/services/image';
 import {
   getInvitePreview,
   getJoinRequestApproval,
@@ -82,6 +86,50 @@ test('requestToJoin then approveJoinRequest then checkPendingJoinRequest complet
   await expect(getCircle(result.circleId)).resolves.toMatchObject({ name: 'Family Circle' });
   await expect(getPendingJoinRequest(requestId)).resolves.toBeNull();
   expect(drainOutbox).toHaveBeenCalledWith(result.circleId);
+});
+
+test('requestToJoin compresses the profile picture into a thumbnail and includes it in the join request', async () => {
+  const { invite } = await makeCircleWithInvite('Family Circle');
+  await saveProfile({ name: 'Priya Raman', picture: new Uint8Array([9, 9, 9]), createdAt: Date.now(), updatedAt: Date.now() });
+  const thumbnail = new Uint8Array([1, 2, 3]);
+  (compressToThumbnail as jest.Mock).mockResolvedValue(thumbnail);
+  (putJoinRequest as jest.Mock).mockResolvedValue(undefined);
+
+  await requestToJoin(invite.code);
+
+  expect(compressToThumbnail).toHaveBeenCalledWith(new Uint8Array([9, 9, 9]));
+  const [, , requestBlob] = (putJoinRequest as jest.Mock).mock.calls[0];
+  const key = deriveJoinRequestKey(invite.code);
+  const request = JSON.parse(new TextDecoder().decode(decrypt(requestBlob, key))) as JoinRequestPayload;
+  expect(request.pictureThumbnail).toBe(Buffer.from(thumbnail).toString('base64'));
+});
+
+test('requestToJoin omits pictureThumbnail when the profile has no picture', async () => {
+  const { invite } = await makeCircleWithInvite('Family Circle');
+  await saveProfile({ name: 'Tomás Ruiz', picture: null, createdAt: Date.now(), updatedAt: Date.now() });
+  (putJoinRequest as jest.Mock).mockResolvedValue(undefined);
+
+  await requestToJoin(invite.code);
+
+  expect(compressToThumbnail).not.toHaveBeenCalled();
+  const [, , requestBlob] = (putJoinRequest as jest.Mock).mock.calls[0];
+  const key = deriveJoinRequestKey(invite.code);
+  const request = JSON.parse(new TextDecoder().decode(decrypt(requestBlob, key))) as JoinRequestPayload;
+  expect(request.pictureThumbnail).toBeUndefined();
+});
+
+test('requestToJoin still submits the request when thumbnail compression fails', async () => {
+  const { invite } = await makeCircleWithInvite('Family Circle');
+  await saveProfile({ name: 'Priya Raman', picture: new Uint8Array([9, 9, 9]), createdAt: Date.now(), updatedAt: Date.now() });
+  (compressToThumbnail as jest.Mock).mockRejectedValue(new Error('unsupported image format'));
+  (putJoinRequest as jest.Mock).mockResolvedValue(undefined);
+
+  await expect(requestToJoin(invite.code)).resolves.toEqual({ requestId: expect.any(String) });
+
+  const [, , requestBlob] = (putJoinRequest as jest.Mock).mock.calls[0];
+  const key = deriveJoinRequestKey(invite.code);
+  const request = JSON.parse(new TextDecoder().decode(decrypt(requestBlob, key))) as JoinRequestPayload;
+  expect(request.pictureThumbnail).toBeUndefined();
 });
 
 test('requestToJoin throws a clear error when the invite has no preview (bad code, or expired)', async () => {

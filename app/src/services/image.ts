@@ -3,6 +3,8 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { Directory, File, Paths } from 'expo-file-system';
 import { Image } from 'react-native';
 
+import { generateUUID } from '@/services/crypto';
+
 /**
  * Long-edge cap and JPEG quality for anything we store or send. The relay
  * never sees plaintext, so this is the only place compression can ever
@@ -12,6 +14,15 @@ import { Image } from 'react-native';
  */
 const MAX_DIMENSION = 1080;
 const JPEG_QUALITY = 0.65;
+
+/**
+ * A small avatar-sized thumbnail — for embedding directly inside an
+ * encrypted payload that needs to stay small (e.g. a join request's
+ * self-reported picture, see domain/usecases/circle/invite-payloads.ts),
+ * not for anything ever displayed at more than avatar size.
+ */
+const THUMBNAIL_MAX_DIMENSION = 96;
+const THUMBNAIL_JPEG_QUALITY = 0.5;
 
 /** Opens the system image picker. Returns the picked file's local URI, or null if cancelled. */
 export async function pickImage(): Promise<string | null> {
@@ -70,6 +81,36 @@ export async function compressImage(uri: string): Promise<CompressedImage> {
 export async function pickAndCompressImage(): Promise<CompressedImage | null> {
   const uri = await pickImage();
   return uri ? compressImage(uri) : null;
+}
+
+/**
+ * Shrinks already-in-memory picture bytes (e.g. a stored profile picture)
+ * down to avatar size — for embedding directly inside an encrypted
+ * payload that needs to stay small, not for anything ever displayed at
+ * more than avatar size. Writes to a temp file and back since
+ * `ImageManipulator` operates on a URI, not raw bytes; both temp files are
+ * cleaned up before returning.
+ */
+export async function compressToThumbnail(bytes: Uint8Array): Promise<Uint8Array> {
+  const source = new File(Paths.cache, `thumbnail-source-${generateUUID()}`);
+  source.create({ overwrite: true });
+  source.write(bytes);
+  try {
+    const { width, height } = await getImageSize(source.uri);
+    const resize =
+      width >= height ? { width: Math.min(width, THUMBNAIL_MAX_DIMENSION) } : { height: Math.min(height, THUMBNAIL_MAX_DIMENSION) };
+
+    const rendered = await ImageManipulator.manipulate(source.uri).resize(resize).renderAsync();
+    const saved = await rendered.saveAsync({ compress: THUMBNAIL_JPEG_QUALITY, format: SaveFormat.JPEG });
+    const savedFile = new File(saved.uri);
+    try {
+      return new Uint8Array(await savedFile.arrayBuffer());
+    } finally {
+      savedFile.delete();
+    }
+  } finally {
+    source.delete();
+  }
 }
 
 /**

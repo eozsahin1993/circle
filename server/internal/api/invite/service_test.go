@@ -181,3 +181,34 @@ func TestService_PutApproval_ErrorsForANonexistentRequest(t *testing.T) {
 		t.Fatalf("expected ErrJoinRequestNotFound, got %v", err)
 	}
 }
+
+func TestService_DeleteRequestThenGetRequest_ReturnsNil(t *testing.T) {
+	ctx := context.Background()
+	svc := &invite.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
+	inviteTag := testsupport.UniqueInviteTag(t)
+	requesterID := "requester-1"
+
+	if err := svc.PutRequest(ctx, inviteTag, requesterID, []byte("request")); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.DeleteRequest(ctx, inviteTag, requesterID); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := svc.GetRequest(ctx, inviteTag, requesterID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != nil {
+		t.Fatalf("expected the row to be gone after DeleteRequest, got %+v", got)
+	}
+}
+
+func TestService_DeleteRequest_IsIdempotentForAnUnknownRequester(t *testing.T) {
+	ctx := context.Background()
+	svc := &invite.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
+
+	if err := svc.DeleteRequest(ctx, testsupport.UniqueInviteTag(t), "nobody"); err != nil {
+		t.Fatalf("expected deleting a never-existed request to succeed, got %v", err)
+	}
+}

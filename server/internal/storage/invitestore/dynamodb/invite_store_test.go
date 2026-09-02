@@ -232,3 +232,34 @@ func TestInviteStore_ApproveJoinRequest_ErrorsForANonexistentRequest(t *testing.
 		t.Fatalf("expected ErrJoinRequestNotFound, got %v", err)
 	}
 }
+
+func TestInviteStore_DeleteJoinRequest_RemovesTheRow(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewInviteStore(t, 0)
+	inviteTag := testsupport.UniqueInviteTag(t)
+	requesterID := "requester-1"
+
+	if err := store.PutJoinRequest(ctx, inviteTag, requesterID, []byte("request")); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteJoinRequest(ctx, inviteTag, requesterID); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := store.GetJoinRequest(ctx, inviteTag, requesterID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != nil {
+		t.Fatalf("expected the row to be gone after DeleteJoinRequest, got %+v", got)
+	}
+}
+
+func TestInviteStore_DeleteJoinRequest_IsIdempotentForAnUnknownRequester(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewInviteStore(t, 0)
+
+	if err := store.DeleteJoinRequest(ctx, testsupport.UniqueInviteTag(t), "nobody"); err != nil {
+		t.Fatalf("expected deleting a never-existed request to succeed, got %v", err)
+	}
+}
