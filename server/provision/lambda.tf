@@ -52,17 +52,28 @@ data "aws_iam_policy_document" "lambda_storage_access" {
   }
 
   # Separate statement, separate resource list from DynamoDBAccess above —
-  # the devices table is a genuinely different table, not the circle-log
-  # one (see devices_table.tf).
+  # sessions is a genuinely different table, not the sync-log one (see
+  # sessions_table.tf). Matches authstore.Store's three methods exactly.
   statement {
-    sid = "DevicesTableAccess"
+    sid = "SessionsTableAccess"
     actions = [
       "dynamodb:GetItem",
       "dynamodb:PutItem",
       "dynamodb:DeleteItem",
-      "dynamodb:TransactWriteItems",
     ]
-    resources = [aws_dynamodb_table.devices.arn]
+    resources = [aws_dynamodb_table.sessions.arn]
+  }
+
+  # Also separate from sessions above — different table, different access
+  # pattern (see accounts_table.tf). Matches manifeststore.Store's two
+  # methods exactly; no delete needed until account deletion is built.
+  statement {
+    sid = "AccountsTableAccess"
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+    ]
+    resources = [aws_dynamodb_table.accounts.arn]
   }
 
   statement {
@@ -104,7 +115,8 @@ resource "aws_lambda_function" "relay" {
     variables = {
       TABLE_NAME               = module.storage.table_name
       BUCKET_NAME              = module.storage.bucket_name
-      DEVICES_TABLE_NAME       = aws_dynamodb_table.devices.name
+      SESSIONS_TABLE_NAME      = aws_dynamodb_table.sessions.name
+      ACCOUNTS_TABLE_NAME      = aws_dynamodb_table.accounts.name
       ROOT_SECRET_CIPHERTEXT   = data.aws_kms_ciphertext.root_secret.ciphertext_blob
       GOOGLE_CLIENT_ID_IOS     = var.google_client_id_ios
       GOOGLE_CLIENT_ID_ANDROID = var.google_client_id_android

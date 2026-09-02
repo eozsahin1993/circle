@@ -42,7 +42,7 @@ func TestEndToEnd_AppendThenFetchThenDownload(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
-	claims := validClaims(testsupport.UniqueEmail(t), testsupport.TestGoogleClientID)
+	claims := validClaims(t, testsupport.UniqueEmail(t), testsupport.TestGoogleClientID)
 	claims["iss"] = google.Issuer
 	token := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
 

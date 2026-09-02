@@ -12,11 +12,11 @@ import (
 func TestAuthStore_SaveSessionThenGetSession_RoundTrips(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewAuthStore(t)
-	token := testsupport.UniqueEmailHMAC(t) // any unique opaque string works as a token here
-	emailHmac := testsupport.UniqueEmailHMAC(t)
+	token := testsupport.UniqueAccountID(t) // any unique opaque string works as a token here
+	accountID := testsupport.UniqueAccountID(t)
 	expiresAt := time.Now().Add(time.Hour).Truncate(time.Second)
 
-	if err := store.SaveSession(ctx, token, authstore.Session{DeviceID: emailHmac, ExpiresAt: expiresAt}); err != nil {
+	if err := store.SaveSession(ctx, token, authstore.Session{AccountID: accountID, ExpiresAt: expiresAt}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -24,8 +24,8 @@ func TestAuthStore_SaveSessionThenGetSession_RoundTrips(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if session == nil || session.DeviceID != emailHmac {
-		t.Fatalf("expected a session with DeviceID %q, got %+v", emailHmac, session)
+	if session == nil || session.AccountID != accountID {
+		t.Fatalf("expected a session with AccountID %q, got %+v", accountID, session)
 	}
 	if !session.ExpiresAt.Equal(expiresAt) {
 		t.Fatalf("expected ExpiresAt %v, got %v", expiresAt, session.ExpiresAt)
@@ -36,7 +36,7 @@ func TestAuthStore_GetSession_ReturnsNilForAnUnknownToken(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewAuthStore(t)
 
-	session, err := store.GetSession(ctx, testsupport.UniqueEmailHMAC(t))
+	session, err := store.GetSession(ctx, testsupport.UniqueAccountID(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,10 +48,10 @@ func TestAuthStore_GetSession_ReturnsNilForAnUnknownToken(t *testing.T) {
 func TestAuthStore_DeleteSession_RevokesAnExistingSession(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewAuthStore(t)
-	token := testsupport.UniqueEmailHMAC(t)
+	token := testsupport.UniqueAccountID(t)
 
 	if err := store.SaveSession(ctx, token, authstore.Session{
-		DeviceID:  testsupport.UniqueEmailHMAC(t),
+		AccountID: testsupport.UniqueAccountID(t),
 		ExpiresAt: time.Now().Add(time.Hour),
 	}); err != nil {
 		t.Fatal(err)
@@ -74,7 +74,7 @@ func TestAuthStore_DeleteSession_IsIdempotentForAnUnknownToken(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewAuthStore(t)
 
-	if err := store.DeleteSession(ctx, testsupport.UniqueEmailHMAC(t)); err != nil {
+	if err := store.DeleteSession(ctx, testsupport.UniqueAccountID(t)); err != nil {
 		t.Fatalf("expected deleting a never-existed session to succeed, got %v", err)
 	}
 }

@@ -1,6 +1,6 @@
 // Package authstore defines the interface domain logic depends on for
-// device/session state — implementations live in subpackages, one per
-// backing technology (see authstore/dynamodb). Nothing storage- or
+// session state — implementations live in subpackages, one per backing
+// technology (see authstore/dynamodb). Nothing storage- or
 // runtime-specific is allowed to leak past this package.
 package authstore
 
@@ -9,20 +9,19 @@ import (
 	"time"
 )
 
-// Session is what a bearer token resolves to. Deliberately not emailHmac
-// itself: emailHmac is permanent (same email address, same value, forever),
-// so using it directly as the request credential would mean no way to
-// revoke or rotate access without banning the email address outright. A
+// Session is what a bearer token resolves to. Deliberately not the
+// accountId itself: the accountId is permanent (see
+// server/internal/api/auth/google's SignIn — "provider:sub", never
+// rotated), so using it directly as the request credential would mean no
+// way to revoke or rotate access without banning the account outright. A
 // session token is random and independently revocable/expirable —
 // "who you are" and "what currently authorizes you" are different things.
 type Session struct {
-	DeviceID  string
+	AccountID string
 	ExpiresAt time.Time
 }
 
-// Store persists active sessions, keyed by bearer token — the raw email
-// address itself is never passed to any Store method; that's the caller's
-// job to hash first.
+// Store persists active sessions, keyed by bearer token.
 type Store interface {
 	// SaveSession records a freshly-issued bearer token. Overwrites
 	// nothing meaningful in practice — token is caller-generated random,

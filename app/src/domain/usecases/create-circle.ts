@@ -1,8 +1,9 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { generateCircleSecret, generateIdentity, generateUUID } from '@/services/crypto';
+import { deriveCircleIdentity, generateCircleSecret, generateUUID } from '@/services/crypto';
 import { getProfile, insertCircle, insertMember, MemberRoles } from '@/data/db';
-import { saveCircleIdentity, saveCircleSecret } from '@/services/keystore';
+import { syncAccountManifestBestEffort } from '@/domain/usecases/account-manifest';
+import { getMasterSeed, saveCircleIdentity, saveCircleSecret } from '@/services/keystore';
 
 export type CreateCircleInput = {
   name: string;
@@ -13,16 +14,21 @@ export type CreateCircleInput = {
 /**
  * Creates a circle and makes this device its first member — as `admin`,
  * since the founder is the only member who exists until they invite anyone
- * else. A fresh per-circle identity (never reused across circles — see
- * `generateIdentity`) plus a fresh shared secret, both persisted to the
- * Keychain, then the circle and roster rows themselves. The device
- * profile's name/picture become this member's roster entry.
+ * else. The per-circle identity is derived from the device's master seed
+ * (see `deriveCircleIdentity` — domain-separated per circleId, same as
+ * the old `generateIdentity`'s never-reuse-across-circles rule, but now
+ * recoverable from the seed alone) plus a fresh shared secret, both
+ * persisted to the Keychain, then the circle and roster rows themselves.
+ * The device profile's name/picture become this member's roster entry.
  */
 export async function createCircle(input: CreateCircleInput): Promise<{ id: string }> {
+  const masterSeed = await getMasterSeed();
+  if (!masterSeed) throw new Error('No master seed yet — onboarding must generate one before any circle exists.');
+
   const now = Date.now();
   const circleId = generateUUID();
   const memberId = generateUUID();
-  const identity = generateIdentity();
+  const identity = deriveCircleIdentity(masterSeed, circleId);
   const secret = generateCircleSecret();
 
   await saveCircleIdentity(circleId, { ...identity, memberId });
@@ -46,6 +52,8 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
     picture: profile?.picture ?? null,
     joinedAt: now,
   });
+
+  await syncAccountManifestBestEffort();
 
   return { id: circleId };
 }

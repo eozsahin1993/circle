@@ -91,6 +91,34 @@ export async function fetchEntries(circleLogId: string, since: number): Promise<
 }
 
 /**
+ * Fetches this account's encrypted circle-membership manifest — GET
+ * /v1/account/manifest. Returns null before the account has ever stored
+ * one (a fresh account, or a device that predates this feature). The
+ * relay only ever sees ciphertext; decrypting it is the caller's job (see
+ * `deriveManifestKey` in services/crypto.ts).
+ */
+export async function getManifest(): Promise<Uint8Array | null> {
+  const response = await authorizedFetch('/v1/account/manifest');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch manifest: ${response.status}`);
+  }
+  const body = (await response.json()) as { blob: string | null };
+  return body.blob ? new Uint8Array(Buffer.from(body.blob, 'base64')) : null;
+}
+
+/** Overwrites this account's encrypted circle-membership manifest — PUT /v1/account/manifest. */
+export async function putManifest(blob: Uint8Array): Promise<void> {
+  const response = await authorizedFetch('/v1/account/manifest', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ blob: Buffer.from(blob).toString('base64') }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to save manifest: ${response.status}`);
+  }
+}
+
+/**
  * Uploads ciphertext bytes straight to S3 using the presigned POST target
  * an `appendEntry` response handed back — never touches the relay itself.
  */

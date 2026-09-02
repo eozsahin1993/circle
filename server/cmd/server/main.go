@@ -23,6 +23,7 @@ import (
 	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
 	blobs3 "circle-relay/internal/storage/blobstore/s3"
 	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
+	manifestdynamodb "circle-relay/internal/storage/manifeststore/dynamodb"
 )
 
 const (
@@ -45,7 +46,8 @@ func main() {
 	s3Client := awss3.NewFromConfig(awsCfg, func(o *awss3.Options) { o.UsePathStyle = cfg.S3ForcePathStyle })
 	blobStore := blobs3.New(s3Client, cfg.BucketName, cfg.MaxBlobSize)
 
-	authStore := authdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.DevicesTableName)
+	authStore := authdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.SessionsTableName)
+	manifestStore := manifestdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.AccountsTableName)
 	secretStore, err := kmssecrets.New(awskms.NewFromConfig(awsCfg), cfg.RootSecretCiphertext)
 	if err != nil {
 		log.Fatalf("failed to construct root secret store: %v", err)
@@ -53,7 +55,7 @@ func main() {
 	googleVerifier := oidcverify.New(googleIssuer, googleJWKSURL, nonEmpty(cfg.GoogleClientIDIOS, cfg.GoogleClientIDAndroid, cfg.GoogleClientIDWeb))
 	appleVerifier := oidcverify.New(appleIssuer, appleJWKSURL, nonEmpty(cfg.AppleClientIDIOS))
 
-	mux := api.NewRouter(logStore, blobStore, authStore, secretStore, googleVerifier, appleVerifier)
+	mux := api.NewRouter(logStore, blobStore, authStore, secretStore, manifestStore, googleVerifier, appleVerifier)
 
 	addr := ":" + cfg.Port
 	log.Printf("listening on %s", addr)

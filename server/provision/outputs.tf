@@ -11,8 +11,12 @@ output "bucket_name" {
   value = module.storage.bucket_name
 }
 
-output "devices_table_name" {
-  value = aws_dynamodb_table.devices.name
+output "sessions_table_name" {
+  value = aws_dynamodb_table.sessions.name
+}
+
+output "accounts_table_name" {
+  value = aws_dynamodb_table.accounts.name
 }
 
 output "root_secret_ciphertext" {

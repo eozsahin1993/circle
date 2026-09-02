@@ -12,7 +12,7 @@ import (
 // testKeyFunc always returns pub, ignoring the token's kid — real provider
 // verification looks the key up by kid (see jwks.go); that lookup logic is
 // simple enough not to need its own test here, so tests exercise
-// verifyAndGetEmail directly against a known key instead of hitting a real
+// verifyAndGetClaims directly against a known key instead of hitting a real
 // network JWKS endpoint.
 func testKeyFunc(pub *rsa.PublicKey) jwt.Keyfunc {
 	return func(*jwt.Token) (any, error) { return pub, nil }
@@ -32,6 +32,7 @@ func baseClaims() jwt.MapClaims {
 	return jwt.MapClaims{
 		"iss":            "https://issuer.example",
 		"aud":            "client-id-1",
+		"sub":            "user-1",
 		"email":          "person@example.com",
 		"email_verified": true,
 		"exp":            time.Now().Add(time.Hour).Unix(),
@@ -48,95 +49,111 @@ func testKey(t *testing.T) *rsa.PrivateKey {
 	return key
 }
 
-func TestVerifyAndGetEmail_ValidTokenReturnsEmail(t *testing.T) {
+func TestVerifyAndGetClaims_ValidTokenReturnsSubAndEmail(t *testing.T) {
 	key := testKey(t)
 	token := signTestToken(t, key, baseClaims())
 
-	email, err := verifyAndGetEmail(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
+	claims, err := verifyAndGetClaims(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
 		map[string]struct{}{"client-id-1": {}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if email != "person@example.com" {
-		t.Fatalf("expected person@example.com, got %q", email)
+	if claims.Sub != "user-1" {
+		t.Fatalf("expected sub user-1, got %q", claims.Sub)
+	}
+	if claims.Email != "person@example.com" {
+		t.Fatalf("expected person@example.com, got %q", claims.Email)
 	}
 }
 
-func TestVerifyAndGetEmail_AppleStyleStringEmailVerifiedIsAccepted(t *testing.T) {
+func TestVerifyAndGetClaims_MissingSubIsRejected(t *testing.T) {
+	key := testKey(t)
+	claims := baseClaims()
+	delete(claims, "sub")
+	token := signTestToken(t, key, claims)
+
+	_, err := verifyAndGetClaims(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
+		map[string]struct{}{"client-id-1": {}})
+	if err == nil {
+		t.Fatal("expected an error for a token with no sub claim")
+	}
+}
+
+func TestVerifyAndGetClaims_AppleStyleStringEmailVerifiedIsAccepted(t *testing.T) {
 	key := testKey(t)
 	claims := baseClaims()
 	claims["email_verified"] = "true"
 	token := signTestToken(t, key, claims)
 
-	if _, err := verifyAndGetEmail(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
+	if _, err := verifyAndGetClaims(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
 		map[string]struct{}{"client-id-1": {}}); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestVerifyAndGetEmail_UnverifiedEmailIsRejected(t *testing.T) {
+func TestVerifyAndGetClaims_UnverifiedEmailIsRejected(t *testing.T) {
 	key := testKey(t)
 	claims := baseClaims()
 	claims["email_verified"] = false
 	token := signTestToken(t, key, claims)
 
-	_, err := verifyAndGetEmail(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
+	_, err := verifyAndGetClaims(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
 		map[string]struct{}{"client-id-1": {}})
 	if err != ErrEmailNotVerified {
 		t.Fatalf("expected ErrEmailNotVerified, got %v", err)
 	}
 }
 
-func TestVerifyAndGetEmail_WrongAudienceIsRejected(t *testing.T) {
+func TestVerifyAndGetClaims_WrongAudienceIsRejected(t *testing.T) {
 	key := testKey(t)
 	token := signTestToken(t, key, baseClaims())
 
-	_, err := verifyAndGetEmail(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
+	_, err := verifyAndGetClaims(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
 		map[string]struct{}{"some-other-client-id": {}})
 	if err == nil {
 		t.Fatal("expected an error for an unaccepted audience")
 	}
 }
 
-func TestVerifyAndGetEmail_ArrayAudienceIsAccepted(t *testing.T) {
+func TestVerifyAndGetClaims_ArrayAudienceIsAccepted(t *testing.T) {
 	key := testKey(t)
 	claims := baseClaims()
 	claims["aud"] = []string{"some-other-client-id", "client-id-1"}
 	token := signTestToken(t, key, claims)
 
-	if _, err := verifyAndGetEmail(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
+	if _, err := verifyAndGetClaims(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
 		map[string]struct{}{"client-id-1": {}}); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestVerifyAndGetEmail_WrongIssuerIsRejected(t *testing.T) {
+func TestVerifyAndGetClaims_WrongIssuerIsRejected(t *testing.T) {
 	key := testKey(t)
 	claims := baseClaims()
 	claims["iss"] = "https://not-the-real-issuer.example"
 	token := signTestToken(t, key, claims)
 
-	_, err := verifyAndGetEmail(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
+	_, err := verifyAndGetClaims(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
 		map[string]struct{}{"client-id-1": {}})
 	if err == nil {
 		t.Fatal("expected an error for a mismatched issuer")
 	}
 }
 
-func TestVerifyAndGetEmail_ExpiredTokenIsRejected(t *testing.T) {
+func TestVerifyAndGetClaims_ExpiredTokenIsRejected(t *testing.T) {
 	key := testKey(t)
 	claims := baseClaims()
 	claims["exp"] = time.Now().Add(-time.Hour).Unix()
 	token := signTestToken(t, key, claims)
 
-	_, err := verifyAndGetEmail(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
+	_, err := verifyAndGetClaims(token, testKeyFunc(&key.PublicKey), "https://issuer.example",
 		map[string]struct{}{"client-id-1": {}})
 	if err == nil {
 		t.Fatal("expected an error for an expired token")
 	}
 }
 
-func TestVerifyAndGetEmail_WrongSigningKeyIsRejected(t *testing.T) {
+func TestVerifyAndGetClaims_WrongSigningKeyIsRejected(t *testing.T) {
 	signingKey := testKey(t)
 	otherKey := testKey(t)
 	token := signTestToken(t, signingKey, baseClaims())
@@ -144,7 +161,7 @@ func TestVerifyAndGetEmail_WrongSigningKeyIsRejected(t *testing.T) {
 	// Verifying against a different public key than the one that actually
 	// signed the token must fail — this is the core forgery-prevention
 	// property the whole package exists for.
-	_, err := verifyAndGetEmail(token, testKeyFunc(&otherKey.PublicKey), "https://issuer.example",
+	_, err := verifyAndGetClaims(token, testKeyFunc(&otherKey.PublicKey), "https://issuer.example",
 		map[string]struct{}{"client-id-1": {}})
 	if err == nil {
 		t.Fatal("expected an error when verifying against the wrong public key")

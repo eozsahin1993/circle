@@ -8,6 +8,7 @@ package api
 import (
 	"net/http"
 
+	"circle-relay/internal/api/account/manifest"
 	"circle-relay/internal/api/appendentry"
 	"circle-relay/internal/api/auth"
 	"circle-relay/internal/api/auth/apple"
@@ -20,6 +21,7 @@ import (
 	"circle-relay/internal/storage/authstore"
 	"circle-relay/internal/storage/blobstore"
 	"circle-relay/internal/storage/logstore"
+	"circle-relay/internal/storage/manifeststore"
 )
 
 func NewRouter(
@@ -27,11 +29,12 @@ func NewRouter(
 	blobStore blobstore.Store,
 	authStore authstore.Store,
 	secretStore secrets.Store,
+	manifestStore manifeststore.Store,
 	googleVerifier *oidcverify.Verifier,
 	appleVerifier *oidcverify.Verifier,
 ) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.Handle("/v1/", http.StripPrefix("/v1", newV1Mux(logStore, blobStore, authStore, secretStore, googleVerifier, appleVerifier)))
+	mux.Handle("/v1/", http.StripPrefix("/v1", newV1Mux(logStore, blobStore, authStore, secretStore, manifestStore, googleVerifier, appleVerifier)))
 	return mux
 }
 
@@ -44,6 +47,7 @@ func newV1Mux(
 	blobStore blobstore.Store,
 	authStore authstore.Store,
 	secretStore secrets.Store,
+	manifestStore manifeststore.Store,
 	googleVerifier *oidcverify.Verifier,
 	appleVerifier *oidcverify.Verifier,
 ) *http.ServeMux {
@@ -56,8 +60,14 @@ func newV1Mux(
 	getblob.Register(circleMux, &getblob.Service{BlobStore: blobStore})
 	mux.Handle("/circles/", auth.RequireSession(authStore, circleMux))
 
-	google.Register(mux, &google.Service{Secrets: secretStore, AuthStore: authStore, Verifier: googleVerifier})
-	apple.Register(mux, &apple.Service{Secrets: secretStore, AuthStore: authStore, Verifier: appleVerifier})
+	// Account-scoped, not circle-scoped — its own sub-mux, same
+	// RequireSession wrapping as circleMux above.
+	accountMux := http.NewServeMux()
+	manifest.Register(accountMux, &manifest.Service{ManifestStore: manifestStore})
+	mux.Handle("/account/", auth.RequireSession(authStore, accountMux))
+
+	google.Register(mux, &google.Service{AuthStore: authStore, Verifier: googleVerifier})
+	apple.Register(mux, &apple.Service{AuthStore: authStore, Verifier: appleVerifier})
 	logout.Register(mux, &logout.Service{AuthStore: authStore})
 
 	return mux

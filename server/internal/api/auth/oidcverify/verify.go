@@ -1,8 +1,8 @@
 // Package oidcverify verifies OIDC ID tokens (Google Sign-In, Sign in with
-// Apple) and extracts a verified email claim — one generic implementation
-// shared by both providers instead of a bespoke verifier per provider,
-// since the underlying mechanism (a JWT signed by keys published at the
-// provider's own JWKS URL) is identical.
+// Apple) and extracts their claims — one generic implementation shared by
+// both providers instead of a bespoke verifier per provider, since the
+// underlying mechanism (a JWT signed by keys published at the provider's
+// own JWKS URL) is identical.
 package oidcverify
 
 import (
@@ -17,6 +17,17 @@ import (
 // one here would defeat the entire point of using this as a registration
 // credential.
 var ErrEmailNotVerified = errors.New("oidcverify: email not verified")
+
+// Claims is what a verified token yields. Sub is the provider's own
+// permanent per-user identifier — required by the OIDC spec on every
+// token, unlike Email (scope-gated, and the value itself can change: a
+// user's account email, or an Apple private-relay address, at any time).
+// Callers should key identity on Sub, not Email — see server/DESIGN.md's
+// "Account recovery" section for why.
+type Claims struct {
+	Sub   string
+	Email string
+}
 
 // Verifier checks ID tokens from one OIDC provider (issuer) against its
 // published JWKS, and enforces that the token's audience is one this app
@@ -41,16 +52,16 @@ func New(issuer, jwksURL string, audiences []string) *Verifier {
 	return &Verifier{issuer: issuer, audiences: audienceSet, jwks: newJWKS(jwksURL)}
 }
 
-// VerifyAndGetEmail validates rawToken's signature, issuer, audience, and
-// expiry, then returns its verified email claim.
-func (v *Verifier) VerifyAndGetEmail(rawToken string) (string, error) {
-	return verifyAndGetEmail(rawToken, v.jwks.keyFunc, v.issuer, v.audiences)
+// VerifyAndGetClaims validates rawToken's signature, issuer, audience, and
+// expiry, then returns its Sub and verified Email.
+func (v *Verifier) VerifyAndGetClaims(rawToken string) (Claims, error) {
+	return verifyAndGetClaims(rawToken, v.jwks.keyFunc, v.issuer, v.audiences)
 }
 
-// verifyAndGetEmail is split out from the method above purely so tests can
+// verifyAndGetClaims is split out from the method above purely so tests can
 // supply a fake keyFunc (a locally-generated RSA key signing a test token)
 // instead of needing a real network call to Google/Apple's JWKS endpoint.
-func verifyAndGetEmail(rawToken string, keyFunc jwt.Keyfunc, issuer string, audiences map[string]struct{}) (string, error) {
+func verifyAndGetClaims(rawToken string, keyFunc jwt.Keyfunc, issuer string, audiences map[string]struct{}) (Claims, error) {
 	// RS256 only — restricting accepted algorithms up front is standard
 	// defense against JWT algorithm-confusion attacks (e.g. an attacker
 	// crafting a token with "alg: none" or a symmetric algorithm that
@@ -61,26 +72,31 @@ func verifyAndGetEmail(rawToken string, keyFunc jwt.Keyfunc, issuer string, audi
 		jwt.WithExpirationRequired(),
 	)
 	if err != nil {
-		return "", fmt.Errorf("oidcverify: %w", err)
+		return Claims{}, fmt.Errorf("oidcverify: %w", err)
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return "", errors.New("oidcverify: unexpected claims type")
+		return Claims{}, errors.New("oidcverify: unexpected claims type")
 	}
 
 	if !audienceAccepted(claims, audiences) {
-		return "", errors.New("oidcverify: audience not accepted")
+		return Claims{}, errors.New("oidcverify: audience not accepted")
+	}
+
+	sub, _ := claims["sub"].(string)
+	if sub == "" {
+		return Claims{}, errors.New("oidcverify: token has no sub claim")
 	}
 
 	email, _ := claims["email"].(string)
 	if email == "" {
-		return "", errors.New("oidcverify: token has no email claim")
+		return Claims{}, errors.New("oidcverify: token has no email claim")
 	}
 	if !emailVerifiedClaim(claims) {
-		return "", ErrEmailNotVerified
+		return Claims{}, ErrEmailNotVerified
 	}
-	return email, nil
+	return Claims{Sub: sub, Email: email}, nil
 }
 
 // audienceAccepted checks the token's aud claim (a string or array of

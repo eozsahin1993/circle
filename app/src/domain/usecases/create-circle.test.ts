@@ -1,12 +1,17 @@
 jest.mock('@/domain/usecases/sync-circle');
+jest.mock('@/domain/usecases/account-manifest');
 
 import { getAllCircles, getCircleMembers, initDatabase } from '@/data/db';
 import { createCircle } from '@/domain/usecases/create-circle';
 import { createPost } from '@/domain/usecases/create-post';
 import { drainOutbox } from '@/domain/usecases/sync-circle';
 import { getCirclePosts } from '@/data/db/posts';
+import { saveMasterSeed } from '@/services/keystore';
 
-beforeAll(() => initDatabase());
+beforeAll(async () => {
+  await initDatabase();
+  await saveMasterSeed(new Uint8Array(16));
+});
 beforeEach(() => (drainOutbox as jest.Mock).mockResolvedValue(undefined));
 
 test('createCircle inserts a circle and makes this device its first member', async () => {

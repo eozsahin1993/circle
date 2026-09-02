@@ -39,7 +39,7 @@ func TestRequireSession_UnknownTokenReturns401(t *testing.T) {
 	}))
 
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, newTestRequest(testsupport.UniqueEmailHMAC(t)))
+	handler.ServeHTTP(rec, newTestRequest(testsupport.UniqueAccountID(t)))
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", rec.Code)
@@ -49,9 +49,9 @@ func TestRequireSession_UnknownTokenReturns401(t *testing.T) {
 func TestRequireSession_ExpiredSessionReturns401(t *testing.T) {
 	ctx := context.Background()
 	authStore := testsupport.NewAuthStore(t)
-	token := testsupport.UniqueEmailHMAC(t)
+	token := testsupport.UniqueAccountID(t)
 	if err := authStore.SaveSession(ctx, token, authstore.Session{
-		DeviceID:  testsupport.UniqueEmailHMAC(t),
+		AccountID: testsupport.UniqueAccountID(t),
 		ExpiresAt: time.Now().Add(-time.Hour),
 	}); err != nil {
 		t.Fatal(err)
@@ -69,21 +69,21 @@ func TestRequireSession_ExpiredSessionReturns401(t *testing.T) {
 	}
 }
 
-func TestRequireSession_ValidSessionCallsNextWithDeviceID(t *testing.T) {
+func TestRequireSession_ValidSessionCallsNextWithAccountID(t *testing.T) {
 	ctx := context.Background()
 	authStore := testsupport.NewAuthStore(t)
-	token := testsupport.UniqueEmailHMAC(t)
-	deviceID := testsupport.UniqueEmailHMAC(t)
+	token := testsupport.UniqueAccountID(t)
+	accountID := testsupport.UniqueAccountID(t)
 	if err := authStore.SaveSession(ctx, token, authstore.Session{
-		DeviceID:  deviceID,
+		AccountID: accountID,
 		ExpiresAt: time.Now().Add(time.Hour),
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	var gotDeviceID string
+	var gotAccountID string
 	handler := auth.RequireSession(authStore, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotDeviceID = auth.DeviceID(r.Context())
+		gotAccountID = auth.AccountID(r.Context())
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -93,7 +93,7 @@ func TestRequireSession_ValidSessionCallsNextWithDeviceID(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
-	if gotDeviceID != deviceID {
-		t.Fatalf("expected DeviceID(ctx) to be %q, got %q", deviceID, gotDeviceID)
+	if gotAccountID != accountID {
+		t.Fatalf("expected AccountID(ctx) to be %q, got %q", accountID, gotAccountID)
 	}
 }

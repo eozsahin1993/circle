@@ -16,9 +16,10 @@ import (
 	"circle-relay/internal/testsupport"
 )
 
-func validClaims(email, audience string) jwt.MapClaims {
+func validClaims(t *testing.T, email, audience string) jwt.MapClaims {
 	return jwt.MapClaims{
 		"aud":            audience,
+		"sub":            testsupport.UniqueAccountID(t),
 		"email":          email,
 		"email_verified": true,
 		"exp":            time.Now().Add(time.Hour).Unix(),
@@ -53,7 +54,7 @@ func TestEndToEnd_GoogleSignIn(t *testing.T) {
 	defer server.Close()
 
 	email := testsupport.UniqueEmail(t)
-	claims := validClaims(email, testsupport.TestGoogleClientID)
+	claims := validClaims(t, email, testsupport.TestGoogleClientID)
 	claims["iss"] = google.Issuer
 	idToken := google.SignToken(t, claims)
 
@@ -72,7 +73,7 @@ func TestEndToEnd_AppleSignIn(t *testing.T) {
 	defer server.Close()
 
 	email := testsupport.UniqueEmail(t)
-	claims := validClaims(email, testsupport.TestAppleClientID)
+	claims := validClaims(t, email, testsupport.TestAppleClientID)
 	claims["iss"] = apple.Issuer
 	// Apple's real tokens send email_verified as a string, not a bool —
 	// exercising that here, not just in oidcverify's own unit tests, to
@@ -94,7 +95,7 @@ func TestEndToEnd_GoogleSignIn_WrongIssuerReturns401(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
-	claims := validClaims(testsupport.UniqueEmail(t), testsupport.TestGoogleClientID)
+	claims := validClaims(t, testsupport.UniqueEmail(t), testsupport.TestGoogleClientID)
 	claims["iss"] = "https://not-actually-google.example"
 	// Signed by the fake Google key but claiming a different issuer —
 	// the router's Google verifier is configured to only accept
@@ -113,7 +114,7 @@ func TestEndToEnd_GoogleSignIn_TokenSignedByAppleKeyIsRejected(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
-	claims := validClaims(testsupport.UniqueEmail(t), testsupport.TestGoogleClientID)
+	claims := validClaims(t, testsupport.UniqueEmail(t), testsupport.TestGoogleClientID)
 	claims["iss"] = "https://accounts.google.com"
 	// Signed by Apple's fake key, not Google's — must fail signature
 	// verification against Google's JWKS regardless of what the claims say.
@@ -146,7 +147,7 @@ func TestEndToEnd_LogoutRevokesTheSession(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
-	claims := validClaims(testsupport.UniqueEmail(t), testsupport.TestGoogleClientID)
+	claims := validClaims(t, testsupport.UniqueEmail(t), testsupport.TestGoogleClientID)
 	claims["iss"] = google.Issuer
 	idToken := google.SignToken(t, claims)
 	token := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", idToken))

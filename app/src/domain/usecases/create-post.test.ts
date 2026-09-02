@@ -1,14 +1,18 @@
 jest.mock('@/domain/usecases/sync-circle');
+jest.mock('@/domain/usecases/account-manifest');
 
 import { decrypt, generateUUID } from '@/services/crypto';
-import { getCircleSecret } from '@/services/keystore';
+import { getCircleSecret, saveMasterSeed } from '@/services/keystore';
 import { getPendingOutboxEntries, initDatabase } from '@/data/db';
 import { createCircle } from '@/domain/usecases/create-circle';
 import { createPost } from '@/domain/usecases/create-post';
 import { drainOutbox } from '@/domain/usecases/sync-circle';
 import { getCirclePosts } from '@/data/db/posts';
 
-beforeAll(() => initDatabase());
+beforeAll(async () => {
+  await initDatabase();
+  await saveMasterSeed(new Uint8Array(16));
+});
 beforeEach(() => jest.clearAllMocks());
 
 test('createPost triggers a drain of the circle it just posted to', async () => {

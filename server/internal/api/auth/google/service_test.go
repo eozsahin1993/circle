@@ -17,16 +17,15 @@ func TestService_SignIn_ValidTokenIssuesASession(t *testing.T) {
 	provider := testsupport.NewFakeOIDCProvider(t, "https://accounts.google.com")
 	authStore := testsupport.NewAuthStore(t)
 	svc := &google.Service{
-		Secrets:   testsupport.NewSecretStore(t),
 		AuthStore: authStore,
 		Verifier:  oidcverify.New(provider.Issuer, provider.JWKSURL, []string{testsupport.TestGoogleClientID}),
 	}
 
-	email := testsupport.UniqueEmail(t)
 	idToken := provider.SignToken(t, jwt.MapClaims{
 		"iss":            provider.Issuer,
 		"aud":            testsupport.TestGoogleClientID,
-		"email":          email,
+		"sub":            testsupport.UniqueAccountID(t),
+		"email":          testsupport.UniqueEmail(t),
 		"email_verified": true,
 		"exp":            time.Now().Add(time.Hour).Unix(),
 	})
@@ -48,22 +47,22 @@ func TestService_SignIn_ValidTokenIssuesASession(t *testing.T) {
 	}
 }
 
-func TestService_SignIn_SameEmailTwiceResolvesToTheSameDevice(t *testing.T) {
+func TestService_SignIn_SameSubTwiceResolvesToTheSameAccount(t *testing.T) {
 	ctx := context.Background()
 	provider := testsupport.NewFakeOIDCProvider(t, "https://accounts.google.com")
 	authStore := testsupport.NewAuthStore(t)
 	svc := &google.Service{
-		Secrets:   testsupport.NewSecretStore(t),
 		AuthStore: authStore,
 		Verifier:  oidcverify.New(provider.Issuer, provider.JWKSURL, []string{testsupport.TestGoogleClientID}),
 	}
 
-	email := testsupport.UniqueEmail(t)
+	sub := testsupport.UniqueAccountID(t)
 	claims := func() jwt.MapClaims {
 		return jwt.MapClaims{
 			"iss":            provider.Issuer,
 			"aud":            testsupport.TestGoogleClientID,
-			"email":          email,
+			"sub":            sub,
+			"email":          testsupport.UniqueEmail(t),
 			"email_verified": true,
 			"exp":            time.Now().Add(time.Hour).Unix(),
 		}
@@ -89,9 +88,53 @@ func TestService_SignIn_SameEmailTwiceResolvesToTheSameDevice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if session1.DeviceID != session2.DeviceID {
-		t.Fatalf("expected both sign-ins for the same email to resolve to the same deviceId, got %q and %q",
-			session1.DeviceID, session2.DeviceID)
+	if session1.AccountID != session2.AccountID {
+		t.Fatalf("expected both sign-ins for the same sub to resolve to the same account, got %q and %q",
+			session1.AccountID, session2.AccountID)
+	}
+}
+
+func TestService_SignIn_DifferentEmailSameSubStillResolvesToTheSameAccount(t *testing.T) {
+	ctx := context.Background()
+	provider := testsupport.NewFakeOIDCProvider(t, "https://accounts.google.com")
+	authStore := testsupport.NewAuthStore(t)
+	svc := &google.Service{
+		AuthStore: authStore,
+		Verifier:  oidcverify.New(provider.Issuer, provider.JWKSURL, []string{testsupport.TestGoogleClientID}),
+	}
+
+	sub := testsupport.UniqueAccountID(t)
+	claimsWithEmail := func(email string) jwt.MapClaims {
+		return jwt.MapClaims{
+			"iss":            provider.Issuer,
+			"aud":            testsupport.TestGoogleClientID,
+			"sub":            sub,
+			"email":          email,
+			"email_verified": true,
+			"exp":            time.Now().Add(time.Hour).Unix(),
+		}
+	}
+
+	token1, err := svc.SignIn(ctx, provider.SignToken(t, claimsWithEmail(testsupport.UniqueEmail(t))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	token2, err := svc.SignIn(ctx, provider.SignToken(t, claimsWithEmail(testsupport.UniqueEmail(t))))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	session1, err := authStore.GetSession(ctx, token1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session2, err := authStore.GetSession(ctx, token2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if session1.AccountID != session2.AccountID {
+		t.Fatalf("expected a changed email on a returning sub to still resolve to the same account, got %q and %q",
+			session1.AccountID, session2.AccountID)
 	}
 }
 
@@ -99,7 +142,6 @@ func TestService_SignIn_InvalidTokenIsRejected(t *testing.T) {
 	ctx := context.Background()
 	provider := testsupport.NewFakeOIDCProvider(t, "https://accounts.google.com")
 	svc := &google.Service{
-		Secrets:   testsupport.NewSecretStore(t),
 		AuthStore: testsupport.NewAuthStore(t),
 		Verifier:  oidcverify.New(provider.Issuer, provider.JWKSURL, []string{testsupport.TestGoogleClientID}),
 	}
@@ -113,7 +155,6 @@ func TestService_SignIn_UnverifiedEmailIsRejected(t *testing.T) {
 	ctx := context.Background()
 	provider := testsupport.NewFakeOIDCProvider(t, "https://accounts.google.com")
 	svc := &google.Service{
-		Secrets:   testsupport.NewSecretStore(t),
 		AuthStore: testsupport.NewAuthStore(t),
 		Verifier:  oidcverify.New(provider.Issuer, provider.JWKSURL, []string{testsupport.TestGoogleClientID}),
 	}
@@ -121,6 +162,7 @@ func TestService_SignIn_UnverifiedEmailIsRejected(t *testing.T) {
 	idToken := provider.SignToken(t, jwt.MapClaims{
 		"iss":            provider.Issuer,
 		"aud":            testsupport.TestGoogleClientID,
+		"sub":            testsupport.UniqueAccountID(t),
 		"email":          testsupport.UniqueEmail(t),
 		"email_verified": false,
 		"exp":            time.Now().Add(time.Hour).Unix(),

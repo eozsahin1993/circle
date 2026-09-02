@@ -7,31 +7,30 @@ import (
 
 	"circle-relay/internal/api/auth"
 	"circle-relay/internal/api/auth/oidcverify"
-	"circle-relay/internal/crypto"
-	"circle-relay/internal/secrets"
 	"circle-relay/internal/storage/authstore"
 )
 
 type Service struct {
-	Secrets   secrets.Store
 	AuthStore authstore.Store
 	Verifier  *oidcverify.Verifier
 }
 
-// SignIn verifies idToken against Google's own signing keys, then confirms
-// the device and issues a bearer token for the token's verified email —
-// same downstream session machinery the apple package uses, just a
-// different provider verifying the email up front.
+// providerName namespaces the accountID so Google's and Apple's sub
+// values, independently issued by unrelated ID spaces, can never collide
+// — see server/DESIGN.md's "Account recovery" section for why identity is
+// keyed on sub, not email.
+const providerName = "google"
+
+// SignIn verifies idToken against Google's own signing keys, then issues a
+// bearer token for the token's verified subject — same downstream session
+// machinery the apple package uses, just a different provider verifying
+// the token up front.
 func (s *Service) SignIn(ctx context.Context, idToken string) (string, error) {
-	email, err := s.Verifier.VerifyAndGetEmail(idToken)
+	claims, err := s.Verifier.VerifyAndGetClaims(idToken)
 	if err != nil {
 		return "", err
 	}
 
-	emailHmac, err := crypto.EmailHMAC(ctx, s.Secrets, email)
-	if err != nil {
-		return "", err
-	}
-
-	return auth.Issue(ctx, s.AuthStore, emailHmac)
+	accountID := providerName + ":" + claims.Sub
+	return auth.Issue(ctx, s.AuthStore, accountID)
 }

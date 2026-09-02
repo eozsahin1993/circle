@@ -1,4 +1,5 @@
 import { deleteCircle, markCircleLeft } from '@/data/db';
+import { syncAccountManifestBestEffort } from '@/domain/usecases/account-manifest';
 import { isCircleAdmin } from '@/domain/usecases/invite-to-circle';
 import { deleteCircleKeys } from '@/services/keystore';
 
@@ -11,6 +12,7 @@ import { deleteCircleKeys } from '@/services/keystore';
 export async function leaveCircle(circleId: string): Promise<void> {
   await markCircleLeft(circleId);
   await deleteCircleKeys(circleId);
+  await syncAccountManifestBestEffort();
 }
 
 /**
@@ -25,4 +27,5 @@ export async function deleteCircleForEveryone(circleId: string): Promise<void> {
 
   await deleteCircle(circleId);
   await deleteCircleKeys(circleId);
+  await syncAccountManifestBestEffort();
 }

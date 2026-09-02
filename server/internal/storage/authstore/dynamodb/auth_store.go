@@ -1,7 +1,10 @@
-// Package dynamodb implements authstore.Store against its own DynamoDB
-// table — deliberately separate from logstore's table (different field,
-// different package): session state isn't circle-scoped data, see
-// server/DESIGN.md's "Email auth" section.
+// Package dynamodb implements authstore.Store against its own "sessions"
+// table — one item per bearer token, no sort key needed since a session
+// is the only thing ever looked up by token (see
+// server/provision/sessions_table.tf). Deliberately a different table
+// from the account document (manifeststore): token-lookup and
+// account-lookup are different access patterns, and sessions are
+// ephemeral (TTL'd) where the account document isn't.
 package dynamodb
 
 import (
@@ -17,11 +20,6 @@ import (
 	"circle-relay/internal/storage/authstore"
 	"circle-relay/internal/storage/dynamoutil"
 )
-
-// sessionSK is the only item kind this table holds — pk = token, since a
-// session is looked up by the bearer token a client actually presents, not
-// by email address.
-const sessionSK = "#session"
 
 type Store struct {
 	client    *dynamodb.Client
@@ -39,8 +37,7 @@ func (s *Store) SaveSession(ctx context.Context, token string, session authstore
 		TableName: aws.String(s.tableName),
 		Item: map[string]types.AttributeValue{
 			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: token},
-			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: sessionSK},
-			"deviceId":        &types.AttributeValueMemberS{Value: session.DeviceID},
+			"accountId":       &types.AttributeValueMemberS{Value: session.AccountID},
 			"expiresAt":       &types.AttributeValueMemberN{Value: strconv.FormatInt(session.ExpiresAt.Unix(), 10)},
 		},
 	})
@@ -52,7 +49,6 @@ func (s *Store) GetSession(ctx context.Context, token string) (*authstore.Sessio
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
 			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: token},
-			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: sessionSK},
 		},
 		ConsistentRead: aws.Bool(true),
 	})
@@ -62,15 +58,15 @@ func (s *Store) GetSession(ctx context.Context, token string) (*authstore.Sessio
 	if out.Item == nil {
 		return nil, nil
 	}
-	deviceID, ok := dynamoutil.AttrString(out.Item, "deviceId")
+	accountID, ok := dynamoutil.AttrString(out.Item, "accountId")
 	if !ok {
-		return nil, errors.New("session item missing deviceId")
+		return nil, errors.New("session item missing accountId")
 	}
 	expiresAt, err := dynamoutil.AttrInt(out.Item, "expiresAt")
 	if err != nil {
 		return nil, err
 	}
-	return &authstore.Session{DeviceID: deviceID, ExpiresAt: time.Unix(expiresAt, 0)}, nil
+	return &authstore.Session{AccountID: accountID, ExpiresAt: time.Unix(expiresAt, 0)}, nil
 }
 
 // DeleteSession revokes token immediately — logout, or responding to a
@@ -82,7 +78,6 @@ func (s *Store) DeleteSession(ctx context.Context, token string) error {
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
 			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: token},
-			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: sessionSK},
 		},
 	})
 	return err

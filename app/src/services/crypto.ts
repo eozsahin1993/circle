@@ -1,6 +1,7 @@
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { bytesToHex, concatBytes, randomBytes } from '@noble/curves/utils.js';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js';
+import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { generateMnemonic, mnemonicToEntropy } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
@@ -85,6 +86,32 @@ export function generateInviteCode(): string {
  */
 export function generateIdentity(): Keypair {
   return ed25519.keygen();
+}
+
+const CIRCLE_IDENTITY_DOMAIN = new TextEncoder().encode('circle-identity');
+const MANIFEST_KEY_DOMAIN = new TextEncoder().encode('recovery-manifest');
+
+/**
+ * Derives a circle's identity keypair from the device's master seed —
+ * deterministic, unlike `generateIdentity()`, so recovering the seed
+ * regenerates the exact same keypair. Domain-separated per circleId, same
+ * reasoning as `generateIdentity`'s doc comment: one circle's derived seed
+ * must never double as another's. See server/DESIGN.md's "Account
+ * recovery" section.
+ */
+export function deriveCircleIdentity(masterSeed: Uint8Array, circleId: string): Keypair {
+  const seed = hkdf(sha256, masterSeed, undefined, concatBytes(CIRCLE_IDENTITY_DOMAIN, new TextEncoder().encode(circleId)), 32);
+  return ed25519.keygen(seed);
+}
+
+/**
+ * Derives the symmetric key that encrypts the account-recovery manifest
+ * (the list of circleIds this account belongs to) before it's sent to the
+ * relay — see server/DESIGN.md's "Account recovery" section. The relay
+ * only ever stores the resulting ciphertext.
+ */
+export function deriveManifestKey(masterSeed: Uint8Array): Uint8Array {
+  return hkdf(sha256, masterSeed, undefined, MANIFEST_KEY_DOMAIN, 32);
 }
 
 /**

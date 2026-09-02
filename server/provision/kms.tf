@@ -10,7 +10,7 @@
 # provisioned as its own KMS-encrypted secret. See internal/kdf's doc
 # comment.
 resource "aws_kms_key" "master" {
-  description         = "${local.name_prefix} master key — root secret envelope encryption, devices table SSE"
+  description         = "${local.name_prefix} master key — root secret envelope encryption, sessions/accounts tables SSE"
   enable_key_rotation = true
 }
 

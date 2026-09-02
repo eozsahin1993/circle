@@ -33,13 +33,16 @@ import (
 	blobs3 "circle-relay/internal/storage/blobstore/s3"
 	"circle-relay/internal/storage/logstore"
 	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
+	"circle-relay/internal/storage/manifeststore"
+	manifestdynamodb "circle-relay/internal/storage/manifeststore/dynamodb"
 )
 
 const (
 	localstackEndpoint = "http://localhost:4566"
-	tableName          = "test-circle-log"
+	tableName          = "test-sync-log"
 	bucketName         = "test-circle-blobs"
-	devicesTableName   = "test-devices"
+	sessionsTableName  = "test-sessions"
+	accountsTableName  = "test-accounts"
 )
 
 var (
@@ -49,8 +52,11 @@ var (
 	bucketOnce sync.Once
 	bucketErr  error
 
-	devicesTableOnce sync.Once
-	devicesTableErr  error
+	sessionsTableOnce sync.Once
+	sessionsTableErr  error
+
+	accountsTableOnce sync.Once
+	accountsTableErr  error
 
 	kmsKeyOnce sync.Once
 	kmsKeyErr  error
@@ -71,19 +77,19 @@ func UniqueCircleID(t testing.TB) string {
 }
 
 // UniqueEmail returns a fake-but-uniquely-formatted email address, for
-// the same reason UniqueCircleID exists — the shared devices table isn't
-// wiped between test runs.
+// the same reason UniqueCircleID exists — the shared sessions/accounts
+// tables aren't wiped between test runs.
 func UniqueEmail(t testing.TB) string {
 	t.Helper()
 	return fmt.Sprintf("test-%d@example.com", time.Now().UnixNano())
 }
 
-// UniqueEmailHMAC returns an opaque string standing in for a real emailHmac
-// — for adapter-level AuthStore tests that only care about key uniqueness,
-// not about how a real emailHmac is derived.
-func UniqueEmailHMAC(t testing.TB) string {
+// UniqueAccountID returns an opaque string standing in for a real account
+// identifier (provider:sub) — for adapter-level tests that only care about
+// key uniqueness, not about how a real one is derived.
+func UniqueAccountID(t testing.TB) string {
 	t.Helper()
-	return fmt.Sprintf("emailhmac-%s-%d", t.Name(), time.Now().UnixNano())
+	return fmt.Sprintf("account-%s-%d", t.Name(), time.Now().UnixNano())
 }
 
 func loadConfig(t testing.TB) aws.Config {
@@ -153,22 +159,40 @@ func NewBlobStore(t testing.TB) blobstore.Store {
 }
 
 // NewAuthStore returns a real dynamodb-backed AuthStore against LocalStack,
-// creating the devices table once per test binary run — same
+// creating the sessions table once per test binary run — same
 // sync.Once-guarded create-if-not-exists pattern as NewLogStore, against a
-// genuinely separate table (see server/DESIGN.md's "Email auth" section:
-// not circle-scoped data, doesn't belong in the circle-log table).
+// genuinely separate table from everything else (see
+// server/provision/sessions_table.tf).
 func NewAuthStore(t testing.TB) authstore.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	devicesTableOnce.Do(func() { devicesTableErr = createDevicesTable(client) })
-	if devicesTableErr != nil {
-		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", devicesTableErr)
+	sessionsTableOnce.Do(func() { sessionsTableErr = createSessionsTable(client) })
+	if sessionsTableErr != nil {
+		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", sessionsTableErr)
 	}
 
-	return authdynamodb.New(client, devicesTableName)
+	return authdynamodb.New(client, sessionsTableName)
+}
+
+// NewManifestStore returns a real dynamodb-backed manifeststore.Store
+// against LocalStack, creating the accounts table once per test binary
+// run — a genuinely separate table from sessions (see
+// server/provision/accounts_table.tf).
+func NewManifestStore(t testing.TB) manifeststore.Store {
+	t.Helper()
+	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
+		o.BaseEndpoint = aws.String(localstackEndpoint)
+	})
+
+	accountsTableOnce.Do(func() { accountsTableErr = createAccountsTable(client) })
+	if accountsTableErr != nil {
+		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", accountsTableErr)
+	}
+
+	return manifestdynamodb.New(client, accountsTableName)
 }
 
 // NewSecretStore returns a real kms-backed secrets.Store against
@@ -208,18 +232,16 @@ func NewSecretStore(t testing.TB) secrets.Store {
 	return store
 }
 
-func createDevicesTable(client *awsdynamodb.Client) error {
+func createSessionsTable(client *awsdynamodb.Client) error {
 	ctx := context.Background()
 	_, err := client.CreateTable(ctx, &awsdynamodb.CreateTableInput{
-		TableName:   aws.String(devicesTableName),
+		TableName:   aws.String(sessionsTableName),
 		BillingMode: ddbtypes.BillingModePayPerRequest,
 		KeySchema: []ddbtypes.KeySchemaElement{
 			{AttributeName: aws.String("pk"), KeyType: ddbtypes.KeyTypeHash},
-			{AttributeName: aws.String("sk"), KeyType: ddbtypes.KeyTypeRange},
 		},
 		AttributeDefinitions: []ddbtypes.AttributeDefinition{
 			{AttributeName: aws.String("pk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
-			{AttributeName: aws.String("sk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
 		},
 	})
 	if err != nil {
@@ -230,7 +252,30 @@ func createDevicesTable(client *awsdynamodb.Client) error {
 		return err
 	}
 	waiter := awsdynamodb.NewTableExistsWaiter(client)
-	return waiter.Wait(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(devicesTableName)}, 30*time.Second)
+	return waiter.Wait(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(sessionsTableName)}, 30*time.Second)
+}
+
+func createAccountsTable(client *awsdynamodb.Client) error {
+	ctx := context.Background()
+	_, err := client.CreateTable(ctx, &awsdynamodb.CreateTableInput{
+		TableName:   aws.String(accountsTableName),
+		BillingMode: ddbtypes.BillingModePayPerRequest,
+		KeySchema: []ddbtypes.KeySchemaElement{
+			{AttributeName: aws.String("pk"), KeyType: ddbtypes.KeyTypeHash},
+		},
+		AttributeDefinitions: []ddbtypes.AttributeDefinition{
+			{AttributeName: aws.String("pk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
+		},
+	})
+	if err != nil {
+		var inUse *ddbtypes.ResourceInUseException
+		if errors.As(err, &inUse) {
+			return nil // already created by an earlier test package's run
+		}
+		return err
+	}
+	waiter := awsdynamodb.NewTableExistsWaiter(client)
+	return waiter.Wait(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(accountsTableName)}, 30*time.Second)
 }
 
 func createTable(client *awsdynamodb.Client) error {

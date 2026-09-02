@@ -5,7 +5,7 @@ variable "aws_region" {
 }
 
 variable "env" {
-  description = "Environment name, folded into every resource's name (e.g. circle-relay-prod-circle-log) so multiple environments can coexist in one account without colliding."
+  description = "Environment name, folded into every resource's name (e.g. circle-relay-prod-sync-log) so multiple environments can coexist in one account without colliding."
   type        = string
   default     = "prod"
 }

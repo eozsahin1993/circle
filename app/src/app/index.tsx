@@ -10,6 +10,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { getProfile } from '@/data/db';
+import { recordSignInProviderBestEffort } from '@/domain/usecases/account-manifest';
 import { completeProfileSetup } from '@/domain/usecases/onboarding';
 import { signInWithApple, signInWithGoogle } from '@/domain/usecases/sign-in';
 import { downloadAndCompressImage } from '@/services/image';
@@ -52,6 +53,10 @@ export default function WelcomeScreen() {
     try {
       const result = provider === 'google' ? await signInWithGoogle() : await signInWithApple();
       if (result.outcome !== 'success') return;
+
+      // Best-effort — silently a no-op on a brand-new install's very
+      // first sign-in (no master seed yet), picked up on the next one.
+      recordSignInProviderBestEffort(provider);
 
       // A returning device (local profile already exists — e.g. this was
       // just a re-auth after signing out) has nothing new to fill in.

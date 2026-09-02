@@ -16,7 +16,7 @@ jest.mock('@/services/keystore', () => ({
   getAuthToken: () => mockGetAuthToken(),
 }));
 
-import { appendEntry, fetchEntries, uploadBlob } from '@/services/relay';
+import { appendEntry, fetchEntries, getManifest, putManifest, uploadBlob } from '@/services/relay';
 
 const RELAY_URL = 'http://localhost:8080';
 const AUTH_TOKEN = 'test-session-token';
@@ -86,6 +86,52 @@ describe('fetchEntries', () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 404));
 
     await expect(fetchEntries('circle-a', 0)).rejects.toThrow();
+  });
+});
+
+describe('getManifest', () => {
+  test('GETs and decodes a stored blob', async () => {
+    const encoded = Buffer.from([4, 5, 6]).toString('base64');
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ blob: encoded }));
+
+    const result = await getManifest();
+
+    const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toBe(`${RELAY_URL}/v1/account/manifest`);
+    expect(init.headers.Authorization).toBe(`Bearer ${AUTH_TOKEN}`);
+    expect(result).toEqual(new Uint8Array([4, 5, 6]));
+  });
+
+  test('returns null when the account has never stored a manifest', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ blob: null }));
+
+    await expect(getManifest()).resolves.toBeNull();
+  });
+
+  test('throws when the relay responds with an error status', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 500));
+
+    await expect(getManifest()).rejects.toThrow();
+  });
+});
+
+describe('putManifest', () => {
+  test('PUTs the base64-encoded blob', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ ok: true }));
+
+    await putManifest(new Uint8Array([1, 2, 3]));
+
+    const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toBe(`${RELAY_URL}/v1/account/manifest`);
+    expect(init.method).toBe('PUT');
+    expect(init.headers.Authorization).toBe(`Bearer ${AUTH_TOKEN}`);
+    expect(JSON.parse(init.body)).toEqual({ blob: Buffer.from([1, 2, 3]).toString('base64') });
+  });
+
+  test('throws when the relay responds with an error status', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 500));
+
+    await expect(putManifest(new Uint8Array([1]))).rejects.toThrow();
   });
 });
 

@@ -23,6 +23,7 @@ import (
 	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
 	blobs3 "circle-relay/internal/storage/blobstore/s3"
 	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
+	manifestdynamodb "circle-relay/internal/storage/manifeststore/dynamodb"
 )
 
 const (
@@ -44,7 +45,8 @@ func main() {
 	logStore := logdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.TableName, cfg.LogRetentionDays)
 	blobStore := blobs3.New(awss3.NewFromConfig(awsCfg), cfg.BucketName, cfg.MaxBlobSize)
 
-	authStore := authdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.DevicesTableName)
+	authStore := authdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.SessionsTableName)
+	manifestStore := manifestdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.AccountsTableName)
 	secretStore, err := kmssecrets.New(awskms.NewFromConfig(awsCfg), cfg.RootSecretCiphertext)
 	if err != nil {
 		log.Fatalf("failed to construct root secret store: %v", err)
@@ -52,7 +54,7 @@ func main() {
 	googleVerifier := oidcverify.New(googleIssuer, googleJWKSURL, nonEmpty(cfg.GoogleClientIDIOS, cfg.GoogleClientIDAndroid, cfg.GoogleClientIDWeb))
 	appleVerifier := oidcverify.New(appleIssuer, appleJWKSURL, nonEmpty(cfg.AppleClientIDIOS))
 
-	mux := api.NewRouter(logStore, blobStore, authStore, secretStore, googleVerifier, appleVerifier)
+	mux := api.NewRouter(logStore, blobStore, authStore, secretStore, manifestStore, googleVerifier, appleVerifier)
 
 	// NewV2, not New: provision/lambda_url.tf fronts this with a Lambda
 	// Function URL, which uses the same v2.0 Lambda payload format as an

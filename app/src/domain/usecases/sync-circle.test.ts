@@ -1,13 +1,16 @@
 jest.mock('@/services/relay');
 
 import { encryptJSON, generateUUID } from '@/services/crypto';
-import { getCircleSecret } from '@/services/keystore';
+import { getCircleSecret, saveMasterSeed } from '@/services/keystore';
 import { appendEntry, uploadBlob } from '@/services/relay';
 import { getPendingOutboxEntries, initDatabase, insertPostAndEnqueue, OutboxStatuses, type Post } from '@/data/db';
 import { createCircle } from '@/domain/usecases/create-circle';
 import { drainOutbox } from '@/domain/usecases/sync-circle';
 
-beforeAll(() => initDatabase());
+beforeAll(async () => {
+  await initDatabase();
+  await saveMasterSeed(new Uint8Array(16));
+});
 beforeEach(() => jest.clearAllMocks());
 
 async function enqueuePost(circleId: string, secret: Uint8Array, photo: Uint8Array): Promise<Post> {

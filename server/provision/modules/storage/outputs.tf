@@ -1,9 +1,9 @@
 output "table_name" {
-  value = aws_dynamodb_table.circle_log.name
+  value = aws_dynamodb_table.sync_log.name
 }
 
 output "table_arn" {
-  value = aws_dynamodb_table.circle_log.arn
+  value = aws_dynamodb_table.sync_log.arn
 }
 
 output "bucket_name" {

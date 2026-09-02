@@ -14,10 +14,15 @@ import (
 type Config struct {
 	TableName  string
 	BucketName string
-	// DevicesTableName is the standalone device/session-state table — see
-	// server/provision/devices_table.tf. Not circle-scoped, so it's a
-	// separate table from TableName, not a shape sharing it.
-	DevicesTableName string
+	// SessionsTableName is the standalone bearer-token session table — see
+	// server/provision/sessions_table.tf. Not circle-scoped, so it's a
+	// separate table from TableName; also separate from AccountsTableName
+	// (token-lookup vs account-lookup are different access patterns).
+	SessionsTableName string
+	// AccountsTableName is the standalone one-document-per-account table
+	// (today: the encrypted recovery manifest) — see
+	// server/provision/accounts_table.tf.
+	AccountsTableName string
 	// RootSecretCiphertext is the base64 KMS ciphertext blob for the app's
 	// single root secret — see internal/adapters/kms, internal/kdf, and
 	// server/provision/kms.tf. Safe as a plain env var: useless without the
@@ -64,7 +69,8 @@ func Load() Config {
 	return Config{
 		TableName:             mustEnv("TABLE_NAME"),
 		BucketName:            mustEnv("BUCKET_NAME"),
-		DevicesTableName:      mustEnv("DEVICES_TABLE_NAME"),
+		SessionsTableName:     mustEnv("SESSIONS_TABLE_NAME"),
+		AccountsTableName:     mustEnv("ACCOUNTS_TABLE_NAME"),
 		RootSecretCiphertext:  mustEnv("ROOT_SECRET_CIPHERTEXT"),
 		GoogleClientIDIOS:     envOr("GOOGLE_CLIENT_ID_IOS", ""),
 		GoogleClientIDAndroid: envOr("GOOGLE_CLIENT_ID_ANDROID", ""),

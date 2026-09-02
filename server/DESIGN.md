@@ -8,9 +8,11 @@ generic per-circle log) and the app's outbox + push-to-relay half of sync
 Not built: the pull side (`pullCircle`, a local `circleLog` mirror table),
 invites/roles/kick actually syncing through the relay (today these are
 local-only — see `app/src/domain/usecases/invite-to-circle.ts` etc.), push
-notifications (section 2 below is a full design, zero implementation), and
-the client-side onboarding UI for email auth (server-side API is built —
-see "Email auth" below).
+notifications (section 2 below is a full design, zero implementation), the
+client-side onboarding UI for email auth (server-side API is built — see
+"Email auth" below), and account recovery (see that section below — the
+master seed exists and is already framed in the UI as the way back into
+your circles, but nothing today actually makes that true yet).
 
 The relay's core property: it is blind. It never sees plaintext content, and
 it's designed so it can infer as little as possible about circle membership,
@@ -342,7 +344,151 @@ which is the actual backstop either way.
   stop a scripted attacker here, since minting a new device identity is
   free and instant either way; the concurrency cap + budget alert turns
   "could cost millions" into "costs a bounded, known ceiling and I get
-  paged," regardless of how many fake identities are involved.
+  paged," regardless of how many fake identities are involved. **Not yet
+  provisioned** — no `reserved_concurrent_executions` is set on the
+  Lambda and no `aws_budgets_budget` exists in Terraform today, so
+  nothing currently bounds a real spend spike. The concurrency cap is a
+  real-time, self-recovering throttle (AWS rejects new invocations past
+  the ceiling, no code involved); the budget piece is an alert only
+  unless paired with AWS Budget Actions, which can automatically attach
+  a deny-policy to the Lambda's own execution role past a threshold —
+  blunt (it can't tell an abusive account from a legitimate traffic
+  spike, and takes down the service for everyone either way), but a real
+  automated stop if wanted instead of a page.
+- **No per-account rate limiting either** — `RequireSession` only checks
+  "is this a valid signed-in account," not how fast that account is
+  calling. The concurrency cap above bounds aggregate cost but not one
+  account crowding out others. Deferred for the same reason: not worth
+  building before there's real concurrent multi-user traffic for a
+  "noisy neighbor" to actually degrade. When it is built, the window
+  needs to be day-scale, not minute-scale — `drainOutbox` flushes a
+  device's backlog sequentially but as fast as the network allows, so a
+  device back online after two offline weeks can legitimately fire
+  dozens of `appendEntry` calls within a minute or two. A per-minute
+  limiter would mistake normal catch-up sync for abuse; a generous daily
+  cap (sized to plausible worst-case human-paced backlog) still catches
+  sustained scripted abuse without breaking it.
+
+## Account recovery (not built)
+
+The master seed already exists (`generateSeedPhrase()`/`saveMasterSeed()`)
+and is already framed in the UI as the way back into your circles
+(`account/recovery.tsx`, `signOut()`'s own doc comment) — but nothing today
+actually makes that true. Circle identities and secrets are pure-random
+(`generateIdentity()`, `generateCircleSecret()`), not derived from the seed,
+so having the 12 words back doesn't currently let you regenerate a lost
+circle's keys. This section is what closes that gap.
+
+**The audience rules out "write down 12 words" as the primary path.** This
+isn't a self-selected crypto-wallet audience opting into self-custody — it's
+family photo sharing, likely including people who will never back up a seed
+phrase, ever. Recovery has to happen automatically, as a side effect of
+something people already do (getting a new phone, signing back in), not as
+an opt-in chore. The phrase stays available as a manual/portable fallback,
+never the primary mechanism.
+
+**Rejected: PIN + server-side escrow, even with real hardware attestation.**
+A memorable PIN (4-6 digits) is too low-entropy to protect with encryption
+alone — a KDF only raises the cost of brute force, it doesn't make brute
+force infeasible against that few possibilities. Making a PIN actually safe
+needs an attempt counter enforced somewhere the operator can't bypass even
+with full access to the stored data — an AWS Nitro Enclave with an
+attestation-gated KMS key, the same class of investment "Email auth" above
+already defers for the (simpler) email-HMAC secret. Building it here first,
+for something more sensitive than an account identifier (every circle
+identity a person has), would be inconsistent. It also can't run on
+Lambda — Nitro Enclaves need a standing EC2 host, the first non-serverless
+piece of infrastructure this project would take on. Deferred, not rejected
+outright: worth it once real user count and stakes justify the same enclave
+investment already deferred elsewhere, not before.
+
+**Also rejected: deriving a recovery key from the account's email/full
+name.** Sounds like a simplification, isn't one — email and full name
+aren't secrets, they're identifying information, often literally public
+(a person's name is the exact "Seller" field Apple puts on an App Store
+listing for an Individual account). Anyone targeting a specific person's
+account typically already has both. This is the same failure mode "security
+questions" (mother's maiden name, etc.) were deprecated industry-wide for —
+weak is "guessable in bounded tries," this is "not a secret at all."
+
+**Chosen: make the seed do the crypto work, make the relay remember the
+index.** Two separate problems were tangled together in earlier drafts of
+this section — regenerating your *keys* from the seed, and knowing *which
+circles* to regenerate keys for — and they have very different answers.
+
+**Regenerating keys needs nothing from the relay.** Circle **identity**
+(the Ed25519 keypair) becomes deterministic: `HKDF(masterSeed,
+"circle-identity" || circleId)` instead of `generateIdentity()`'s pure
+randomness. Recovering the seed regenerates the exact same public key you
+had before — same identity, not a new device asking to be let in. Circle
+**secrets** stay random and rotatable (determinism and rotation are
+incompatible, and rotation-on-kick from section 1 above has to keep
+working) — a recovered device gets its secret back the same way any
+returning device would: replay the circle's log from epoch 0, find the
+"secret rotated to me" event already encrypted to your now-recoverable
+public key, decrypt it. This is a pure client-side change; the relay is
+neither involved nor aware.
+
+**Knowing which circles to even look for is the part that needs somewhere
+durable to live**, and the relay already is that somewhere: it's the one
+party both your old and new device always talk to, present or not. A
+plain per-account table — `accountId → {circleId, ...}` — updated on every
+join/create/leave, kept forever until the account itself is deleted, no
+TTL. New tiny endpoint, `GET/POST/DELETE /v1/account/circles`, behind the
+same `auth.RequireSession` middleware the circle-log routes already use.
+
+This is deliberately *not* encrypted, unlike the log content itself, and
+that's a real departure from the relay's stated "infer as little as
+possible about circle membership" property at the top of this doc — worth
+being honest about rather than dressing it up. The mitigating fact: the
+relay already sees the same membership in real time, unencrypted, every
+time an authenticated device calls `fetchentries`/`appendentry` for a
+circleId — a durable table doesn't hand it new information, just persists
+what request logs already reveal moment-to-moment. Encrypting the list
+(the earlier drafts' `HKDF(masterSeed, "recovery-manifest")` idea) would
+protect a data-at-rest snapshot without protecting the exact same fact
+already visible in transit, for meaningfully more code — not worth it
+unless the access-pattern leak itself gets closed first.
+
+**What this drops from earlier drafts, on purpose**: no Drive/CloudKit
+integration, no per-platform backup blob, no "iCloud/Drive unavailable"
+detection-and-fallback flow. Those solved a problem — automatically
+backing up the *seed itself* — that's still real but is now decoupled and
+optional: the seed remains something only the user's device holds, via the
+manual recovery-phrase screen already built (`account/recovery.tsx`). If
+that phrase is never written down and the device is lost, the seed is
+genuinely gone — same as today — and the plain circleId table can't help
+without it. Automatic seed backup to Drive/CloudKit is still a legitimate
+future enhancement, but it's additive to this design, not required to make
+the seed useful.
+
+**Recovery, end to end**: sign in (Apple/Google) → same account, so
+`GET /v1/account/circles` returns the circleId list → enter the recovery
+phrase (manual, for now) → derive each circle's identity from the seed →
+replay each circle's log from epoch 0 → recover each circle's current
+secret from its rotation history → restored. No other circle member's
+help needed.
+
+**Caveat this does *not* solve: content older than the relay's retention
+window.** Recovery restores keys and access, not history. The relay is a
+transient sync cache (`LOG_RETENTION_DAYS`, 14 by default — see the TTL
+eviction design in section 1), not the source of truth for old photos;
+each device's local SQLite is. A lost device's content that's aged out of
+the relay's window is gone unless another member's device still has it
+locally and peer-to-peer backfill exists to pull it from them — which it
+doesn't yet (`pullCircle`, the local `circleLog` mirror table, is listed
+as not built at the top of this doc). Recovering an account today means
+continuity of identity and everything still in the relay's live window,
+not a guaranteed full photo history back.
+
+**If plain email sign-in is ever added** (see "Explicitly rejected" below
+for why it isn't today): the account-circles table works identically —
+it's keyed off whatever the session already resolves to, Apple/Google
+account or otherwise. The seed itself is the only piece that would need a
+different backstop, since there's no platform account to eventually hang
+an automatic backup off of; emailing the phrase to that same address at
+generation time (reusing whatever OTP infra email auth needs anyway) is
+the fallback, weaker than a real backup and should be presented as such.
 
 ## Explicitly rejected
 
@@ -362,3 +508,14 @@ which is the actual backstop either way.
 - **Circle-level (shared) mailbox for content delivery.** Superseded by the
   per-circle log design above, which solves replay/history correctly
   instead of trying to force it through N ephemeral per-member copies.
+- **Plain email/OTP as a user-facing sign-in method.** Distinct from the
+  `emailHmac` *mechanism* "Email auth" above already builds for spam
+  resistance under phone auth — this is about letting someone sign in with
+  only an email address, no Apple/Google account behind it. The
+  account-circles table in "Account recovery" above works the same either
+  way, but the recovery *phrase* itself loses its only real backstop: with
+  Apple/Google there's at least a path to eventually back the seed up to
+  Drive/CloudKit automatically; an email-only account has no platform
+  account to ever hang that on, just the strictly weaker "email the phrase
+  at generation time" fallback. Not worth the permanent ceiling on
+  recovery strength for the convenience of one fewer tap.

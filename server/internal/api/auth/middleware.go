@@ -11,7 +11,7 @@ import (
 
 type contextKey int
 
-const deviceIDKey contextKey = iota
+const accountIDKey contextKey = iota
 
 // RequireSession gates next behind a valid, unexpired bearer token. Not
 // applied to the sign-in routes (that's how you get a token) or logout
@@ -36,13 +36,14 @@ func RequireSession(authStore authstore.Store, next http.Handler) http.Handler {
 			return
 		}
 
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), deviceIDKey, session.DeviceID)))
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), accountIDKey, session.AccountID)))
 	})
 }
 
-// DeviceID returns the authenticated device (emailHmac), or "" if this
-// request never went through RequireSession.
-func DeviceID(ctx context.Context) string {
-	deviceID, _ := ctx.Value(deviceIDKey).(string)
-	return deviceID
+// AccountID returns the authenticated account ("google:<sub>",
+// "apple:<sub>", ...), or "" if this request never went through
+// RequireSession.
+func AccountID(ctx context.Context) string {
+	accountID, _ := ctx.Value(accountIDKey).(string)
+	return accountID
 }
