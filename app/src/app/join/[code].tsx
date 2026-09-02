@@ -19,6 +19,7 @@ export default function JoinInviteScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
   const [phase, setPhase] = useState<Phase>('checking');
   const [circleName, setCircleName] = useState('');
+  const [inviterName, setInviterName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,6 +41,7 @@ export default function JoinInviteScreen() {
       try {
         const preview = await previewInvite(code);
         setCircleName(preview.name);
+        setInviterName(preview.createdByName);
         setPhase('ready');
       } catch (err) {
         console.error('Failed to load invite preview', err);
@@ -78,10 +80,12 @@ export default function JoinInviteScreen() {
           </View>
         ) : (
           <View style={styles.content}>
-            <ThemedText type="screenTitle">You&apos;re about to join</ThemedText>
+            <ThemedText type="screenTitle">
+              {inviterName ? `${inviterName} has invited you to` : "You're about to join"}
+            </ThemedText>
             <ThemedText type="onboardingHeadline">{circleName}</ThemedText>
             <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
-              Whoever shared this key still has to approve you before you&apos;re in.
+              {inviterName || 'Whoever shared this key'} still has to approve you before you&apos;re in.
             </ThemedText>
             <PrimaryButton
               label={phase === 'submitting' ? 'Sending request…' : 'Request to join'}

@@ -13,6 +13,7 @@ import { checkPendingJoinRequest } from '@/domain/usecases/circle/join-circle';
 export default function JoinPendingScreen() {
   const { requestId } = useLocalSearchParams<{ requestId: string }>();
   const [circleName, setCircleName] = useState('');
+  const [inviterName, setInviterName] = useState('');
   const [gone, setGone] = useState(false);
 
   // Re-checked on every focus (app foreground, returning to this screen)
@@ -31,6 +32,7 @@ export default function JoinPendingScreen() {
           return;
         }
         setCircleName(pending.circleName);
+        setInviterName(pending.createdByName);
       });
 
       checkPendingJoinRequest(requestId)
@@ -63,8 +65,8 @@ export default function JoinPendingScreen() {
               <ThemedText type="screenTitle">Waiting for approval</ThemedText>
               <ThemedText type="onboardingHeadline">{circleName}</ThemedText>
               <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
-                Whoever shared this key needs to let you in. Come back to this screen once they
-                have — or just reopen the app.
+                {inviterName || 'Whoever shared this key'} needs to let you in. Come back to this
+                screen once they have — or just reopen the app.
               </ThemedText>
             </>
           )}

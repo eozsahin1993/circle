@@ -5,13 +5,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
 
 import { BackButton } from '@/components/back-button';
+import { PendingJoinRequestCard } from '@/components/pending-join-request-card';
 import { PrimaryButton } from '@/components/primary-button';
 import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import { getCircle } from '@/data/db';
-import { approveJoinRequest, discoverPendingRequests, getOrCreateInvite, replaceInvite, type PendingRequest } from '@/domain/usecases/circle/invite-to-circle';
+import {
+  approveJoinRequest,
+  denyJoinRequest,
+  discoverPendingRequests,
+  getOrCreateInvite,
+  replaceInvite,
+  type PendingRequest,
+} from '@/domain/usecases/circle/invite-to-circle';
 import type { Invite } from '@/data/db';
 
 function inviteLink(code: string): string {
@@ -32,7 +40,7 @@ export default function CircleInviteScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
-  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [actioningId, setActioningId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!circleId) return;
@@ -61,15 +69,29 @@ export default function CircleInviteScreen() {
 
   async function handleApprove(requesterId: string) {
     if (!circleId) return;
-    setApprovingId(requesterId);
+    setActioningId(requesterId);
     try {
       await approveJoinRequest(circleId, requesterId);
       setPendingRequests((current) => current.filter((request) => request.requesterId !== requesterId));
     } catch (err) {
       console.error('Failed to approve join request', err);
-      Alert.alert("Couldn't approve", 'Try again in a moment.');
+      Alert.alert("Couldn't let them in", 'Try again in a moment.');
     } finally {
-      setApprovingId(null);
+      setActioningId(null);
+    }
+  }
+
+  async function handleDeny(requesterId: string) {
+    if (!circleId) return;
+    setActioningId(requesterId);
+    try {
+      await denyJoinRequest(circleId, requesterId);
+      setPendingRequests((current) => current.filter((request) => request.requesterId !== requesterId));
+    } catch (err) {
+      console.error('Failed to dismiss join request', err);
+      Alert.alert("Couldn't dismiss that request", 'Try again in a moment.');
+    } finally {
+      setActioningId(null);
     }
   }
 
@@ -157,23 +179,14 @@ export default function CircleInviteScreen() {
 
           {pendingRequests.length > 0 ? (
             <View style={styles.requestsSection}>
-              <ThemedText type="eyebrow" themeColor="muted">
-                Waiting to join
-              </ThemedText>
               {pendingRequests.map((request) => (
-                <View key={request.requesterId} style={styles.requestRow}>
-                  <View style={styles.requestText}>
-                    <ThemedText type="cardTitle">{request.selfReportedName || 'Someone'}</ThemedText>
-                    <ThemedText type="meta" themeColor="muted">
-                      Used the key you created — not a verified identity.
-                    </ThemedText>
-                  </View>
-                  <SecondaryButton
-                    label={approvingId === request.requesterId ? 'Approving…' : 'Approve'}
-                    disabled={approvingId !== null}
-                    onPress={() => handleApprove(request.requesterId)}
-                  />
-                </View>
+                <PendingJoinRequestCard
+                  key={request.requesterId}
+                  request={request}
+                  busy={actioningId !== null}
+                  onApprove={() => handleApprove(request.requesterId)}
+                  onDeny={() => handleDeny(request.requesterId)}
+                />
               ))}
             </View>
           ) : null}
@@ -242,14 +255,5 @@ const styles = StyleSheet.create({
   requestsSection: {
     marginTop: Spacing.cardListGap,
     gap: 12,
-  },
-  requestRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  requestText: {
-    flex: 1,
-    gap: 2,
   },
 });

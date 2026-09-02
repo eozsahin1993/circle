@@ -63,7 +63,7 @@ export default function ProfileSetupScreen() {
     setError(null);
     try {
       await completeProfileSetup({ name: name.trim(), picture: picture?.bytes ?? null });
-      router.push(await postAuthDestination());
+      router.replace(await postAuthDestination());
     } catch (err) {
       console.error('Failed to save profile', err);
       setError("Couldn't save your profile — try again.");

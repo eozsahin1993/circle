@@ -10,6 +10,7 @@ import m0005 from './0005_rare_professor_monster.sql';
 import m0006 from './0006_wandering_hardball.sql';
 import m0007 from './0007_adorable_violations.sql';
 import m0008 from './0008_purple_darwin.sql';
+import m0009 from './0009_majestic_lady_ursula.sql';
 
   export default {
     journal,
@@ -22,7 +23,8 @@ m0004,
 m0005,
 m0006,
 m0007,
-m0008
+m0008,
+m0009
     }
   }
   

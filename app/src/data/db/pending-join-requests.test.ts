@@ -16,6 +16,7 @@ function makeRequest(overrides: Partial<{ id: string; inviteCode: string; circle
     id: generateUUID(),
     inviteCode: 'AAAA-BBBB-CCCC',
     circleName: 'Family Circle',
+    createdByName: 'Alex',
     createdByPublicKey: 'bb'.repeat(32),
     ephemeralPublicKey: 'aa'.repeat(32),
     submittedAt: Date.now(),

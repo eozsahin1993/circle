@@ -1,3 +1,5 @@
+import { Buffer } from 'buffer';
+
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 import {
@@ -27,6 +29,7 @@ import {
 import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
+import { compressToThumbnail } from '@/services/image';
 import { deletePendingJoinKeypair, getMasterSeed, getPendingJoinKeypair, saveCircleIdentity, saveCircleSecret, savePendingJoinKeypair } from '@/services/keystore';
 import { getInvitePreview, getJoinRequestApproval, putJoinRequest } from '@/services/mailbox-relay';
 
@@ -57,7 +60,22 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
   const keypair = generateEphemeralKeypair();
   const profile = await getProfile();
 
-  const request: JoinRequestPayload = { ephemeralPub: bytesToHex(keypair.publicKey), selfReportedName: profile?.name ?? '' };
+  // Best-effort — a thumbnail failure shouldn't block submitting the
+  // request itself; the approval screen just falls back to a placeholder.
+  let pictureThumbnail: string | undefined;
+  if (profile?.picture) {
+    try {
+      pictureThumbnail = Buffer.from(await compressToThumbnail(profile.picture)).toString('base64');
+    } catch (err) {
+      console.error('Failed to compress profile picture for join request', err);
+    }
+  }
+
+  const request: JoinRequestPayload = {
+    ephemeralPub: bytesToHex(keypair.publicKey),
+    selfReportedName: profile?.name ?? '',
+    pictureThumbnail,
+  };
   const key = deriveJoinRequestKey(inviteCode);
   await putJoinRequest(deriveInviteTag(inviteCode), requestId, encryptJSON(request, key));
 
@@ -66,6 +84,7 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
     id: requestId,
     inviteCode,
     circleName: preview.name,
+    createdByName: preview.createdByName,
     createdByPublicKey: preview.createdByPublicKey,
     ephemeralPublicKey: bytesToHex(keypair.publicKey),
     submittedAt: Date.now(),

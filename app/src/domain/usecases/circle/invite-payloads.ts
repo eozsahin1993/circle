@@ -18,6 +18,13 @@
 export type InvitePreviewPayload = {
   name: string;
   /**
+   * The creator's own display name at the moment the invite was created —
+   * shown as "X has invited you to Y" on the join preview. Self-reported,
+   * same trust tier as everything else here (see `JoinRequestPayload`'s
+   * `selfReportedName`), not re-derived later if they rename themselves.
+   */
+  createdByName: string;
+  /**
    * Hex-encoded Ed25519 public key — the invite creator's own circle
    * identity (see `deriveCircleIdentity`). Carried here, not fetched from
    * anywhere else, because the requester has no other way to learn it
@@ -32,13 +39,23 @@ export type InvitePreviewPayload = {
 /**
  * What a join request row's `encryptedRequest` decrypts to — written by
  * the requester, read by the invite's creator, encrypted under
- * `deriveJoinRequestKey`. The self-reported name is explicitly not
- * verified identity — see server/DESIGN.md's "Invites" section.
+ * `deriveJoinRequestKey`. The self-reported name (and picture) are
+ * explicitly not verified identity — see server/DESIGN.md's "Invites"
+ * section.
  */
 export type JoinRequestPayload = {
   /** Hex-encoded X25519 public key — the requester's one-time ephemeral keypair for this handshake. */
   ephemeralPub: string;
   selfReportedName: string;
+  /**
+   * Base64-encoded avatar-sized JPEG thumbnail (see
+   * `compressToThumbnail`) of the requester's local profile picture, if
+   * they have one — optional, since profile setup doesn't require a
+   * picture. Small on purpose: this rides inside a request row meant to
+   * stay small, not the full-quality picture the roster eventually gets
+   * once the join actually completes.
+   */
+  pictureThumbnail?: string;
 };
 
 /**

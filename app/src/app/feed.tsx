@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CircleHeader } from '@/components/circle-header';
 import { FabButton } from '@/components/fab-button';
+import { PendingJoinRequestCard } from '@/components/pending-join-request-card';
 import { PostCard, type Post } from '@/components/post-card';
 import { PrivacyInfoModal } from '@/components/privacy-info-modal';
 import { PrivacyNotice } from '@/components/privacy-notice';
@@ -12,6 +13,12 @@ import { Radius, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { getCircle, getCircleMembers, getCirclePosts, getPostComments, getProfile } from '@/data/db';
+import {
+  approveJoinRequest,
+  denyJoinRequest,
+  discoverPendingRequests,
+  type PendingRequest,
+} from '@/domain/usecases/circle/invite-to-circle';
 import { addComment } from '@/domain/usecases/post/comment-on-post';
 import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
 import { bytesToDataUri } from '@/services/image';
@@ -26,7 +33,11 @@ function formatTimestamp(ms: number): string {
 // The privacy notice scrolls away with the feed — it's list content, not
 // part of the pinned nav header — so it rides along as row zero of `data`
 // rather than living inside `ListHeaderComponent`.
-type FeedRow = { kind: 'privacy' } | { kind: 'just-joined' } | { kind: 'post'; post: Post };
+type FeedRow =
+  | { kind: 'privacy' }
+  | { kind: 'just-joined' }
+  | { kind: 'pending-request'; request: PendingRequest }
+  | { kind: 'post'; post: Post };
 
 export default function FeedScreen() {
   const { circleId, justJoined } = useLocalSearchParams<{ circleId: string; justJoined?: string }>();
@@ -34,6 +45,8 @@ export default function FeedScreen() {
   const [memberCount, setMemberCount] = useState(0);
   const [posts, setPosts] = useState<Post[]>([]);
   const [showPrivacyInfo, setShowPrivacyInfo] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+  const [actioningId, setActioningId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -67,8 +80,41 @@ export default function FeedScreen() {
           })),
         );
       });
+
+      // Only ever resolves non-empty for this invite's actual creator (see
+      // discoverPendingRequests's creator-only gate) — silently shows
+      // nothing for anyone else, same as circle/invite.tsx's own section.
+      discoverPendingRequests(circleId)
+        .then(setPendingRequests)
+        .catch(() => setPendingRequests([]));
     }, [circleId]),
   );
+
+  async function handleApprove(requesterId: string) {
+    if (!circleId) return;
+    setActioningId(requesterId);
+    try {
+      await approveJoinRequest(circleId, requesterId);
+      setPendingRequests((current) => current.filter((request) => request.requesterId !== requesterId));
+    } catch (err) {
+      console.error('Failed to approve join request', err);
+    } finally {
+      setActioningId(null);
+    }
+  }
+
+  async function handleDeny(requesterId: string) {
+    if (!circleId) return;
+    setActioningId(requesterId);
+    try {
+      await denyJoinRequest(circleId, requesterId);
+      setPendingRequests((current) => current.filter((request) => request.requesterId !== requesterId));
+    } catch (err) {
+      console.error('Failed to dismiss join request', err);
+    } finally {
+      setActioningId(null);
+    }
+  }
 
   async function handleToggleReaction(postId: string, emoji: string) {
     if (!circleId) return;
@@ -93,6 +139,7 @@ export default function FeedScreen() {
   const showJustJoinedBanner = justJoined === '1' && posts.length === 0;
 
   const rows: FeedRow[] = [
+    ...pendingRequests.map((request) => ({ kind: 'pending-request' as const, request })),
     { kind: 'privacy' },
     ...(showJustJoinedBanner ? [{ kind: 'just-joined' as const }] : []),
     ...posts.map((post) => ({ kind: 'post' as const, post })),
@@ -103,7 +150,11 @@ export default function FeedScreen() {
       <SafeAreaView style={styles.safeArea}>
         <FlatList
           data={rows}
-          keyExtractor={(row) => (row.kind === 'post' ? row.post.id : row.kind)}
+          keyExtractor={(row) => {
+            if (row.kind === 'post') return row.post.id;
+            if (row.kind === 'pending-request') return row.request.requesterId;
+            return row.kind;
+          }}
           renderItem={({ item }) => {
             if (item.kind === 'privacy') return <PrivacyNotice onPress={() => setShowPrivacyInfo(true)} />;
             if (item.kind === 'just-joined') {
@@ -113,6 +164,18 @@ export default function FeedScreen() {
                   <ThemedText type="meta" themeColor="muted">
                     Content will sync soon.
                   </ThemedText>
+                </ThemedView>
+              );
+            }
+            if (item.kind === 'pending-request') {
+              return (
+                <ThemedView style={styles.pendingRequestRow}>
+                  <PendingJoinRequestCard
+                    request={item.request}
+                    busy={actioningId !== null}
+                    onApprove={() => handleApprove(item.request.requesterId)}
+                    onDeny={() => handleDeny(item.request.requesterId)}
+                  />
                 </ThemedView>
               );
             }
@@ -171,6 +234,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.panel,
     alignItems: 'center',
     gap: 2,
+  },
+  pendingRequestRow: {
+    marginHorizontal: Spacing.cardListGap,
   },
   fab: {
     position: 'absolute',

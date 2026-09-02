@@ -1,3 +1,5 @@
+import { Buffer } from 'buffer';
+
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 import {
@@ -10,10 +12,11 @@ import {
   sealToPublicKey,
   sign,
 } from '@/services/crypto';
-import { getCircle, getCurrentInvite, getMemberByPublicKey, insertInvite, MemberRoles, revokeInvite, type Invite } from '@/data/db';
+import { getCircle, getCurrentInvite, getMemberByPublicKey, getProfile, insertInvite, MemberRoles, revokeInvite, type Invite } from '@/data/db';
 import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinApprovalPayload, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
+import { bytesToDataUri } from '@/services/image';
 import { getCircleIdentity, getCircleSecret } from '@/services/keystore';
-import { listJoinRequests, putInvitePreview, putJoinApproval } from '@/services/mailbox-relay';
+import { deleteJoinRequest, listJoinRequests, putInvitePreview, putJoinApproval } from '@/services/mailbox-relay';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -50,7 +53,8 @@ async function requireAdminPublicKey(circleId: string): Promise<string> {
  * same way any other invite-creation failure does.
  */
 async function writeInvitePreview(code: string, circleName: string, createdByPublicKey: string): Promise<void> {
-  const payload: InvitePreviewPayload = { name: circleName, createdByPublicKey };
+  const profile = await getProfile();
+  const payload: InvitePreviewPayload = { name: circleName, createdByName: profile?.name ?? '', createdByPublicKey };
   const key = deriveInvitePreviewKey(code);
   await putInvitePreview(deriveInviteTag(code), encryptJSON(payload, key));
 }
@@ -125,14 +129,27 @@ async function requireInviteCreatorPublicKey(circleId: string): Promise<{ public
   return { publicKey: own.publicKey, invite };
 }
 
-export type PendingRequest = { requesterId: string; selfReportedName: string };
+export type PendingRequest = {
+  requesterId: string;
+  selfReportedName: string;
+  /** Data URI of the requester's self-reported thumbnail, if they sent one — see `compressToThumbnail`. */
+  pictureUri?: string;
+  createdAt: number;
+};
 
 /**
- * Lists join requests under the circle's current invite, decrypted enough
- * to show an approval screen — the self-reported name only, per
+ * Lists join requests under the circle's current invite that are still
+ * actually awaiting this device's decision, decrypted enough to show an
+ * approval screen — the self-reported name (and picture) only, per
  * server/DESIGN.md ("not verified identity"). Silently skips any row that
  * fails to decrypt (e.g. a stale row from a previous invite that happens
  * to share a mailbox tag prefix) rather than failing the whole list.
+ *
+ * Excludes rows that already have an `encryptedApproval` — `approveJoinRequest`
+ * updates a request row in place rather than deleting it (the requester
+ * still needs to poll and read that approval), so without this filter an
+ * already-approved request would keep reappearing here on every refetch,
+ * even though there's nothing left for the creator to do with it.
  */
 export async function discoverPendingRequests(circleId: string): Promise<PendingRequest[]> {
   const { invite } = await requireInviteCreatorPublicKey(circleId);
@@ -141,14 +158,31 @@ export async function discoverPendingRequests(circleId: string): Promise<Pending
   const requests = await listJoinRequests(deriveInviteTag(invite.code));
   const pending: PendingRequest[] = [];
   for (const request of requests) {
+    if (request.encryptedApproval) continue;
     try {
       const payload = JSON.parse(new TextDecoder().decode(decrypt(request.encryptedRequest, key))) as JoinRequestPayload;
-      pending.push({ requesterId: request.requesterId, selfReportedName: payload.selfReportedName });
+      pending.push({
+        requesterId: request.requesterId,
+        selfReportedName: payload.selfReportedName,
+        pictureUri: payload.pictureThumbnail ? bytesToDataUri(Buffer.from(payload.pictureThumbnail, 'base64')) : undefined,
+        createdAt: request.createdAt,
+      });
     } catch (err) {
       console.error('Failed to decrypt a join request', err);
     }
   }
   return pending;
+}
+
+/**
+ * Dismisses a pending join request without approving it ("not now") —
+ * permanently: the request row is deleted server-side, so the requester
+ * would need to submit a fresh request (reopen the invite link) to try
+ * again. Same creator-only gate as `approveJoinRequest`.
+ */
+export async function denyJoinRequest(circleId: string, requesterId: string): Promise<void> {
+  const { invite } = await requireInviteCreatorPublicKey(circleId);
+  await deleteJoinRequest(deriveInviteTag(invite.code), requesterId);
 }
 
 /**

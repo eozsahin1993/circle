@@ -163,6 +163,8 @@ export const pendingJoinRequests = sqliteTable('pending_join_requests', {
   inviteCode: text('invite_code').notNull(),
   /** From the decrypted invite preview — shown on the pending screen without needing to re-fetch/re-decrypt it. */
   circleName: text('circle_name').notNull(),
+  /** Also from the decrypted invite preview — the creator's self-reported display name, shown on the pending screen ("X needs to let you in"). Defaults to '' (matches profile?.name ?? '' elsewhere) so ALTER TABLE ADD COLUMN stays valid against existing local rows. */
+  createdByName: text('created_by_name').notNull().default(''),
   /**
    * Also from the decrypted invite preview — the invite creator's own
    * circle-identity public key (hex, Ed25519), kept locally so a later

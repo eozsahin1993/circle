@@ -22,6 +22,17 @@ global.Buffer = global.Buffer ?? Buffer;
 
 SplashScreen.preventAutoHideAsync();
 
+// Deep-linking straight into a route like join/[code] would otherwise make
+// it the *only* stack entry — nothing behind it for a sheet to sit over,
+// and no way back. This synthesizes `index` underneath any deep-linked
+// route, and index.tsx's own hasProfile/hasSession check already resolves
+// that to /circle for a signed-in user (or the welcome screen otherwise) —
+// same logic a normal cold app open already goes through, not a second
+// copy of it. Normal (non-deep-link) navigation is unaffected.
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
 const HearthDarkTheme = {
   ...DarkTheme,
   colors: {
