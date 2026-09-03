@@ -5,11 +5,13 @@ package s3
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"circle-relay/internal/storage/blobstore"
 )
@@ -36,6 +38,7 @@ const (
 )
 
 type Store struct {
+	client        *s3.Client
 	presignClient *s3.PresignClient
 	bucketName    string
 	maxBlobSize   int64
@@ -45,21 +48,30 @@ func New(client *s3.Client, bucketName string, maxBlobSize int64) *Store {
 	if maxBlobSize <= 0 {
 		maxBlobSize = DefaultMaxBlobSize
 	}
-	return &Store{presignClient: s3.NewPresignClient(client), bucketName: bucketName, maxBlobSize: maxBlobSize}
+	return &Store{client: client, presignClient: s3.NewPresignClient(client), bucketName: bucketName, maxBlobSize: maxBlobSize}
 }
 
 var _ blobstore.Store = (*Store)(nil)
 
-// GetUploadTarget signs a POST policy with a content-length-range
+// GetUploadTarget checks for an existing object first (see the interface
+// doc for why), then signs a POST policy with a content-length-range
 // condition and a pinned Content-Type, so S3 itself rejects an oversized
-// or mistyped upload at the point it happens — nothing after the fact has
-// to check or clean it up. Unlike Key, ContentType on PutObjectInput isn't
-// picked up by PresignPostObject on its own (verified: it neither adds a
-// policy condition nor a Fields entry) — both have to be added explicitly.
-func (s *Store) GetUploadTarget(ctx context.Context, circleLogID string, epoch int64) (blobstore.UploadTarget, error) {
+// or mistyped upload. Unlike Key, ContentType on PutObjectInput isn't
+// picked up by PresignPostObject on its own — both need adding explicitly.
+func (s *Store) GetUploadTarget(ctx context.Context, circleLogID, entryID string) (blobstore.UploadTarget, error) {
+	key := blobKey(circleLogID, entryID)
+	_, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(s.bucketName), Key: aws.String(key)})
+	if err == nil {
+		return blobstore.UploadTarget{}, blobstore.ErrBlobAlreadyExists
+	}
+	var notFound *s3types.NotFound
+	if !errors.As(err, &notFound) {
+		return blobstore.UploadTarget{}, err
+	}
+
 	req, err := s.presignClient.PresignPostObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucketName),
-		Key:    aws.String(blobKey(circleLogID, epoch)),
+		Key:    aws.String(blobKey(circleLogID, entryID)),
 	}, func(o *s3.PresignPostOptions) {
 		o.Expires = uploadURLTTL
 		o.Conditions = []any{
@@ -74,10 +86,10 @@ func (s *Store) GetUploadTarget(ctx context.Context, circleLogID string, epoch i
 	return blobstore.UploadTarget{URL: req.URL, Fields: req.Values}, nil
 }
 
-func (s *Store) GetDownloadURL(ctx context.Context, circleLogID string, epoch int64) (string, error) {
+func (s *Store) GetDownloadURL(ctx context.Context, circleLogID, entryID string) (string, error) {
 	req, err := s.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucketName),
-		Key:    aws.String(blobKey(circleLogID, epoch)),
+		Key:    aws.String(blobKey(circleLogID, entryID)),
 	}, s3.WithPresignExpires(downloadURLTTL))
 	if err != nil {
 		return "", err
@@ -86,8 +98,10 @@ func (s *Store) GetDownloadURL(ctx context.Context, circleLogID string, epoch in
 }
 
 // blobKey is the deterministic object key both sides compute independently
-// — see server/DESIGN.md: "the S3 object key just *is*
-// ${circleLogId}/${epoch}", never a separately-issued token.
-func blobKey(circleLogID string, epoch int64) string {
-	return fmt.Sprintf("%s/%d", circleLogID, epoch)
+// — see server/SYNC_DESIGN.md's "Post" operation: keyed by entryID (known
+// to the client before the entry is ever committed), not epoch, so a blob
+// can be uploaded before the entry that references it exists. Never a
+// separately-issued token.
+func blobKey(circleLogID, entryID string) string {
+	return fmt.Sprintf("%s/%s", circleLogID, entryID)
 }

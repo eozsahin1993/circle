@@ -4,7 +4,10 @@
 // allowed to leak past this package.
 package blobstore
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // UploadTarget is a presigned S3 POST (URL plus required form fields), not
 // a bare PUT URL — a POST policy is what lets the max blob size be
@@ -15,20 +18,34 @@ type UploadTarget struct {
 	Fields map[string]string
 }
 
+// ErrBlobAlreadyExists: GetUploadTarget refused because something is
+// already uploaded at this key — blobs are single-use, first-upload-wins.
+// See GetUploadTarget's doc comment for why.
+var ErrBlobAlreadyExists = errors.New("blobstore: a blob already exists for this entry")
+
 // Store is storage for the (large, encrypted) blob behind one log entry.
-// Presigned URLs generated here always succeed and cost nothing to hand
-// out — they're pure local signing, not a network call — so callers are
-// never expected to check "does this entry actually have a blob" first;
-// see server/DESIGN.md's "deciding whether to fetch a blob is entirely
-// client-side" note.
+// GetDownloadURL always succeeds and costs nothing to hand out — pure
+// local signing — so callers never check "does this entry have a blob"
+// first (server/DESIGN.md). GetUploadTarget is different: it checks first
+// and can fail.
+//
+// Keyed by entryID, not epoch — a client can obtain and use an upload
+// target *before* the entry referencing it is committed. See
+// server/SYNC_DESIGN.md's "Post" operation: uploading the blob first
+// means a crash in between leaves a harmless orphaned blob rather than a
+// permanent entry pointing at nothing, unfixable in an immutable log.
 type Store interface {
-	// GetUploadTarget returns a short-lived presigned POST the client can
-	// send ciphertext bytes to for this exact entry, capped at the
-	// store's configured max blob size.
-	GetUploadTarget(ctx context.Context, circleLogID string, epoch int64) (UploadTarget, error)
+	// GetUploadTarget returns a short-lived presigned POST for this exact
+	// entry, capped at the store's max blob size — or ErrBlobAlreadyExists
+	// if something is already there. Single-use, first-upload-wins:
+	// without this, any current member could re-request a target for an
+	// entryID they didn't create and overwrite it with a replacement that
+	// still decrypts successfully — a write token proves "a current
+	// member," never "the original author," so it can't close this alone.
+	GetUploadTarget(ctx context.Context, circleLogID, entryID string) (UploadTarget, error)
 
 	// GetDownloadURL returns a short-lived URL the client can GET
 	// ciphertext bytes from. It 404s on use if nothing was ever uploaded
 	// there — that's expected, not an error here.
-	GetDownloadURL(ctx context.Context, circleLogID string, epoch int64) (string, error)
+	GetDownloadURL(ctx context.Context, circleLogID, entryID string) (string, error)
 }

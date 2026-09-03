@@ -6,9 +6,18 @@ export const circles = sqliteTable('circles', {
   name: text('name').notNull(),
   /** Cover photo picked on creation, if any — separate from any post's photo. */
   picture: blob('picture').$type<Uint8Array>(),
+  /**
+   * The relay-facing address for this circle's log — random, independent
+   * of key material so rotation never repoints it. Stored, never derived
+   * — see server/SYNC_DESIGN.md's "Identifiers... stay decoupled" invariant.
+   */
+  syncId: text('sync_id').notNull(),
   createdAt: integer('created_at').notNull(),
   /** Set when this device leaves the circle — kept (not deleted) so already-synced posts stay as a local archive. */
   leftAt: integer('left_at'),
+  /** How far this device has synced each namespace — see server/SYNC_DESIGN.md's "Read / sync". 0 means never synced. */
+  metaCursor: integer('meta_cursor').notNull().default(0),
+  contentCursor: integer('content_cursor').notNull().default(0),
 });
 
 export const circleMembers = sqliteTable(
@@ -17,7 +26,14 @@ export const circleMembers = sqliteTable(
     circleId: text('circle_id')
       .notNull()
       .references(() => circles.id, { onDelete: 'cascade' }),
-    publicKey: text('public_key').notNull(),
+    /** Ed25519 signing key (hex) — see `deriveCircleIdentity`. Verifies who signed a log entry. */
+    identityPublicKey: text('identity_public_key').notNull(),
+    /**
+     * X25519 sealing key (hex) — see `deriveCircleSealingKeypair`. Needed
+     * to seal a rotated content key to this member. Defaults to '' so
+     * `ALTER TABLE ADD COLUMN` stays valid against existing rows.
+     */
+    encPublicKey: text('enc_public_key').notNull().default(''),
     memberId: text('member_id').notNull(),
     role: text('role', { enum: ['admin', 'member'] }).notNull().default('member'),
     name: text('name').notNull(),
@@ -25,7 +41,7 @@ export const circleMembers = sqliteTable(
     joinedAt: integer('joined_at').notNull(),
   },
   (t) => [
-    primaryKey({ columns: [t.circleId, t.publicKey] }),
+    primaryKey({ columns: [t.circleId, t.identityPublicKey] }),
     uniqueIndex('circle_members_member_id').on(t.circleId, t.memberId),
   ]
 );

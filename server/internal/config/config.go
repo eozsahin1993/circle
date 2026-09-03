@@ -41,12 +41,6 @@ type Config struct {
 	// ID tokens — the app's iOS bundle ID. A Services ID would join this
 	// as a second named field if a web/Android Apple flow is ever added.
 	AppleClientIDIOS string
-	// LogRetentionDays is passed straight to dynamodb.NewLogStore — see
-	// server/DESIGN.md and provision/variables.tf's log_retention_days. 0
-	// means "use the adapter's own default". Eviction itself is DynamoDB's
-	// native TTL (see provision/modules/storage/dynamodb.tf), not this
-	// process — this only controls what expiresAt gets written as.
-	LogRetentionDays int64
 	// MaxBlobSize is passed straight to s3.NewBlobStore — see
 	// server/DESIGN.md and provision/variables.tf's max_blob_size_bytes. 0
 	// means "use the adapter's own default".
@@ -82,7 +76,6 @@ func Load() Config {
 		GoogleClientIDAndroid: envOr("GOOGLE_CLIENT_ID_ANDROID", ""),
 		GoogleClientIDWeb:     envOr("GOOGLE_CLIENT_ID_WEB", ""),
 		AppleClientIDIOS:      envOr("APPLE_CLIENT_ID_IOS", ""),
-		LogRetentionDays:      intEnv("LOG_RETENTION_DAYS", 0),
 		MaxBlobSize:           intEnv("MAX_BLOB_SIZE_BYTES", 0),
 		InviteRetentionDays:   intEnv("INVITE_RETENTION_DAYS", 0),
 		Port:                  envOr("PORT", "8080"),

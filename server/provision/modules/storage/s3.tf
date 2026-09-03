@@ -31,21 +31,24 @@ resource "aws_s3_bucket_cors_configuration" "circle_blobs" {
   }
 }
 
-# Same retention window as the DynamoDB log's TTL (see dynamodb.tf) — a
-# blob shouldn't outlive the log entry that points to it, and this is the
-# dominant cost driver (photos, not log metadata), so it's the one that
-# actually matters for keeping storage bounded rather than growing forever.
+# Blobs are never deleted — permanent retention, same as the log entries
+# that point to them (server/SYNC_DESIGN.md invariant 1). Affordable via
+# tiering, not eviction: after blob_glacier_transition_days, objects move
+# to Glacier Instant Retrieval — same millisecond-latency access as
+# Standard, ~6x cheaper per GB. Defaults to Glacier IR's own 90-day
+# minimum billable duration.
 resource "aws_s3_bucket_lifecycle_configuration" "circle_blobs" {
   bucket = aws_s3_bucket.circle_blobs.id
 
   rule {
-    id     = "expire-blobs"
+    id     = "archive-blobs"
     status = "Enabled"
 
     filter {}
 
-    expiration {
-      days = var.log_retention_days
+    transition {
+      days          = var.blob_glacier_transition_days
+      storage_class = "GLACIER_IR"
     }
   }
 }

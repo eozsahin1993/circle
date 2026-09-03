@@ -2,6 +2,9 @@
 // the account's encrypted circle-membership index, see server/DESIGN.md's
 // "Account recovery" section. The relay only ever stores and returns
 // ciphertext; nothing here looks inside it.
+//
+// See manifeststore's package doc: server/SYNC_DESIGN.md's "Discovery"
+// section supersedes this endpoint's storage shape (not yet migrated).
 package manifest
 
 import (

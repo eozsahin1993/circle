@@ -138,7 +138,7 @@ export default function CircleDetailsScreen() {
           </View>
 
           {members.map((member) => (
-            <View key={member.publicKey} style={styles.memberRow}>
+            <View key={member.identityPublicKey} style={styles.memberRow}>
               <View style={styles.memberInfo}>
                 <View style={styles.memberNameRow}>
                   <ThemedText type="postAuthor">{member.name || 'Unnamed member'}</ThemedText>

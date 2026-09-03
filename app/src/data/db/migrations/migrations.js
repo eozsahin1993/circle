@@ -11,6 +11,8 @@ import m0006 from './0006_wandering_hardball.sql';
 import m0007 from './0007_adorable_violations.sql';
 import m0008 from './0008_purple_darwin.sql';
 import m0009 from './0009_majestic_lady_ursula.sql';
+import m0010 from './0010_aberrant_terrax.sql';
+import m0011 from './0011_slippery_black_cat.sql';
 
   export default {
     journal,
@@ -24,7 +26,9 @@ m0005,
 m0006,
 m0007,
 m0008,
-m0009
+m0009,
+m0010,
+m0011
     }
   }
   

@@ -6,7 +6,7 @@ import { getCirclePosts, insertPost } from '@/data/db/posts';
 beforeAll(() => initDatabase());
 
 async function makeCircle() {
-  const circle = { id: generateUUID(), name: 'Test Circle', picture: null, createdAt: Date.now(), leftAt: null };
+  const circle = { id: generateUUID(), name: 'Test Circle', picture: null, syncId: generateUUID(), createdAt: Date.now(), leftAt: null, metaCursor: 0, contentCursor: 0 };
   await insertCircle(circle);
   return circle;
 }

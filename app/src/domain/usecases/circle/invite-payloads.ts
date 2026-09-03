@@ -64,8 +64,24 @@ export type JoinRequestPayload = {
  * `ephemeralPub` (not code-derived like the two payloads above).
  */
 export type JoinApprovalPayload = {
-  /** Hex-encoded circle secret. */
-  secret: string;
+  /**
+   * The approver's *entire* version→content-key map (each value hex-
+   * encoded), not just the current version — see server/SYNC_DESIGN.md's
+   * "Add a member" operation: a joiner needs every version to decrypt
+   * history predating their join, not only new content going forward.
+   * Today this only ever has one entry (`{1: ...}`), since key rotation
+   * itself isn't built yet — but the shape doesn't need to change when it
+   * is; there's simply nothing beyond version 1 to include yet.
+   */
+  keyMap: Record<number, string>;
+  /**
+   * The circle's relay-facing address — without this, a joiner has
+   * nothing that can actually reach the relay (the pre-redesign version
+   * of this payload didn't carry it at all, and could only complete
+   * "locally," the same structural gap the old account-manifest had —
+   * see server/SYNC_DESIGN.md's "Discovery" section).
+   */
+  syncId: string;
   circleName: string;
 };
 

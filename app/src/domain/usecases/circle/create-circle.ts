@@ -1,9 +1,20 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { deriveCircleIdentity, generateCircleSecret, generateUUID } from '@/services/crypto';
+import {
+  deriveAuthorityKeypair,
+  deriveCircleIdentity,
+  deriveCircleSealingKeypair,
+  deriveWriteToken,
+  generateContentKey,
+  generateUUID,
+  hashWriteToken,
+  sealToPublicKey,
+} from '@/services/crypto';
 import { getProfile, insertCircle, insertMember, MemberRoles } from '@/data/db';
+import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
-import { getMasterSeed, saveCircleIdentity, saveCircleSecret } from '@/services/keystore';
+import { bootstrapCircle, appendEntry } from '@/services/relay';
+import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap } from '@/services/keystore';
 
 export type CreateCircleInput = {
   name: string;
@@ -12,14 +23,17 @@ export type CreateCircleInput = {
 };
 
 /**
- * Creates a circle and makes this device its first member — as `admin`,
- * since the founder is the only member who exists until they invite anyone
- * else. The per-circle identity is derived from the device's master seed
- * (see `deriveCircleIdentity` — domain-separated per circleId, same as
- * the old `generateIdentity`'s never-reuse-across-circles rule, but now
- * recoverable from the seed alone) plus a fresh shared secret, both
- * persisted to the Keychain, then the circle and roster rows themselves.
- * The device profile's name/picture become this member's roster entry.
+ * Creates a circle and makes this device its first member, as `admin`.
+ * Two required relay calls, not one (server/SYNC_DESIGN.md operation 1):
+ * `bootstrapCircle` registers the control state, then `appendEntry` logs
+ * the founder's own `member_added` using the token just registered. Both
+ * propagate on failure rather than being swallowed — nothing about this
+ * circle works until they succeed.
+ *
+ * Identity, sealing, and authority keys are all seed-derived (recoverable
+ * from the phrase alone); the content key is freshly generated and sealed
+ * to the founder's own sealing key so it's recoverable from the log too,
+ * not just this device's Keychain.
  */
 export async function createCircle(input: CreateCircleInput): Promise<{ id: string }> {
   const masterSeed = await getMasterSeed();
@@ -27,25 +41,52 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
 
   const now = Date.now();
   const circleId = generateUUID();
+  const syncId = generateUUID();
   const memberId = generateUUID();
   const identity = deriveCircleIdentity(masterSeed, circleId);
-  const secret = generateCircleSecret();
+  const sealingKeypair = deriveCircleSealingKeypair(masterSeed, circleId);
+  const authorityKeypair = deriveAuthorityKeypair(masterSeed, circleId);
+  const contentKey = generateContentKey();
+  const writeToken = deriveWriteToken(contentKey);
+
+  await bootstrapCircle(syncId, authorityKeypair.publicKey, hashWriteToken(writeToken));
+
+  const profile = await getProfile();
+  const memberAddedEntry = buildAndEncryptLogEntry(
+    'member_added',
+    {
+      signPub: bytesToHex(identity.publicKey),
+      x25519Pub: bytesToHex(sealingKeypair.publicKey),
+      name: profile?.name ?? '',
+      role: MemberRoles.admin,
+      keyVersion: 1,
+      sealedContentKey: bytesToHex(sealToPublicKey(contentKey, sealingKeypair.publicKey)),
+    },
+    identity,
+    contentKey
+  );
+  await appendEntry(syncId, 'meta', generateUUID(), memberAddedEntry, 1, writeToken);
 
   await saveCircleIdentity(circleId, { ...identity, memberId });
-  await saveCircleSecret(circleId, secret);
+  await saveCircleKeyMap(circleId, { 1: contentKey });
 
   await insertCircle({
     id: circleId,
     name: input.name,
     picture: input.picture ?? null,
+    syncId,
     createdAt: now,
     leftAt: null,
+    // Caught up through the entry this device just wrote itself —
+    // nothing to gain by re-fetching what it already knows.
+    metaCursor: 1,
+    contentCursor: 0,
   });
 
-  const profile = await getProfile();
   await insertMember({
     circleId,
-    publicKey: bytesToHex(identity.publicKey),
+    identityPublicKey: bytesToHex(identity.publicKey),
+    encPublicKey: bytesToHex(sealingKeypair.publicKey),
     memberId,
     role: MemberRoles.admin,
     name: profile?.name ?? '',

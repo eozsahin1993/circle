@@ -1,15 +1,20 @@
 import { Buffer } from 'buffer';
 import { File, Paths, UploadType } from 'expo-file-system';
+import { bytesToHex } from '@noble/curves/utils.js';
 
 import { generateUUID } from '@/services/crypto';
 import { getAuthToken } from '@/services/keystore';
 
 /**
- * Thin fetch-based client for the relay's three endpoints — see
- * server/DESIGN.md and server/internal/api. No retry/queueing logic
- * here; that's `domain/usecases/circle/sync-circle.ts`'s job. This module only
- * knows how to talk to the wire, nothing about outbox/circleLog state.
+ * Thin fetch-based client for the relay's circle-log endpoints — see
+ * server/SYNC_DESIGN.md and server/internal/api. No retry/queueing logic
+ * here; that's `domain/usecases/circle/sync-circle.ts`'s job. This module
+ * only knows how to talk to the wire, nothing about outbox/key state.
+ * Raw key/token/signature material is always accepted as `Uint8Array` and
+ * hex-encoded right here at the wire boundary — callers never hand-encode.
  */
+
+export type Namespace = 'meta' | 'content';
 
 export type UploadTarget = {
   url: string;
@@ -19,20 +24,28 @@ export type UploadTarget = {
 export type AppendResult = {
   epoch: number;
   receivedAt: number;
-  upload: UploadTarget;
 };
 
 export type LogEntry = {
   epoch: number;
+  /** Plaintext — which content-key version `encryptedMeta` was encrypted under, for direct lookup instead of trial-decryption. */
+  keyVersion: number;
   encryptedMeta: Uint8Array;
   receivedAt: number;
 };
 
 export type FetchEntriesResult = {
   entries: LogEntry[];
-  latestEpoch: number;
-  oldestAvailableEpoch: number;
+  currentEpoch: number;
 };
+
+/** Thrown by `getUploadTarget` specifically — see its own doc comment for why this isn't necessarily a failure. */
+export class BlobAlreadyExistsError extends Error {
+  constructor() {
+    super('A blob already exists for this entry.');
+    this.name = 'BlobAlreadyExistsError';
+  }
+}
 
 function baseUrl(): string {
   const url = process.env.EXPO_PUBLIC_RELAY_URL;
@@ -41,13 +54,9 @@ function baseUrl(): string {
 }
 
 /**
- * fetch, with the stored session token attached — every circle-log route
- * requires one now (see server's auth.RequireSession). Sign-in itself
- * doesn't go through this (that's how you get a token in the first
- * place); logout takes its token as a parameter instead, since it revokes
- * a specific token rather than "whatever's currently stored." Exported so
- * other relay-facing modules (e.g. services/mailbox-relay.ts) can reuse
- * the same session-attaching wrapper instead of duplicating it.
+ * fetch with the stored session token attached — every circle-log route
+ * requires one (server's auth.RequireSession). Exported so other
+ * relay-facing modules (e.g. services/mailbox-relay.ts) can reuse it.
  */
 export async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const token = await getAuthToken();
@@ -60,36 +69,130 @@ export async function authorizedFetch(path: string, init: RequestInit = {}): Pro
   });
 }
 
-/** Appends one entry to a circle's log — POST /v1/circles/{circleLogId}/entries. */
-export async function appendEntry(circleLogId: string, entryId: string, encryptedMeta: Uint8Array): Promise<AppendResult> {
-  const response = await authorizedFetch(`/v1/circles/${circleLogId}/entries`, {
+/**
+ * Creates a circle's control state — POST /v1/circles/{syncId} (see
+ * server/SYNC_DESIGN.md operation 1). Nothing else is written here: the
+ * founder's own member_added entry is a separate, subsequent
+ * `appendEntry` call using the token this registers.
+ */
+export async function bootstrapCircle(syncId: string, founderAuthorityPublicKey: Uint8Array, initialWriteTokenHash: string): Promise<void> {
+  const response = await authorizedFetch(`/v1/circles/${syncId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ entryId, encryptedMeta: Buffer.from(encryptedMeta).toString('base64') }),
+    body: JSON.stringify({
+      founderAuthorityPublicKey: bytesToHex(founderAuthorityPublicKey),
+      initialWriteTokenHash,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to create circle: ${response.status}`);
+  }
+}
+
+/**
+ * Appends one entry to a circle's log — POST /v1/circles/{syncId}/entries.
+ * `keyVersion` is sent as plaintext alongside the ciphertext (not part of
+ * it) — which content key `encryptedMeta` was actually encrypted under,
+ * so a reader can pick the right key by direct lookup rather than
+ * trial-decrypting with every version it holds.
+ */
+export async function appendEntry(
+  syncId: string,
+  namespace: Namespace,
+  entryId: string,
+  encryptedMeta: Uint8Array,
+  keyVersion: number,
+  writeToken: Uint8Array
+): Promise<AppendResult> {
+  const response = await authorizedFetch(`/v1/circles/${syncId}/entries`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      namespace,
+      entryId,
+      encryptedMeta: Buffer.from(encryptedMeta).toString('base64'),
+      keyVersion,
+      writeToken: bytesToHex(writeToken),
+    }),
   });
   if (!response.ok) {
     throw new Error(`Failed to append entry: ${response.status}`);
   }
   const body = await response.json();
-  return { epoch: body.epoch, receivedAt: body.receivedAt, upload: body.upload };
+  return { epoch: body.epoch, receivedAt: body.receivedAt };
 }
 
-/** Fetches every entry after `since` — GET /v1/circles/{circleLogId}/entries?since=. */
-export async function fetchEntries(circleLogId: string, since: number): Promise<FetchEntriesResult> {
-  const response = await authorizedFetch(`/v1/circles/${circleLogId}/entries?since=${since}`);
+/**
+ * Rotates a circle's write token — POST /v1/circles/{syncId}/rotate. See
+ * server/SYNC_DESIGN.md's "Remove a member" operation: appends the
+ * key_rotation meta entry and swaps in the new write token atomically.
+ * `signature` must verify against `deriveRotateMessage(syncId, entryId,
+ * newWriteTokenHash)` — see crypto.ts.
+ */
+export async function rotateLog(
+  syncId: string,
+  entryId: string,
+  encryptedMeta: Uint8Array,
+  currentKeyVersion: number,
+  currentWriteToken: Uint8Array,
+  newWriteTokenHash: string,
+  authorityPublicKey: Uint8Array,
+  signature: Uint8Array
+): Promise<AppendResult> {
+  const response = await authorizedFetch(`/v1/circles/${syncId}/rotate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      entryId,
+      encryptedMeta: Buffer.from(encryptedMeta).toString('base64'),
+      currentKeyVersion,
+      currentWriteToken: bytesToHex(currentWriteToken),
+      newWriteTokenHash,
+      authorityPublicKey: bytesToHex(authorityPublicKey),
+      signature: bytesToHex(signature),
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to rotate: ${response.status}`);
+  }
+  const body = await response.json();
+  return { epoch: body.epoch, receivedAt: body.receivedAt };
+}
+
+/** Fetches every entry in `namespace` after `since` — GET /v1/circles/{syncId}/entries?namespace=&since=. */
+export async function fetchEntries(syncId: string, namespace: Namespace, since: number): Promise<FetchEntriesResult> {
+  const response = await authorizedFetch(`/v1/circles/${syncId}/entries?namespace=${namespace}&since=${since}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch entries: ${response.status}`);
   }
   const body = await response.json();
   return {
-    entries: (body.entries as { epoch: number; encryptedMeta: string; receivedAt: number }[]).map((entry) => ({
+    entries: (body.entries as { epoch: number; keyVersion: number; encryptedMeta: string; receivedAt: number }[]).map((entry) => ({
       epoch: entry.epoch,
+      keyVersion: entry.keyVersion,
       encryptedMeta: new Uint8Array(Buffer.from(entry.encryptedMeta, 'base64')),
       receivedAt: entry.receivedAt,
     })),
-    latestEpoch: body.latestEpoch,
-    oldestAvailableEpoch: body.oldestAvailableEpoch,
+    currentEpoch: body.currentEpoch,
   };
+}
+
+/**
+ * Obtains a presigned upload target for one entry's blob — GET
+ * /v1/circles/{syncId}/entries/{entryId}/upload. Gated by the write token
+ * (unlike downloads — obtaining an upload URL is a write capability) and
+ * single-use: `BlobAlreadyExistsError` isn't necessarily a failure, it's
+ * also what a legitimate retry sees once the earlier upload succeeded.
+ */
+export async function getUploadTarget(syncId: string, entryId: string, writeToken: Uint8Array): Promise<UploadTarget> {
+  const response = await authorizedFetch(`/v1/circles/${syncId}/entries/${entryId}/upload?writeToken=${bytesToHex(writeToken)}`);
+  if (response.status === 409) {
+    throw new BlobAlreadyExistsError();
+  }
+  if (!response.ok) {
+    throw new Error(`Failed to get upload target: ${response.status}`);
+  }
+  return response.json();
 }
 
 /**
@@ -122,7 +225,7 @@ export async function putManifest(blob: Uint8Array): Promise<void> {
 
 /**
  * Uploads ciphertext bytes straight to S3 using the presigned POST target
- * an `appendEntry` response handed back — never touches the relay itself.
+ * a `getUploadTarget` response handed back — never touches the relay itself.
  */
 export async function uploadBlob(target: UploadTarget, bytes: Uint8Array): Promise<void> {
   const file = new File(Paths.cache, `upload-${generateUUID()}`);

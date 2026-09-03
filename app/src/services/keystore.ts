@@ -16,9 +16,12 @@ function identityStorageKey(circleId: string) {
   return `circle_identity_${circleId}`;
 }
 
-function secretStorageKey(circleId: string) {
-  return `circle_secret_${circleId}`;
+function keyMapStorageKey(circleId: string) {
+  return `circle_keys_${circleId}`;
 }
+
+/** One circle's full `{version -> content key}` map — see server/SYNC_DESIGN.md's "Content encryption" section. */
+export type ContentKeyMap = Record<number, Uint8Array>;
 
 /** Persists this circle's identity (keypair + own member ID) in the device Keychain/Keystore. */
 export async function saveCircleIdentity(circleId: string, identity: CircleIdentity): Promise<void> {
@@ -42,21 +45,50 @@ export async function getCircleIdentity(circleId: string): Promise<CircleIdentit
   };
 }
 
-/** Persists this circle's shared symmetric secret. */
-export async function saveCircleSecret(circleId: string, secret: Uint8Array): Promise<void> {
-  await SecureStore.setItemAsync(secretStorageKey(circleId), bytesToHex(secret));
+/** Persists this circle's full content-key map, replacing whatever was stored before. */
+export async function saveCircleKeyMap(circleId: string, keyMap: ContentKeyMap): Promise<void> {
+  const value = JSON.stringify(Object.fromEntries(Object.entries(keyMap).map(([version, key]) => [version, bytesToHex(key)])));
+  await SecureStore.setItemAsync(keyMapStorageKey(circleId), value);
 }
 
-/** Reads this circle's shared symmetric secret back, or null if none is stored. */
-export async function getCircleSecret(circleId: string): Promise<Uint8Array | null> {
-  const raw = await SecureStore.getItemAsync(secretStorageKey(circleId));
-  return raw ? hexToBytes(raw) : null;
+/** Reads this circle's full content-key map back, or null if none is stored. */
+export async function getCircleKeyMap(circleId: string): Promise<ContentKeyMap | null> {
+  const raw = await SecureStore.getItemAsync(keyMapStorageKey(circleId));
+  if (!raw) return null;
+  const parsed = JSON.parse(raw) as Record<string, string>;
+  return Object.fromEntries(Object.entries(parsed).map(([version, hex]) => [Number(version), hexToBytes(hex)]));
 }
 
-/** Removes both the identity keypair and the secret for a circle (e.g. on leave). */
+/**
+ * The content key this device should encrypt new content with and derive
+ * the current write token from — the highest version in the map. Null if
+ * no map is stored, or the map is empty.
+ */
+export async function getCurrentContentKey(circleId: string): Promise<{ version: number; key: Uint8Array } | null> {
+  const keyMap = await getCircleKeyMap(circleId);
+  if (!keyMap) return null;
+  const versions = Object.keys(keyMap).map(Number);
+  if (versions.length === 0) return null;
+  const version = Math.max(...versions);
+  return { version, key: keyMap[version] };
+}
+
+/**
+ * Merges one new content-key version into whatever's already stored —
+ * used when a rotation lands (see server/SYNC_DESIGN.md's "Remove a
+ * member" operation), never overwrites older versions: a member needs
+ * every version it's ever held to decrypt old content, not just the
+ * current one.
+ */
+export async function addCircleKeyVersion(circleId: string, version: number, key: Uint8Array): Promise<void> {
+  const existing = (await getCircleKeyMap(circleId)) ?? {};
+  await saveCircleKeyMap(circleId, { ...existing, [version]: key });
+}
+
+/** Removes both the identity keypair and the content-key map for a circle (e.g. on leave). */
 export async function deleteCircleKeys(circleId: string): Promise<void> {
   await SecureStore.deleteItemAsync(identityStorageKey(circleId));
-  await SecureStore.deleteItemAsync(secretStorageKey(circleId));
+  await SecureStore.deleteItemAsync(keyMapStorageKey(circleId));
 }
 
 const MASTER_SEED_KEY = 'master_seed';

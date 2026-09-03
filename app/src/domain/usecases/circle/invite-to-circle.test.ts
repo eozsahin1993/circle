@@ -1,6 +1,7 @@
 jest.mock('@/domain/usecases/circle/sync-circle');
 jest.mock('@/domain/usecases/account/account-manifest');
 jest.mock('@/services/mailbox-relay');
+jest.mock('@/services/relay');
 
 import { Buffer } from 'buffer';
 
@@ -18,6 +19,7 @@ import { deriveInviteTag, deriveJoinRequestKey, encryptJSON, generateEphemeralKe
 import { bytesToHex } from '@noble/curves/utils.js';
 import { deleteJoinRequest, listJoinRequests, putInvitePreview } from '@/services/mailbox-relay';
 import { saveMasterSeed } from '@/services/keystore';
+import { appendEntry, bootstrapCircle } from '@/services/relay';
 
 beforeAll(async () => {
   await initDatabase();
@@ -27,6 +29,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   (drainOutbox as jest.Mock).mockResolvedValue(undefined);
   (putInvitePreview as jest.Mock).mockResolvedValue(undefined);
+  (bootstrapCircle as jest.Mock).mockResolvedValue(undefined);
+  (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
 });
 
 test('getOrCreateInvite writes the server-side preview row alongside the local invite', async () => {

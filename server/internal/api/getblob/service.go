@@ -1,5 +1,5 @@
 // Package getblob is the whole vertical slice for GET
-// /circles/{circleLogId}/entries/{epoch}/blob.
+// /circles/{syncId}/entries/{epoch}/blob.
 package getblob
 
 import (
@@ -12,6 +12,6 @@ type Service struct {
 	BlobStore blobstore.Store
 }
 
-func (s *Service) DownloadURL(ctx context.Context, circleLogID string, epoch int64) (string, error) {
-	return s.BlobStore.GetDownloadURL(ctx, circleLogID, epoch)
+func (s *Service) DownloadURL(ctx context.Context, syncID, entryID string) (string, error) {
+	return s.BlobStore.GetDownloadURL(ctx, syncID, entryID)
 }

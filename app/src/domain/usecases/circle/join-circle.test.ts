@@ -2,6 +2,7 @@ jest.mock('@/domain/usecases/circle/sync-circle');
 jest.mock('@/domain/usecases/account/account-manifest');
 jest.mock('@/services/mailbox-relay');
 jest.mock('@/services/image');
+jest.mock('@/services/relay');
 
 import { Buffer } from 'buffer';
 
@@ -23,7 +24,8 @@ import {
   putJoinApproval,
   putJoinRequest,
 } from '@/services/mailbox-relay';
-import { getCircleSecret, saveMasterSeed } from '@/services/keystore';
+import { getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
+import { appendEntry, bootstrapCircle } from '@/services/relay';
 
 beforeAll(async () => {
   await initDatabase();
@@ -32,6 +34,8 @@ beforeAll(async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   (drainOutbox as jest.Mock).mockResolvedValue(undefined);
+  (bootstrapCircle as jest.Mock).mockResolvedValue(undefined);
+  (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
 });
 
 /**
@@ -162,10 +166,11 @@ test('an approval signed by anyone other than the invite creator is rejected, ev
   (putJoinRequest as jest.Mock).mockResolvedValue(undefined);
   const { requestId } = await requestToJoin(invite.code);
   const pending = await getPendingJoinRequest(requestId);
-  const realSecret = (await getCircleSecret(circleId))!;
+  const realCircle = (await getCircle(circleId))!;
+  const realCurrent = (await getCurrentContentKey(circleId))!;
   const rogueIdentity = generateIdentity();
 
-  const approval: JoinApprovalPayload = { secret: bytesToHex(realSecret), circleName: 'Family Circle' };
+  const approval: JoinApprovalPayload = { keyMap: { 1: bytesToHex(realCurrent.key) }, syncId: realCircle.syncId, circleName: 'Family Circle' };
   const signature = sign(new TextEncoder().encode(JSON.stringify(approval)), rogueIdentity.secretKey);
   const envelope: JoinApprovalEnvelope = { approval, signature: bytesToHex(signature) };
   const forgedSealed = sealToPublicKey(new TextEncoder().encode(JSON.stringify(envelope)), hexToBytes(pending!.ephemeralPublicKey));

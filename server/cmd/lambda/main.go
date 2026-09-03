@@ -41,7 +41,7 @@ func main() {
 		log.Fatalf("failed to load AWS config: %v", err)
 	}
 
-	logStore := logdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.TableName, cfg.LogRetentionDays)
+	logStore := logdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.TableName)
 	blobStore := blobs3.New(awss3.NewFromConfig(awsCfg), cfg.BucketName, cfg.MaxBlobSize)
 
 	authStore := authdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.SessionsTableName)

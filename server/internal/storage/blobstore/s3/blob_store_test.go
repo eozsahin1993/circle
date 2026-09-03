@@ -2,6 +2,7 @@ package s3_test
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -10,6 +11,29 @@ import (
 	"circle-relay/internal/storage/blobstore"
 	"circle-relay/internal/testsupport"
 )
+
+// GetUploadTarget refuses a second target once a blob has actually landed
+// at that key — see its doc comment for why this matters (a shared write
+// token can't distinguish the original author from any other current
+// member). A retry before any upload has succeeded must still work, since
+// nothing has been created yet to conflict with.
+func TestGetUploadTarget_RefusesOnceABlobExists(t *testing.T) {
+	store := testsupport.NewBlobStore(t)
+	ctx := t.Context()
+	syncID := testsupport.UniqueSyncID(t)
+
+	retryTarget, err := store.GetUploadTarget(ctx, syncID, "entry-1")
+	if err != nil {
+		t.Fatalf("expected a retry before any upload has succeeded to still work: %v", err)
+	}
+	if status, body := postUpload(t, retryTarget, []byte("hello world")); status < 200 || status >= 300 {
+		t.Fatalf("upload failed: %d %s", status, body)
+	}
+
+	if _, err := store.GetUploadTarget(ctx, syncID, "entry-1"); !errors.Is(err, blobstore.ErrBlobAlreadyExists) {
+		t.Fatalf("expected ErrBlobAlreadyExists once a blob has actually landed, got %v", err)
+	}
+}
 
 // Exercises the actual presigned-POST-then-upload round trip against
 // LocalStack, including S3's own enforcement of the content-length-range
@@ -25,7 +49,7 @@ func TestGetUploadTarget_RoundTrip(t *testing.T) {
 	store := testsupport.NewBlobStore(t)
 	ctx := t.Context()
 
-	target, err := store.GetUploadTarget(ctx, testsupport.UniqueCircleID(t), 1)
+	target, err := store.GetUploadTarget(ctx, testsupport.UniqueSyncID(t), "entry-1")
 	if err != nil {
 		t.Fatalf("GetUploadTarget: %v", err)
 	}
@@ -40,7 +64,7 @@ func TestGetUploadTarget_RejectsOversizedBlob(t *testing.T) {
 	store := testsupport.NewBlobStore(t)
 	ctx := t.Context()
 
-	target, err := store.GetUploadTarget(ctx, testsupport.UniqueCircleID(t), 1)
+	target, err := store.GetUploadTarget(ctx, testsupport.UniqueSyncID(t), "entry-1")
 	if err != nil {
 		t.Fatalf("GetUploadTarget: %v", err)
 	}

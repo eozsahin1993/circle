@@ -1,12 +1,18 @@
 // Package dynamodb implements logstore.Store against a single DynamoDB
-// table.
+// table, one partition per syncID. See server/SYNC_DESIGN.md for the
+// design and internal/storage/logstore's package doc for the two
+// capabilities (write token, authority signature) this enforces.
 package dynamodb
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -16,100 +22,236 @@ import (
 	"circle-relay/internal/storage/logstore"
 )
 
-// DefaultLogRetentionDays is configurable per server/DESIGN.md. Eviction
-// itself is DynamoDB's native TTL feature, not application code — this
-// value only controls what `expiresAt` gets written as at commit time.
-const DefaultLogRetentionDays = 14
-
 // readPageSize caps how many entries a single Read call returns — an
 // internal server policy, not a client-controllable parameter. A caller
 // that needs more just calls again with `since` advanced to the epoch of
-// the last entry it actually received (never to LatestEpoch — a truncated
-// page means LatestEpoch is still ahead of what was actually returned).
+// the last entry it actually received (never to CurrentEpoch — a capped
+// page means CurrentEpoch is still ahead of what was actually returned).
 const readPageSize = 200
 
-// Single-table design: PK = circleLogId, SK distinguishes item kinds.
-// Sort keys share one attribute (DynamoDB requires a uniform type per
-// table), so epoch is represented as a zero-padded string to preserve
-// numeric ordering lexicographically — the standard trick for mixing
-// numeric ordering into a string sort key.
+// maxCASAttempts bounds the compare-and-swap retry loop Append and Rotate
+// use to keep "check the token/authority" and "bump the counter" atomic
+// (see getControlState). Retries only happen under genuine concurrent
+// writes to the same circle — vanishingly rare at family-circle scale.
+const maxCASAttempts = 5
+
+// idemMarkerTTL is a short, fixed retry window — deliberately not tied to
+// any product retention setting (entries and #control never expire; see
+// invariant 1). A marker's only job is making a same-entryID retry
+// converge shortly after the original commit.
+const idemMarkerTTL = 48 * time.Hour
+
+// Single-table design: PK = syncID, SK distinguishes item kinds, epoch
+// zero-padded to preserve numeric ordering lexicographically. The four SK
+// shapes never collide: "#control" sorts before both namespace prefixes,
+// and "idem#<ns>#..." sorts strictly outside either namespace's entry
+// range.
 const (
-	counterSK  = "#counter"
-	epochWidth = 12 // supports up to 999,999,999,999 entries per circle — generous past any real use.
+	controlSK  = "#control"
+	epochWidth = 12 // supports up to 999,999,999,999 entries per namespace — generous past any real use.
 )
 
-func epochSK(epoch int64) string {
-	return fmt.Sprintf("epoch#%0*d", epochWidth, epoch)
+func entrySK(ns logstore.Namespace, epoch int64) string {
+	return fmt.Sprintf("%s#%0*d", ns, epochWidth, epoch)
 }
 
-// epochSKUpperBound sorts after any real epoch key, for range queries.
-func epochSKUpperBound() string {
+// entrySKUpperBound sorts after any real entry key in ns, for range
+// queries.
+func entrySKUpperBound(ns logstore.Namespace) string {
 	max := ""
 	for i := 0; i < epochWidth; i++ {
 		max += "9"
 	}
-	return "epoch#" + max
+	return string(ns) + "#" + max
 }
 
-func idemSK(entryID string) string {
-	return "idem#" + entryID
+func idemSK(ns logstore.Namespace, entryID string) string {
+	return "idem#" + string(ns) + "#" + entryID
+}
+
+func counterAttrName(ns logstore.Namespace) string {
+	if ns == logstore.NamespaceContent {
+		return "contentCounter"
+	}
+	return "metaCounter"
 }
 
 type Store struct {
-	client           *dynamodb.Client
-	tableName        string
-	retentionSeconds int64
+	client    *dynamodb.Client
+	tableName string
 }
 
-func New(client *dynamodb.Client, tableName string, logRetentionDays int64) *Store {
-	if logRetentionDays <= 0 {
-		logRetentionDays = DefaultLogRetentionDays
-	}
-	return &Store{client: client, tableName: tableName, retentionSeconds: logRetentionDays * 24 * 60 * 60}
+func New(client *dynamodb.Client, tableName string) *Store {
+	return &Store{client: client, tableName: tableName}
 }
 
 var _ logstore.Store = (*Store)(nil)
 
-// CommitEntry assigns an epoch, then writes the log entry and the
-// idempotency marker in one TransactWriteItems call — both happen or
-// neither does. The epoch assignment itself is a separate, non-
-// transactional counter bump; if the transaction that follows fails, that
-// epoch just goes unused (a harmless gap — same as an entry aging out
-// under TTL, from a client's perspective), which is a fine trade for
-// keeping "content written" and "idempotency recorded" atomically linked.
-//
-// Both items carry their own `expiresAt` (epoch seconds) and are deleted
-// independently by DynamoDB's TTL sweep once the table's TTL attribute is
-// enabled (see provision/modules/storage/dynamodb.tf) — no application
-// code deletes anything.
-func (s *Store) CommitEntry(ctx context.Context, circleLogID, entryID string, encryptedMeta []byte) (logstore.CommitResult, error) {
-	// Consistent read first: a pure retry of an already-committed entryID
-	// returns here without ever touching the counter.
-	if existing, err := s.lookupIdempotencyMarker(ctx, circleLogID, entryID); err != nil {
+// Bootstrap is a plain conditional PutItem — the founder's own
+// member_added entry is a separate, subsequent Append call using the
+// write token this registers.
+func (s *Store) Bootstrap(ctx context.Context, syncID, founderAuthorityPublicKey, initialWriteTokenHash string) error {
+	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(s.tableName),
+		Item: map[string]types.AttributeValue{
+			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: syncID},
+			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: controlSK},
+			"authoritySet":    &types.AttributeValueMemberSS{Value: []string{founderAuthorityPublicKey}},
+			"writeTokenHash":  &types.AttributeValueMemberS{Value: initialWriteTokenHash},
+			"metaCounter":     &types.AttributeValueMemberN{Value: "0"},
+			"contentCounter":  &types.AttributeValueMemberN{Value: "0"},
+		},
+		ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%s)", dynamoutil.PKAttr)),
+	})
+	if err != nil {
+		var condFailed *types.ConditionalCheckFailedException
+		if errors.As(err, &condFailed) {
+			return logstore.ErrAlreadyExists
+		}
+		return err
+	}
+	return nil
+}
+
+// Append verifies possession (the write token) and bumps ns's counter
+// atomically, then writes the entry and its idempotency marker in the
+// same transaction. See getControlState's doc comment for why this is a
+// read-then-compare-and-swap rather than one unconditional transaction.
+func (s *Store) Append(ctx context.Context, syncID string, ns logstore.Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeToken string) (logstore.CommitResult, error) {
+	if !ns.Valid() {
+		return logstore.CommitResult{}, logstore.ErrInvalidNamespace
+	}
+	if existing, err := s.lookupIdempotencyMarker(ctx, syncID, ns, entryID); err != nil {
 		return logstore.CommitResult{}, err
 	} else if existing != nil {
 		return *existing, nil
 	}
 
-	epoch, err := s.nextEpochAtomically(ctx, circleLogID)
-	if err != nil {
+	// A malformed (non-hex) token can never be correct, so it fails the
+	// same way a well-formed-but-wrong one does — one outcome, not two,
+	// for "this token doesn't work."
+	expectedHash, hashErr := hashWriteToken(writeToken)
+
+	for attempt := 0; attempt < maxCASAttempts; attempt++ {
+		control, err := s.getControlState(ctx, syncID, true)
+		if err != nil {
+			return logstore.CommitResult{}, err
+		}
+		if hashErr != nil || control.writeTokenHash != expectedHash {
+			return logstore.CommitResult{}, logstore.ErrWriteTokenMismatch
+		}
+
+		current := control.counter(ns)
+		nextEpoch := current + 1
+		receivedAt := dynamoutil.NowMillis()
+
+		counterAttr := counterAttrName(ns)
+		result, err := s.commit(ctx, syncID, ns, entryID, encryptedPayload, keyVersion, nextEpoch, receivedAt, types.Update{
+			TableName:           aws.String(s.tableName),
+			Key:                 controlKey(syncID),
+			UpdateExpression:    aws.String(fmt.Sprintf("SET %s = :next", counterAttr)),
+			ConditionExpression: aws.String(fmt.Sprintf("writeTokenHash = :hash AND %s = :current", counterAttr)),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":hash":    &types.AttributeValueMemberS{Value: expectedHash},
+				":current": &types.AttributeValueMemberN{Value: strconv.FormatInt(current, 10)},
+				":next":    &types.AttributeValueMemberN{Value: strconv.FormatInt(nextEpoch, 10)},
+			},
+		})
+		if err == nil {
+			return result, nil
+		}
+		if converged, convErr := s.convergeOnRace(ctx, syncID, ns, entryID, err); convErr != nil {
+			return logstore.CommitResult{}, convErr
+		} else if converged != nil {
+			return *converged, nil
+		}
+		// Neither converged nor a hard error: #control moved under us
+		// (someone else's concurrent Append/Rotate won the race) — loop
+		// and retry against fresh state.
+	}
+	return logstore.CommitResult{}, logstore.ErrConcurrentModification
+}
+
+// Rotate verifies the authority signature before touching storage at all
+// — a forged signature must never attempt a mutation — then runs the
+// same possession-check-and-CAS pattern as Append, plus an authority-set
+// membership check, and swaps in the new write-token hash in the same
+// transaction as the entry write.
+func (s *Store) Rotate(ctx context.Context, syncID, entryID string, encryptedPayload []byte, currentKeyVersion int64, currentWriteToken, newWriteTokenHash, authorityPublicKey string, signature []byte) (logstore.CommitResult, error) {
+	if err := verifyAuthoritySignature(authorityPublicKey, logstore.RotateMessage(syncID, entryID, newWriteTokenHash), signature); err != nil {
 		return logstore.CommitResult{}, err
 	}
-	receivedAt := dynamoutil.NowMillis()
-	expiresAt := receivedAt/1000 + s.retentionSeconds
 
-	_, err = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+	if existing, err := s.lookupIdempotencyMarker(ctx, syncID, logstore.NamespaceMeta, entryID); err != nil {
+		return logstore.CommitResult{}, err
+	} else if existing != nil {
+		return *existing, nil
+	}
+
+	// Same reasoning as Append: a malformed token can never be correct, so
+	// it fails the same way a well-formed-but-wrong one does.
+	expectedCurrentHash, hashErr := hashWriteToken(currentWriteToken)
+
+	for attempt := 0; attempt < maxCASAttempts; attempt++ {
+		control, err := s.getControlState(ctx, syncID, true)
+		if err != nil {
+			return logstore.CommitResult{}, err
+		}
+		if hashErr != nil || control.writeTokenHash != expectedCurrentHash {
+			return logstore.CommitResult{}, logstore.ErrWriteTokenMismatch
+		}
+		if !control.authoritySet[authorityPublicKey] {
+			return logstore.CommitResult{}, logstore.ErrAuthorityNotRecognized
+		}
+
+		current := control.metaCounter
+		nextEpoch := current + 1
+		receivedAt := dynamoutil.NowMillis()
+
+		result, err := s.commit(ctx, syncID, logstore.NamespaceMeta, entryID, encryptedPayload, currentKeyVersion, nextEpoch, receivedAt, types.Update{
+			TableName:           aws.String(s.tableName),
+			Key:                 controlKey(syncID),
+			UpdateExpression:    aws.String("SET writeTokenHash = :newHash, metaCounter = :next"),
+			ConditionExpression: aws.String("writeTokenHash = :currentHash AND metaCounter = :current AND contains(authoritySet, :pubkey)"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":currentHash": &types.AttributeValueMemberS{Value: expectedCurrentHash},
+				":newHash":     &types.AttributeValueMemberS{Value: newWriteTokenHash},
+				":current":     &types.AttributeValueMemberN{Value: strconv.FormatInt(current, 10)},
+				":next":        &types.AttributeValueMemberN{Value: strconv.FormatInt(nextEpoch, 10)},
+				":pubkey":      &types.AttributeValueMemberS{Value: authorityPublicKey},
+			},
+		})
+		if err == nil {
+			return result, nil
+		}
+		if converged, convErr := s.convergeOnRace(ctx, syncID, logstore.NamespaceMeta, entryID, err); convErr != nil {
+			return logstore.CommitResult{}, convErr
+		} else if converged != nil {
+			return *converged, nil
+		}
+	}
+	return logstore.CommitResult{}, logstore.ErrConcurrentModification
+}
+
+// commit runs the three-item transaction shared by Append and Rotate: the
+// caller-supplied conditional update to #control (a counter bump, or a
+// counter bump plus a token swap), the entry Put, and the idempotency
+// marker Put. Returns the raw TransactWriteItems error unexamined —
+// callers use convergeOnRace to interpret it.
+func (s *Store) commit(ctx context.Context, syncID string, ns logstore.Namespace, entryID string, encryptedPayload []byte, keyVersion, epoch, receivedAt int64, controlUpdate types.Update) (logstore.CommitResult, error) {
+	_, err := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
 		TransactItems: []types.TransactWriteItem{
+			{Update: &controlUpdate},
 			{
 				Put: &types.Put{
 					TableName: aws.String(s.tableName),
 					Item: map[string]types.AttributeValue{
-						dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: circleLogID},
-						dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: epochSK(epoch)},
+						dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: syncID},
+						dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: entrySK(ns, epoch)},
 						"epoch":           &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
-						"encryptedMeta":   &types.AttributeValueMemberB{Value: encryptedMeta},
+						"keyVersion":      &types.AttributeValueMemberN{Value: strconv.FormatInt(keyVersion, 10)},
+						"encryptedMeta":   &types.AttributeValueMemberB{Value: encryptedPayload},
 						"receivedAt":      &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
-						"expiresAt":       &types.AttributeValueMemberN{Value: strconv.FormatInt(expiresAt, 10)},
 					},
 				},
 			},
@@ -117,60 +259,110 @@ func (s *Store) CommitEntry(ctx context.Context, circleLogID, entryID string, en
 				Put: &types.Put{
 					TableName: aws.String(s.tableName),
 					Item: map[string]types.AttributeValue{
-						dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: circleLogID},
-						dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: idemSK(entryID)},
+						dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: syncID},
+						dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: idemSK(ns, entryID)},
 						"epoch":           &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
 						"receivedAt":      &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
-						"expiresAt":       &types.AttributeValueMemberN{Value: strconv.FormatInt(expiresAt, 10)},
+						"expiresAt":       &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt/1000+int64(idemMarkerTTL.Seconds()), 10)},
 					},
 					ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%s)", dynamoutil.PKAttr)),
 				},
 			},
 		},
 	})
-	if err == nil {
-		return logstore.CommitResult{Epoch: epoch, ReceivedAt: receivedAt}, nil
+	if err != nil {
+		return logstore.CommitResult{}, err
 	}
-
-	// Someone else already committed this entryID — look up what they
-	// recorded and return that, so a retry converges instead of erroring.
-	var canceled *types.TransactionCanceledException
-	if errors.As(err, &canceled) {
-		if existing, lookupErr := s.lookupIdempotencyMarker(ctx, circleLogID, entryID); lookupErr == nil && existing != nil {
-			return *existing, nil
-		}
-	}
-	return logstore.CommitResult{}, err
+	return logstore.CommitResult{Epoch: epoch, ReceivedAt: receivedAt}, nil
 }
 
-func (s *Store) nextEpochAtomically(ctx context.Context, circleLogID string) (int64, error) {
-	out, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName: aws.String(s.tableName),
-		Key: map[string]types.AttributeValue{
-			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: circleLogID},
-			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: counterSK},
-		},
-		UpdateExpression: aws.String("ADD #counter :one"),
-		ExpressionAttributeNames: map[string]string{
-			"#counter": "counter",
-		},
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":one": &types.AttributeValueMemberN{Value: "1"},
-		},
-		ReturnValues: types.ReturnValueUpdatedNew,
+// convergeOnRace interprets a TransactWriteItems failure from commit: if
+// it's not a cancellation, it's a hard error. If it is, either the
+// idempotency marker condition lost (someone else's concurrent identical
+// commit already won — return their result so both callers converge) or
+// the #control condition lost (concurrent state change — return
+// (nil, nil) so the caller's retry loop tries again against fresh state).
+func (s *Store) convergeOnRace(ctx context.Context, syncID string, ns logstore.Namespace, entryID string, commitErr error) (*logstore.CommitResult, error) {
+	var canceled *types.TransactionCanceledException
+	if !errors.As(commitErr, &canceled) {
+		return nil, commitErr
+	}
+	existing, err := s.lookupIdempotencyMarker(ctx, syncID, ns, entryID)
+	if err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
+
+func controlKey(syncID string) map[string]types.AttributeValue {
+	return map[string]types.AttributeValue{
+		dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: syncID},
+		dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: controlSK},
+	}
+}
+
+type controlState struct {
+	authoritySet   map[string]bool
+	writeTokenHash string
+	metaCounter    int64
+	contentCounter int64
+}
+
+func (c *controlState) counter(ns logstore.Namespace) int64 {
+	if ns == logstore.NamespaceContent {
+		return c.contentCounter
+	}
+	return c.metaCounter
+}
+
+// getControlState is the read half of the compare-and-swap Append and
+// Rotate build on — a separate read because TransactWriteItems's Update
+// action can't hand back the value it just wrote (only standalone
+// UpdateItem supports ReturnValues). So the counter's *next* value is
+// computed from a value read beforehand, and the transaction's
+// ConditionExpression re-checks nothing moved in between.
+func (s *Store) getControlState(ctx context.Context, syncID string, consistent bool) (*controlState, error) {
+	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName:      aws.String(s.tableName),
+		Key:            controlKey(syncID),
+		ConsistentRead: aws.Bool(consistent),
 	})
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return dynamoutil.AttrInt(out.Attributes, "counter")
+	if out.Item == nil {
+		return nil, logstore.ErrCircleNotFound
+	}
+
+	authoritySet := map[string]bool{}
+	if attr, ok := out.Item["authoritySet"].(*types.AttributeValueMemberSS); ok {
+		for _, key := range attr.Value {
+			authoritySet[key] = true
+		}
+	}
+	writeTokenHash, _ := dynamoutil.AttrString(out.Item, "writeTokenHash")
+	metaCounter, err := dynamoutil.AttrInt(out.Item, "metaCounter")
+	if err != nil {
+		return nil, err
+	}
+	contentCounter, err := dynamoutil.AttrInt(out.Item, "contentCounter")
+	if err != nil {
+		return nil, err
+	}
+	return &controlState{
+		authoritySet:   authoritySet,
+		writeTokenHash: writeTokenHash,
+		metaCounter:    metaCounter,
+		contentCounter: contentCounter,
+	}, nil
 }
 
-func (s *Store) lookupIdempotencyMarker(ctx context.Context, circleLogID, entryID string) (*logstore.CommitResult, error) {
+func (s *Store) lookupIdempotencyMarker(ctx context.Context, syncID string, ns logstore.Namespace, entryID string) (*logstore.CommitResult, error) {
 	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
-			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: circleLogID},
-			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: idemSK(entryID)},
+			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: syncID},
+			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: idemSK(ns, entryID)},
 		},
 		ConsistentRead: aws.Bool(true),
 	})
@@ -191,43 +383,28 @@ func (s *Store) lookupIdempotencyMarker(ctx context.Context, circleLogID, entryI
 	return &logstore.CommitResult{Epoch: epoch, ReceivedAt: receivedAt}, nil
 }
 
-func (s *Store) Read(ctx context.Context, circleLogID string, since int64) (logstore.FetchSinceResult, error) {
-	counterOut, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(s.tableName),
-		Key: map[string]types.AttributeValue{
-			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: circleLogID},
-			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: counterSK},
-		},
-	})
-	if err != nil {
-		return logstore.FetchSinceResult{}, err
-	}
-	if counterOut.Item == nil {
-		return logstore.FetchSinceResult{Entries: []logstore.LogEntry{}}, nil
-	}
-	latestEpoch, err := dynamoutil.AttrInt(counterOut.Item, "counter")
-	if err != nil {
-		return logstore.FetchSinceResult{}, err
+// Read never deletes or evicts — nothing to reconcile against retention,
+// unlike the pre-redesign version (see server/SYNC_DESIGN.md invariant
+// 1). A circle with no control state yet (never Bootstrapped) reads back
+// as empty rather than an error — Read is used for ordinary catch-up
+// sync, where "nothing here yet" is a normal state, not a caller mistake.
+func (s *Store) Read(ctx context.Context, syncID string, ns logstore.Namespace, since int64) (logstore.FetchResult, error) {
+	if !ns.Valid() {
+		return logstore.FetchResult{}, logstore.ErrInvalidNamespace
 	}
 
-	oldestAvailableEpoch, err := s.oldestAvailableEpoch(ctx, circleLogID)
+	control, err := s.getControlState(ctx, syncID, false)
+	if errors.Is(err, logstore.ErrCircleNotFound) {
+		return logstore.FetchResult{Entries: []logstore.LogEntry{}}, nil
+	}
 	if err != nil {
-		return logstore.FetchSinceResult{}, err
+		return logstore.FetchResult{}, err
 	}
+	currentEpoch := control.counter(ns)
 
-	lowerBound := since
-	if lowerBound < oldestAvailableEpoch-1 {
-		lowerBound = oldestAvailableEpoch - 1
-	}
-
-	// Loops rather than one Query call: DynamoDB caps a single Query
-	// response at 1MB of data regardless of readPageSize, signaling "more
-	// exists past this page" via LastEvaluatedKey — a single unpaginated
-	// call would silently return a partial result once a circle's backlog
-	// since `since` crosses that size, with nothing telling the caller
-	// entries were missing. Each iteration asks DynamoDB for only as many
-	// items as still needed to reach readPageSize, so this never
-	// over-fetches past the intended page size either.
+	// Loops rather than one Query call: DynamoDB caps a single response at
+	// 1MB regardless of readPageSize — an unpaginated call would silently
+	// truncate once a namespace's backlog crosses that size.
 	entries := make([]logstore.LogEntry, 0, readPageSize)
 	var exclusiveStartKey map[string]types.AttributeValue
 	for len(entries) < readPageSize {
@@ -235,32 +412,36 @@ func (s *Store) Read(ctx context.Context, circleLogID string, since int64) (logs
 			TableName:              aws.String(s.tableName),
 			KeyConditionExpression: aws.String(fmt.Sprintf("%s = :pk AND %s BETWEEN :lower AND :upper", dynamoutil.PKAttr, dynamoutil.SKAttr)),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":pk":    &types.AttributeValueMemberS{Value: circleLogID},
-				":lower": &types.AttributeValueMemberS{Value: epochSK(lowerBound + 1)},
-				":upper": &types.AttributeValueMemberS{Value: epochSKUpperBound()},
+				":pk":    &types.AttributeValueMemberS{Value: syncID},
+				":lower": &types.AttributeValueMemberS{Value: entrySK(ns, since+1)},
+				":upper": &types.AttributeValueMemberS{Value: entrySKUpperBound(ns)},
 			},
 			ScanIndexForward:  aws.Bool(true),
 			Limit:             aws.Int32(int32(readPageSize - len(entries))),
 			ExclusiveStartKey: exclusiveStartKey,
 		})
 		if err != nil {
-			return logstore.FetchSinceResult{}, err
+			return logstore.FetchResult{}, err
 		}
 
 		for _, item := range queryOut.Items {
 			epoch, err := dynamoutil.AttrInt(item, "epoch")
 			if err != nil {
-				return logstore.FetchSinceResult{}, err
+				return logstore.FetchResult{}, err
+			}
+			keyVersion, err := dynamoutil.AttrInt(item, "keyVersion")
+			if err != nil {
+				return logstore.FetchResult{}, err
 			}
 			receivedAt, err := dynamoutil.AttrInt(item, "receivedAt")
 			if err != nil {
-				return logstore.FetchSinceResult{}, err
+				return logstore.FetchResult{}, err
 			}
 			blobAttr, ok := item["encryptedMeta"].(*types.AttributeValueMemberB)
 			if !ok {
-				return logstore.FetchSinceResult{}, fmt.Errorf("entry at epoch %d missing encryptedMeta", epoch)
+				return logstore.FetchResult{}, fmt.Errorf("entry at epoch %d missing encryptedMeta", epoch)
 			}
-			entries = append(entries, logstore.LogEntry{Epoch: epoch, EncryptedMeta: blobAttr.Value, ReceivedAt: receivedAt})
+			entries = append(entries, logstore.LogEntry{Epoch: epoch, KeyVersion: keyVersion, EncryptedMeta: blobAttr.Value, ReceivedAt: receivedAt})
 		}
 
 		if queryOut.LastEvaluatedKey == nil {
@@ -272,55 +453,51 @@ func (s *Store) Read(ctx context.Context, circleLogID string, since int64) (logs
 	// ascending epoch order, and consecutive pages continue that same
 	// order, so entries is already fully sorted by the time this loop ends.
 
-	return logstore.FetchSinceResult{
-		Entries:              entries,
-		LatestEpoch:          latestEpoch,
-		OldestAvailableEpoch: oldestAvailableEpoch,
-	}, nil
+	return logstore.FetchResult{Entries: entries, CurrentEpoch: currentEpoch}, nil
 }
 
-// oldestAvailableEpoch finds the epoch of the oldest log entry that
-// currently physically exists for circleLogID — computed live, on every
-// read, rather than tracked in bookkeeping the way a manual trim would.
-// TTL deletion is best-effort ("typically within 48 hours of expiration"
-// per AWS's own docs, not instant), so this can occasionally lag a bit
-// behind the true retention cutoff — an item just past its own expiresAt
-// but not yet swept still counts as "available" here. That slack is
-// small relative to a multi-day/week retention window and is the
-// deliberate trade for not running any custom deletion code at all.
-//
-// This as a single scalar cutoff is only a *complete* gap signal when
-// expiresAt is monotonic in epoch — true as long as LOG_RETENTION_DAYS
-// stays constant or only increases, since a later entry then always
-// expires no earlier than an older one. Decreasing it breaks that: an
-// entry written just after the decrease gets the new, shorter window
-// immediately, so it can expire before an older entry that's still
-// riding out its longer, pre-change expiresAt — a real hole in the
-// *middle* of the epoch range, for roughly the length of the old
-// retention window, that this single "oldest surviving epoch" value
-// won't reflect (a caller past it would look caught up while still
-// missing that hole). Not fixed here: nothing downstream reads this yet
-// (no client-side pull/catch-up path exists), and it's a rare, deliberate
-// operator action, not a routine one. If/when that changes, know this
-// before treating LOG_RETENTION_DAYS as freely adjustable in both
-// directions.
-func (s *Store) oldestAvailableEpoch(ctx context.Context, circleLogID string) (int64, error) {
-	out, err := s.client.Query(ctx, &dynamodb.QueryInput{
-		TableName:              aws.String(s.tableName),
-		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :pk AND %s BETWEEN :lower AND :upper", dynamoutil.PKAttr, dynamoutil.SKAttr)),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk":    &types.AttributeValueMemberS{Value: circleLogID},
-			":lower": &types.AttributeValueMemberS{Value: epochSK(1)},
-			":upper": &types.AttributeValueMemberS{Value: epochSKUpperBound()},
-		},
-		ScanIndexForward: aws.Bool(true),
-		Limit:            aws.Int32(1),
-	})
+// VerifyWriteToken is a plain, non-consistent read-and-compare — no CAS
+// loop needed, since nothing is mutated. Deliberately eventually
+// consistent: this gates a read-shaped operation (obtaining an upload
+// URL), where being briefly stale after a rotation just means a retry,
+// the same tolerance Read already has.
+func (s *Store) VerifyWriteToken(ctx context.Context, syncID, writeToken string) error {
+	control, err := s.getControlState(ctx, syncID, false)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	if len(out.Items) == 0 {
-		return 0, nil // nothing survives (or nothing was ever committed)
+	expectedHash, err := hashWriteToken(writeToken)
+	if err != nil || control.writeTokenHash != expectedHash {
+		return logstore.ErrWriteTokenMismatch
 	}
-	return dynamoutil.AttrInt(out.Items[0], "epoch")
+	return nil
+}
+
+func hashWriteToken(writeTokenHex string) (string, error) {
+	raw, err := hex.DecodeString(writeTokenHex)
+	if err != nil {
+		return "", fmt.Errorf("write token is not valid hex: %w", err)
+	}
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+// verifyAuthoritySignature checks cryptographic validity only — whether
+// authorityPublicKeyHex is actually a key the circle currently recognizes
+// is a separate, storage-backed check (see Rotate). ed25519.Verify panics
+// on a wrong-length key or signature rather than returning false, so
+// lengths are validated first — a malformed request must fail cleanly,
+// not crash the process.
+func verifyAuthoritySignature(authorityPublicKeyHex string, message []byte, signature []byte) error {
+	pubKey, err := hex.DecodeString(authorityPublicKeyHex)
+	if err != nil || len(pubKey) != ed25519.PublicKeySize {
+		return logstore.ErrInvalidSignature
+	}
+	if len(signature) != ed25519.SignatureSize {
+		return logstore.ErrInvalidSignature
+	}
+	if !ed25519.Verify(ed25519.PublicKey(pubKey), message, signature) {
+		return logstore.ErrInvalidSignature
+	}
+	return nil
 }

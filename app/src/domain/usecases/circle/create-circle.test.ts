@@ -1,5 +1,6 @@
 jest.mock('@/domain/usecases/circle/sync-circle');
 jest.mock('@/domain/usecases/account/account-manifest');
+jest.mock('@/services/relay');
 
 import { getAllCircles, getCircleMembers, initDatabase } from '@/data/db';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
@@ -7,12 +8,17 @@ import { createPost } from '@/domain/usecases/post/create-post';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { getCirclePosts } from '@/data/db/posts';
 import { saveMasterSeed } from '@/services/keystore';
+import { appendEntry, bootstrapCircle } from '@/services/relay';
 
 beforeAll(async () => {
   await initDatabase();
   await saveMasterSeed(new Uint8Array(16));
 });
-beforeEach(() => (drainOutbox as jest.Mock).mockResolvedValue(undefined));
+beforeEach(() => {
+  (drainOutbox as jest.Mock).mockResolvedValue(undefined);
+  (bootstrapCircle as jest.Mock).mockResolvedValue(undefined);
+  (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
+});
 
 test('createCircle inserts a circle and makes this device its first member', async () => {
   const { id } = await createCircle({ name: "Nana's House" });

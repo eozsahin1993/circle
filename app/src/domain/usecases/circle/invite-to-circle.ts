@@ -15,7 +15,7 @@ import {
 import { getCircle, getCurrentInvite, getMemberByPublicKey, getProfile, insertInvite, MemberRoles, revokeInvite, type Invite } from '@/data/db';
 import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinApprovalPayload, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
 import { bytesToDataUri } from '@/services/image';
-import { getCircleIdentity, getCircleSecret } from '@/services/keystore';
+import { getCircleIdentity, getCircleKeyMap } from '@/services/keystore';
 import { deleteJoinRequest, listJoinRequests, putInvitePreview, putJoinApproval } from '@/services/mailbox-relay';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -107,18 +107,10 @@ export async function replaceInvite(circleId: string): Promise<Invite> {
 }
 
 /**
- * Resolves the circle's current invite and confirms this device is
- * specifically the invite's *creator* — deliberately not
- * `requireAdminPublicKey`, which only checks circle-admin role. Per
- * server/DESIGN.md's "Invites" section, approval is always the invite's
- * specific creator, never "any admin" — an admin who didn't create this
- * invite has no more context to judge a join request against than a
- * stranger would. This is a client-side gate, same trust tier as
- * everything else in this flow: the relay is blind and doesn't enforce
- * it, so a device holding both the invite code and a valid session could
- * still call the mailbox API directly, bypassing this check — same as it
- * could always forge other locally-enforced conventions here (e.g. a
- * requester's self-reported name).
+ * Confirms this device is specifically the invite's *creator*, not just
+ * any admin (server/DESIGN.md's "Invites": an admin who didn't create
+ * this invite has no more context to judge a request than a stranger
+ * would). Client-side only — the relay is blind and can't enforce it.
  */
 async function requireInviteCreatorPublicKey(circleId: string): Promise<{ publicKey: string; invite: Invite }> {
   const own = await getOwnMember(circleId);
@@ -138,18 +130,12 @@ export type PendingRequest = {
 };
 
 /**
- * Lists join requests under the circle's current invite that are still
- * actually awaiting this device's decision, decrypted enough to show an
- * approval screen — the self-reported name (and picture) only, per
- * server/DESIGN.md ("not verified identity"). Silently skips any row that
- * fails to decrypt (e.g. a stale row from a previous invite that happens
- * to share a mailbox tag prefix) rather than failing the whole list.
- *
- * Excludes rows that already have an `encryptedApproval` — `approveJoinRequest`
- * updates a request row in place rather than deleting it (the requester
- * still needs to poll and read that approval), so without this filter an
- * already-approved request would keep reappearing here on every refetch,
- * even though there's nothing left for the creator to do with it.
+ * Lists join requests still awaiting this device's decision — self-
+ * reported name and picture only, not verified identity (server/DESIGN.md).
+ * Skips rows that fail to decrypt (e.g. stale, from a previous invite)
+ * rather than failing the whole list, and rows already carrying an
+ * `encryptedApproval` (approved in place, not deleted, so they'd
+ * otherwise keep reappearing here with nothing left to do).
  */
 export async function discoverPendingRequests(circleId: string): Promise<PendingRequest[]> {
   const { invite } = await requireInviteCreatorPublicKey(circleId);
@@ -186,20 +172,16 @@ export async function denyJoinRequest(circleId: string, requesterId: string): Pr
 }
 
 /**
- * Approves one pending join request: seals the circle secret + current
- * name to the requester's own ephemeral public key (see
- * `sealToPublicKey`), so only that specific requester can read it back.
+ * Approves one pending join request: seals this device's entire
+ * version→content-key map (not just the current version — a joiner needs
+ * every version to decrypt history predating their join) + circle name
+ * to the requester's ephemeral public key.
  *
- * Also signs the approval with this device's own circle-identity secret
- * key (the same keypair every post is already signed with) before
- * sealing it. Without this, the seal alone isn't enough: anyone who knows
- * the invite code and the circle secret — any existing member, not just
- * this invite's creator — has everything needed to forge an equally
- * valid-looking approval, since `requireInviteCreatorPublicKey` above is
- * a client-side gate the relay can't enforce. The signature is what the
- * requester actually checks (see `checkPendingJoinRequest`) against the
- * `createdByPublicKey` it captured from the invite preview — binding
- * trust to the one identity that's supposed to matter.
+ * Also signs the approval with this device's circle identity before
+ * sealing — without it, any existing member (not just the creator) could
+ * forge an equally valid-looking approval, since the creator-only check
+ * above is client-side only. The signature is what
+ * `checkPendingJoinRequest` actually verifies against.
  */
 export async function approveJoinRequest(circleId: string, requesterId: string): Promise<void> {
   const { invite } = await requireInviteCreatorPublicKey(circleId);
@@ -214,12 +196,16 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   const requestKey = deriveJoinRequestKey(invite.code);
   const { ephemeralPub } = JSON.parse(new TextDecoder().decode(decrypt(request.encryptedRequest, requestKey))) as JoinRequestPayload;
 
-  const secret = await getCircleSecret(circleId);
-  if (!secret) throw new Error('No circle secret on this device.');
+  // TODO(sync-before-approve): should sync meta before sealing (server/
+  // SYNC_DESIGN.md "Add a member") — a stale approver hands the joiner an
+  // incomplete key map. Blocked on pullCircle not existing yet.
+  const keyMap = await getCircleKeyMap(circleId);
+  if (!keyMap) throw new Error('No content key on this device.');
   const identity = await getCircleIdentity(circleId);
   if (!identity) throw new Error('No circle identity on this device.');
 
-  const approval: JoinApprovalPayload = { secret: bytesToHex(secret), circleName: circle.name };
+  const hexKeyMap = Object.fromEntries(Object.entries(keyMap).map(([version, key]) => [version, bytesToHex(key)]));
+  const approval: JoinApprovalPayload = { keyMap: hexKeyMap, syncId: circle.syncId, circleName: circle.name };
   const signature = sign(new TextEncoder().encode(JSON.stringify(approval)), identity.secretKey);
   const envelope: JoinApprovalEnvelope = { approval, signature: bytesToHex(signature) };
 

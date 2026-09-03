@@ -61,11 +61,11 @@ var (
 	inviteTableErr  error
 )
 
-// UniqueCircleID returns a circleLogID guaranteed not to collide with data
-// left behind by a previous test run — the shared test table isn't wiped
+// UniqueSyncID returns a syncID guaranteed not to collide with data left
+// behind by a previous test run — the shared test table isn't wiped
 // between `go test` invocations, only created once, so hardcoded IDs
 // (and hardcoded epoch assertions) would go flaky on a second run.
-func UniqueCircleID(t testing.TB) string {
+func UniqueSyncID(t testing.TB) string {
 	t.Helper()
 	return fmt.Sprintf("%s-%d", t.Name(), time.Now().UnixNano())
 }
@@ -108,9 +108,9 @@ func loadConfig(t testing.TB) aws.Config {
 
 // NewLogStore returns a real dynamodb-backed LogStore against LocalStack,
 // creating the test table once per test binary run (shared across tests —
-// safe because tests use distinct circleLogID values). Skips the test if
+// safe because tests use distinct syncID values). Skips the test if
 // LocalStack isn't reachable.
-func NewLogStore(t testing.TB, logRetentionDays int64) logstore.Store {
+func NewLogStore(t testing.TB) logstore.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
@@ -121,7 +121,7 @@ func NewLogStore(t testing.TB, logRetentionDays int64) logstore.Store {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", tableErr)
 	}
 
-	return logdynamodb.New(client, tableName, logRetentionDays)
+	return logdynamodb.New(client, tableName)
 }
 
 // RawDynamoDBClient returns the same client + table name NewLogStore uses,

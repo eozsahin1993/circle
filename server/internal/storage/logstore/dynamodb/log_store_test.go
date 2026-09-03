@@ -2,69 +2,197 @@ package dynamodb_test
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
-	"strconv"
 	"sync"
 	"testing"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"circle-relay/internal/storage/logstore"
 	"circle-relay/internal/testsupport"
 )
 
-// Sort-key formats duplicated from log_store.go (unexported, and this is an
-// external _test package) — epoch#<12-digit zero-padded> and idem#<id>.
-// Only the two things these tests need to reach directly: reading a raw
-// item's expiresAt, and deleting an item to simulate what DynamoDB's
-// background TTL sweep would eventually do for real (sweep timing itself
-// isn't something a fast unit test can exercise).
-func epochSortKey(epoch int64) string {
-	return fmt.Sprintf("epoch#%012d", epoch)
-}
-
-func idemSortKey(entryID string) string {
-	return "idem#" + entryID
-}
-
-func getRawItem(t *testing.T, client *awsdynamodb.Client, table, pk, sk string) map[string]types.AttributeValue {
+// hashToken duplicates the adapter's private hashWriteToken (unexported,
+// and this is an external _test package, same reasoning as the sort-key
+// format duplication below) — sha256 over the raw bytes a hex-encoded
+// write token decodes to.
+func hashToken(t *testing.T, tokenHex string) string {
 	t.Helper()
-	out, err := client.GetItem(context.Background(), &awsdynamodb.GetItemInput{
-		TableName: aws.String(table),
-		Key: map[string]types.AttributeValue{
-			"pk": &types.AttributeValueMemberS{Value: pk},
-			"sk": &types.AttributeValueMemberS{Value: sk},
-		},
-	})
+	raw, err := hex.DecodeString(tokenHex)
 	if err != nil {
-		t.Fatalf("failed to read raw item: %v", err)
+		t.Fatalf("test token isn't valid hex: %v", err)
 	}
-	if out.Item == nil {
-		t.Fatalf("expected item at pk=%s sk=%s to exist", pk, sk)
-	}
-	return out.Item
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:])
 }
 
-func deleteRawItem(t *testing.T, client *awsdynamodb.Client, table, pk, sk string) {
+// newToken returns a fresh, random hex-encoded string standing in for a
+// real writeToken (in reality HKDF(K_v, "relay-write-token")) — tests
+// only care that two calls produce different values and that hashToken
+// is stable for a given one, not about the real derivation. Must be valid
+// hex, unlike testsupport.UniqueSyncID (which embeds the test name).
+func newToken(t *testing.T) string {
 	t.Helper()
-	_, err := client.DeleteItem(context.Background(), &awsdynamodb.DeleteItemInput{
-		TableName: aws.String(table),
-		Key: map[string]types.AttributeValue{
-			"pk": &types.AttributeValueMemberS{Value: pk},
-			"sk": &types.AttributeValueMemberS{Value: sk},
-		},
-	})
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		t.Fatalf("failed to generate random token: %v", err)
+	}
+	return hex.EncodeToString(buf)
+}
+
+type authorityKey struct {
+	publicKeyHex string
+	private      ed25519.PrivateKey
+}
+
+func newAuthorityKey(t *testing.T) authorityKey {
+	t.Helper()
+	pub, priv, err := ed25519.GenerateKey(nil)
 	if err != nil {
-		t.Fatalf("failed to delete raw item (simulating TTL sweep): %v", err)
+		t.Fatalf("failed to generate authority key: %v", err)
+	}
+	return authorityKey{publicKeyHex: hex.EncodeToString(pub), private: priv}
+}
+
+func (k authorityKey) sign(syncID, entryID, newWriteTokenHash string) []byte {
+	return ed25519.Sign(k.private, logstore.RotateMessage(syncID, entryID, newWriteTokenHash))
+}
+
+func bootstrap(t *testing.T, store logstore.Store, syncID string, founder authorityKey, token string) {
+	t.Helper()
+	if err := store.Bootstrap(context.Background(), syncID, founder.publicKeyHex, hashToken(t, token)); err != nil {
+		t.Fatalf("bootstrap failed: %v", err)
 	}
 }
 
-func TestLogStore_CommitEntry_ConcurrentDuplicatesConvergeToSameEpoch(t *testing.T) {
+func TestLogStore_Bootstrap_RejectsDuplicateSyncID(t *testing.T) {
 	ctx := context.Background()
-	circleLogID := testsupport.UniqueCircleID(t)
-	logStore := testsupport.NewLogStore(t, 0)
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+
+	bootstrap(t, store, syncID, founder, newToken(t))
+
+	err := store.Bootstrap(ctx, syncID, founder.publicKeyHex, hashToken(t, newToken(t)))
+	if !errors.Is(err, logstore.ErrAlreadyExists) {
+		t.Fatalf("expected ErrAlreadyExists on a second Bootstrap, got %v", err)
+	}
+}
+
+func TestLogStore_Append_SucceedsWithTheCurrentWriteTokenAndAssignsSequentialEpochs(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	first, err := store.Append(ctx, syncID, logstore.NamespaceMeta, "entry-1", []byte("ciphertext"), 1, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Epoch != 1 {
+		t.Fatalf("expected first entry to land at epoch 1, got %d", first.Epoch)
+	}
+
+	second, err := store.Append(ctx, syncID, logstore.NamespaceMeta, "entry-2", []byte("ciphertext"), 1, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.Epoch != 2 {
+		t.Fatalf("expected second entry to land at epoch 2, got %d", second.Epoch)
+	}
+}
+
+func TestLogStore_Append_RejectsWrongWriteTokenAndLeavesCounterUntouched(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	_, err := store.Append(ctx, syncID, logstore.NamespaceMeta, "entry-1", []byte("ciphertext"), 1, "not-the-real-token-hex")
+	if !errors.Is(err, logstore.ErrWriteTokenMismatch) {
+		t.Fatalf("expected ErrWriteTokenMismatch, got %v", err)
+	}
+
+	// A wrong token must never burn an epoch — the first entry with the
+	// *correct* token still lands at epoch 1, not 2.
+	commit, err := store.Append(ctx, syncID, logstore.NamespaceMeta, "entry-2", []byte("ciphertext"), 1, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if commit.Epoch != 1 {
+		t.Fatalf("expected the rejected attempt to have consumed no epoch, got epoch %d", commit.Epoch)
+	}
+}
+
+func TestLogStore_Append_UnknownSyncIDIsDistinctFromWrongToken(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+
+	_, err := store.Append(ctx, testsupport.UniqueSyncID(t), logstore.NamespaceMeta, "entry-1", []byte("ciphertext"), 1, newToken(t))
+	if !errors.Is(err, logstore.ErrCircleNotFound) {
+		t.Fatalf("expected ErrCircleNotFound for a never-bootstrapped syncID, got %v", err)
+	}
+}
+
+func TestLogStore_Append_MetaAndContentCountersAreIndependent(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	metaCommit, err := store.Append(ctx, syncID, logstore.NamespaceMeta, "meta-1", []byte("m"), 1, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content1, err := store.Append(ctx, syncID, logstore.NamespaceContent, "content-1", []byte("c1"), 1, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content2, err := store.Append(ctx, syncID, logstore.NamespaceContent, "content-2", []byte("c2"), 1, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if metaCommit.Epoch != 1 {
+		t.Fatalf("expected meta's own first entry at epoch 1, got %d", metaCommit.Epoch)
+	}
+	if content1.Epoch != 1 || content2.Epoch != 2 {
+		t.Fatalf("expected content's own independent sequence 1,2 — got %d,%d", content1.Epoch, content2.Epoch)
+	}
+
+	metaRead, err := store.Read(ctx, syncID, logstore.NamespaceMeta, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(metaRead.Entries) != 1 {
+		t.Fatalf("expected exactly the one meta entry when reading meta, got %d (content must not leak into meta)", len(metaRead.Entries))
+	}
+
+	contentRead, err := store.Read(ctx, syncID, logstore.NamespaceContent, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(contentRead.Entries) != 2 {
+		t.Fatalf("expected exactly the two content entries when reading content, got %d (meta must not leak into content)", len(contentRead.Entries))
+	}
+}
+
+func TestLogStore_Append_ConcurrentDuplicateEntryIDsConvergeToSameEpoch(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
 
 	const concurrency = 10
 	results := make([]logstore.CommitResult, concurrency)
@@ -75,165 +203,177 @@ func TestLogStore_CommitEntry_ConcurrentDuplicatesConvergeToSameEpoch(t *testing
 	for i := range concurrency {
 		go func() {
 			defer wg.Done()
-			results[i], errs[i] = logStore.CommitEntry(ctx, circleLogID, "post-1", []byte("ciphertext"))
+			results[i], errs[i] = store.Append(ctx, syncID, logstore.NamespaceContent, "post-1", []byte("ciphertext"), 1, token)
 		}()
 	}
 	wg.Wait()
 
 	for i, err := range errs {
 		if err != nil {
-			t.Fatalf("commit %d failed: %v", i, err)
+			t.Fatalf("append %d failed: %v", i, err)
 		}
 	}
-
 	want := results[0]
 	for i, got := range results {
 		if got != want {
-			t.Fatalf("commit %d = %+v, want %+v (all concurrent commits of the same entryID must converge)", i, got, want)
+			t.Fatalf("append %d = %+v, want %+v (all concurrent commits of the same entryID must converge)", i, got, want)
 		}
 	}
 }
 
-func TestLogStore_CommitEntry_WritesExpiresAtFromRetentionWindow(t *testing.T) {
+func TestLogStore_Rotate_SwapsWriteTokenAndAppendsMetaEntryAtomically(t *testing.T) {
 	ctx := context.Background()
-	circleLogID := testsupport.UniqueCircleID(t)
-	const retentionDays = 7
-	logStore := testsupport.NewLogStore(t, retentionDays)
-	client, table := testsupport.RawDynamoDBClient(t)
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	oldToken := newToken(t)
+	newTokenValue := newToken(t)
+	newHash := hashToken(t, newTokenValue)
+	bootstrap(t, store, syncID, founder, oldToken)
 
-	commit, err := logStore.CommitEntry(ctx, circleLogID, "post-1", []byte("ciphertext"))
+	sig := founder.sign(syncID, "rotate-1", newHash)
+	commit, err := store.Rotate(ctx, syncID, "rotate-1", []byte("key_rotation payload"), 1, oldToken, newHash, founder.publicKeyHex, sig)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantExpiresAt := commit.ReceivedAt/1000 + retentionDays*24*60*60
-
-	entryItem := getRawItem(t, client, table, circleLogID, epochSortKey(commit.Epoch))
-	if got := mustAttrInt(t, entryItem, "expiresAt"); got != wantExpiresAt {
-		t.Fatalf("log entry expiresAt = %d, want %d", got, wantExpiresAt)
+	if commit.Epoch != 1 {
+		t.Fatalf("expected the rotation to land as meta's first entry (epoch 1), got %d", commit.Epoch)
 	}
 
-	idemItem := getRawItem(t, client, table, circleLogID, idemSortKey("post-1"))
-	if got := mustAttrInt(t, idemItem, "expiresAt"); got != wantExpiresAt {
-		t.Fatalf("idempotency marker expiresAt = %d, want %d", got, wantExpiresAt)
+	// The old token must no longer work...
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, "post-with-old-token", []byte("c"), 1, oldToken); !errors.Is(err, logstore.ErrWriteTokenMismatch) {
+		t.Fatalf("expected old write token to be rejected after rotation, got %v", err)
+	}
+	// ...and the new one must.
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, "post-with-new-token", []byte("c"), 1, newTokenValue); err != nil {
+		t.Fatalf("expected new write token to work after rotation: %v", err)
+	}
+
+	metaRead, err := store.Read(ctx, syncID, logstore.NamespaceMeta, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(metaRead.Entries) != 1 || string(metaRead.Entries[0].EncryptedMeta) != "key_rotation payload" {
+		t.Fatalf("expected the rotation's own entry to be readable back from meta, got %+v", metaRead.Entries)
 	}
 }
 
-// DynamoDB's TTL sweep isn't something a fast unit test can wait on for
-// real (AWS documents it as best-effort, not instant) — this simulates
-// the outcome of a sweep having already run (deleting the item directly)
-// and asserts Read()/CommitEntry() react correctly to what's actually
-// left in the table, the same way they would after a real sweep.
-func TestLogStore_Read_OldestAvailableEpochReflectsWhatSurvivedEviction(t *testing.T) {
+func TestLogStore_Rotate_RejectsSignatureFromAKeyNotInTheAuthoritySet(t *testing.T) {
 	ctx := context.Background()
-	circleLogID := testsupport.UniqueCircleID(t)
-	logStore := testsupport.NewLogStore(t, 0)
-	client, table := testsupport.RawDynamoDBClient(t)
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	impostor := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
 
-	const numEntries = 5
-	var epochs []int64
-	for i := range numEntries {
-		commit, err := logStore.CommitEntry(ctx, circleLogID, fmt.Sprintf("post-%d", i), []byte("ciphertext"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		epochs = append(epochs, commit.Epoch)
+	newHash := hashToken(t, newToken(t))
+	sig := impostor.sign(syncID, "rotate-1", newHash)
+
+	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, impostor.publicKeyHex, sig)
+	if !errors.Is(err, logstore.ErrAuthorityNotRecognized) {
+		t.Fatalf("expected ErrAuthorityNotRecognized for a validly-signed but unrecognized authority key, got %v", err)
 	}
 
-	// Simulate TTL having already evicted the two oldest entries.
-	for _, epoch := range epochs[:2] {
-		deleteRawItem(t, client, table, circleLogID, epochSortKey(epoch))
-	}
-
-	result, err := logStore.Read(ctx, circleLogID, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	wantOldest := epochs[2]
-	if result.OldestAvailableEpoch != wantOldest {
-		t.Fatalf("expected oldestAvailableEpoch %d, got %d", wantOldest, result.OldestAvailableEpoch)
-	}
-	if len(result.Entries) != numEntries-2 || result.Entries[0].Epoch != wantOldest {
-		t.Fatalf("expected surviving entries to start at epoch %d, got %v", wantOldest, result.Entries)
+	// Nothing should have moved: the original token still works.
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, "post-1", []byte("c"), 1, token); err != nil {
+		t.Fatalf("expected the original write token to still work after a rejected rotation: %v", err)
 	}
 }
 
-func TestLogStore_CommitEntry_RetryAfterIdempotencyMarkerEvictionGetsNewEpoch(t *testing.T) {
+func TestLogStore_Rotate_RejectsAnInvalidSignatureBeforeTouchingStorage(t *testing.T) {
 	ctx := context.Background()
-	circleLogID := testsupport.UniqueCircleID(t)
-	logStore := testsupport.NewLogStore(t, 0)
-	client, table := testsupport.RawDynamoDBClient(t)
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
 
-	original, err := logStore.CommitEntry(ctx, circleLogID, "post-1", []byte("ciphertext"))
-	if err != nil {
-		t.Fatal(err)
+	newHash := hashToken(t, newToken(t))
+	// Correct, recognized public key, but a signature over the wrong
+	// message (as if forged, or replayed from a different rotation).
+	badSig := founder.sign(syncID, "some-other-entry-id", newHash)
+
+	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, founder.publicKeyHex, badSig)
+	if !errors.Is(err, logstore.ErrInvalidSignature) {
+		t.Fatalf("expected ErrInvalidSignature, got %v", err)
 	}
 
-	// A still-present idempotency marker makes a retry converge, same as
-	// before TTL existed.
-	retry, err := logStore.CommitEntry(ctx, circleLogID, "post-1", []byte("ciphertext"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if retry != original {
-		t.Fatalf("expected retry to converge to original commit %+v, got %+v", original, retry)
-	}
-
-	// Simulate TTL having evicted just the idempotency marker (its own
-	// independent expiresAt, unrelated to the log entry's) — a retry now
-	// has nothing to converge to, so it's treated as a brand-new commit.
-	deleteRawItem(t, client, table, circleLogID, idemSortKey("post-1"))
-
-	afterEviction, err := logStore.CommitEntry(ctx, circleLogID, "post-1", []byte("ciphertext"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if afterEviction.Epoch == original.Epoch {
-		t.Fatalf("expected retry after idempotency marker eviction to get a new epoch, still got original epoch %d", original.Epoch)
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, "post-1", []byte("c"), 1, token); err != nil {
+		t.Fatalf("expected the original write token to still work after a rejected rotation: %v", err)
 	}
 }
 
-// readPageSize duplicated from log_store.go (unexported, and this is an
-// external _test package, same reasoning as the sort-key formats above) —
-// see its own doc comment for why it's an internal server policy, not a
-// caller-supplied parameter.
+func TestLogStore_Rotate_RejectsAStaleCurrentWriteToken(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	newHash := hashToken(t, newToken(t))
+	sig := founder.sign(syncID, "rotate-1", newHash)
+
+	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, "stale-token-not-the-real-one", newHash, founder.publicKeyHex, sig)
+	if !errors.Is(err, logstore.ErrWriteTokenMismatch) {
+		t.Fatalf("expected ErrWriteTokenMismatch for a stale currentWriteToken, got %v", err)
+	}
+}
+
+func TestLogStore_Read_UnbootstrappedSyncIDReadsAsEmptyNotError(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+
+	result, err := store.Read(ctx, testsupport.UniqueSyncID(t), logstore.NamespaceMeta, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Entries) != 0 || result.CurrentEpoch != 0 {
+		t.Fatalf("expected an empty result for a never-bootstrapped syncID, got %+v", result)
+	}
+}
+
+// readPageSize duplicated from log_store.go (unexported, external _test
+// package, same reasoning as elsewhere in this file).
 const readPageSize = 200
 
-// Proves Read() actually loops past DynamoDB's own internal per-call
-// response cap instead of silently returning a truncated result — the bug
-// this pagination fix addresses. Committing more entries than a single
-// unpaginated Query could easily return isn't simulate-able the way TTL
-// eviction is above; this exercises the real boundary directly.
+// Proves Read() loops past DynamoDB's own internal per-call response cap
+// instead of silently returning a truncated result, and that a caller
+// resuming from the last entry it actually received (never from
+// CurrentEpoch) picks up exactly where it left off — same property the
+// pre-redesign version of this store had, now scoped to one namespace.
 func TestLogStore_Read_PaginatesPastASinglePageAndResumesCorrectly(t *testing.T) {
 	ctx := context.Background()
-	circleLogID := testsupport.UniqueCircleID(t)
-	logStore := testsupport.NewLogStore(t, 0)
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
 
 	const totalEntries = readPageSize + 50
 	for i := range totalEntries {
-		if _, err := logStore.CommitEntry(ctx, circleLogID, fmt.Sprintf("post-%d", i), []byte("ciphertext")); err != nil {
-			t.Fatalf("commit %d failed: %v", i, err)
+		if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, fmt.Sprintf("post-%d", i), []byte("ciphertext"), 1, token); err != nil {
+			t.Fatalf("append %d failed: %v", i, err)
 		}
 	}
 
-	first, err := logStore.Read(ctx, circleLogID, 0)
+	first, err := store.Read(ctx, syncID, logstore.NamespaceContent, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(first.Entries) != readPageSize {
 		t.Fatalf("expected exactly %d entries in a capped page, got %d", readPageSize, len(first.Entries))
 	}
-	if first.LatestEpoch != int64(totalEntries) {
-		t.Fatalf("expected LatestEpoch to report the true latest (%d) even though this page was truncated, got %d", totalEntries, first.LatestEpoch)
+	if first.CurrentEpoch != int64(totalEntries) {
+		t.Fatalf("expected CurrentEpoch to report the true latest (%d) even though this page was truncated, got %d", totalEntries, first.CurrentEpoch)
 	}
 	lastInFirstPage := first.Entries[len(first.Entries)-1].Epoch
 	if lastInFirstPage != readPageSize {
 		t.Fatalf("expected the first page's last entry to be epoch %d, got %d", readPageSize, lastInFirstPage)
 	}
 
-	// A correct caller advances `since` to the last entry it actually
-	// received, not to LatestEpoch — this is exactly that resumption.
-	second, err := logStore.Read(ctx, circleLogID, lastInFirstPage)
+	second, err := store.Read(ctx, syncID, logstore.NamespaceContent, lastInFirstPage)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,21 +387,4 @@ func TestLogStore_Read_PaginatesPastASinglePageAndResumesCorrectly(t *testing.T)
 	if second.Entries[len(second.Entries)-1].Epoch != int64(totalEntries) {
 		t.Fatalf("expected the second page to reach the true latest epoch %d, got %d", totalEntries, second.Entries[len(second.Entries)-1].Epoch)
 	}
-}
-
-func mustAttrInt(t *testing.T, item map[string]types.AttributeValue, key string) int64 {
-	t.Helper()
-	attr, ok := item[key]
-	if !ok {
-		t.Fatalf("missing attribute %q", key)
-	}
-	n, ok := attr.(*types.AttributeValueMemberN)
-	if !ok {
-		t.Fatalf("attribute %q is not a number", key)
-	}
-	value, err := strconv.ParseInt(n.Value, 10, 64)
-	if err != nil {
-		t.Fatalf("attribute %q is not a valid integer: %v", key, err)
-	}
-	return value
 }

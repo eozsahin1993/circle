@@ -3,10 +3,10 @@ variable "name_prefix" {
   type        = string
 }
 
-variable "log_retention_days" {
-  description = "Age at which S3 expires a blob — kept in step with the DynamoDB TTL on the log entry that points to it (see log_store.go), so a blob doesn't outlive the entry referencing it."
+variable "blob_glacier_transition_days" {
+  description = "Age at which S3 transitions a blob to Glacier Instant Retrieval (see s3.tf) — blobs are never deleted, only tiered. Defaults to Glacier IR's own 90-day minimum billable duration."
   type        = number
-  default     = 14
+  default     = 90
 }
 
 variable "invite_retention_days" {

@@ -14,10 +14,10 @@ locals {
   name_prefix = "circle-${var.env}"
 }
 
-variable "log_retention_days" {
-  description = "How long a circle's log entries (and their blobs) are kept before AWS evicts them — DynamoDB TTL for the log, an S3 lifecycle rule for blobs — see server/DESIGN.md. Safe to raise anytime; lowering it needs care (see log_store.go's oldestAvailableEpoch doc comment) — start conservative, not aggressive. Exposed here rather than hardcoded so it can be changed without a rebuild."
+variable "blob_glacier_transition_days" {
+  description = "Age at which a circle's blobs (photos, avatars, cover images) transition to Glacier Instant Retrieval — see provision/modules/storage/s3.tf and server/SYNC_DESIGN.md. Nothing is ever deleted (the log and its blobs are permanent by design); this only controls when storage gets cheaper. Exposed here rather than hardcoded so it can be changed without a rebuild."
   type        = number
-  default     = 14
+  default     = 90
 }
 
 variable "invite_retention_days" {

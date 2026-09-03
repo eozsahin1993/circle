@@ -140,7 +140,6 @@ resource "aws_lambda_function" "relay" {
       GOOGLE_CLIENT_ID_ANDROID = var.google_client_id_android
       GOOGLE_CLIENT_ID_WEB     = var.google_client_id_web
       APPLE_CLIENT_ID_IOS      = var.apple_client_id_ios
-      LOG_RETENTION_DAYS       = tostring(var.log_retention_days)
       MAX_BLOB_SIZE_BYTES      = tostring(var.max_blob_size_bytes)
       INVITE_RETENTION_DAYS    = tostring(var.invite_retention_days)
     }

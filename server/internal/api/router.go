@@ -9,15 +9,18 @@ import (
 	"net/http"
 
 	"circle-relay/internal/api/account/manifest"
-	"circle-relay/internal/api/appendentry"
+	"circle-relay/internal/api/appendlog"
 	"circle-relay/internal/api/auth"
 	"circle-relay/internal/api/auth/apple"
 	"circle-relay/internal/api/auth/google"
 	"circle-relay/internal/api/auth/logout"
 	"circle-relay/internal/api/auth/oidcverify"
-	"circle-relay/internal/api/fetchentries"
+	"circle-relay/internal/api/createlog"
 	"circle-relay/internal/api/getblob"
+	"circle-relay/internal/api/getlog"
+	"circle-relay/internal/api/getuploadtarget"
 	"circle-relay/internal/api/invite"
+	"circle-relay/internal/api/rotatelog"
 	"circle-relay/internal/storage/authstore"
 	"circle-relay/internal/storage/blobstore"
 	"circle-relay/internal/storage/invitestore"
@@ -54,11 +57,17 @@ func newV1Mux(
 ) *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// Grouped under one sub-mux so RequireSession wraps all three at once.
+	// Grouped under one sub-mux so RequireSession wraps all five at once —
+	// each endpoint also checks its own write token/authority signature
+	// beyond this shared session check (server/SYNC_DESIGN.md's
+	// "Authorization" section).
 	circleMux := http.NewServeMux()
-	appendentry.Register(circleMux, &appendentry.Service{LogStore: logStore, BlobStore: blobStore})
-	fetchentries.Register(circleMux, &fetchentries.Service{LogStore: logStore})
+	createlog.Register(circleMux, &createlog.Service{LogStore: logStore})
+	appendlog.Register(circleMux, &appendlog.Service{LogStore: logStore})
+	rotatelog.Register(circleMux, &rotatelog.Service{LogStore: logStore})
+	getlog.Register(circleMux, &getlog.Service{LogStore: logStore})
 	getblob.Register(circleMux, &getblob.Service{BlobStore: blobStore})
+	getuploadtarget.Register(circleMux, &getuploadtarget.Service{BlobStore: blobStore, LogStore: logStore})
 	mux.Handle("/circles/", auth.RequireSession(authStore, circleMux))
 
 	// Account-scoped, not circle-scoped — its own sub-mux, same

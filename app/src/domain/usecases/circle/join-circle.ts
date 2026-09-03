@@ -5,6 +5,7 @@ import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 import {
   decrypt,
   deriveCircleIdentity,
+  deriveCircleSealingKeypair,
   deriveInvitePreviewKey,
   deriveInviteTag,
   deriveJoinRequestKey,
@@ -14,6 +15,7 @@ import {
   openSealedBox,
   verify,
 } from '@/services/crypto';
+import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
 import {
   deletePendingJoinRequest,
   getPendingJoinRequest,
@@ -30,7 +32,7 @@ import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinRequestPayload } f
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { compressToThumbnail } from '@/services/image';
-import { deletePendingJoinKeypair, getMasterSeed, getPendingJoinKeypair, saveCircleIdentity, saveCircleSecret, savePendingJoinKeypair } from '@/services/keystore';
+import { deletePendingJoinKeypair, getMasterSeed, getPendingJoinKeypair, saveCircleIdentity, saveCircleKeyMap, savePendingJoinKeypair } from '@/services/keystore';
 import { getInvitePreview, getJoinRequestApproval, putJoinRequest } from '@/services/mailbox-relay';
 
 /**
@@ -95,34 +97,55 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
 }
 
 /**
- * Finishes a join once the secret's been decrypted: mirrors
- * `createCircle`'s order of operations exactly (secret + identity to
- * Keychain before any local DB writes), except the roster role is
- * `member`, never `admin` — only the founder auto-admins. Also enqueues a
- * `member_added` outbox entry so existing members eventually learn about
- * this join (once `pullCircle` exists to let them see it — see
- * server/INVITE_FLOW.md's "what this flow depends on" section for why
- * that's a known, separate gap, not a bug here).
+ * Finishes a join once the approval's been decrypted: mirrors
+ * `createCircle`'s order of operations (key map + identity to Keychain
+ * before any local DB writes), roster role `member` not `admin`.
+ *
+ * `keyMap` is the approver's *entire* version→key map, not just the
+ * current version — lets this device decrypt history predating its own
+ * join (see server/SYNC_DESIGN.md's "Add a member"). Its own
+ * `member_added` entry uses the current (highest) version, same as any
+ * post would.
+ *
+ * Known gaps, not addressed here: existing members only learn of this
+ * join once `pullCircle` exists (server/INVITE_FLOW.md); `member_added`
+ * is self-announced by the joiner via the outbox rather than written by
+ * the approver, as the design calls for.
  */
-async function completeJoin(pending: PendingJoinRequest, secret: Uint8Array, circleName: string): Promise<{ circleId: string }> {
+async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, Uint8Array>, syncId: string, circleName: string): Promise<{ circleId: string }> {
   const masterSeed = await getMasterSeed();
   if (!masterSeed) throw new Error('No master seed yet — onboarding must generate one before joining any circle.');
+
+  const currentVersion = Math.max(...Object.keys(keyMap).map(Number));
+  const currentKey = keyMap[currentVersion];
 
   const now = Date.now();
   const circleId = generateUUID();
   const memberId = generateUUID();
   const identity = deriveCircleIdentity(masterSeed, circleId);
+  const sealingKeypair = deriveCircleSealingKeypair(masterSeed, circleId);
 
-  await saveCircleSecret(circleId, secret);
+  await saveCircleKeyMap(circleId, keyMap);
   await saveCircleIdentity(circleId, { ...identity, memberId });
 
-  await insertCircle({ id: circleId, name: circleName, picture: null, createdAt: now, leftAt: null });
+  await insertCircle({
+    id: circleId,
+    name: circleName,
+    picture: null,
+    syncId,
+    createdAt: now,
+    leftAt: null,
+    metaCursor: 0,
+    contentCursor: 0,
+  });
 
   const profile = await getProfile();
-  const publicKey = bytesToHex(identity.publicKey);
+  const identityPublicKey = bytesToHex(identity.publicKey);
+  const encPublicKey = bytesToHex(sealingKeypair.publicKey);
   await insertMember({
     circleId,
-    publicKey,
+    identityPublicKey,
+    encPublicKey,
     memberId,
     role: MemberRoles.member,
     name: profile?.name ?? '',
@@ -130,7 +153,12 @@ async function completeJoin(pending: PendingJoinRequest, secret: Uint8Array, cir
     joinedAt: now,
   });
 
-  const encryptedMeta = encryptJSON({ entryType: 'member_added', memberId, publicKey, name: profile?.name ?? '', joinedAt: now }, secret);
+  const encryptedMeta = buildAndEncryptLogEntry(
+    'member_added',
+    { signPub: identityPublicKey, x25519Pub: encPublicKey, name: profile?.name ?? '', role: MemberRoles.member, keyVersion: currentVersion },
+    identity,
+    currentKey
+  );
   await insertOutboxEntry({
     circleId,
     entryType: 'member_added',
@@ -153,21 +181,16 @@ async function completeJoin(pending: PendingJoinRequest, secret: Uint8Array, cir
 export type PendingJoinCheck = { joined: true; circleId: string } | { joined: false };
 
 /**
- * Checks whether a pending join request has been approved yet — same
- * app-lifecycle-triggered polling as everywhere else in this flow, never
- * push-dependent (see server/INVITE_FLOW.md's goals). Returns `{joined:
- * false}` while still pending, or if the local pending row is already
- * gone (completed elsewhere, or abandoned). Returns the new circle's id
- * once the join has fully completed locally, so the caller can navigate
- * straight to it.
+ * Checks whether a pending join request has been approved yet — polled,
+ * never push-dependent (see server/INVITE_FLOW.md). Returns `{joined:
+ * false}` while pending, or once the join has completed, the new
+ * circle's id.
  *
- * An approval that opens but fails signature verification (see
- * `approveJoinRequest`'s doc comment) is treated exactly like no approval
- * having arrived yet, not a fatal error — anyone who knew the invite code
- * and the real circle secret could otherwise get this far, so the
- * signature check is what actually decides whether this approval came
- * from the invite's real creator. The local pending row is left in place
- * either way, so a later, legitimate approval can still land and succeed.
+ * A signature failure is treated the same as no approval yet, not a
+ * fatal error — it's the actual gate deciding this came from the
+ * invite's real creator (anyone with the invite code could otherwise
+ * forge one) — and the pending row is left in place so a later,
+ * legitimate approval can still land.
  */
 export async function checkPendingJoinRequest(requestId: string): Promise<PendingJoinCheck> {
   const pending = await getPendingJoinRequest(requestId);
@@ -187,6 +210,7 @@ export async function checkPendingJoinRequest(requestId: string): Promise<Pendin
     return { joined: false };
   }
 
-  const { circleId } = await completeJoin(pending, hexToBytes(envelope.approval.secret), envelope.approval.circleName);
+  const keyMap = Object.fromEntries(Object.entries(envelope.approval.keyMap).map(([version, hex]) => [Number(version), hexToBytes(hex)]));
+  const { circleId } = await completeJoin(pending, keyMap, envelope.approval.syncId, envelope.approval.circleName);
   return { joined: true, circleId };
 }

@@ -29,12 +29,12 @@ export async function insertMember(member: Member): Promise<void> {
   await db.insert(circleMembers).values(member);
 }
 
-/** Looks up a member by their public key — used to verify a post's signature. */
-export async function getMemberByPublicKey(circleId: string, publicKey: string): Promise<Member | null> {
+/** Looks up a member by their identity (Ed25519 signing) public key — used to verify a post's signature. */
+export async function getMemberByPublicKey(circleId: string, identityPublicKey: string): Promise<Member | null> {
   const rows = await db
     .select()
     .from(circleMembers)
-    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.publicKey, publicKey)));
+    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey)));
   return rows[0] ? normalizeMember(rows[0]) : null;
 }
 
@@ -59,18 +59,18 @@ export async function getCircleMembers(circleId: string): Promise<Member[]> {
 
 export async function updateMemberProfile(
   circleId: string,
-  publicKey: string,
+  identityPublicKey: string,
   profile: { name: string; picture: Uint8Array | null },
 ): Promise<void> {
   await db
     .update(circleMembers)
     .set(profile)
-    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.publicKey, publicKey)));
+    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey)));
 }
 
 /** Removes a member from a circle's roster (e.g. after a kick + rotation). */
-export async function deleteMember(circleId: string, publicKey: string): Promise<void> {
+export async function deleteMember(circleId: string, identityPublicKey: string): Promise<void> {
   await db
     .delete(circleMembers)
-    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.publicKey, publicKey)));
+    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey)));
 }

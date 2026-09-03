@@ -1,36 +1,52 @@
-import { deriveCircleLogId, encrypt } from '@/services/crypto';
-import { getCircleSecret } from '@/services/keystore';
-import { appendEntry, uploadBlob } from '@/services/relay';
-import { getPendingOutboxEntries, markOutboxEntrySynced } from '@/data/db';
+import { getCircle } from '@/data/db';
+import { getCurrentContentKey } from '@/services/keystore';
+import { deriveWriteToken, encrypt } from '@/services/crypto';
+import { appendEntry, BlobAlreadyExistsError, getUploadTarget, uploadBlob, type Namespace } from '@/services/relay';
+import { getPendingOutboxEntries, markOutboxEntrySynced, type OutboxEntry } from '@/data/db';
 import { getPost } from '@/data/db/posts';
 
+/** Which relay namespace a locally-queued entry type belongs in — see server/SYNC_DESIGN.md's "meta"/"content" split. */
+function namespaceFor(entryType: OutboxEntry['entryType']): Namespace {
+  return entryType === 'post' ? 'content' : 'meta';
+}
+
 /**
- * Pushes every pending outbox entry for a circle, strictly in the order
- * they were created — one at a time, stopping on the first failure
- * (offline, relay error) rather than reordering around it, since the
- * whole point of the outbox's ordering is that push order matches local
- * creation order exactly. Safe to call repeatedly (e.g. after a failed
- * attempt, or opportunistically whenever connectivity looks likely):
- * `appendEntry` is idempotent per entryId, and an entry only gets marked
- * synced once both the metadata append and the blob upload succeed, so a
- * retry after a partial failure just repeats whichever half didn't land.
+ * Pushes every pending outbox entry, strictly in creation order, stopping
+ * on the first failure rather than reordering around it. Safe to retry:
+ * `appendEntry` is idempotent per entryId, and an entry is only marked
+ * synced once its blob (if any) and its append both succeed.
+ *
+ * For a 'post', the blob is uploaded *before* the entry is appended (see
+ * server/SYNC_DESIGN.md's "Post" operation) — a crash in between leaves a
+ * harmless orphaned blob rather than a permanent entry pointing at
+ * nothing, which an immutable log could never fix. `BlobAlreadyExistsError`
+ * on retry means the previous attempt's upload actually succeeded; treat
+ * it as done, not as a failure.
  */
 export async function drainOutbox(circleId: string): Promise<void> {
-  const secret = await getCircleSecret(circleId);
-  if (!secret) throw new Error('No circle secret on this device.');
-  const circleLogId = deriveCircleLogId(secret);
+  const circle = await getCircle(circleId);
+  if (!circle) throw new Error('No local circle row for this id.');
+  const current = await getCurrentContentKey(circleId);
+  if (!current) throw new Error('No content key on this device.');
+  const writeToken = deriveWriteToken(current.key);
 
   const pending = await getPendingOutboxEntries(circleId);
   for (const entry of pending) {
-    const { epoch, upload } = await appendEntry(circleLogId, entry.localId, entry.encryptedMeta);
+    const namespace = namespaceFor(entry.entryType);
 
     if (entry.entryType === 'post') {
       const post = await getPost(entry.localId);
       if (post) {
-        await uploadBlob(upload, encrypt(post.photo, secret));
+        try {
+          const target = await getUploadTarget(circle.syncId, entry.localId, writeToken);
+          await uploadBlob(target, encrypt(post.photo, current.key));
+        } catch (err) {
+          if (!(err instanceof BlobAlreadyExistsError)) throw err;
+        }
       }
     }
 
+    const { epoch } = await appendEntry(circle.syncId, namespace, entry.localId, entry.encryptedMeta, current.version, writeToken);
     await markOutboxEntrySynced(entry.sequenceNum, epoch);
   }
 }

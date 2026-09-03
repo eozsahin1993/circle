@@ -89,18 +89,42 @@ export function generateIdentity(): Keypair {
 }
 
 const CIRCLE_IDENTITY_DOMAIN = new TextEncoder().encode('circle-identity');
+const CIRCLE_SEALING_KEY_DOMAIN = new TextEncoder().encode('circle-identity-seal');
+const AUTHORITY_KEY_DOMAIN = new TextEncoder().encode('token-authority');
 const MANIFEST_KEY_DOMAIN = new TextEncoder().encode('recovery-manifest');
 
 /**
- * Derives a circle's identity keypair from the device's master seed —
- * deterministic, unlike `generateIdentity()`, so recovering the seed
- * regenerates the exact same keypair. Domain-separated per circleId, same
- * reasoning as `generateIdentity`'s doc comment: one circle's derived seed
- * must never double as another's. See server/DESIGN.md's "Account
- * recovery" section.
+ * Derives a circle's identity keypair (Ed25519, for signing) from the
+ * device's master seed — deterministic, so recovering the seed
+ * regenerates the same keypair. Domain-separated per circleId, same
+ * reasoning as `generateIdentity`'s doc comment.
  */
 export function deriveCircleIdentity(masterSeed: Uint8Array, circleId: string): Keypair {
   const seed = hkdf(sha256, masterSeed, undefined, concatBytes(CIRCLE_IDENTITY_DOMAIN, new TextEncoder().encode(circleId)), 32);
+  return ed25519.keygen(seed);
+}
+
+/**
+ * Derives a circle's sealing keypair (X25519), the companion to
+ * `deriveCircleIdentity` — used to seal content-key wraps to this member
+ * (see `sealToPublicKey`). A different HKDF domain, deliberately: never
+ * derive one key type from the other's raw seed.
+ */
+export function deriveCircleSealingKeypair(masterSeed: Uint8Array, circleId: string): Keypair {
+  const seed = hkdf(sha256, masterSeed, undefined, concatBytes(CIRCLE_SEALING_KEY_DOMAIN, new TextEncoder().encode(circleId)), 32);
+  return x25519.keygen(seed);
+}
+
+/**
+ * Derives an admin's authority keypair (Ed25519) — see
+ * server/SYNC_DESIGN.md's "token-authority key". Signs control-plane
+ * operations (rotating the write token, changing the authority set) that
+ * the relay itself verifies, unlike the circle identity above, which only
+ * clients verify. Cheap to derive for a non-admin too — it's just never
+ * registered with the relay for them.
+ */
+export function deriveAuthorityKeypair(masterSeed: Uint8Array, circleId: string): Keypair {
+  const seed = hkdf(sha256, masterSeed, undefined, concatBytes(AUTHORITY_KEY_DOMAIN, new TextEncoder().encode(circleId)), 32);
   return ed25519.keygen(seed);
 }
 
@@ -115,25 +139,47 @@ export function deriveManifestKey(masterSeed: Uint8Array): Uint8Array {
 }
 
 /**
- * Generates a fresh circle secret: 32 random bytes, unrelated to any
- * keypair. This is the symmetric secret shared with every member of one
- * circle — used to derive routing tags and encrypt/decrypt circle content.
+ * Generates a fresh, versioned content key: 32 random bytes. Shared by
+ * every member holding this version (sealed to each individually — see
+ * `sealToPublicKey`); a removed member's exclusion from the *next*
+ * version's wraps is what revokes their access — see
+ * server/SYNC_DESIGN.md's "Content encryption" section.
  */
-export function generateCircleSecret(): Uint8Array {
+export function generateContentKey(): Uint8Array {
   return randomBytes(32);
 }
 
-const CIRCLE_LOG_ID_DOMAIN = new TextEncoder().encode('circle-log');
+const WRITE_TOKEN_DOMAIN = new TextEncoder().encode('relay-write-token');
 
 /**
- * Derives the opaque, relay-visible ID for a circle's log —
- * `sha256('circle-log' || circle_secret)`, hex-encoded. The relay only
- * ever sees this derived ID, never the secret itself; domain-separated so
- * it can never collide with some other hash this same secret might get
- * used to derive later (e.g. a future push tag).
+ * Derives the write token for one content-key version —
+ * `HKDF(contentKey, "relay-write-token")`. Everyone holding this key
+ * version computes the identical token; the relay only ever sees its hash
+ * (see `hashWriteToken`), never this value or the key it came from. This
+ * is what proves "a current member" to the relay without the relay
+ * learning who — see server/SYNC_DESIGN.md's "Authorization" section.
  */
-export function deriveCircleLogId(secret: Uint8Array): string {
-  return bytesToHex(sha256(concatBytes(CIRCLE_LOG_ID_DOMAIN, secret)));
+export function deriveWriteToken(contentKey: Uint8Array): Uint8Array {
+  return hkdf(sha256, contentKey, undefined, WRITE_TOKEN_DOMAIN, 32);
+}
+
+/**
+ * `sha256(writeToken)`, hex-encoded — what actually gets sent to the
+ * relay (as `initialWriteTokenHash`/`newWriteTokenHash`) or compared
+ * against (the relay hashes a presented raw token the same way). Must
+ * match the server's own `hashWriteToken` byte-for-byte — see
+ * internal/storage/logstore/dynamodb/log_store.go.
+ */
+export function hashWriteToken(writeToken: Uint8Array): string {
+  return bytesToHex(sha256(writeToken));
+}
+
+/**
+ * The exact byte sequence an authority signature must cover for a rotate
+ * call — must match the relay's own `logstore.RotateMessage` byte-for-byte.
+ */
+export function deriveRotateMessage(syncId: string, entryId: string, newWriteTokenHash: string): Uint8Array {
+  return new TextEncoder().encode(`circle-relay/rotate/v1\x00${syncId}\x00${entryId}\x00${newWriteTokenHash}`);
 }
 
 /**
@@ -167,6 +213,17 @@ export function decrypt(ciphertext: Uint8Array, secret: Uint8Array): Uint8Array 
   const nonce = ciphertext.subarray(0, NONCE_LENGTH);
   const box = ciphertext.subarray(NONCE_LENGTH);
   return xchacha20poly1305(secret, nonce).decrypt(box);
+}
+
+/**
+ * `sha256(bytes)`, hex-encoded — a generic content hash, distinct from
+ * `hashWriteToken`. Binds a blob's actual bytes into a log entry's
+ * already-signed payload (e.g. `photoHash`), catching a member swapping
+ * another member's uploaded photo — something a shared write token can't
+ * prevent on its own.
+ */
+export function hashBytes(bytes: Uint8Array): string {
+  return bytesToHex(sha256(bytes));
 }
 
 /**

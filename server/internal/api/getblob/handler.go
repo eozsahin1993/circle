@@ -2,7 +2,6 @@ package getblob
 
 import (
 	"net/http"
-	"strconv"
 
 	"circle-relay/internal/httputil"
 )
@@ -12,15 +11,14 @@ type Handler struct {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	circleLogID := r.PathValue("circleLogId")
-
-	epoch, err := strconv.ParseInt(r.PathValue("epoch"), 10, 64)
-	if err != nil {
-		httputil.WriteError(w, http.StatusBadRequest, "epoch must be an integer")
+	syncID := r.PathValue("syncId")
+	entryID := r.PathValue("entryId")
+	if entryID == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "entryId is required")
 		return
 	}
 
-	url, err := h.Service.DownloadURL(r.Context(), circleLogID, epoch)
+	url, err := h.Service.DownloadURL(r.Context(), syncID, entryID)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to get blob URL")
 		return

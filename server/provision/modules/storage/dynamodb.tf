@@ -1,5 +1,5 @@
-# Single-table design — see server/internal/adapters/dynamodb/keys.go for
-# the key-shape rationale (why sort key is a string, not a number).
+# Single-table design, one partition per syncId — see server/SYNC_DESIGN.md
+# and log_store.go for the key-shape rationale.
 resource "aws_dynamodb_table" "sync_log" {
   name         = "${var.name_prefix}-sync-log"
   billing_mode = "PAY_PER_REQUEST" # unpredictable, low traffic — no capacity to plan for.
@@ -17,10 +17,10 @@ resource "aws_dynamodb_table" "sync_log" {
     type = "S"
   }
 
-  # Log entries and idempotency markers each carry their own `expiresAt`
-  # (epoch seconds), set at write time from log_retention_days — see
-  # internal/adapters/dynamodb/log_store.go's CommitEntry. AWS evicts them
-  # itself in the background; no application code deletes anything.
+  # Only idempotency markers ever carry an `expiresAt` — a short, fixed
+  # retry window (log_store.go's idemMarkerTTL), not a product setting.
+  # Log entries and #control never set it: the log is permanent (invariant
+  # 1). AWS sweeps expired items itself; no application code deletes.
   ttl {
     attribute_name = "expiresAt"
     enabled        = true

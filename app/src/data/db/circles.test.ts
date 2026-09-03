@@ -10,8 +10,11 @@ function makeCircle(overrides: Partial<{ id: string; name: string; createdAt: nu
     id: generateUUID(),
     name: 'Nana’s House',
     picture: null,
+    syncId: generateUUID(),
     createdAt: Date.now(),
     leftAt: null,
+    metaCursor: 0,
+    contentCursor: 0,
     ...overrides,
   };
 }
@@ -62,7 +65,8 @@ describe('circles CRUD', () => {
     await insertCircle(circle);
     const member = {
       circleId: circle.id,
-      publicKey: 'aa'.repeat(32),
+      identityPublicKey: 'aa'.repeat(32),
+      encPublicKey: 'cc'.repeat(32),
       memberId: 'bb'.repeat(16),
       role: MemberRoles.member,
       name: 'Grandma',
@@ -73,6 +77,6 @@ describe('circles CRUD', () => {
 
     await deleteCircle(circle.id);
 
-    await expect(getMemberByPublicKey(circle.id, member.publicKey)).resolves.toBeNull();
+    await expect(getMemberByPublicKey(circle.id, member.identityPublicKey)).resolves.toBeNull();
   });
 });

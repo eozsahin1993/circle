@@ -6,5 +6,5 @@ import "net/http"
 // aggregating router in internal/api, which decides what version prefix
 // (if any) mux itself is mounted under.
 func Register(mux *http.ServeMux, service *Service) {
-	mux.Handle("GET /circles/{circleLogId}/entries/{epoch}/blob", &Handler{Service: service})
+	mux.Handle("GET /circles/{syncId}/entries/{entryId}/blob", &Handler{Service: service})
 }
