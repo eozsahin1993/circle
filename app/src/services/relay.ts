@@ -63,6 +63,24 @@ function baseUrl(): string {
 }
 
 /**
+ * Reads a failed response's body so callers see the relay's actual reason,
+ * not just a bare status code — httputil.WriteError's shape is
+ * `{"error": "..."}`, so that string is pulled out and appended when
+ * present; otherwise falls back to whatever raw text came back.
+ */
+async function describeError(response: Response, summary: string): Promise<string> {
+  const text = await response.text().catch(() => '');
+  let detail = text;
+  try {
+    const body = JSON.parse(text);
+    if (typeof body?.error === 'string' && body.error) detail = body.error;
+  } catch {
+    // not JSON — use the raw text as-is
+  }
+  return detail ? `${summary}: ${response.status} ${detail}` : `${summary}: ${response.status}`;
+}
+
+/**
  * fetch with the stored session token attached — every circle-log route
  * requires one (server's auth.RequireSession). Exported so other
  * relay-facing modules (e.g. services/mailbox-relay.ts) can reuse it.
@@ -94,7 +112,7 @@ export async function bootstrapCircle(syncId: string, founderAuthorityPublicKey:
     }),
   });
   if (!response.ok) {
-    throw new Error(`Failed to create circle: ${response.status}`);
+    throw new Error(await describeError(response, 'Failed to create circle'));
   }
 }
 
@@ -125,7 +143,7 @@ export async function appendEntry(
     }),
   });
   if (!response.ok) {
-    throw new Error(`Failed to append entry: ${response.status}`);
+    throw new Error(await describeError(response, 'Failed to append entry'));
   }
   const body = await response.json();
   return { epoch: body.epoch, receivedAt: body.receivedAt };
@@ -162,7 +180,7 @@ export async function rotateLog(
     }),
   });
   if (!response.ok) {
-    throw new Error(`Failed to rotate: ${response.status}`);
+    throw new Error(await describeError(response, 'Failed to rotate'));
   }
   const body = await response.json();
   return { epoch: body.epoch, receivedAt: body.receivedAt };
@@ -172,7 +190,7 @@ export async function rotateLog(
 export async function fetchEntries(syncId: string, namespace: Namespace, since: number): Promise<FetchEntriesResult> {
   const response = await authorizedFetch(`/v1/circles/${syncId}/entries?namespace=${namespace}&since=${since}`);
   if (!response.ok) {
-    throw new Error(`Failed to fetch entries: ${response.status}`);
+    throw new Error(await describeError(response, 'Failed to fetch entries'));
   }
   const body = await response.json();
   return {
@@ -199,7 +217,7 @@ export async function getUploadTarget(syncId: string, entryId: string, writeToke
     throw new BlobAlreadyExistsError();
   }
   if (!response.ok) {
-    throw new Error(`Failed to get upload target: ${response.status}`);
+    throw new Error(await describeError(response, 'Failed to get upload target'));
   }
   return response.json();
 }
@@ -214,7 +232,7 @@ export async function getUploadTarget(syncId: string, entryId: string, writeToke
 export async function getManifest(): Promise<Uint8Array | null> {
   const response = await authorizedFetch('/v1/account/manifest');
   if (!response.ok) {
-    throw new Error(`Failed to fetch manifest: ${response.status}`);
+    throw new Error(await describeError(response, 'Failed to fetch manifest'));
   }
   const body = (await response.json()) as { blob: string | null };
   return body.blob ? new Uint8Array(Buffer.from(body.blob, 'base64')) : null;
@@ -228,7 +246,7 @@ export async function putManifest(blob: Uint8Array): Promise<void> {
     body: JSON.stringify({ blob: Buffer.from(blob).toString('base64') }),
   });
   if (!response.ok) {
-    throw new Error(`Failed to save manifest: ${response.status}`);
+    throw new Error(await describeError(response, 'Failed to save manifest'));
   }
 }
 
@@ -268,7 +286,7 @@ async function signIn(provider: 'google' | 'apple', idToken: string): Promise<st
     body: JSON.stringify({ idToken }),
   });
   if (!response.ok) {
-    throw new Error(`${provider} sign-in failed: ${response.status}`);
+    throw new Error(await describeError(response, `${provider} sign-in failed`));
   }
   const body = await response.json();
   return body.token;
@@ -284,6 +302,6 @@ export async function logout(token: string): Promise<void> {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
-    throw new Error(`Logout failed: ${response.status}`);
+    throw new Error(await describeError(response, 'Logout failed'));
   }
 }
