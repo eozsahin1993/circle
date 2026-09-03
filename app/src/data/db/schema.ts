@@ -11,7 +11,7 @@ export const circles = sqliteTable('circles', {
    * of key material so rotation never repoints it. Stored, never derived
    * — see server/SYNC_DESIGN.md's "Identifiers... stay decoupled" invariant.
    */
-  syncId: text('sync_id').notNull(),
+  syncId: text('sync_id').notNull().default(''),
   createdAt: integer('created_at').notNull(),
   /** Set when this device leaves the circle — kept (not deleted) so already-synced posts stay as a local archive. */
   leftAt: integer('left_at'),
