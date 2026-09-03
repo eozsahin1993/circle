@@ -17,6 +17,7 @@ import (
 	"circle-relay/internal/api/auth/oidcverify"
 	"circle-relay/internal/api/createlog"
 	"circle-relay/internal/api/getblob"
+	"circle-relay/internal/api/getcoverphotouploadtarget"
 	"circle-relay/internal/api/getlog"
 	"circle-relay/internal/api/getuploadtarget"
 	"circle-relay/internal/api/invite"
@@ -57,7 +58,7 @@ func newV1Mux(
 ) *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// Grouped under one sub-mux so RequireSession wraps all five at once —
+	// Grouped under one sub-mux so RequireSession wraps all six at once —
 	// each endpoint also checks its own write token/authority signature
 	// beyond this shared session check (server/SYNC_DESIGN.md's
 	// "Authorization" section).
@@ -68,6 +69,7 @@ func newV1Mux(
 	getlog.Register(circleMux, &getlog.Service{LogStore: logStore})
 	getblob.Register(circleMux, &getblob.Service{BlobStore: blobStore})
 	getuploadtarget.Register(circleMux, &getuploadtarget.Service{BlobStore: blobStore, LogStore: logStore})
+	getcoverphotouploadtarget.Register(circleMux, &getcoverphotouploadtarget.Service{BlobStore: blobStore, LogStore: logStore})
 	mux.Handle("/circles/", auth.RequireSession(authStore, circleMux))
 
 	// Account-scoped, not circle-scoped — its own sub-mux, same

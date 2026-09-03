@@ -205,19 +205,59 @@ export async function fetchEntries(syncId: string, namespace: Namespace, since: 
 }
 
 /**
- * Obtains a presigned upload target for one entry's blob — GET
- * /v1/circles/{syncId}/entries/{entryId}/upload. Gated by the write token
- * (unlike downloads — obtaining an upload URL is a write capability) and
- * single-use: `BlobAlreadyExistsError` isn't necessarily a failure, it's
- * also what a legitimate retry sees once the earlier upload succeeded.
+ * Obtains a presigned upload target for one entry's blob — POST
+ * /v1/circles/{syncId}/entries/{entryId}/upload (POST despite not
+ * mutating anything server-side: writeToken belongs in the body, not a
+ * query param access logs commonly capture by default). Gated by the
+ * write token (unlike downloads — obtaining an upload URL is a write
+ * capability) and single-use: `BlobAlreadyExistsError` isn't necessarily
+ * a failure, it's also what a legitimate retry sees once the earlier
+ * upload succeeded.
  */
 export async function getUploadTarget(syncId: string, entryId: string, writeToken: Uint8Array): Promise<UploadTarget> {
-  const response = await authorizedFetch(`/v1/circles/${syncId}/entries/${entryId}/upload?writeToken=${bytesToHex(writeToken)}`);
+  const response = await authorizedFetch(`/v1/circles/${syncId}/entries/${entryId}/upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ writeToken: bytesToHex(writeToken) }),
+  });
   if (response.status === 409) {
     throw new BlobAlreadyExistsError();
   }
   if (!response.ok) {
     throw new Error(await describeError(response, 'Failed to get upload target'));
+  }
+  return response.json();
+}
+
+/**
+ * Obtains a presigned upload target for a circle's cover photo — POST
+ * /v1/circles/{syncId}/cover-photo/upload (same not-mutating-but-POST
+ * reasoning as getUploadTarget above). Always the same key (see
+ * getUploadTarget's doc comment for the entryID-keyed default; this one
+ * doesn't have that) and always overwritable — repeatable on purpose,
+ * unlike getUploadTarget's single-use guarantee. Dual-gated: writeToken
+ * proves "a current member," authorityPublicKey + signature prove "an
+ * admin" (signature must verify against `deriveCoverPhotoUploadMessage(syncId)`
+ * — see crypto.ts). No `BlobAlreadyExistsError` case here; that's exactly
+ * the failure mode this endpoint doesn't have.
+ */
+export async function getCoverPhotoUploadTarget(
+  syncId: string,
+  writeToken: Uint8Array,
+  authorityPublicKey: Uint8Array,
+  signature: Uint8Array
+): Promise<UploadTarget> {
+  const response = await authorizedFetch(`/v1/circles/${syncId}/cover-photo/upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      writeToken: bytesToHex(writeToken),
+      authorityPublicKey: bytesToHex(authorityPublicKey),
+      signature: bytesToHex(signature),
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(await describeError(response, 'Failed to get cover-photo upload target'));
   }
   return response.json();
 }

@@ -473,6 +473,26 @@ func (s *Store) VerifyWriteToken(ctx context.Context, syncID, writeToken string)
 	return nil
 }
 
+// VerifyAuthoritySignature checks cryptographic validity first (so a
+// forged signature never triggers a storage read for a syncID that may
+// not even exist), then confirms authorityPublicKey is actually a member
+// of syncID's current authority set. Same non-consistent-read tolerance
+// as VerifyWriteToken — this gates a read-shaped operation, where being
+// briefly stale after an authority-set change just means a retry.
+func (s *Store) VerifyAuthoritySignature(ctx context.Context, syncID, authorityPublicKey string, message []byte, signature []byte) error {
+	if err := verifyAuthoritySignature(authorityPublicKey, message, signature); err != nil {
+		return err
+	}
+	control, err := s.getControlState(ctx, syncID, false)
+	if err != nil {
+		return err
+	}
+	if !control.authoritySet[authorityPublicKey] {
+		return logstore.ErrAuthorityNotRecognized
+	}
+	return nil
+}
+
 func hashWriteToken(writeTokenHex string) (string, error) {
 	raw, err := hex.DecodeString(writeTokenHex)
 	if err != nil {

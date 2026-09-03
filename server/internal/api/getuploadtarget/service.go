@@ -1,8 +1,10 @@
 // Package getuploadtarget is the upload-side mirror of getblob's download
 // endpoint. Unlike getblob, this requires a write token: obtaining an
-// upload URL is a write capability despite being a GET, so it's gated
-// the same way appendlog is rather than left open (getblob/getlog's
-// confidentiality comes from encryption, not access control).
+// upload URL is a write capability, gated the same way appendlog is
+// rather than left open (getblob/getlog's confidentiality comes from
+// encryption, not access control). POST, not GET, despite not mutating
+// anything server-side — writeToken belongs in the body, not a query
+// param that access logs commonly capture by default.
 package getuploadtarget
 
 import (

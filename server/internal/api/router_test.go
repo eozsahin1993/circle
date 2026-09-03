@@ -186,17 +186,46 @@ func TestEndToEnd_BootstrapAppendFetchRotateAndDownload(t *testing.T) {
 		t.Fatalf("expected 200 for the post-rotation write token, got %d", postRotationResp.StatusCode)
 	}
 
-	// 5. Upload target — gated by the (post-rotation, still current)
-	// write token, keyed by entryId rather than epoch.
-	uploadReq, err := http.NewRequest(http.MethodGet, server.URL+"/v1/circles/"+syncID+"/entries/post-1/upload?writeToken="+writeToken, nil)
+	// 5. Cover-photo upload target — dual-gated by the (post-rotation,
+	// still current) write token *and* an authority signature, since the
+	// object it points at has no per-upload existence check to fall back
+	// on (see blobstore.Store.GetCoverPhotoUploadTarget). POST with every
+	// credential in the body, not a query param — see
+	// getcoverphotouploadtarget/handler.go's doc comment for why.
+	coverSig := ed25519.Sign(founderPriv, logstore.CoverPhotoUploadMessage(syncID))
+	coverBody := `{"writeToken":"` + newWriteToken + `","authorityPublicKey":"` + founderPubHex + `","signature":"` + hex.EncodeToString(coverSig) + `"}`
+	coverResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/cover-photo/upload", authToken, coverBody)
+	defer coverResp.Body.Close()
+	if coverResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 from cover-photo upload target, got %d", coverResp.StatusCode)
+	}
+	var coverTarget struct {
+		Fields map[string]string `json:"fields"`
+	}
+	if err := json.NewDecoder(coverResp.Body).Decode(&coverTarget); err != nil {
+		t.Fatal(err)
+	}
+	if coverTarget.Fields["key"] != syncID+"/cover" {
+		t.Fatalf("expected cover-photo upload key %s/cover, got %q", syncID, coverTarget.Fields["key"])
+	}
+
+	// A non-authority signer must be rejected even with a valid write token.
+	strangerPub, strangerPriv, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	uploadReq.Header.Set("Authorization", "Bearer "+authToken)
-	uploadResp, err := http.DefaultClient.Do(uploadReq)
-	if err != nil {
-		t.Fatal(err)
+	strangerSig := ed25519.Sign(strangerPriv, logstore.CoverPhotoUploadMessage(syncID))
+	strangerBody := `{"writeToken":"` + newWriteToken + `","authorityPublicKey":"` + hex.EncodeToString(strangerPub) + `","signature":"` + hex.EncodeToString(strangerSig) + `"}`
+	strangerResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/cover-photo/upload", authToken, strangerBody)
+	defer strangerResp.Body.Close()
+	if strangerResp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 for a non-authority signer, got %d", strangerResp.StatusCode)
 	}
+
+	// 6. Upload target — gated by the (post-rotation, still current)
+	// write token, keyed by entryId rather than epoch. POST with the
+	// token in the body, same reasoning as the cover-photo target above.
+	uploadResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/entries/post-1/upload", authToken, `{"writeToken":"`+writeToken+`"}`)
 	defer uploadResp.Body.Close()
 	if uploadResp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403 for an upload target requested with the pre-rotation write token, got %d", uploadResp.StatusCode)

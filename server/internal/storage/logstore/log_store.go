@@ -138,9 +138,21 @@ type Store interface {
 	// VerifyWriteToken checks writeToken against what's on file, without
 	// mutating anything — exposed standalone for operations that need to
 	// gate on "a current member" without appending. See getuploadtarget:
-	// obtaining a blob upload URL is a write capability despite being an
-	// HTTP GET, so it's gated the same way Append is.
+	// obtaining a blob upload URL is a write capability despite not
+	// mutating anything server-side, so it's gated the same way Append is.
 	VerifyWriteToken(ctx context.Context, syncID, writeToken string) error
+
+	// VerifyAuthoritySignature checks signature's cryptographic validity
+	// for message against authorityPublicKey, then confirms
+	// authorityPublicKey is a member of syncID's current authority set —
+	// without mutating anything. The authority-plane analog of
+	// VerifyWriteToken: for an operation that needs to gate on "an admin"
+	// rather than just "a current member," without appending or rotating.
+	// See getcoverphotouploadtarget: obtaining a cover-photo upload URL
+	// requires proving admin status, since the object it points at has no
+	// per-upload existence check to fall back on (see
+	// blobstore.Store.GetCoverPhotoUploadTarget).
+	VerifyAuthoritySignature(ctx context.Context, syncID, authorityPublicKey string, message []byte, signature []byte) error
 }
 
 // RotateMessage is the exact byte sequence an authority signature must
@@ -153,4 +165,15 @@ type Store interface {
 // Both the relay and every client must construct this identically.
 func RotateMessage(syncID, entryID, newWriteTokenHash string) []byte {
 	return []byte("circle-relay/rotate/v1\x00" + syncID + "\x00" + entryID + "\x00" + newWriteTokenHash)
+}
+
+// CoverPhotoUploadMessage is the exact byte sequence an authority
+// signature must cover to obtain a cover-photo upload URL — see
+// getcoverphotouploadtarget. Same version-prefixed, null-byte-joined
+// construction as RotateMessage, and for the same reason: it's what makes
+// the signature mean "I am authorizing a cover-photo upload for this
+// circle" specifically, not reinterpretable as authorization for anything
+// else this same admin key might sign.
+func CoverPhotoUploadMessage(syncID string) []byte {
+	return []byte("circle-relay/cover-photo-upload/v1\x00" + syncID)
 }

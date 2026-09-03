@@ -54,12 +54,9 @@ func New(client *s3.Client, bucketName string, maxBlobSize int64) *Store {
 var _ blobstore.Store = (*Store)(nil)
 
 // GetUploadTarget checks for an existing object first (see the interface
-// doc for why), then signs a POST policy with a content-length-range
-// condition and a pinned Content-Type, so S3 itself rejects an oversized
-// or mistyped upload. Unlike Key, ContentType on PutObjectInput isn't
-// picked up by PresignPostObject on its own — both need adding explicitly.
-func (s *Store) GetUploadTarget(ctx context.Context, circleLogID, entryID string) (blobstore.UploadTarget, error) {
-	key := blobKey(circleLogID, entryID)
+// doc for why), then hands off to presignUpload.
+func (s *Store) GetUploadTarget(ctx context.Context, syncID, entryID string) (blobstore.UploadTarget, error) {
+	key := blobKey(syncID, entryID)
 	_, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(s.bucketName), Key: aws.String(key)})
 	if err == nil {
 		return blobstore.UploadTarget{}, blobstore.ErrBlobAlreadyExists
@@ -68,10 +65,31 @@ func (s *Store) GetUploadTarget(ctx context.Context, circleLogID, entryID string
 	if !errors.As(err, &notFound) {
 		return blobstore.UploadTarget{}, err
 	}
+	return s.presignUpload(ctx, key)
+}
 
+// coverPhotoEntryID is the fixed "entryID" a circle's cover photo always
+// lives at — see GetCoverPhotoUploadTarget. Just a normal blobKey suffix,
+// nothing S3-special about it; GetDownloadURL(ctx, syncID, "cover")
+// already reads it back with zero changes.
+const coverPhotoEntryID = "cover"
+
+// GetCoverPhotoUploadTarget skips GetUploadTarget's existence check —
+// see the interface doc for why that's safe here specifically — and
+// signs at the fixed key every device will look for a circle's cover
+// photo at.
+func (s *Store) GetCoverPhotoUploadTarget(ctx context.Context, syncID string) (blobstore.UploadTarget, error) {
+	return s.presignUpload(ctx, blobKey(syncID, coverPhotoEntryID))
+}
+
+// presignUpload signs a POST policy with a content-length-range condition
+// and a pinned Content-Type, so S3 itself rejects an oversized or
+// mistyped upload. Unlike Key, ContentType on PutObjectInput isn't picked
+// up by PresignPostObject on its own — both need adding explicitly.
+func (s *Store) presignUpload(ctx context.Context, key string) (blobstore.UploadTarget, error) {
 	req, err := s.presignClient.PresignPostObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucketName),
-		Key:    aws.String(blobKey(circleLogID, entryID)),
+		Key:    aws.String(key),
 	}, func(o *s3.PresignPostOptions) {
 		o.Expires = uploadURLTTL
 		o.Conditions = []any{
@@ -86,10 +104,10 @@ func (s *Store) GetUploadTarget(ctx context.Context, circleLogID, entryID string
 	return blobstore.UploadTarget{URL: req.URL, Fields: req.Values}, nil
 }
 
-func (s *Store) GetDownloadURL(ctx context.Context, circleLogID, entryID string) (string, error) {
+func (s *Store) GetDownloadURL(ctx context.Context, syncID, entryID string) (string, error) {
 	req, err := s.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucketName),
-		Key:    aws.String(blobKey(circleLogID, entryID)),
+		Key:    aws.String(blobKey(syncID, entryID)),
 	}, s3.WithPresignExpires(downloadURLTTL))
 	if err != nil {
 		return "", err
@@ -102,6 +120,6 @@ func (s *Store) GetDownloadURL(ctx context.Context, circleLogID, entryID string)
 // to the client before the entry is ever committed), not epoch, so a blob
 // can be uploaded before the entry that references it exists. Never a
 // separately-issued token.
-func blobKey(circleLogID, entryID string) string {
-	return fmt.Sprintf("%s/%s", circleLogID, entryID)
+func blobKey(syncID, entryID string) string {
+	return fmt.Sprintf("%s/%s", syncID, entryID)
 }

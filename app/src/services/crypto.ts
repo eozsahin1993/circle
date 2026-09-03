@@ -183,6 +183,15 @@ export function deriveRotateMessage(syncId: string, entryId: string, newWriteTok
 }
 
 /**
+ * The exact byte sequence an authority signature must cover to obtain a
+ * cover-photo upload URL — must match the relay's own
+ * `logstore.CoverPhotoUploadMessage` byte-for-byte.
+ */
+export function deriveCoverPhotoUploadMessage(syncId: string): Uint8Array {
+  return new TextEncoder().encode(`circle-relay/cover-photo-upload/v1\x00${syncId}`);
+}
+
+/**
  * Encrypts `plaintext` under the circle's shared secret using
  * XChaCha20-Poly1305 (AEAD — tampering makes decrypt fail, it doesn't
  * silently return corrupted data). A fresh random nonce is generated per

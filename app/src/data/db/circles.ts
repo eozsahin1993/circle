@@ -29,6 +29,10 @@ export async function updateCircleName(id: string, name: string): Promise<void> 
   await db.update(circles).set({ name }).where(eq(circles.id, id));
 }
 
+export async function updateCirclePicture(id: string, picture: Uint8Array | null): Promise<void> {
+  await db.update(circles).set({ picture }).where(eq(circles.id, id));
+}
+
 /**
  * Marks this device as having left the circle — a soft leave, not a
  * delete. Already-synced posts stay in SQLite as a local archive; this

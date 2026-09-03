@@ -23,6 +23,7 @@ import {
   BlobAlreadyExistsError,
   bootstrapCircle,
   fetchEntries,
+  getCoverPhotoUploadTarget,
   getManifest,
   getUploadTarget,
   putManifest,
@@ -158,7 +159,7 @@ describe('fetchEntries', () => {
 });
 
 describe('getUploadTarget', () => {
-  test('GETs with the hex-encoded write token as a query param', async () => {
+  test('POSTs the hex-encoded write token in the body', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ url: 'https://s3/bucket', fields: { key: 'sync-a/post-1' } }));
     const writeToken = new Uint8Array([9, 9]);
 
@@ -166,7 +167,9 @@ describe('getUploadTarget', () => {
 
     expect(result).toEqual({ url: 'https://s3/bucket', fields: { key: 'sync-a/post-1' } });
     const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toBe(`${RELAY_URL}/v1/circles/sync-a/entries/post-1/upload?writeToken=${bytesToHex(writeToken)}`);
+    expect(url).toBe(`${RELAY_URL}/v1/circles/sync-a/entries/post-1/upload`);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ writeToken: bytesToHex(writeToken) });
     expect(init.headers.Authorization).toBe(`Bearer ${AUTH_TOKEN}`);
   });
 
@@ -181,6 +184,34 @@ describe('getUploadTarget', () => {
 
     const err = await getUploadTarget('sync-a', 'post-1', new Uint8Array([1])).catch((e) => e);
     expect(err).not.toBeInstanceOf(BlobAlreadyExistsError);
+  });
+});
+
+describe('getCoverPhotoUploadTarget', () => {
+  test('POSTs the hex-encoded write token, authority public key, and signature in the body', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ url: 'https://s3/bucket', fields: { key: 'sync-a/cover' } }));
+    const writeToken = new Uint8Array([9, 9]);
+    const authorityPublicKey = new Uint8Array([1, 2, 3]);
+    const signature = new Uint8Array([4, 5, 6]);
+
+    const result = await getCoverPhotoUploadTarget('sync-a', writeToken, authorityPublicKey, signature);
+
+    expect(result).toEqual({ url: 'https://s3/bucket', fields: { key: 'sync-a/cover' } });
+    const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toBe(`${RELAY_URL}/v1/circles/sync-a/cover-photo/upload`);
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({
+      writeToken: bytesToHex(writeToken),
+      authorityPublicKey: bytesToHex(authorityPublicKey),
+      signature: bytesToHex(signature),
+    });
+    expect(init.headers.Authorization).toBe(`Bearer ${AUTH_TOKEN}`);
+  });
+
+  test('throws when the relay responds with an error status', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 403));
+
+    await expect(getCoverPhotoUploadTarget('sync-a', new Uint8Array([1]), new Uint8Array([2]), new Uint8Array([3]))).rejects.toThrow();
   });
 });
 

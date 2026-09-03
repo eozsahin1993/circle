@@ -42,10 +42,22 @@ type Store interface {
 	// entryID they didn't create and overwrite it with a replacement that
 	// still decrypts successfully — a write token proves "a current
 	// member," never "the original author," so it can't close this alone.
-	GetUploadTarget(ctx context.Context, circleLogID, entryID string) (UploadTarget, error)
+	GetUploadTarget(ctx context.Context, syncID, entryID string) (UploadTarget, error)
+
+	// GetCoverPhotoUploadTarget returns a short-lived presigned POST for a
+	// circle's cover photo — always the same key (entryID "cover"; see
+	// GetDownloadURL, which needs no changes to read it back), and always
+	// overwritable, unlike GetUploadTarget: a new cover photo is meant to
+	// replace the old one, not collide with it, so there's no
+	// already-exists check here. Safe from the same insider-overwrite risk
+	// GetUploadTarget's check guards against only because the API layer
+	// gates issuing this specifically on an authority (admin) signature —
+	// see logstore.Store.VerifyAuthoritySignature — not just possession of
+	// the write token every other upload target accepts.
+	GetCoverPhotoUploadTarget(ctx context.Context, syncID string) (UploadTarget, error)
 
 	// GetDownloadURL returns a short-lived URL the client can GET
 	// ciphertext bytes from. It 404s on use if nothing was ever uploaded
 	// there — that's expected, not an error here.
-	GetDownloadURL(ctx context.Context, circleLogID, entryID string) (string, error)
+	GetDownloadURL(ctx context.Context, syncID, entryID string) (string, error)
 }
