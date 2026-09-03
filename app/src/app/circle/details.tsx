@@ -1,3 +1,4 @@
+import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
@@ -10,6 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing, Tints } from '@/constants/theme';
 import { getCircle, getCircleMembers, MemberRoles, type Circle, type Member } from '@/data/db';
+import { buildDebugKeysetFlags } from '@/domain/usecases/circle/debug-keyset';
 import { getOrCreateInvite, isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
 import { deleteCircleForEveryone, leaveCircle } from '@/domain/usecases/circle/leave-circle';
 
@@ -70,6 +72,18 @@ export default function CircleDetailsScreen() {
         },
       },
     ]);
+  }
+
+  async function handleCopyDebugKeyset() {
+    if (!circleId) return;
+    try {
+      const flags = await buildDebugKeysetFlags(circleId);
+      await Clipboard.setStringAsync(flags);
+      Alert.alert('Copied', "Paste after `go run ./cmd/decryptlog --table <table>` on your machine.");
+    } catch (err) {
+      console.error('Failed to build debug keyset', err);
+      Alert.alert("Couldn't copy the keyset", String(err));
+    }
   }
 
   function handleDeleteForEveryone() {
@@ -156,6 +170,15 @@ export default function CircleDetailsScreen() {
               </View>
             </View>
           ))}
+
+          {__DEV__ ? (
+            <View style={styles.debugZone}>
+              <ThemedText type="eyebrow" themeColor="muted">
+                Debug
+              </ThemedText>
+              <SecondaryButton label="Copy keyset for decryptlog" onPress={handleCopyDebugKeyset} />
+            </View>
+          ) : null}
 
           <View style={styles.dangerZone}>
             <Pressable style={styles.dangerRow} onPress={handleLeave}>
@@ -250,6 +273,10 @@ const styles = StyleSheet.create({
   adminBadgeText: {
     fontSize: 10.5,
     fontWeight: '600',
+  },
+  debugZone: {
+    marginTop: Spacing.cardListGap,
+    gap: 8,
   },
   dangerZone: {
     marginTop: Spacing.cardListGap,
