@@ -1,7 +1,9 @@
+import { bytesToHex } from '@noble/curves/utils.js';
+
 import { generateUUID, hashBytes } from '@/services/crypto';
 import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
 import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
-import { insertPostAndEnqueue, OutboxStatuses } from '@/data/db';
+import { AttachmentKinds, AttachmentStatuses, insertPostAndEnqueue, OutboxStatuses } from '@/data/db';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 
 export type CreatePostInput = {
@@ -39,9 +41,10 @@ export async function createPost(input: CreatePostInput): Promise<void> {
 
   const postId = generateUUID();
   const createdAt = Date.now();
+  const photoHash = hashBytes(input.photo);
   const encryptedMeta = buildAndEncryptLogEntry(
     'post',
-    { postId, caption: input.caption, photoHash: hashBytes(input.photo), createdAt, keyVersion: current.version },
+    { postId, caption: input.caption, photoHash, createdAt, keyVersion: current.version },
     identity,
     current.key
   );
@@ -51,7 +54,23 @@ export async function createPost(input: CreatePostInput): Promise<void> {
       id: postId,
       circleId: input.circleId,
       caption: input.caption,
-      photo: input.photo,
+      authorPublicKey: bytesToHex(identity.publicKey),
+      createdAt,
+    },
+    {
+      circleId: input.circleId,
+      // A post photo's blob address is the postId — the same id
+      // `drainOutbox` uploads it under (see services/relay.ts's
+      // getUploadTarget).
+      entryId: postId,
+      kind: AttachmentKinds.POST_PHOTO,
+      bytes: input.photo,
+      hash: photoHash,
+      keyVersion: current.version,
+      // Created here, so there is nothing to download.
+      status: AttachmentStatuses.FETCHED,
+      fetchAttempts: 0,
+      nextAttemptAt: null,
       createdAt,
     },
     {

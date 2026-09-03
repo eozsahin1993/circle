@@ -1,1 +1,0 @@
-ALTER TABLE `circle_members` ADD `role` text DEFAULT 'member' NOT NULL;

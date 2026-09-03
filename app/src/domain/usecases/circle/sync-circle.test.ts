@@ -1,10 +1,20 @@
 jest.mock('@/services/relay');
 
-import { decrypt, generateUUID } from '@/services/crypto';
+import { bytesToHex } from '@noble/curves/utils.js';
+
+import { decrypt, generateUUID, hashBytes } from '@/services/crypto';
 import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
 import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
 import { appendEntry, BlobAlreadyExistsError, bootstrapCircle, getUploadTarget, uploadBlob } from '@/services/relay';
-import { getPendingOutboxEntries, initDatabase, insertPostAndEnqueue, OutboxStatuses, type Post } from '@/data/db';
+import {
+  AttachmentKinds,
+  AttachmentStatuses,
+  getPendingOutboxEntries,
+  initDatabase,
+  insertPostAndEnqueue,
+  OutboxStatuses,
+  type Post,
+} from '@/data/db';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 
@@ -23,15 +33,30 @@ async function enqueuePost(circleId: string, photo: Uint8Array): Promise<Post> {
   const postId = generateUUID();
   const createdAt = Date.now();
   const encryptedMeta = buildAndEncryptLogEntry('post', { postId, caption: 'hi', createdAt }, identity, current.key);
-  const post = { id: postId, circleId, caption: 'hi', photo, createdAt };
-  await insertPostAndEnqueue(post, {
-    circleId,
-    entryType: 'post',
-    localId: postId,
-    status: OutboxStatuses.pending,
-    epoch: null,
-    encryptedMeta,
-  });
+  const post = { id: postId, circleId, caption: 'hi', authorPublicKey: bytesToHex(identity.publicKey), createdAt };
+  await insertPostAndEnqueue(
+    post,
+    {
+      circleId,
+      entryId: postId,
+      kind: AttachmentKinds.POST_PHOTO,
+      bytes: photo,
+      hash: hashBytes(photo),
+      keyVersion: current.version,
+      status: AttachmentStatuses.FETCHED,
+      fetchAttempts: 0,
+      nextAttemptAt: null,
+      createdAt,
+    },
+    {
+      circleId,
+      entryType: 'post',
+      localId: postId,
+      status: OutboxStatuses.pending,
+      epoch: null,
+      encryptedMeta,
+    }
+  );
   return post;
 }
 
@@ -50,7 +75,8 @@ async function makeCircle() {
 
 test('drainOutbox obtains an upload target, uploads the blob, appends the entry, then marks it synced', async () => {
   const { circleId, contentKey } = await makeCircle();
-  const post = await enqueuePost(circleId, new Uint8Array([7, 7, 7]));
+  const photo = new Uint8Array([7, 7, 7]);
+  const post = await enqueuePost(circleId, photo);
   (getUploadTarget as jest.Mock).mockResolvedValue({ url: 'https://s3', fields: {} });
   (uploadBlob as jest.Mock).mockResolvedValue(undefined);
   (appendEntry as jest.Mock).mockResolvedValue({ epoch: 5, receivedAt: 999 });
@@ -60,8 +86,8 @@ test('drainOutbox obtains an upload target, uploads the blob, appends the entry,
   expect(getUploadTarget).toHaveBeenCalledWith(expect.any(String), post.id, expect.any(Uint8Array));
   const [uploadTarget, uploadedBytes] = (uploadBlob as jest.Mock).mock.calls[0];
   expect(uploadTarget).toEqual({ url: 'https://s3', fields: {} });
-  expect(uploadedBytes).not.toEqual(post.photo);
-  expect(decrypt(uploadedBytes, contentKey)).toEqual(post.photo);
+  expect(uploadedBytes).not.toEqual(photo);
+  expect(decrypt(uploadedBytes, contentKey)).toEqual(photo);
 
   // Upload must happen before the append — see server/SYNC_DESIGN.md's
   // "Post" operation for why (an orphaned blob is recoverable; a log

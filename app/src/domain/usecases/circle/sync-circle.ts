@@ -3,7 +3,7 @@ import { getCurrentContentKey } from '@/services/keystore';
 import { deriveWriteToken, encrypt } from '@/services/crypto';
 import { appendEntry, BlobAlreadyExistsError, getUploadTarget, uploadBlob, type Namespace } from '@/services/relay';
 import { getPendingOutboxEntries, markOutboxEntrySynced, type OutboxEntry } from '@/data/db';
-import { getPost } from '@/data/db/posts';
+import { getAttachment } from '@/data/db/attachments';
 
 /** Which relay namespace a locally-queued entry type belongs in — see server/SYNC_DESIGN.md's "meta"/"content" split. */
 function namespaceFor(entryType: OutboxEntry['entryType']): Namespace {
@@ -35,11 +35,15 @@ export async function drainOutbox(circleId: string): Promise<void> {
     const namespace = namespaceFor(entry.entryType);
 
     if (entry.entryType === 'post') {
-      const post = await getPost(entry.localId);
-      if (post) {
+      // The bytes live on the attachment, not the post — and they're
+      // encrypted under the version that attachment recorded, not
+      // whatever is current now, so the blob can never disagree with the
+      // entry that references it.
+      const attachment = await getAttachment(circleId, entry.localId);
+      if (attachment?.bytes) {
         try {
           const target = await getUploadTarget(circle.syncId, entry.localId, writeToken);
-          await uploadBlob(target, encrypt(post.photo, current.key));
+          await uploadBlob(target, encrypt(attachment.bytes, current.key));
         } catch (err) {
           if (!(err instanceof BlobAlreadyExistsError)) throw err;
         }

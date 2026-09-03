@@ -10,7 +10,7 @@ import { FabButton } from '@/components/fab-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { getAllCircles, getAllPendingJoinRequests, getCircleMembers, getCirclePosts, getProfile, type Circle } from '@/data/db';
+import { getAllCircles, getAllPendingJoinRequests, getCircleFeed, getCircleMembers, getProfile, type Circle } from '@/data/db';
 import { checkPendingJoinRequest } from '@/domain/usecases/circle/join-circle';
 import { bytesToDataUri } from '@/services/image';
 
@@ -35,9 +35,9 @@ export default function CircleListScreen() {
           allCircles.map(async (circle) => {
             const [members, posts] = await Promise.all([
               getCircleMembers(circle.id),
-              getCirclePosts(circle.id),
+              getCircleFeed(circle.id),
             ]);
-            const coverBytes = circle.picture ?? posts[0]?.photo;
+            const coverBytes = circle.picture ?? posts[0]?.photo ?? undefined;
             return {
               ...circle,
               memberCount: members.length,

@@ -12,78 +12,36 @@
     {
       "idx": 1,
       "version": "6",
-      "when": 1788199555615,
-      "tag": "0001_clear_vapor",
+      "when": 1788200635537,
+      "tag": "0001_mature_zuras",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "6",
-      "when": 1788200635537,
-      "tag": "0002_mature_zuras",
+      "when": 1788207612733,
+      "tag": "0002_rare_professor_monster",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "6",
-      "when": 1788203645129,
-      "tag": "0003_cold_tyrannus",
+      "when": 1788210860155,
+      "tag": "0003_wandering_hardball",
       "breakpoints": true
     },
     {
       "idx": 4,
       "version": "6",
-      "when": 1788205211824,
-      "tag": "0004_parallel_jamie_braddock",
+      "when": 1788263890520,
+      "tag": "0004_adorable_violations",
       "breakpoints": true
     },
     {
       "idx": 5,
       "version": "6",
-      "when": 1788207612733,
-      "tag": "0005_rare_professor_monster",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1788210860155,
-      "tag": "0006_wandering_hardball",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "6",
-      "when": 1788263890520,
-      "tag": "0007_adorable_violations",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "6",
       "when": 1788374083799,
-      "tag": "0008_purple_darwin",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "6",
-      "when": 1788382483007,
-      "tag": "0009_majestic_lady_ursula",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "6",
-      "when": 1788464504648,
-      "tag": "0010_aberrant_terrax",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "6",
-      "when": 1788550000000,
-      "tag": "0011_slippery_black_cat",
+      "tag": "0005_purple_darwin",
       "breakpoints": true
     }
   ]

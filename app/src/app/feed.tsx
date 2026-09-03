@@ -12,7 +12,7 @@ import { PrivacyNotice } from '@/components/privacy-notice';
 import { Radius, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { getCircle, getCircleMembers, getCirclePosts, getPostComments, getProfile } from '@/data/db';
+import { getCircle, getCircleFeed, getCircleMembers, getPostComments, getProfile } from '@/data/db';
 import {
   approveJoinRequest,
   denyJoinRequest,
@@ -55,25 +55,31 @@ export default function FeedScreen() {
       Promise.all([
         getCircle(circleId),
         getCircleMembers(circleId),
-        getCirclePosts(circleId),
+        getCircleFeed(circleId),
         getProfile(),
       ]).then(async ([circle, members, circlePosts, profile]) => {
         setCircleName(circle?.name ?? '');
         setMemberCount(members.length);
-        const authorPhotoUri = profile?.picture ? bytesToDataUri(profile.picture) : undefined;
-
         const [reactionsByPost, commentsByPost] = await Promise.all([
           Promise.all(circlePosts.map((post) => getReactionsForPost(circleId, post.id))),
           Promise.all(circlePosts.map((post) => getPostComments(post.id))),
         ]);
 
+        // Author name/picture already came resolved from the roster by
+        // `getCircleFeed` — this screen only turns bytes into data URIs
+        // and timestamps into strings. Falls back to this device's own
+        // profile for a post whose author has no roster row yet.
         setPosts(
           circlePosts.map((post, index) => ({
             id: post.id,
-            authorName: profile?.name || 'You',
-            authorPhotoUri,
+            authorName: post.authorName || profile?.name || 'Unknown member',
+            authorPhotoUri: (post.authorPicture ?? profile?.picture)
+              ? bytesToDataUri(post.authorPicture ?? profile!.picture!)
+              : undefined,
             timestamp: formatTimestamp(post.createdAt),
-            photoUri: bytesToDataUri(post.photo),
+            // Undefined while the photo is still queued for download —
+            // PostCard renders its placeholder rather than a broken image.
+            photoUri: post.photo ? bytesToDataUri(post.photo) : undefined,
             caption: post.caption,
             reactions: reactionsByPost[index],
             comments: commentsByPost[index],

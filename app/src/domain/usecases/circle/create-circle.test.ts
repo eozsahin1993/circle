@@ -6,7 +6,7 @@ import { getAllCircles, getCircleMembers, initDatabase } from '@/data/db';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import { createPost } from '@/domain/usecases/post/create-post';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
-import { getCirclePosts } from '@/data/db/posts';
+import { getCircleFeed } from '@/data/db/posts';
 import { saveMasterSeed } from '@/services/keystore';
 import { appendEntry, bootstrapCircle } from '@/services/relay';
 
@@ -36,7 +36,7 @@ test('createCircle then createPost end to end matches what the feed screen reads
 
   await createPost({ circleId, caption: 'Hello from the test', photo: new Uint8Array([1, 2, 3]) });
 
-  const posts = await getCirclePosts(circleId);
+  const posts = await getCircleFeed(circleId);
   expect(posts).toHaveLength(1);
   expect(posts[0].caption).toBe('Hello from the test');
   expect(posts[0].photo).toEqual(new Uint8Array([1, 2, 3]));

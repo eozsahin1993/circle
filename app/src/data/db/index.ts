@@ -5,6 +5,7 @@ export async function initDatabase(): Promise<void> {
   await runMigrations();
 }
 
+export * from '@/data/db/attachments';
 export * from '@/data/db/circles';
 export * from '@/data/db/comments';
 export * from '@/data/db/invites';

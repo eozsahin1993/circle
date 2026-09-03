@@ -1,7 +1,9 @@
 import { generateUUID } from '@/services/crypto';
 import { initDatabase } from '@/data/db';
+import { AttachmentKinds, AttachmentStatuses, type NewAttachment } from '@/data/db/attachments';
+import { insertMember } from '@/data/db/members';
 import { deleteCircle, insertCircle } from '@/data/db/circles';
-import { getCirclePosts, insertPost } from '@/data/db/posts';
+import { getCircleFeed, insertPost } from '@/data/db/posts';
 
 beforeAll(() => initDatabase());
 
@@ -16,34 +18,90 @@ function makePost(circleId: string, overrides: Partial<{ caption: string; create
     id: generateUUID(),
     circleId,
     caption: overrides.caption ?? 'Nana in the kitchen.',
-    photo: new Uint8Array([1, 2, 3]),
+    authorPublicKey: 'aa'.repeat(32),
     createdAt: overrides.createdAt ?? Date.now(),
   };
 }
 
+/** The photo attachment a locally-created post carries: bytes already in hand, nothing to download. */
+function makeAttachment(post: { id: string; circleId: string; createdAt: number }): NewAttachment {
+  return {
+    circleId: post.circleId,
+    entryId: post.id,
+    kind: AttachmentKinds.POST_PHOTO,
+    bytes: new Uint8Array([1, 2, 3]),
+    hash: 'deadbeef',
+    keyVersion: 1,
+    status: AttachmentStatuses.FETCHED,
+    fetchAttempts: 0,
+    nextAttemptAt: null,
+    createdAt: post.createdAt,
+  };
+}
+
 describe('posts CRUD', () => {
-  test('getCirclePosts returns nothing before any post is inserted', async () => {
+  test('getCircleFeed returns nothing before any post is inserted', async () => {
     const circle = await makeCircle();
 
-    await expect(getCirclePosts(circle.id)).resolves.toEqual([]);
+    await expect(getCircleFeed(circle.id)).resolves.toEqual([]);
   });
 
-  test('insertPost then getCirclePosts returns it', async () => {
+  test('a post with no attachment yet reads back with no photo, rather than dropping out', async () => {
     const circle = await makeCircle();
     const post = makePost(circle.id);
     await insertPost(post);
 
-    await expect(getCirclePosts(circle.id)).resolves.toEqual([post]);
+    const [stored] = await getCircleFeed(circle.id);
+    expect(stored.id).toBe(post.id);
+    expect(stored.photo).toBeNull();
+    expect(stored.photoStatus).toBeNull();
   });
 
-  test('getCirclePosts returns every post in a circle, newest first', async () => {
+  test('insertPost with an attachment reads the photo bytes back on the post', async () => {
+    const circle = await makeCircle();
+    const post = makePost(circle.id);
+    await insertPost(post, makeAttachment(post));
+
+    const [stored] = await getCircleFeed(circle.id);
+    expect(stored.photo).toEqual(new Uint8Array([1, 2, 3]));
+    expect(stored.photoStatus).toBe('fetched');
+    expect(stored.createdAt).toBe(post.createdAt);
+  });
+
+  test('getCircleFeed resolves the author and photo without the join blanking the post', async () => {
+    const circle = await makeCircle();
+    const post = makePost(circle.id);
+    await insertMember({
+      circleId: circle.id,
+      identityPublicKey: post.authorPublicKey,
+      encPublicKey: 'bb',
+      memberId: generateUUID(),
+      role: 'admin',
+      name: 'Priya Raman',
+      picture: null,
+      joinedAt: 100,
+    });
+    await insertPost(post, makeAttachment(post));
+
+    const [row] = await getCircleFeed(circle.id);
+
+    expect(row.authorName).toBe('Priya Raman');
+    expect(row.photo).toEqual(new Uint8Array([1, 2, 3]));
+    // Regression guard for drizzle-team/drizzle-orm#555: joined columns
+    // are emitted without AS aliases and this driver keys rows by column
+    // name, so selecting any column whose name also exists on a joined
+    // table silently overwrites this one. `createdAt` is the canary.
+    expect(row.createdAt).toBe(post.createdAt);
+  });
+
+  test('getCircleFeed returns every post in a circle, newest first', async () => {
     const circle = await makeCircle();
     const earlier = makePost(circle.id, { caption: 'Earlier', createdAt: 1000 });
     const later = makePost(circle.id, { caption: 'Later', createdAt: 2000 });
     await insertPost(earlier);
     await insertPost(later);
 
-    const posts = await getCirclePosts(circle.id);
+    const posts = await getCircleFeed(circle.id);
     expect(posts.map((p) => p.id)).toEqual([later.id, earlier.id]);
   });
 
@@ -53,6 +111,6 @@ describe('posts CRUD', () => {
 
     await deleteCircle(circle.id);
 
-    await expect(getCirclePosts(circle.id)).resolves.toEqual([]);
+    await expect(getCircleFeed(circle.id)).resolves.toEqual([]);
   });
 });

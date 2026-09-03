@@ -8,7 +8,7 @@ import { getPendingOutboxEntries, initDatabase } from '@/data/db';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import { createPost } from '@/domain/usecases/post/create-post';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
-import { getCirclePosts } from '@/data/db/posts';
+import { getCircleFeed } from '@/data/db/posts';
 import { appendEntry, bootstrapCircle } from '@/services/relay';
 import { hexToBytes } from '@noble/curves/utils.js';
 
@@ -44,7 +44,7 @@ test('createPost queues an outbox entry whose encryptedMeta decrypts to a signed
   const photo = new Uint8Array([1, 2, 3]);
   await createPost({ circleId, caption: 'Hello from the test', photo });
 
-  const [post] = await getCirclePosts(circleId);
+  const [post] = await getCircleFeed(circleId);
   const [entry] = await getPendingOutboxEntries(circleId);
   expect(entry.localId).toBe(post.id);
 

@@ -1,1 +1,0 @@
-ALTER TABLE `circles` ADD `picture` blob;

@@ -1,1 +1,0 @@
-ALTER TABLE `pending_join_requests` ADD `created_by_name` text DEFAULT '' NOT NULL;
