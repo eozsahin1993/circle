@@ -154,6 +154,14 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
  * meta from epoch 0 — where it lands as a no-op against the row inserted
  * here. The local insert exists only so the joiner sees themselves
  * immediately, without waiting for a sync pass.
+ *
+ * That row has a consequence worth knowing before touching the roster
+ * rules: a joiner's roster is therefore *never empty* on its first meta
+ * walk. `member_added`'s bootstrap exemption has to be phrased as "no
+ * admin exists yet", not "no members exist yet" — phrased the second way
+ * it never fires here, the founder's entry is rejected for lacking a
+ * voucher that only that same entry could install, and the joiner ends up
+ * with an empty feed and a roster of one. See entry-handlers/member-added.ts.
  */
 async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, Uint8Array>, syncId: string, circleName: string): Promise<{ circleId: string }> {
   const masterSeed = await getMasterSeed();
