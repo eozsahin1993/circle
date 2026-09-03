@@ -263,6 +263,23 @@ export async function getCoverPhotoUploadTarget(
 }
 
 /**
+ * Downloads one entry's ciphertext bytes — GET
+ * /v1/circles/{syncId}/entries/{entryId}/blob, following the relay's
+ * redirect to the presigned S3 URL. Returns null if nothing was ever
+ * uploaded there — see getUploadTarget's doc comment on GetDownloadURL:
+ * that's expected (e.g. a circle with no cover photo set yet), not an
+ * error.
+ */
+export async function getBlob(syncId: string, entryId: string): Promise<Uint8Array | null> {
+  const response = await authorizedFetch(`/v1/circles/${syncId}/entries/${entryId}/blob`);
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(await describeError(response, 'Failed to download blob'));
+  }
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+/**
  * Fetches this account's encrypted circle-membership manifest — GET
  * /v1/account/manifest. Returns null before the account has ever stored
  * one (a fresh account, or a device that predates this feature). The

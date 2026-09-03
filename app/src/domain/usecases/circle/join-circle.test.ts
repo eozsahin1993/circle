@@ -14,7 +14,7 @@ import { approveJoinRequest, getOrCreateInvite } from '@/domain/usecases/circle/
 import type { JoinApprovalEnvelope, JoinApprovalPayload, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
 import { checkPendingJoinRequest, requestToJoin } from '@/domain/usecases/circle/join-circle';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
-import { decrypt, deriveJoinRequestKey, generateIdentity, sealToPublicKey, sign } from '@/services/crypto';
+import { decrypt, deriveJoinRequestKey, encrypt, generateIdentity, sealToPublicKey, sign } from '@/services/crypto';
 import { compressToThumbnail } from '@/services/image';
 import {
   getInvitePreview,
@@ -25,7 +25,7 @@ import {
   putJoinRequest,
 } from '@/services/mailbox-relay';
 import { getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
-import { appendEntry, bootstrapCircle } from '@/services/relay';
+import { appendEntry, bootstrapCircle, getBlob } from '@/services/relay';
 
 beforeAll(async () => {
   await initDatabase();
@@ -36,6 +36,7 @@ beforeEach(() => {
   (drainOutbox as jest.Mock).mockResolvedValue(undefined);
   (bootstrapCircle as jest.Mock).mockResolvedValue(undefined);
   (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
+  (getBlob as jest.Mock).mockResolvedValue(null);
 });
 
 /**
@@ -90,6 +91,76 @@ test('requestToJoin then approveJoinRequest then checkPendingJoinRequest complet
   await expect(getCircle(result.circleId)).resolves.toMatchObject({ name: 'Family Circle' });
   await expect(getPendingJoinRequest(requestId)).resolves.toBeNull();
   expect(drainOutbox).toHaveBeenCalledWith(result.circleId);
+});
+
+test('checkPendingJoinRequest fetches and decrypts the circle cover photo when one exists', async () => {
+  const { circleId: creatorCircleId, invite } = await makeCircleWithInvite('Family Circle');
+  const creatorCurrent = (await getCurrentContentKey(creatorCircleId))!;
+  const photo = new Uint8Array([9, 8, 7]);
+  (getBlob as jest.Mock).mockResolvedValue(encrypt(photo, creatorCurrent.key));
+  (putJoinRequest as jest.Mock).mockResolvedValue(undefined);
+  const { requestId } = await requestToJoin(invite.code);
+
+  const [, , requestBlob] = (putJoinRequest as jest.Mock).mock.calls[0];
+  (listJoinRequests as jest.Mock).mockResolvedValue([
+    { requesterId: requestId, encryptedRequest: requestBlob, encryptedApproval: null, createdAt: Date.now() },
+  ]);
+  (putJoinApproval as jest.Mock).mockResolvedValue(undefined);
+  await approveJoinRequest(creatorCircleId, requestId);
+
+  const [, , approvalBlob] = (putJoinApproval as jest.Mock).mock.calls[0];
+  (getJoinRequestApproval as jest.Mock).mockResolvedValue(approvalBlob);
+  const result = await checkPendingJoinRequest(requestId);
+
+  expect(result.joined).toBe(true);
+  if (!result.joined) throw new Error('unreachable');
+  const creatorCircle = (await getCircle(creatorCircleId))!;
+  expect(getBlob).toHaveBeenCalledWith(creatorCircle.syncId, 'cover');
+  await expect(getCircle(result.circleId)).resolves.toMatchObject({ picture: photo });
+});
+
+test('checkPendingJoinRequest leaves the circle picture null when no cover photo has ever been set', async () => {
+  const { circleId: creatorCircleId, invite } = await makeCircleWithInvite('Family Circle');
+  // beforeEach already stubs getBlob to resolve null — the "nothing uploaded at this key yet" case.
+  (putJoinRequest as jest.Mock).mockResolvedValue(undefined);
+  const { requestId } = await requestToJoin(invite.code);
+
+  const [, , requestBlob] = (putJoinRequest as jest.Mock).mock.calls[0];
+  (listJoinRequests as jest.Mock).mockResolvedValue([
+    { requesterId: requestId, encryptedRequest: requestBlob, encryptedApproval: null, createdAt: Date.now() },
+  ]);
+  (putJoinApproval as jest.Mock).mockResolvedValue(undefined);
+  await approveJoinRequest(creatorCircleId, requestId);
+
+  const [, , approvalBlob] = (putJoinApproval as jest.Mock).mock.calls[0];
+  (getJoinRequestApproval as jest.Mock).mockResolvedValue(approvalBlob);
+  const result = await checkPendingJoinRequest(requestId);
+
+  expect(result.joined).toBe(true);
+  if (!result.joined) throw new Error('unreachable');
+  await expect(getCircle(result.circleId)).resolves.toMatchObject({ picture: null });
+});
+
+test('checkPendingJoinRequest still completes the join even if fetching the cover photo fails', async () => {
+  const { circleId: creatorCircleId, invite } = await makeCircleWithInvite('Family Circle');
+  (getBlob as jest.Mock).mockRejectedValue(new Error('network error'));
+  (putJoinRequest as jest.Mock).mockResolvedValue(undefined);
+  const { requestId } = await requestToJoin(invite.code);
+
+  const [, , requestBlob] = (putJoinRequest as jest.Mock).mock.calls[0];
+  (listJoinRequests as jest.Mock).mockResolvedValue([
+    { requesterId: requestId, encryptedRequest: requestBlob, encryptedApproval: null, createdAt: Date.now() },
+  ]);
+  (putJoinApproval as jest.Mock).mockResolvedValue(undefined);
+  await approveJoinRequest(creatorCircleId, requestId);
+
+  const [, , approvalBlob] = (putJoinApproval as jest.Mock).mock.calls[0];
+  (getJoinRequestApproval as jest.Mock).mockResolvedValue(approvalBlob);
+  const result = await checkPendingJoinRequest(requestId);
+
+  expect(result.joined).toBe(true);
+  if (!result.joined) throw new Error('unreachable');
+  await expect(getCircle(result.circleId)).resolves.toMatchObject({ picture: null });
 });
 
 test('requestToJoin compresses the profile picture into a thumbnail and includes it in the join request', async () => {

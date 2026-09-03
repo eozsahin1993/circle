@@ -34,6 +34,27 @@ import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account
 import { compressToThumbnail } from '@/services/image';
 import { deletePendingJoinKeypair, getMasterSeed, getPendingJoinKeypair, saveCircleIdentity, saveCircleKeyMap, savePendingJoinKeypair } from '@/services/keystore';
 import { getInvitePreview, getJoinRequestApproval, putJoinRequest } from '@/services/mailbox-relay';
+import { getBlob } from '@/services/relay';
+
+/**
+ * Fetches and decrypts the circle's cover photo, if it has one — the
+ * fixed, predictable `entryId: 'cover'` location (see
+ * services/relay.ts's `getBlob` and set-cover-photo.ts) means a joiner
+ * can fetch it directly on join without needing `pullCircle`/meta-log
+ * consumption to exist first (which nothing in the app does yet — see
+ * this function's caller's doc comment). Best-effort: a stranger's
+ * tampered or missing object just decrypts to nothing usable, caught
+ * here rather than failing the join over a picture.
+ */
+async function fetchCoverPhoto(syncId: string, contentKey: Uint8Array): Promise<Uint8Array | null> {
+  try {
+    const encrypted = await getBlob(syncId, 'cover');
+    return encrypted ? decrypt(encrypted, contentKey) : null;
+  } catch (err) {
+    console.error('Failed to fetch cover photo while joining', err);
+    return null;
+  }
+}
 
 /**
  * Fetches and decrypts an invite's preview — "You're about to join: X" —
@@ -110,7 +131,10 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
  * Known gaps, not addressed here: existing members only learn of this
  * join once `pullCircle` exists (server/INVITE_FLOW.md); `member_added`
  * is self-announced by the joiner via the outbox rather than written by
- * the approver, as the design calls for.
+ * the approver, as the design calls for. The cover photo is the one
+ * piece of circle state this device *does* pick up despite `pullCircle`
+ * not existing — see `fetchCoverPhoto` — because it lives at a fixed,
+ * known location rather than needing meta-log replay to find.
  */
 async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, Uint8Array>, syncId: string, circleName: string): Promise<{ circleId: string }> {
   const masterSeed = await getMasterSeed();
@@ -128,10 +152,11 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
   await saveCircleKeyMap(circleId, keyMap);
   await saveCircleIdentity(circleId, { ...identity, memberId });
 
+  const picture = await fetchCoverPhoto(syncId, currentKey);
   await insertCircle({
     id: circleId,
     name: circleName,
-    picture: null,
+    picture,
     syncId,
     createdAt: now,
     leftAt: null,
