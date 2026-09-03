@@ -42,11 +42,18 @@ export const memberAddedHandler: EntryHandler = {
     if (!payload) return false;
 
     const members = await getCircleMembers(circleId);
-    if (members.length === 0) return true;
+    const admins = members.filter((member) => member.role === MemberRoles.admin);
 
-    return members.some(
-      (member) => member.identityPublicKey === envelope.authorPubkey && member.role === MemberRoles.admin
-    );
+    // "Nobody has vouched yet" means no *admin* exists yet — not that the
+    // table is empty. A joiner replaying from epoch 0 already holds one
+    // row: its own, written by completeJoin so it can see itself before
+    // the first sync. Testing for an empty table would therefore never
+    // fire for the one case this exemption exists to serve, and the
+    // founder's entry would be rejected for lacking a voucher that only
+    // that same entry can install.
+    if (admins.length === 0) return true;
+
+    return admins.some((member) => member.identityPublicKey === envelope.authorPubkey);
   },
 
   /**

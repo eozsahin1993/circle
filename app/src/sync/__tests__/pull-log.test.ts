@@ -3,11 +3,25 @@ jest.mock('@/domain/usecases/account/account-manifest');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { getCircle, getCircleFeed, getCircleMembers, initDatabase } from '@/data/db';
+import {
+  getCircle,
+  getCircleFeed,
+  getCircleMembers,
+  initDatabase,
+  insertCircle,
+  insertMember,
+  MemberRoles,
+} from '@/data/db';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
-import { generateIdentity, generateUUID, hashBytes } from '@/services/crypto';
-import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
+import { generateContentKey, generateIdentity, generateUUID, hashBytes } from '@/services/crypto';
+import {
+  getCircleIdentity,
+  getCurrentContentKey,
+  saveCircleIdentity,
+  saveCircleKeyMap,
+  saveMasterSeed,
+} from '@/services/keystore';
 import { appendEntry, bootstrapCircle, fetchEntries, type LogEntry } from '@/services/relay';
 import { pullContent, pullMeta } from '@/sync/pull-log';
 
@@ -158,6 +172,58 @@ describe('pullMeta', () => {
     expect((fetchEntries as jest.Mock).mock.calls[1][2]).toBe(1);
     const members = await getCircleMembers(circleId);
     expect(members.map((member) => member.name)).toEqual(expect.arrayContaining(['First', 'Second']));
+  });
+  test('a joiner replaying from epoch 0 accepts the founder, despite already holding its own row', async () => {
+    // completeJoin inserts the joiner's own member row before any sync, so
+    // its roster is never empty on the first walk. The founder's entry is
+    // the one that installs the first admin, and it can only be accepted
+    // by an exemption that asks whether an *admin* exists — not whether
+    // the table has rows. Getting this wrong rejects the founder, and then
+    // every post by them fails the author check too.
+    const circleId = generateUUID();
+    const contentKey = generateContentKey();
+    const joiner = generateIdentity();
+    const founder = generateIdentity();
+
+    await saveCircleKeyMap(circleId, { 1: contentKey });
+    await saveCircleIdentity(circleId, { ...joiner, memberId: generateUUID() });
+    await insertCircle({
+      id: circleId,
+      name: 'Family Circle',
+      picture: null,
+      syncId: generateUUID(),
+      createdAt: Date.now(),
+      leftAt: null,
+      metaCursor: 0,
+      contentCursor: 0,
+    });
+    await insertMember({
+      circleId,
+      identityPublicKey: bytesToHex(joiner.publicKey),
+      encPublicKey: 'cc',
+      memberId: generateUUID(),
+      role: MemberRoles.member,
+      name: 'Me',
+      picture: null,
+      joinedAt: Date.now(),
+    });
+
+    onePage([
+      entry(
+        1,
+        buildAndEncryptLogEntry(
+          'member_added',
+          { identityPublicKey: bytesToHex(founder.publicKey), encPublicKey: 'dd', name: 'Founder', role: 'admin' },
+          founder,
+          contentKey
+        )
+      ),
+    ]);
+
+    await pullMeta(circleId);
+
+    const names = (await getCircleMembers(circleId)).map((member) => member.name);
+    expect(names).toEqual(expect.arrayContaining(['Me', 'Founder']));
   });
 });
 
