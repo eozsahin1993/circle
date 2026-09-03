@@ -172,6 +172,32 @@ cp .env.example .env   # fill in values from `terraform output` above
 export $(cat .env | xargs) && go run ./cmd/server   # see .env.example — Go doesn't load .env itself
 ```
 
+### Rebuild on change, or you will chase phantom bugs
+
+`go run` builds once and keeps serving that binary, so a route edited
+after startup simply isn't there. The symptom is a lie: the path still
+matches an old pattern, so Go answers **405 Method Not Allowed** rather
+than 404, and it looks like a client bug. This has already cost one
+debugging session — a client correctly sending `POST .../upload` against
+a binary built ~40 minutes before the route changed from `GET` to `POST`.
+
+Run it under a watcher instead:
+
+```
+go install github.com/bokwoon95/wgo@latest      # once
+export $(cat .env | xargs) && wgo run ./cmd/server
+```
+
+`wgo` needs no config file. `air` works too if you already have it.
+
+When a relay call fails with a status that makes no sense against the
+code in front of you, **check the server's start time before debugging
+the client**:
+
+```
+ps -o lstart,command -p $(lsof -ti :8080)
+```
+
 **Pin LocalStack to exactly `4.4.0`** (the last version usable without a
 LocalStack account/auth token — 2026.03.0 and later require one even for
 free-tier services like S3/DynamoDB). Don't drop back to the `3.8` line

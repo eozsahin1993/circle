@@ -1,5 +1,6 @@
 import { db } from '@/data/db/connection';
 import {
+  attachments,
   circleInvites,
   circleMembers,
   circles,
@@ -18,9 +19,9 @@ export async function getAllCircleIds(): Promise<string[]> {
 }
 
 /**
- * Wipes every locally-stored row — circles, posts, comments, reactions,
- * invites, membership, the outbox, pending join requests, and the device
- * profile. Deletes children before parents explicitly rather than relying
+ * Wipes every locally-stored row — circles, posts and their attachments,
+ * comments, reactions, invites, membership, the outbox, pending join
+ * requests, and the device profile. Deletes children before parents explicitly rather than relying
  * on SQLite foreign-key cascade, since this connection doesn't turn PRAGMA
  * foreign_keys on. Doesn't touch the Keychain/Keystore (circle identities,
  * circle secrets, the master seed, pending-join ephemeral keypairs) —
@@ -31,6 +32,7 @@ export async function resetAllLocalData(): Promise<void> {
   await db.delete(postComments);
   await db.delete(postReactions);
   await db.delete(outbox);
+  await db.delete(attachments);
   await db.delete(posts);
   await db.delete(circleInvites);
   await db.delete(pendingJoinRequests);

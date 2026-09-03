@@ -33,12 +33,37 @@ function namespaceFor(entryType: OutboxEntry['entryType']): Namespace {
  * running instead.
  */
 const inFlightDrains = new Map<string, Promise<void>>();
+const rerunRequested = new Set<string>();
+
+/**
+ * Drains repeatedly until a pass finds nothing new. The loop matters
+ * because joining an in-flight drain is not the same as being pushed by
+ * it: that drain already read its batch, so anything queued after that
+ * read would sit unsent until some later trigger happened along. Posting
+ * during a sync pass is the ordinary case, not a rare one — so a caller
+ * arriving mid-drain asks for one more pass rather than being quietly
+ * dropped.
+ */
+async function drainUntilQuiet(circleId: string): Promise<void> {
+  try {
+    do {
+      rerunRequested.delete(circleId);
+      await pushPendingEntries(circleId);
+    } while (rerunRequested.has(circleId));
+  } finally {
+    rerunRequested.delete(circleId);
+    inFlightDrains.delete(circleId);
+  }
+}
 
 export function drainOutbox(circleId: string): Promise<void> {
   const running = inFlightDrains.get(circleId);
-  if (running) return running;
+  if (running) {
+    rerunRequested.add(circleId);
+    return running;
+  }
 
-  const drain = pushPendingEntries(circleId).finally(() => inFlightDrains.delete(circleId));
+  const drain = drainUntilQuiet(circleId);
   inFlightDrains.set(circleId, drain);
   return drain;
 }

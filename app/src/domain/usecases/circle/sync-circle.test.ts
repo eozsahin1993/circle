@@ -193,3 +193,29 @@ test('a later drain still runs once the first has finished', async () => {
   // The guard must clear itself, or the second post would never go out.
   expect((appendEntry as jest.Mock).mock.calls).toHaveLength(2);
 });
+
+test('an entry queued while a drain is running still gets pushed by it', async () => {
+  // Posting during a sync pass is routine. The second caller joins the
+  // running drain rather than starting a rival one — but that drain had
+  // already read its batch, so without a follow-up pass the new entry
+  // would sit unsent until some later trigger happened along.
+  const { circleId } = await makeCircle();
+  await enqueuePost(circleId, new Uint8Array([1, 1, 1]));
+  (getUploadTarget as jest.Mock).mockResolvedValue({ url: 'https://s3', fields: {} });
+  (uploadBlob as jest.Mock).mockResolvedValue(undefined);
+
+  let queuedDuringDrain = false;
+  (appendEntry as jest.Mock).mockImplementation(async () => {
+    if (!queuedDuringDrain) {
+      queuedDuringDrain = true;
+      await enqueuePost(circleId, new Uint8Array([2, 2, 2]));
+      drainOutbox(circleId); // the fire-and-forget createPost makes
+    }
+    return { epoch: 1, receivedAt: 1 };
+  });
+
+  await drainOutbox(circleId);
+
+  expect((appendEntry as jest.Mock).mock.calls).toHaveLength(2);
+  expect(await getPendingOutboxEntries(circleId)).toHaveLength(0);
+});
