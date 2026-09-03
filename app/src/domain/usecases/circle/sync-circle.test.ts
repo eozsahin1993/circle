@@ -1,6 +1,6 @@
 jest.mock('@/services/relay');
 
-import { encryptJSON, generateUUID } from '@/services/crypto';
+import { decrypt, encryptJSON, generateUUID } from '@/services/crypto';
 import { getCircleSecret, saveMasterSeed } from '@/services/keystore';
 import { appendEntry, uploadBlob } from '@/services/relay';
 import { getPendingOutboxEntries, initDatabase, insertPostAndEnqueue, OutboxStatuses, type Post } from '@/data/db';
@@ -44,7 +44,10 @@ test('drainOutbox appends the entry, uploads its blob, then marks it synced', as
   await drainOutbox(circleId);
 
   expect(appendEntry).toHaveBeenCalledWith(expect.any(String), post.id, expect.any(Uint8Array));
-  expect(uploadBlob).toHaveBeenCalledWith({ url: 'https://s3', fields: {} }, post.photo);
+  const [uploadTarget, uploadedBytes] = (uploadBlob as jest.Mock).mock.calls[0];
+  expect(uploadTarget).toEqual({ url: 'https://s3', fields: {} });
+  expect(uploadedBytes).not.toEqual(post.photo);
+  expect(decrypt(uploadedBytes, secret)).toEqual(post.photo);
   await expect(getPendingOutboxEntries(circleId)).resolves.toEqual([]);
 });
 

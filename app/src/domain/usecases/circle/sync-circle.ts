@@ -1,4 +1,4 @@
-import { deriveCircleLogId } from '@/services/crypto';
+import { deriveCircleLogId, encrypt } from '@/services/crypto';
 import { getCircleSecret } from '@/services/keystore';
 import { appendEntry, uploadBlob } from '@/services/relay';
 import { getPendingOutboxEntries, markOutboxEntrySynced } from '@/data/db';
@@ -27,7 +27,7 @@ export async function drainOutbox(circleId: string): Promise<void> {
     if (entry.entryType === 'post') {
       const post = await getPost(entry.localId);
       if (post) {
-        await uploadBlob(upload, post.photo);
+        await uploadBlob(upload, encrypt(post.photo, secret));
       }
     }
 
