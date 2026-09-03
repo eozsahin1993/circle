@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -21,6 +20,13 @@ import (
 // itself is DynamoDB's native TTL feature, not application code — this
 // value only controls what `expiresAt` gets written as at commit time.
 const DefaultLogRetentionDays = 14
+
+// readPageSize caps how many entries a single Read call returns — an
+// internal server policy, not a client-controllable parameter. A caller
+// that needs more just calls again with `since` advanced to the epoch of
+// the last entry it actually received (never to LatestEpoch — a truncated
+// page means LatestEpoch is still ahead of what was actually returned).
+const readPageSize = 200
 
 // Single-table design: PK = circleLogId, SK distinguishes item kinds.
 // Sort keys share one attribute (DynamoDB requires a uniform type per
@@ -214,37 +220,57 @@ func (s *Store) Read(ctx context.Context, circleLogID string, since int64) (logs
 		lowerBound = oldestAvailableEpoch - 1
 	}
 
-	queryOut, err := s.client.Query(ctx, &dynamodb.QueryInput{
-		TableName:              aws.String(s.tableName),
-		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :pk AND %s BETWEEN :lower AND :upper", dynamoutil.PKAttr, dynamoutil.SKAttr)),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk":    &types.AttributeValueMemberS{Value: circleLogID},
-			":lower": &types.AttributeValueMemberS{Value: epochSK(lowerBound + 1)},
-			":upper": &types.AttributeValueMemberS{Value: epochSKUpperBound()},
-		},
-		ScanIndexForward: aws.Bool(true),
-	})
-	if err != nil {
-		return logstore.FetchSinceResult{}, err
-	}
+	// Loops rather than one Query call: DynamoDB caps a single Query
+	// response at 1MB of data regardless of readPageSize, signaling "more
+	// exists past this page" via LastEvaluatedKey — a single unpaginated
+	// call would silently return a partial result once a circle's backlog
+	// since `since` crosses that size, with nothing telling the caller
+	// entries were missing. Each iteration asks DynamoDB for only as many
+	// items as still needed to reach readPageSize, so this never
+	// over-fetches past the intended page size either.
+	entries := make([]logstore.LogEntry, 0, readPageSize)
+	var exclusiveStartKey map[string]types.AttributeValue
+	for len(entries) < readPageSize {
+		queryOut, err := s.client.Query(ctx, &dynamodb.QueryInput{
+			TableName:              aws.String(s.tableName),
+			KeyConditionExpression: aws.String(fmt.Sprintf("%s = :pk AND %s BETWEEN :lower AND :upper", dynamoutil.PKAttr, dynamoutil.SKAttr)),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":pk":    &types.AttributeValueMemberS{Value: circleLogID},
+				":lower": &types.AttributeValueMemberS{Value: epochSK(lowerBound + 1)},
+				":upper": &types.AttributeValueMemberS{Value: epochSKUpperBound()},
+			},
+			ScanIndexForward:  aws.Bool(true),
+			Limit:             aws.Int32(int32(readPageSize - len(entries))),
+			ExclusiveStartKey: exclusiveStartKey,
+		})
+		if err != nil {
+			return logstore.FetchSinceResult{}, err
+		}
 
-	entries := make([]logstore.LogEntry, 0, len(queryOut.Items))
-	for _, item := range queryOut.Items {
-		epoch, err := dynamoutil.AttrInt(item, "epoch")
-		if err != nil {
-			return logstore.FetchSinceResult{}, err
+		for _, item := range queryOut.Items {
+			epoch, err := dynamoutil.AttrInt(item, "epoch")
+			if err != nil {
+				return logstore.FetchSinceResult{}, err
+			}
+			receivedAt, err := dynamoutil.AttrInt(item, "receivedAt")
+			if err != nil {
+				return logstore.FetchSinceResult{}, err
+			}
+			blobAttr, ok := item["encryptedMeta"].(*types.AttributeValueMemberB)
+			if !ok {
+				return logstore.FetchSinceResult{}, fmt.Errorf("entry at epoch %d missing encryptedMeta", epoch)
+			}
+			entries = append(entries, logstore.LogEntry{Epoch: epoch, EncryptedMeta: blobAttr.Value, ReceivedAt: receivedAt})
 		}
-		receivedAt, err := dynamoutil.AttrInt(item, "receivedAt")
-		if err != nil {
-			return logstore.FetchSinceResult{}, err
+
+		if queryOut.LastEvaluatedKey == nil {
+			break
 		}
-		blobAttr, ok := item["encryptedMeta"].(*types.AttributeValueMemberB)
-		if !ok {
-			return logstore.FetchSinceResult{}, fmt.Errorf("entry at epoch %d missing encryptedMeta", epoch)
-		}
-		entries = append(entries, logstore.LogEntry{Epoch: epoch, EncryptedMeta: blobAttr.Value, ReceivedAt: receivedAt})
+		exclusiveStartKey = queryOut.LastEvaluatedKey
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Epoch < entries[j].Epoch })
+	// No sort needed: ScanIndexForward already returns each page in
+	// ascending epoch order, and consecutive pages continue that same
+	// order, so entries is already fully sorted by the time this loop ends.
 
 	return logstore.FetchSinceResult{
 		Entries:              entries,

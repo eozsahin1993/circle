@@ -193,6 +193,62 @@ func TestLogStore_CommitEntry_RetryAfterIdempotencyMarkerEvictionGetsNewEpoch(t 
 	}
 }
 
+// readPageSize duplicated from log_store.go (unexported, and this is an
+// external _test package, same reasoning as the sort-key formats above) —
+// see its own doc comment for why it's an internal server policy, not a
+// caller-supplied parameter.
+const readPageSize = 200
+
+// Proves Read() actually loops past DynamoDB's own internal per-call
+// response cap instead of silently returning a truncated result — the bug
+// this pagination fix addresses. Committing more entries than a single
+// unpaginated Query could easily return isn't simulate-able the way TTL
+// eviction is above; this exercises the real boundary directly.
+func TestLogStore_Read_PaginatesPastASinglePageAndResumesCorrectly(t *testing.T) {
+	ctx := context.Background()
+	circleLogID := testsupport.UniqueCircleID(t)
+	logStore := testsupport.NewLogStore(t, 0)
+
+	const totalEntries = readPageSize + 50
+	for i := range totalEntries {
+		if _, err := logStore.CommitEntry(ctx, circleLogID, fmt.Sprintf("post-%d", i), []byte("ciphertext")); err != nil {
+			t.Fatalf("commit %d failed: %v", i, err)
+		}
+	}
+
+	first, err := logStore.Read(ctx, circleLogID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.Entries) != readPageSize {
+		t.Fatalf("expected exactly %d entries in a capped page, got %d", readPageSize, len(first.Entries))
+	}
+	if first.LatestEpoch != int64(totalEntries) {
+		t.Fatalf("expected LatestEpoch to report the true latest (%d) even though this page was truncated, got %d", totalEntries, first.LatestEpoch)
+	}
+	lastInFirstPage := first.Entries[len(first.Entries)-1].Epoch
+	if lastInFirstPage != readPageSize {
+		t.Fatalf("expected the first page's last entry to be epoch %d, got %d", readPageSize, lastInFirstPage)
+	}
+
+	// A correct caller advances `since` to the last entry it actually
+	// received, not to LatestEpoch — this is exactly that resumption.
+	second, err := logStore.Read(ctx, circleLogID, lastInFirstPage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantRemaining := totalEntries - readPageSize
+	if len(second.Entries) != wantRemaining {
+		t.Fatalf("expected the remaining %d entries on the second page, got %d", wantRemaining, len(second.Entries))
+	}
+	if second.Entries[0].Epoch != readPageSize+1 {
+		t.Fatalf("expected the second page to pick up right after the first left off, got first epoch %d", second.Entries[0].Epoch)
+	}
+	if second.Entries[len(second.Entries)-1].Epoch != int64(totalEntries) {
+		t.Fatalf("expected the second page to reach the true latest epoch %d, got %d", totalEntries, second.Entries[len(second.Entries)-1].Epoch)
+	}
+}
+
 func mustAttrInt(t *testing.T, item map[string]types.AttributeValue, key string) int64 {
 	t.Helper()
 	attr, ok := item[key]
