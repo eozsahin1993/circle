@@ -22,8 +22,28 @@ function namespaceFor(entryType: OutboxEntry['entryType']): Namespace {
  * nothing, which an immutable log could never fix. `BlobAlreadyExistsError`
  * on retry means the previous attempt's upload actually succeeded; treat
  * it as done, not as a failure.
+ *
+ * Only one drain runs per circle at a time. Drains are triggered from
+ * several uncoordinated places — creating a post and completing a join
+ * both fire one, and every sync pass runs one too — so they genuinely
+ * overlap. Two concurrent drains would read the same pending rows and
+ * both push them: the relay's per-entryId idempotency means that
+ * converges rather than duplicating, but it re-uploads blobs and doubles
+ * the requests for nothing. A second caller joins the drain already
+ * running instead.
  */
-export async function drainOutbox(circleId: string): Promise<void> {
+const inFlightDrains = new Map<string, Promise<void>>();
+
+export function drainOutbox(circleId: string): Promise<void> {
+  const running = inFlightDrains.get(circleId);
+  if (running) return running;
+
+  const drain = pushPendingEntries(circleId).finally(() => inFlightDrains.delete(circleId));
+  inFlightDrains.set(circleId, drain);
+  return drain;
+}
+
+async function pushPendingEntries(circleId: string): Promise<void> {
   const circle = await getCircle(circleId);
   if (!circle) throw new Error('No local circle row for this id.');
   const current = await getCurrentContentKey(circleId);

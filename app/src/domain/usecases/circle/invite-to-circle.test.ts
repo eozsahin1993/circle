@@ -64,7 +64,9 @@ test('discoverPendingRequests decodes the self-reported name, picture, and creat
   const key = deriveJoinRequestKey(invite.code);
   const { publicKey } = generateEphemeralKeypair();
   const payload: JoinRequestPayload = {
-    ephemeralPub: bytesToHex(publicKey),
+    ephemeralPublicKey: bytesToHex(publicKey),
+    identityPublicKey: 'aa'.repeat(32),
+    encPublicKey: 'bb'.repeat(32),
     selfReportedName: 'Priya Raman',
     pictureThumbnail: Buffer.from([1, 2, 3]).toString('base64'),
   };
@@ -91,7 +93,12 @@ test('discoverPendingRequests omits pictureUri when the requester sent no pictur
 
   const key = deriveJoinRequestKey(invite.code);
   const { publicKey } = generateEphemeralKeypair();
-  const payload: JoinRequestPayload = { ephemeralPub: bytesToHex(publicKey), selfReportedName: 'Tomás Ruiz' };
+  const payload: JoinRequestPayload = {
+    ephemeralPublicKey: bytesToHex(publicKey),
+    identityPublicKey: 'aa'.repeat(32),
+    encPublicKey: 'bb'.repeat(32),
+    selfReportedName: 'Tomás Ruiz',
+  };
   (listJoinRequests as jest.Mock).mockResolvedValue([
     { requesterId: 'req-2', encryptedRequest: encryptJSON(payload, key), createdAt: Date.now() },
   ]);
@@ -113,7 +120,12 @@ test('discoverPendingRequests excludes a request that already has an approval', 
 
   const key = deriveJoinRequestKey(invite.code);
   const { publicKey } = generateEphemeralKeypair();
-  const payload: JoinRequestPayload = { ephemeralPub: bytesToHex(publicKey), selfReportedName: 'Priya Raman' };
+  const payload: JoinRequestPayload = {
+    ephemeralPublicKey: bytesToHex(publicKey),
+    identityPublicKey: 'aa'.repeat(32),
+    encPublicKey: 'bb'.repeat(32),
+    selfReportedName: 'Priya Raman',
+  };
   (listJoinRequests as jest.Mock).mockResolvedValue([
     {
       requesterId: 'req-1',

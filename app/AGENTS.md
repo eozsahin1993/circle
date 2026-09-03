@@ -29,3 +29,24 @@ CI (`.github/workflows/app-unit-test.yml`) runs plain `npx jest --ci` on
 Node 22.23.2 and passes quickly with no special flags — this workaround
 is specific to constrained local/sandboxed shells, not a sign anything is
 actually wrong with the test suite.
+
+## After editing a migration `.sql`, run tests with `--no-cache`
+
+Jest caches the transformed contents of `src/data/db/migrations/*.sql`
+and does **not** reliably invalidate that cache when one changes. Tests
+then run the *old* migration against the *new* `schema.ts`, and fail with
+a thoroughly misleading error:
+
+```
+SqliteError: table pending_join_requests has no column named circle_id
+```
+
+— pointing at a column the migration visibly does declare. It's a stale
+cache, not a broken migration. Re-run with `--no-cache` once after
+touching any migration:
+
+```bash
+npx jest --ci --forceExit --runInBand --no-cache
+```
+
+Everyday runs (no migration changes) don't need it.

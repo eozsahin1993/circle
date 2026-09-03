@@ -281,7 +281,7 @@ export function deriveInvitePreviewKey(inviteCode: string): Uint8Array {
 
 /**
  * `HKDF(invite_code, "join-request")` — the symmetric key that
- * encrypts/decrypts a requester's `{ephemeralPub, selfReportedName}`
+ * encrypts/decrypts a requester's `{ephemeralPublicKey, selfReportedName}`
  * payload. Same code-derived-key scheme as `deriveInvitePreviewKey`, a
  * different purpose string so the two keys are unrelated.
  */

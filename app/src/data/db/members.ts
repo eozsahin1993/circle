@@ -29,6 +29,17 @@ export async function insertMember(member: Member): Promise<void> {
   await db.insert(circleMembers).values(member);
 }
 
+/**
+ * Inserts a member only if that identity isn't already on the roster —
+ * how the sync engine applies a `member_added` entry, which it may see
+ * more than once (a crash between applying an entry and advancing the
+ * cursor replays it, and a joiner walking meta from 0 reaches its own
+ * self-announced entry). See server/SYNC_DESIGN.md invariant 8.
+ */
+export async function insertMemberIfAbsent(member: Member): Promise<void> {
+  await db.insert(circleMembers).values(member).onConflictDoNothing();
+}
+
 /** Looks up a member by their identity (Ed25519 signing) public key — used to verify a post's signature. */
 export async function getMemberByPublicKey(circleId: string, identityPublicKey: string): Promise<Member | null> {
   const rows = await db

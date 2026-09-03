@@ -1,6 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm';
 
-import { normalizeAttachment, type Attachment, type NewAttachment } from '@/data/db/attachments';
+import { type Attachment, type NewAttachment } from '@/data/db/attachments';
 import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
 import { attachments, circleMembers, posts } from '@/data/db/schema';

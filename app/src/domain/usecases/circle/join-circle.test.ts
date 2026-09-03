@@ -25,7 +25,7 @@ import {
   putJoinRequest,
 } from '@/services/mailbox-relay';
 import { getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
-import { appendEntry, bootstrapCircle, getBlob } from '@/services/relay';
+import { appendEntry, bootstrapCircle, fetchEntries, getBlob } from '@/services/relay';
 
 beforeAll(async () => {
   await initDatabase();
@@ -37,6 +37,9 @@ beforeEach(() => {
   (bootstrapCircle as jest.Mock).mockResolvedValue(undefined);
   (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
   (getBlob as jest.Mock).mockResolvedValue(null);
+  // approveJoinRequest now catches up on meta before sealing, so the
+  // approver never hands over a stale key map.
+  (fetchEntries as jest.Mock).mockResolvedValue({ entries: [], currentEpoch: 0 });
 });
 
 /**

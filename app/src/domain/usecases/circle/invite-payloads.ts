@@ -45,7 +45,25 @@ export type InvitePreviewPayload = {
  */
 export type JoinRequestPayload = {
   /** Hex-encoded X25519 public key — the requester's one-time ephemeral keypair for this handshake. */
-  ephemeralPub: string;
+  ephemeralPublicKey: string;
+  /**
+   * Hex-encoded Ed25519 public key — the requester's *durable* circle
+   * identity (see `deriveCircleIdentity`), not the ephemeral key above.
+   * Carried so the approver can name this member in the `member_added`
+   * entry it writes: per server/SYNC_DESIGN.md's predicate table that
+   * entry may only be written by an admin, so the joiner cannot announce
+   * itself — nobody would have vouched for it. Every other device uses
+   * this key to verify that member's future post signatures.
+   */
+  identityPublicKey: string;
+  /**
+   * Hex-encoded X25519 public key — the requester's durable sealing key
+   * (see `deriveCircleSealingKeypair`). Also goes into `member_added`,
+   * because it's what a future `key_rotation` seals the new content key
+   * to. Distinct from `ephemeralPublicKey`, which exists only for this one
+   * handshake and is discarded after it.
+   */
+  encPublicKey: string;
   selfReportedName: string;
   /**
    * Base64-encoded avatar-sized JPEG thumbnail (see
@@ -61,7 +79,7 @@ export type JoinRequestPayload = {
 /**
  * What a join request's `encryptedApproval` decrypts to, once opened via
  * `openSealedBox` — written by the creator, sealed to the requester's
- * `ephemeralPub` (not code-derived like the two payloads above).
+ * `ephemeralPublicKey` (not code-derived like the two payloads above).
  */
 export type JoinApprovalPayload = {
   /**
@@ -93,7 +111,7 @@ export type JoinApprovalPayload = {
  * at all — without this, anyone who knows both the invite code and the
  * circle secret (any existing member, not just this invite's creator)
  * could forge a fully-working approval, since the code alone hands them
- * the requester's ephemeralPub and the secret is the same one every
+ * the requester's ephemeralPublicKey and the secret is the same one every
  * member already has. Signing binds the approval to the one identity that
  * actually matters: the specific device that created this invite.
  */

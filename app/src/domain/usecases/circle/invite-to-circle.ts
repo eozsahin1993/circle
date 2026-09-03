@@ -9,12 +9,28 @@ import {
   deriveJoinRequestKey,
   encryptJSON,
   generateInviteCode,
+  generateUUID,
   sealToPublicKey,
   sign,
 } from '@/services/crypto';
-import { getCircle, getCurrentInvite, getMemberByPublicKey, getProfile, insertInvite, MemberRoles, revokeInvite, type Invite } from '@/data/db';
+import {
+  getCircle,
+  getCurrentInvite,
+  getMemberByPublicKey,
+  getProfile,
+  insertInvite,
+  insertMemberIfAbsent,
+  insertOutboxEntry,
+  MemberRoles,
+  OutboxStatuses,
+  revokeInvite,
+  type Invite,
+} from '@/data/db';
 import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinApprovalPayload, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
+import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
+import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { bytesToDataUri } from '@/services/image';
+import { pullMeta } from '@/sync/pull-log';
 import { getCircleIdentity, getCircleKeyMap } from '@/services/keystore';
 import { deleteJoinRequest, listJoinRequests, putInvitePreview, putJoinApproval } from '@/services/mailbox-relay';
 
@@ -194,11 +210,15 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   if (!request) throw new Error('That join request is no longer available.');
 
   const requestKey = deriveJoinRequestKey(invite.code);
-  const { ephemeralPub } = JSON.parse(new TextDecoder().decode(decrypt(request.encryptedRequest, requestKey))) as JoinRequestPayload;
+  const { ephemeralPublicKey, identityPublicKey, encPublicKey, selfReportedName } = JSON.parse(
+    new TextDecoder().decode(decrypt(request.encryptedRequest, requestKey))
+  ) as JoinRequestPayload;
 
-  // TODO(sync-before-approve): should sync meta before sealing (server/
-  // SYNC_DESIGN.md "Add a member") — a stale approver hands the joiner an
-  // incomplete key map. Blocked on pullCircle not existing yet.
+  // Catch up on meta before sealing (server/SYNC_DESIGN.md "Add a member"):
+  // a stale approver would otherwise hand over an incomplete key map, and
+  // the joiner would be unable to read history it should have.
+  await pullMeta(circleId);
+
   const keyMap = await getCircleKeyMap(circleId);
   if (!keyMap) throw new Error('No content key on this device.');
   const identity = await getCircleIdentity(circleId);
@@ -209,6 +229,44 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   const signature = sign(new TextEncoder().encode(JSON.stringify(approval)), identity.secretKey);
   const envelope: JoinApprovalEnvelope = { approval, signature: bytesToHex(signature) };
 
-  const sealed = sealToPublicKey(new TextEncoder().encode(JSON.stringify(envelope)), hexToBytes(ephemeralPub));
+  const sealed = sealToPublicKey(new TextEncoder().encode(JSON.stringify(envelope)), hexToBytes(ephemeralPublicKey));
   await putJoinApproval(inviteTag, requesterId, sealed);
+
+  // Only an admin may write `member_added` (server/SYNC_DESIGN.md's
+  // predicate table), so it is written here, by the approver, rather than
+  // self-announced by the joiner — an entry signed by someone no device
+  // has yet heard of is discarded by every honest client. This is what
+  // makes the new member visible to everyone else: the joiner supplied
+  // the public halves, and this signature is the circle vouching for them.
+  const currentVersion = Math.max(...Object.keys(keyMap).map(Number));
+  const memberAddedEntry = buildAndEncryptLogEntry(
+    'member_added',
+    { identityPublicKey, encPublicKey, name: selfReportedName, role: MemberRoles.member, keyVersion: currentVersion },
+    identity,
+    keyMap[currentVersion]
+  );
+  await insertOutboxEntry({
+    circleId,
+    entryType: 'member_added',
+    localId: generateUUID(),
+    status: OutboxStatuses.pending,
+    epoch: null,
+    encryptedMeta: memberAddedEntry,
+  });
+
+  // Applied locally too, so the approver's own roster updates immediately
+  // instead of only when its next pass walks this entry back. Idempotent
+  // against that later echo.
+  await insertMemberIfAbsent({
+    circleId,
+    identityPublicKey,
+    encPublicKey,
+    memberId: generateUUID(),
+    role: MemberRoles.member,
+    name: selfReportedName,
+    picture: null,
+    joinedAt: Date.now(),
+  });
+
+  drainOutbox(circleId).catch((err) => console.error('Failed to push member_added', err));
 }

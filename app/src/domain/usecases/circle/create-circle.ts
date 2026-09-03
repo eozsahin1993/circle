@@ -55,8 +55,8 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
   const memberAddedEntry = buildAndEncryptLogEntry(
     'member_added',
     {
-      signPub: bytesToHex(identity.publicKey),
-      x25519Pub: bytesToHex(sealingKeypair.publicKey),
+      identityPublicKey: bytesToHex(identity.publicKey),
+      encPublicKey: bytesToHex(sealingKeypair.publicKey),
       name: profile?.name ?? '',
       role: MemberRoles.admin,
       keyVersion: 1,

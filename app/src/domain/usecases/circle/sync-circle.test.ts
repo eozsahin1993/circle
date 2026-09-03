@@ -23,8 +23,13 @@ beforeAll(async () => {
   await saveMasterSeed(new Uint8Array(16));
 });
 beforeEach(() => {
-  jest.clearAllMocks();
+  // resetAllMocks, not clearAllMocks: the latter clears recorded calls but
+  // leaves implementations in place, so a mockRejectedValue from one test
+  // stays armed for the next — which then fails somewhere unrelated (its
+  // setup, usually) with a stale error.
+  jest.resetAllMocks();
   (bootstrapCircle as jest.Mock).mockResolvedValue(undefined);
+  (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
 });
 
 async function enqueuePost(circleId: string, photo: Uint8Array): Promise<Post> {
@@ -155,4 +160,36 @@ test('throws without a content key on this device, and never calls the relay', a
   await expect(drainOutbox(generateUUID())).rejects.toThrow();
 
   expect(appendEntry).not.toHaveBeenCalled();
+});
+
+test('concurrent drains of the same circle collapse into one push', async () => {
+  // createPost and completeJoin both fire a drain, and every sync pass
+  // runs one — so overlapping calls are routine, not exotic.
+  const { circleId } = await makeCircle();
+  await enqueuePost(circleId, new Uint8Array([1, 2, 3]));
+  (getUploadTarget as jest.Mock).mockResolvedValue({ url: 'https://s3', fields: {} });
+  (uploadBlob as jest.Mock).mockResolvedValue(undefined);
+  (appendEntry as jest.Mock).mockResolvedValue({ epoch: 5, receivedAt: 999 });
+
+  await Promise.all([drainOutbox(circleId), drainOutbox(circleId), drainOutbox(circleId)]);
+
+  // Without the guard all three would read the same pending row and push
+  // it — the relay would dedupe, but after three uploads and appends.
+  expect((appendEntry as jest.Mock).mock.calls).toHaveLength(1);
+  expect((uploadBlob as jest.Mock).mock.calls).toHaveLength(1);
+});
+
+test('a later drain still runs once the first has finished', async () => {
+  const { circleId } = await makeCircle();
+  await enqueuePost(circleId, new Uint8Array([1, 2, 3]));
+  (getUploadTarget as jest.Mock).mockResolvedValue({ url: 'https://s3', fields: {} });
+  (uploadBlob as jest.Mock).mockResolvedValue(undefined);
+  (appendEntry as jest.Mock).mockResolvedValue({ epoch: 5, receivedAt: 999 });
+
+  await drainOutbox(circleId);
+  await enqueuePost(circleId, new Uint8Array([4, 5, 6]));
+  await drainOutbox(circleId);
+
+  // The guard must clear itself, or the second post would never go out.
+  expect((appendEntry as jest.Mock).mock.calls).toHaveLength(2);
 });

@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS `pending_join_requests` (
 	`id` text PRIMARY KEY NOT NULL,
+	`circle_id` text NOT NULL,
 	`invite_code` text NOT NULL,
 	`circle_name` text NOT NULL,
 	`created_by_name` text DEFAULT '' NOT NULL,

@@ -15,17 +15,14 @@ import {
   openSealedBox,
   verify,
 } from '@/services/crypto';
-import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
 import {
   deletePendingJoinRequest,
   getPendingJoinRequest,
   getProfile,
   insertCircle,
   insertMember,
-  insertOutboxEntry,
   insertPendingJoinRequest,
   MemberRoles,
-  OutboxStatuses,
   type PendingJoinRequest,
 } from '@/data/db';
 import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
@@ -79,9 +76,24 @@ export async function previewInvite(inviteCode: string): Promise<InvitePreviewPa
 export async function requestToJoin(inviteCode: string): Promise<{ requestId: string }> {
   const preview = await previewInvite(inviteCode);
 
+  const masterSeed = await getMasterSeed();
+  if (!masterSeed) throw new Error('No master seed yet — onboarding must generate one before joining any circle.');
+
   const requestId = generateUUID();
   const keypair = generateEphemeralKeypair();
   const profile = await getProfile();
+
+  // The circle identity is derived here rather than at completion because
+  // its *public* halves have to travel in this request: only an admin may
+  // write `member_added` (server/SYNC_DESIGN.md's predicate table), so the
+  // approver names this member, and can't do that without their keys.
+  // Nothing shared is needed to derive them — circleId is a local id this
+  // device invents, and the secret in the derivation is the seed. It's
+  // parked on the pending row because the same id must be reused at
+  // completion, or the identity would be orphaned.
+  const circleId = generateUUID();
+  const identity = deriveCircleIdentity(masterSeed, circleId);
+  const sealingKeypair = deriveCircleSealingKeypair(masterSeed, circleId);
 
   // Best-effort — a thumbnail failure shouldn't block submitting the
   // request itself; the approval screen just falls back to a placeholder.
@@ -95,7 +107,9 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
   }
 
   const request: JoinRequestPayload = {
-    ephemeralPub: bytesToHex(keypair.publicKey),
+    ephemeralPublicKey: bytesToHex(keypair.publicKey),
+    identityPublicKey: bytesToHex(identity.publicKey),
+    encPublicKey: bytesToHex(sealingKeypair.publicKey),
     selfReportedName: profile?.name ?? '',
     pictureThumbnail,
   };
@@ -105,6 +119,7 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
   await savePendingJoinKeypair(requestId, keypair);
   await insertPendingJoinRequest({
     id: requestId,
+    circleId,
     inviteCode,
     circleName: preview.name,
     createdByName: preview.createdByName,
@@ -128,13 +143,17 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
  * `member_added` entry uses the current (highest) version, same as any
  * post would.
  *
- * Known gaps, not addressed here: existing members only learn of this
- * join once `pullCircle` exists (server/INVITE_FLOW.md); `member_added`
- * is self-announced by the joiner via the outbox rather than written by
- * the approver, as the design calls for. The cover photo is the one
- * piece of circle state this device *does* pick up despite `pullCircle`
- * not existing — see `fetchCoverPhoto` — because it lives at a fixed,
- * known location rather than needing meta-log replay to find.
+ * Adopts the `circleId` minted back at `requestToJoin` rather than
+ * generating a fresh one — the identity whose public halves the approver
+ * already wrote into `member_added` was derived from that id, so a new
+ * one here would silently orphan it.
+ *
+ * This device does *not* announce itself: `member_added` may only be
+ * written by an admin (server/SYNC_DESIGN.md's predicate table), so the
+ * approver wrote it, and this device meets its own entry when it walks
+ * meta from epoch 0 — where it lands as a no-op against the row inserted
+ * here. The local insert exists only so the joiner sees themselves
+ * immediately, without waiting for a sync pass.
  */
 async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, Uint8Array>, syncId: string, circleName: string): Promise<{ circleId: string }> {
   const masterSeed = await getMasterSeed();
@@ -144,7 +163,7 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
   const currentKey = keyMap[currentVersion];
 
   const now = Date.now();
-  const circleId = generateUUID();
+  const { circleId } = pending;
   const memberId = generateUUID();
   const identity = deriveCircleIdentity(masterSeed, circleId);
   const sealingKeypair = deriveCircleSealingKeypair(masterSeed, circleId);
@@ -176,21 +195,6 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
     name: profile?.name ?? '',
     picture: profile?.picture ?? null,
     joinedAt: now,
-  });
-
-  const encryptedMeta = buildAndEncryptLogEntry(
-    'member_added',
-    { signPub: identityPublicKey, x25519Pub: encPublicKey, name: profile?.name ?? '', role: MemberRoles.member, keyVersion: currentVersion },
-    identity,
-    currentKey
-  );
-  await insertOutboxEntry({
-    circleId,
-    entryType: 'member_added',
-    localId: memberId,
-    status: OutboxStatuses.pending,
-    epoch: null,
-    encryptedMeta,
   });
 
   await syncAccountManifestBestEffort();

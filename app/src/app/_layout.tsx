@@ -12,6 +12,7 @@ import { Colors } from '@/constants/theme';
 import { initDatabase } from '@/data/db';
 import { AppSettingsProvider, useAppSettings } from '@/hooks/use-app-settings';
 import { getAppSettings, type AppSettings } from '@/services/settings';
+import { startSyncScheduler } from '@/sync/scheduler';
 
 // drizzle-orm's default sqlite blob column (posts.photo, circleMembers.picture,
 // deviceProfile.picture) calls the global `Buffer` directly with no existence
@@ -94,6 +95,13 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, dbReady, settings]);
+
+  // Gated on the database being ready, since every sync pass reads and
+  // writes it. Starting before sign-in is fine — see startSyncScheduler.
+  useEffect(() => {
+    if (!dbReady) return;
+    return startSyncScheduler();
+  }, [dbReady]);
 
   if (!fontsLoaded || !dbReady || !settings) {
     return null;

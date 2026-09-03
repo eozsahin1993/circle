@@ -252,6 +252,15 @@ export const outbox = sqliteTable(
  */
 export const pendingJoinRequests = sqliteTable('pending_join_requests', {
   id: text('id').primaryKey(),
+  /**
+   * The local circleId minted when the request was made, parked here
+   * until approval. It has to exist that early because the requester's
+   * identity is derived from it and its public half ships in the request
+   * — and it has to be *remembered*, since deriving the same keypair
+   * again later requires the same id (see server/README.md's identity
+   * model). `completeJoin` adopts this as the circle row's `id`.
+   */
+  circleId: text('circle_id').notNull(),
   inviteCode: text('invite_code').notNull(),
   /** From the decrypted invite preview — shown on the pending screen without needing to re-fetch/re-decrypt it. */
   circleName: text('circle_name').notNull(),

@@ -25,6 +25,18 @@ export async function getAllCircles(): Promise<Circle[]> {
   return rows.map(normalizeCircle);
 }
 
+/**
+ * Records how far this device has replayed one namespace of a circle's
+ * log. Always set to the epoch of the last entry actually *processed*,
+ * never blindly to the relay's reported latest — a short page would
+ * otherwise skip everything it didn't return (server/SYNC_DESIGN.md's
+ * "Read / sync").
+ */
+export async function advanceCircleCursor(id: string, namespace: 'meta' | 'content', epoch: number): Promise<void> {
+  const column = namespace === 'meta' ? { metaCursor: epoch } : { contentCursor: epoch };
+  await db.update(circles).set(column).where(eq(circles.id, id));
+}
+
 export async function updateCircleName(id: string, name: string): Promise<void> {
   await db.update(circles).set({ name }).where(eq(circles.id, id));
 }

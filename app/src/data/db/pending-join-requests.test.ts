@@ -14,6 +14,7 @@ beforeAll(() => initDatabase());
 function makeRequest(overrides: Partial<{ id: string; inviteCode: string; circleName: string }> = {}) {
   return {
     id: generateUUID(),
+    circleId: generateUUID(),
     inviteCode: 'AAAA-BBBB-CCCC',
     circleName: 'Family Circle',
     createdByName: 'Alex',
