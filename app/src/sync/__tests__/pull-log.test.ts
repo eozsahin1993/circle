@@ -245,7 +245,7 @@ describe('pullContent', () => {
 
     const [post] = await getCircleFeed(circleId);
     expect(post).toMatchObject({ id: postId, caption: 'Nana in the kitchen', photoStatus: 'pending' });
-    expect(post.photo).toBeNull();
+    expect(post.hasPhoto).toBe(false);
     await expect(getCircle(circleId)).resolves.toMatchObject({ contentCursor: 4 });
   });
 

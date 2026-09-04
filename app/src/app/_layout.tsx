@@ -12,6 +12,7 @@ import { Colors } from '@/constants/theme';
 import { initDatabase } from '@/data/db';
 import { AppSettingsProvider, useAppSettings } from '@/hooks/use-app-settings';
 import { getAppSettings, type AppSettings } from '@/services/settings';
+import { startJankMonitor } from '@/services/timing';
 import { startSyncScheduler } from '@/sync/scheduler';
 
 // drizzle-orm's default sqlite blob column (posts.photo, circleMembers.picture,
@@ -102,6 +103,11 @@ export default function RootLayout() {
     if (!dbReady) return;
     return startSyncScheduler();
   }, [dbReady]);
+
+  // Dev-only: reports how long the JS thread is actually unavailable,
+  // which phase timers can't (they measure wall time, so waiting and
+  // blocking look the same).
+  useEffect(() => startJankMonitor(), []);
 
   if (!fontsLoaded || !dbReady || !settings) {
     return null;

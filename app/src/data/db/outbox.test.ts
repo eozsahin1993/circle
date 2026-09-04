@@ -58,7 +58,7 @@ describe('outbox', () => {
     expect(posts).toHaveLength(1);
     expect(posts[0]).toMatchObject({ id: post.id, caption: post.caption, createdAt: post.createdAt });
     // The attachment went in atomically with the post and the outbox row.
-    expect(posts[0].photo).toEqual(new Uint8Array([1, 2, 3]));
+    expect(posts[0].hasPhoto).toBe(true);
   });
 
   test('pending entries come back in the exact order they were created', async () => {

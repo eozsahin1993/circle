@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Radius, Tints } from '@/constants/theme';
+import { Radius, Tints } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export type CommentItem = {
   id: string;
@@ -19,6 +20,7 @@ export type PostCommentsProps = {
 const PREVIEW_COUNT = 3;
 
 export function PostComments({ comments, onSubmit }: PostCommentsProps) {
+  const theme = useTheme();
   const [text, setText] = useState('');
   const [showAll, setShowAll] = useState(false);
 
@@ -56,9 +58,9 @@ export function PostComments({ comments, onSubmit }: PostCommentsProps) {
           onChangeText={setText}
           onSubmitEditing={handleSubmit}
           placeholder="Add a comment…"
-          placeholderTextColor={Colors.dark.faint}
+          placeholderTextColor={theme.faint}
           returnKeyType="send"
-          style={styles.input}
+          style={[styles.input, { color: theme.text }]}
         />
         <Pressable hitSlop={8} onPress={handleSubmit} disabled={!text.trim()}>
           <ThemedText type="buttonLabel" themeColor={text.trim() ? 'accentBright' : 'faint'}>
@@ -92,7 +94,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Tints.chipIdleBorder,
     backgroundColor: Tints.chipIdleBg,
-    color: Colors.dark.text,
     fontSize: 14,
   },
 });

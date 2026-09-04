@@ -10,11 +10,13 @@ import { PrimaryButton } from '@/components/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Fonts, PhotoAspect, Radius, Spacing, Tints } from '@/constants/theme';
-import { getCircle, getCircleMembers } from '@/data/db';
+import { getCircleSummary, getCircleMembers } from '@/data/db';
 import { createPost } from '@/domain/usecases/post/create-post';
+import { useTheme } from '@/hooks/use-theme';
 import { pickAndCompressImage, type CompressedImage } from '@/services/image';
 
 export default function NewPostScreen() {
+  const theme = useTheme();
   const { circleId } = useLocalSearchParams<{ circleId: string }>();
   const [circleName, setCircleName] = useState('');
   const [memberCount, setMemberCount] = useState(0);
@@ -26,7 +28,7 @@ export default function NewPostScreen() {
 
   useEffect(() => {
     if (!circleId) return;
-    Promise.all([getCircle(circleId), getCircleMembers(circleId)]).then(([circle, members]) => {
+    Promise.all([getCircleSummary(circleId), getCircleMembers(circleId)]).then(([circle, members]) => {
       setCircleName(circle?.name ?? '');
       setMemberCount(members.length);
     });
@@ -56,7 +58,7 @@ export default function NewPostScreen() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.back}>
           <Pressable hitSlop={12} onPress={() => router.back()}>
-            <Feather name="x" size={22} color={Colors.dark.secondary} />
+            <Feather name="x" size={22} color={theme.secondary} />
           </Pressable>
         </View>
 
@@ -88,9 +90,9 @@ export default function NewPostScreen() {
               value={caption}
               onChangeText={setCaption}
               placeholder="Say something about this one…"
-              placeholderTextColor={Colors.dark.faint}
+              placeholderTextColor={theme.faint}
               multiline
-              style={styles.captionInput}
+              style={[styles.captionInput, { color: theme.text }]}
             />
 
             <View style={styles.albumRow}>
@@ -165,7 +167,6 @@ const styles = StyleSheet.create({
   },
   captionInput: {
     minHeight: 60,
-    color: Colors.dark.text,
     fontFamily: Fonts.serif,
     fontSize: 16.5,
     lineHeight: 16.5 * 1.5,

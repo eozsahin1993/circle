@@ -13,7 +13,16 @@ import { PrivacyNotice } from '@/components/privacy-notice';
 import { Radius, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { getCircle, getCircleFeed, getCircleMembers, getPostComments, getProfile, type CommentWithAuthor } from '@/data/db';
+import {
+  getAttachment,
+  getCircleSummary,
+  getCircleFeed,
+  getCircleMembers,
+  getPostComments,
+  getProfile,
+  type CommentWithAuthor,
+  type FeedPost,
+} from '@/data/db';
 import {
   approveJoinRequest,
   denyJoinRequest,
@@ -23,6 +32,8 @@ import {
 import { addComment } from '@/domain/usecases/post/comment-on-post';
 import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
 import { bytesToDataUri } from '@/services/image';
+import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
+import { timed, timedSync } from '@/services/timing';
 import { nudgePhotoQueue } from '@/sync/photo-queue';
 import { syncCircle } from '@/sync/sync-circles';
 
@@ -38,6 +49,29 @@ function toCommentItems(comments: CommentWithAuthor[], ownName?: string): Commen
     authorName: comment.authorName || ownName || 'Unknown member',
     body: comment.body,
   }));
+}
+
+/**
+ * Resolves each post's photo to a cached `file://` path. Only a post
+ * whose file is missing — first sight, or a cache the OS cleared — costs
+ * a read of its bytes; everything else is an existence check, which is
+ * what makes re-entering the feed cheap.
+ */
+async function resolvePhotoUris(circleId: string, posts: FeedPost[]): Promise<Map<string, string>> {
+  const uris = new Map<string, string>();
+
+  for (const post of posts) {
+    if (!post.hasPhoto) continue;
+
+    let uri = ensurePhotoUri(circleId, post.id, () => null);
+    if (!uri) {
+      const attachment = await getAttachment(circleId, post.id);
+      if (attachment?.bytes) uri = writePhotoFile(circleId, post.id, attachment.bytes);
+    }
+    if (uri) uris.set(post.id, uri);
+  }
+
+  return uris;
 }
 
 function formatTimestamp(ms: number): string {
@@ -78,27 +112,29 @@ export default function FeedScreen() {
   const loadFromDatabase = useCallback(async () => {
     if (!circleId) return;
 
-    const [circle, members, circlePosts, profile] = await Promise.all([
-      getCircle(circleId),
-      getCircleMembers(circleId),
-      getCircleFeed(circleId),
-      getProfile(),
-    ]);
+    const [circle, members, circlePosts, profile] = await timed('feed.read', () =>
+      Promise.all([getCircleSummary(circleId), getCircleMembers(circleId), getCircleFeed(circleId), getProfile()]),
+    );
 
     setCircleName(circle?.name ?? '');
     setMemberCount(members.length);
     setProfileName(profile?.name);
 
-    const [reactionsByPost, commentsByPost] = await Promise.all([
-      Promise.all(circlePosts.map((post) => getReactionsForPost(circleId, post.id))),
-      Promise.all(circlePosts.map((post) => getPostComments(circleId, post.id))),
-    ]);
+    const photoUris = await timed('feed.photoUris', () => resolvePhotoUris(circleId, circlePosts));
+
+    const [reactionsByPost, commentsByPost] = await timed('feed.reactionsAndComments', () =>
+      Promise.all([
+        Promise.all(circlePosts.map((post) => getReactionsForPost(circleId, post.id))),
+        Promise.all(circlePosts.map((post) => getPostComments(circleId, post.id))),
+      ]),
+    );
 
     // Author name/picture already came resolved from the roster by
     // `getCircleFeed` — this screen only turns bytes into data URIs
     // and timestamps into strings. Falls back to this device's own
     // profile for a post whose author has no roster row yet.
     setPosts(
+      timedSync(`feed.toDataUris(${circlePosts.length} posts)`, () =>
       circlePosts.map((post, index) => ({
         id: post.id,
         authorName: post.authorName || profile?.name || 'Unknown member',
@@ -106,13 +142,15 @@ export default function FeedScreen() {
           ? bytesToDataUri(post.authorPicture ?? profile!.picture!)
           : undefined,
         timestamp: formatTimestamp(post.createdAt),
-        // Undefined while the photo is still queued for download —
-        // PostCard renders its placeholder rather than a broken image.
-        photoUri: post.photo ? bytesToDataUri(post.photo) : undefined,
+        // A cached file path, never a data URI: the platform decodes it
+        // off the JS thread and caches it, so re-entering the feed costs
+        // nothing per photo. Undefined while a photo is still queued for
+        // download, and PostCard shows its placeholder.
+        photoUri: photoUris.get(post.id),
         caption: post.caption,
         reactions: reactionsByPost[index],
         comments: toCommentItems(commentsByPost[index], profile?.name),
-      })),
+      }))),
     );
 
     // Only ever resolves non-empty for this invite's actual creator (see

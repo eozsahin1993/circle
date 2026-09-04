@@ -31,6 +31,9 @@ export function Avatar({ size = 44, ringColor, uri }: AvatarProps) {
       {uri ? (
         <Image source={{ uri }} style={StyleSheet.absoluteFill} />
       ) : (
+        // Wrapped so the node Fabric moves is a plain view, never the
+        // SvgView — see photo-placeholder.tsx for why that matters.
+        <View style={StyleSheet.absoluteFill}>
         <Svg width="100%" height="100%">
           <Defs>
             <Pattern
@@ -45,6 +48,7 @@ export function Avatar({ size = 44, ringColor, uri }: AvatarProps) {
           </Defs>
           <Rect width="100%" height="100%" fill={`url(#avatarHatch-${size})`} />
         </Svg>
+        </View>
       )}
     </View>
   );

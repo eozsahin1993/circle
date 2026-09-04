@@ -113,14 +113,14 @@ test('syncCircle picks up another member and their post, photo and all', async (
   const [post] = await getCircleFeed(circleId);
   expect(post).toMatchObject({ caption: 'From the other device', authorName: 'Marcus' });
   // The log pass deliberately does not download photos.
-  expect(post.photo).toBeNull();
+  expect(post.hasPhoto).toBe(false);
   expect(post.photoStatus).toBe('pending');
 
   (getBlob as jest.Mock).mockResolvedValue(encrypt(photo, contentKey));
   await drainPhotoQueue();
 
   const [withPhoto] = await getCircleFeed(circleId);
-  expect(withPhoto.photo).toEqual(photo);
+  expect(withPhoto.hasPhoto).toBe(true);
 });
 
 test('syncCircle pushes the queued posts this device made while pulling', async () => {
@@ -183,7 +183,7 @@ test('a post this device just pushed comes straight back on the same pass withou
   expect(feed).toHaveLength(1);
   // Still holds its local bytes — the echo must not blank them back to
   // 'pending' and send the download queue chasing a photo we authored.
-  expect(feed[0].photo).toEqual(photo);
+  expect(feed[0].hasPhoto).toBe(true);
   expect(feed[0].photoStatus).toBe('fetched');
 });
 

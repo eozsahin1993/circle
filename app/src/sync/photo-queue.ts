@@ -6,7 +6,9 @@ import {
 } from '@/data/db';
 import { decrypt, hashBytes } from '@/services/crypto';
 import { getCircleKeyMap } from '@/services/keystore';
+import { writePhotoFile } from '@/services/photo-cache';
 import { getBlob } from '@/services/relay';
+import { timed, timedSync } from '@/services/timing';
 
 /** First retry waits this long; each further failure doubles it, up to `MAX_BACKOFF_MS`. */
 const BASE_BACKOFF_MS = 30_000;
@@ -38,19 +40,22 @@ async function fetchOne(attachment: FetchableAttachment): Promise<void> {
     const key = keyMap?.[keyVersion];
     if (!key) throw new Error(`no content key for version ${keyVersion}`);
 
-    const encrypted = await getBlob(attachment.syncId, entryId);
+    const encrypted = await timed(`photo.fetch(${entryId.slice(0, 8)})`, () => getBlob(attachment.syncId, entryId));
     // A blob that isn't there yet is an ordinary race, not corruption:
     // the uploader appends its entry after uploading, but a reader can
     // still arrive between a failed upload and its retry.
     if (!encrypted) throw new Error('blob not found');
 
-    const bytes = decrypt(encrypted, key);
+    const bytes = timedSync(`photo.decrypt(${encrypted.length} bytes)`, () => decrypt(encrypted, key));
     // The hash rode inside the entry's *signed* payload, so this is what
     // ties the bytes to the author — the entry's signature can't cover a
     // blob uploaded separately (see create-post.ts).
     if (hash && hashBytes(bytes) !== hash) throw new Error('photo hash does not match the signed entry');
 
     await markAttachmentFetched(circleId, entryId, bytes);
+    // Written now, off the render path, so a feed load is only ever a
+    // path string — see services/photo-cache.ts.
+    writePhotoFile(circleId, entryId, bytes);
   } catch (err) {
     const attempts = fetchAttempts + 1;
     console.error(`Failed to fetch attachment ${entryId} (attempt ${attempts})`, err);

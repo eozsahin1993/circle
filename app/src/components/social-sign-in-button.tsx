@@ -55,7 +55,15 @@ export function SocialSignInButton({ provider, disabled, ...rest }: SocialSignIn
             pressed && styles.pressed,
             disabled && styles.disabled,
           ]}>
-          {isApple ? <AntDesign name="apple" size={18} color="#000000" /> : <GoogleLogo />}
+          {/*
+            Both icons are wrapped: this render function re-runs on every
+            press (`pressed`), and an unwrapped SvgView in a slot that
+            re-renders is what Fabric tries to move rather than recreate —
+            see photo-placeholder.tsx.
+          */}
+          <View style={styles.icon}>
+            {isApple ? <AntDesign name="apple" size={18} color="#000000" /> : <GoogleLogo />}
+          </View>
           <ThemedText type="buttonLabel" style={isApple ? styles.appleLabel : { color: theme.text }}>
             Continue with {isApple ? 'Apple' : 'Google'}
           </ThemedText>
@@ -66,6 +74,12 @@ export function SocialSignInButton({ provider, disabled, ...rest }: SocialSignIn
 }
 
 const styles = StyleSheet.create({
+  icon: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   button: {
     height: ButtonHeight.primary,
     borderRadius: Radius.pill,

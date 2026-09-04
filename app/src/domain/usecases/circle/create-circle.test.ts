@@ -39,5 +39,5 @@ test('createCircle then createPost end to end matches what the feed screen reads
   const posts = await getCircleFeed(circleId);
   expect(posts).toHaveLength(1);
   expect(posts[0].caption).toBe('Hello from the test');
-  expect(posts[0].photo).toEqual(new Uint8Array([1, 2, 3]));
+  expect(posts[0].hasPhoto).toBe(true);
 });

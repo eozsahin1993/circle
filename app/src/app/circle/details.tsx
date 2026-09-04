@@ -10,10 +10,11 @@ import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing, Tints } from '@/constants/theme';
-import { getCircle, getCircleMembers, MemberRoles, type Circle, type Member } from '@/data/db';
+import { getCircleSummary, getCircleMembers, MemberRoles, type CircleListRow, type Member } from '@/data/db';
 import { buildDebugKeysetFlags } from '@/domain/usecases/circle/debug-keyset';
 import { getOrCreateInvite, isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
 import { deleteCircleForEveryone, leaveCircle } from '@/domain/usecases/circle/leave-circle';
+import { timed } from '@/services/timing';
 
 function inviteLink(code: string): string {
   return `circle://join/${code}`;
@@ -25,7 +26,7 @@ function formatJoined(joinedAt: number): string {
 
 export default function CircleDetailsScreen() {
   const { circleId } = useLocalSearchParams<{ circleId: string }>();
-  const [circle, setCircle] = useState<Circle | null>(null);
+  const [circle, setCircle] = useState<CircleListRow | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [admin, setAdmin] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -34,7 +35,9 @@ export default function CircleDetailsScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!circleId) return;
-      Promise.all([getCircle(circleId), getCircleMembers(circleId), isCircleAdmin(circleId)]).then(
+      timed('details.load', () =>
+        Promise.all([getCircleSummary(circleId), getCircleMembers(circleId), isCircleAdmin(circleId)]),
+      ).then(
         ([circleRow, memberRows, isAdmin]) => {
           setCircle(circleRow);
           setMembers(memberRows);

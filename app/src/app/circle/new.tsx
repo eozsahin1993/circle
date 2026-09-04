@@ -9,11 +9,13 @@ import { PhotoPlaceholder } from '@/components/photo-placeholder';
 import { PrimaryButton } from '@/components/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Fonts, PhotoAspect, Radius, Spacing, Tints } from '@/constants/theme';
+import { Fonts, PhotoAspect, Radius, Spacing, Tints } from '@/constants/theme';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
+import { useTheme } from '@/hooks/use-theme';
 import { pickAndCompressImage, type CompressedImage } from '@/services/image';
 
 export default function NewCircleScreen() {
+  const theme = useTheme();
   const [name, setName] = useState('');
   const [cover, setCover] = useState<CompressedImage | null>(null);
   const [creating, setCreating] = useState(false);
@@ -53,8 +55,8 @@ export default function NewCircleScreen() {
             value={name}
             onChangeText={setName}
             placeholder="e.g. The Andersons"
-            placeholderTextColor={Colors.dark.faint}
-            style={styles.input}
+            placeholderTextColor={theme.faint}
+            style={[styles.input, { color: theme.text }]}
           />
 
           <View>
@@ -130,7 +132,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.input,
     borderWidth: 1,
     borderColor: Tints.secondaryButtonBorder,
-    color: Colors.dark.text,
     fontFamily: Fonts.serif,
     fontSize: 18,
   },

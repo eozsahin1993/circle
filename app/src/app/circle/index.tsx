@@ -10,13 +10,44 @@ import { FabButton } from '@/components/fab-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { getAllCircles, getAllPendingJoinRequests, getCircleFeed, getCircleMembers, getProfile, type Circle } from '@/data/db';
+import {
+  getAllPendingJoinRequests,
+  getCircleCoverBytes,
+  getCircleMemberCount,
+  getNewestFetchedPostId,
+  getProfile,
+  listCircles,
+  type CircleListRow,
+} from '@/data/db';
 import { checkPendingJoinRequest } from '@/domain/usecases/circle/join-circle';
 import { bytesToDataUri } from '@/services/image';
+import { cachedCoverUri, ensurePhotoUri, writeCoverFile } from '@/services/photo-cache';
 import { nudgePhotoQueue } from '@/sync/photo-queue';
 import { syncAllCircles } from '@/sync/sync-circles';
 
-type CircleListItem = Circle & { memberCount: number; photoUri?: string };
+type CircleListItem = CircleListRow & { memberCount: number; photoUri?: string };
+
+/**
+ * The circle's cover as a cached `file://` path. Only a circle whose file
+ * is missing costs a read of its bytes; everything after is an existence
+ * check — which is what keeps re-entering this screen cheap. Handing
+ * `expo-image` a base64 data URI instead meant serialising ~260KB of
+ * string into the native tree on every focus.
+ */
+async function resolveCoverUri(circleId: string): Promise<string | undefined> {
+  const cached = cachedCoverUri(circleId);
+  if (cached) return cached;
+
+  const bytes = await getCircleCoverBytes(circleId);
+  if (bytes) return writeCoverFile(circleId, bytes);
+
+  // No cover of its own: fall back to the newest post's photo, reusing the
+  // file the photo queue already wrote rather than reading those bytes
+  // back out of SQLite. Deliberately not cached under COVER_ENTRY_ID — the
+  // fallback should follow the newest post, not freeze on today's.
+  const newestPostId = await getNewestFetchedPostId(circleId);
+  return newestPostId ? (ensurePhotoUri(circleId, newestPostId, () => null) ?? undefined) : undefined;
+}
 
 export default function CircleListScreen() {
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
@@ -25,23 +56,21 @@ export default function CircleListScreen() {
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Re-check on every focus, not just mount — picture/circles may have just
-  // changed on a screen this one returns to (profile, new circle, a post).
   /** Re-reads the circle list from the local database. No network. */
   const loadFromDatabase = useCallback(async () => {
     const profile = await getProfile();
     setAvatarUri(profile?.picture ? bytesToDataUri(profile.picture) : undefined);
 
-    const allCircles = await getAllCircles();
+    // listCircles rather than getAllCircles: the latter is select(), so it
+    // drags every circle's cover blob into JS on each focus. See circles.ts.
+    const allCircles = await listCircles();
     const withCounts = await Promise.all(
       allCircles.map(async (circle) => {
-        const [members, posts] = await Promise.all([getCircleMembers(circle.id), getCircleFeed(circle.id)]);
-        const coverBytes = circle.picture ?? posts[0]?.photo ?? undefined;
-        return {
-          ...circle,
-          memberCount: members.length,
-          photoUri: coverBytes ? bytesToDataUri(coverBytes) : undefined,
-        };
+        const [memberCount, photoUri] = await Promise.all([
+          getCircleMemberCount(circle.id),
+          resolveCoverUri(circle.id),
+        ]);
+        return { ...circle, memberCount, photoUri };
       }),
     );
     setCircles(withCounts);
@@ -95,9 +124,9 @@ export default function CircleListScreen() {
 
         <FlatList
           data={loaded ? circles : []}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           keyExtractor={(circle) => circle.id}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           renderItem={({ item }) => (
             <CircleCard
               name={item.name}

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { Colors, Radius, Tints } from '@/constants/theme';
+import { Radius, Tints } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { isSingleEmoji } from '@/services/emoji';
 
 export type ReactionPickerProps = {
@@ -12,6 +13,7 @@ export type ReactionPickerProps = {
 const QUICK_REACTIONS = ['❤️', '😂', '😮', '🙏', '👏'];
 
 export function ReactionPicker({ onSelect }: ReactionPickerProps) {
+  const theme = useTheme();
   const [custom, setCustom] = useState('');
 
   function submitCustom() {
@@ -35,9 +37,9 @@ export function ReactionPicker({ onSelect }: ReactionPickerProps) {
         onSubmitEditing={submitCustom}
         onBlur={submitCustom}
         placeholder="🙂"
-        placeholderTextColor={Colors.dark.faint}
+        placeholderTextColor={theme.faint}
         maxLength={8}
-        style={styles.customInput}
+        style={[styles.customInput, { color: theme.text }]}
       />
     </View>
   );
@@ -72,6 +74,5 @@ const styles = StyleSheet.create({
     backgroundColor: Tints.chipIdleBg,
     borderWidth: 1,
     borderColor: Tints.chipIdleBorder,
-    color: Colors.dark.text,
   },
 });

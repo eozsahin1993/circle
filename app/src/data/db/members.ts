@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, count, eq } from 'drizzle-orm';
 
 import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
@@ -84,4 +84,10 @@ export async function deleteMember(circleId: string, identityPublicKey: string):
   await db
     .delete(circleMembers)
     .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey)));
+}
+
+/** Just the count — the circle list shows "N people" and never needs the rows. */
+export async function getCircleMemberCount(circleId: string): Promise<number> {
+  const rows = await db.select({ count: count() }).from(circleMembers).where(eq(circleMembers.circleId, circleId));
+  return rows[0]?.count ?? 0;
 }

@@ -8,13 +8,15 @@ import { BackButton } from '@/components/back-button';
 import { PrimaryButton } from '@/components/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Fonts, Radius, Spacing, Tints } from '@/constants/theme';
+import { Fonts, Radius, Spacing, Tints } from '@/constants/theme';
 import { getProfile } from '@/data/db';
 import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/services/image';
 import { completeProfileSetup } from '@/domain/usecases/account/onboarding';
+import { useTheme } from '@/hooks/use-theme';
 import { postAuthDestination } from '@/services/pending-deep-link';
 
 export default function ProfileSetupScreen() {
+  const theme = useTheme();
   // Only ever set by index.tsx, right after a first-time sign-in — see
   // sign-in.ts's SignInResult. Used purely as initial state below, not
   // re-read after that: this screen's own local edits always win once the
@@ -103,8 +105,8 @@ export default function ProfileSetupScreen() {
               value={name}
               onChangeText={setName}
               placeholder="e.g. Marcus Adeyemi"
-              placeholderTextColor={Colors.dark.faint}
-              style={styles.input}
+              placeholderTextColor={theme.faint}
+              style={[styles.input, { color: theme.text }]}
             />
           </ScrollView>
 
@@ -169,7 +171,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.input,
     borderWidth: 1,
     borderColor: Tints.secondaryButtonBorder,
-    color: Colors.dark.text,
     fontFamily: Fonts.serif,
     fontSize: 18,
   },

@@ -13,6 +13,7 @@ import {
 import { getProfile, insertCircle, insertMember, MemberRoles } from '@/data/db';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
+import { writeCoverFile } from '@/services/photo-cache';
 import { bootstrapCircle, appendEntry } from '@/services/relay';
 import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap } from '@/services/keystore';
 
@@ -69,6 +70,16 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
 
   await saveCircleIdentity(circleId, { ...identity, memberId });
   await saveCircleKeyMap(circleId, { 1: contentKey });
+
+/**
+ * Cover bytes are written to the photo cache the moment they're known, so
+ * the circle list only ever hands `expo-image` a `file://` path. Without
+ * this the list pays the first read itself, and reading a cover out of
+ * SQLite is dear: the driver returns it as `{data: number[]}`, so a 200KB
+ * picture arrives as one boxed JS number per byte. The cache is still
+ * disposable — resolveCoverUri re-reads if the OS clears it.
+ */
+  if (input.picture) writeCoverFile(circleId, input.picture);
 
   await insertCircle({
     id: circleId,

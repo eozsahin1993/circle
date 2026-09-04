@@ -53,7 +53,7 @@ describe('posts CRUD', () => {
 
     const [stored] = await getCircleFeed(circle.id);
     expect(stored.id).toBe(post.id);
-    expect(stored.photo).toBeNull();
+    expect(stored.hasPhoto).toBe(false);
     expect(stored.photoStatus).toBeNull();
   });
 
@@ -63,7 +63,7 @@ describe('posts CRUD', () => {
     await insertPost(post, makeAttachment(post));
 
     const [stored] = await getCircleFeed(circle.id);
-    expect(stored.photo).toEqual(new Uint8Array([1, 2, 3]));
+    expect(stored.hasPhoto).toBe(true);
     expect(stored.photoStatus).toBe('fetched');
     expect(stored.createdAt).toBe(post.createdAt);
   });
@@ -86,7 +86,7 @@ describe('posts CRUD', () => {
     const [row] = await getCircleFeed(circle.id);
 
     expect(row.authorName).toBe('Priya Raman');
-    expect(row.photo).toEqual(new Uint8Array([1, 2, 3]));
+    expect(row.hasPhoto).toBe(true);
     // Regression guard for drizzle-team/drizzle-orm#555: joined columns
     // are emitted without AS aliases and this driver keys rows by column
     // name, so selecting any column whose name also exists on a joined

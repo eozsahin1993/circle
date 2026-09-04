@@ -11,7 +11,7 @@ import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing } from '@/constants/theme';
-import { getCircle } from '@/data/db';
+import { getCircleSummary } from '@/data/db';
 import {
   approveJoinRequest,
   denyJoinRequest,
@@ -44,7 +44,7 @@ export default function CircleInviteScreen() {
 
   useEffect(() => {
     if (!circleId) return;
-    getCircle(circleId).then((circle) => setCircleName(circle?.name ?? ''));
+    getCircleSummary(circleId).then((circle) => setCircleName(circle?.name ?? ''));
     getOrCreateInvite(circleId)
       .then(setInvite)
       .catch((err) => {

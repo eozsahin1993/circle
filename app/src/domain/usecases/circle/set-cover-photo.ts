@@ -3,6 +3,7 @@ import { getCircle, updateCirclePicture } from '@/data/db';
 import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
 import { isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
 import { getCircleIdentity, getCurrentContentKey, getMasterSeed } from '@/services/keystore';
+import { writeCoverFile } from '@/services/photo-cache';
 import { appendEntry, getCoverPhotoUploadTarget, uploadBlob } from '@/services/relay';
 
 /**
@@ -39,4 +40,5 @@ export async function setCoverPhoto(circleId: string, photo: Uint8Array): Promis
   await appendEntry(circle.syncId, 'meta', generateUUID(), entry, current.version, writeToken);
 
   await updateCirclePicture(circleId, photo);
+  writeCoverFile(circleId, photo);
 }

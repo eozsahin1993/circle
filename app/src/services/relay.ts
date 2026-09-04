@@ -1,4 +1,5 @@
 import { Buffer } from 'buffer';
+import * as Device from 'expo-device';
 import { File, Paths, UploadType } from 'expo-file-system';
 import { Platform } from 'react-native';
 import { bytesToHex } from '@noble/curves/utils.js';
@@ -53,10 +54,15 @@ function baseUrl(): string {
   if (!url) throw new Error('EXPO_PUBLIC_RELAY_URL is not set.');
   // The Android emulator can't reach the host machine via `localhost` — that
   // resolves to the emulator itself, not the Mac running the relay. 10.0.2.2
-  // is the emulator's alias for the host's loopback interface (standard
-  // Android Studio/AVD emulator only — a physical device needs the host's
-  // real LAN IP in EXPO_PUBLIC_RELAY_URL instead).
-  if (Platform.OS === 'android') {
+  // is the emulator's alias for the host's loopback interface.
+  //
+  // Gated on `!Device.isDevice` because that alias means nothing on a real
+  // phone: 10.0.2.2 is simply unroutable on a LAN, so the rewrite turns
+  // every relay call into a TCP connect that hangs for ~20s before the
+  // kernel gives up, rather than failing fast. A physical device needs the
+  // host's real LAN IP in EXPO_PUBLIC_RELAY_URL, so leave the URL alone and
+  // let a wrong one fail immediately and visibly.
+  if (Platform.OS === 'android' && !Device.isDevice) {
     return url.replace('//localhost', '//10.0.2.2').replace('//127.0.0.1', '//10.0.2.2');
   }
   return url;

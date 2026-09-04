@@ -1,5 +1,8 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
+import { writePhotoFile } from '@/services/photo-cache';
+import { timedSync } from '@/services/timing';
+
 import { generateUUID, hashBytes } from '@/services/crypto';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
@@ -49,7 +52,7 @@ export async function createPost(input: CreatePostInput): Promise<void> {
 
   const postId = generateUUID();
   const createdAt = Date.now();
-  const photoHash = hashBytes(input.photo);
+  const photoHash = timedSync(`post.hash(${Math.round(input.photo.length / 1024)}KB)`, () => hashBytes(input.photo));
   const encryptedMeta = buildAndEncryptLogEntry(
     EntryTypes.POST,
     { postId, caption: input.caption, photoHash, createdAt, keyVersion: current.version },
@@ -92,6 +95,7 @@ export async function createPost(input: CreatePostInput): Promise<void> {
   };
 
   await insertPostAndEnqueue(post, attachment, outboxEntry);
+  writePhotoFile(input.circleId, postId, input.photo);
 
   drainOutbox(input.circleId).catch((err) => console.error('Failed to drain outbox', err));
 }

@@ -83,7 +83,7 @@ describe('apply', () => {
 
     const [post] = await getCircleFeed(circleId);
     expect(post).toMatchObject({ id: payload.postId, caption: 'Nana in the kitchen', createdAt: 5000 });
-    expect(post.photo).toBeNull();
+    expect(post.hasPhoto).toBe(false);
 
     const attachment = await getAttachment(circleId, payload.postId as string);
     expect(attachment).toMatchObject({

@@ -1,5 +1,6 @@
 import { getCircle } from '@/data/db';
 import { EntryTypes } from '@/domain/usecases/circle/log-entry';
+import { timed, timedSync } from '@/services/timing';
 import { getCurrentContentKey } from '@/services/keystore';
 import { deriveWriteToken, encrypt } from '@/services/crypto';
 import { appendEntry, BlobAlreadyExistsError, getUploadTarget, uploadBlob, type Namespace } from '@/services/relay';
@@ -91,7 +92,11 @@ async function pushPendingEntries(circleId: string): Promise<void> {
       if (attachment?.bytes) {
         try {
           const target = await getUploadTarget(circle.syncId, entry.entryId, writeToken);
-          await uploadBlob(target, encrypt(attachment.bytes, current.key));
+          const ciphertext = timedSync(
+            `push.encrypt(${Math.round(attachment.bytes.length / 1024)}KB)`,
+            () => encrypt(attachment.bytes!, current.key)
+          );
+          await timed('push.upload', () => uploadBlob(target, ciphertext));
         } catch (err) {
           if (!(err instanceof BlobAlreadyExistsError)) throw err;
         }

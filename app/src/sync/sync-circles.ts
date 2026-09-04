@@ -1,5 +1,6 @@
 import { getAllCircles } from '@/data/db';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
+import { timed } from '@/services/timing';
 import { pullContent, pullMeta } from '@/sync/pull-log';
 
 /**
@@ -15,9 +16,9 @@ import { pullContent, pullMeta } from '@/sync/pull-log';
  * backlog of someone else's posts doesn't delay your own going out.
  */
 export async function syncCircle(circleId: string): Promise<void> {
-  await pullMeta(circleId);
-  await drainOutbox(circleId);
-  await pullContent(circleId);
+  await timed('sync.meta', () => pullMeta(circleId));
+  await timed('sync.push', () => drainOutbox(circleId));
+  await timed('sync.content', () => pullContent(circleId));
 }
 
 /**

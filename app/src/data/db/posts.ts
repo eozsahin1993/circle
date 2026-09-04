@@ -35,8 +35,14 @@ export type FeedPost = {
   /** From `circleMembers`, resolved live — null if the author has no roster row yet. */
   authorName: string | null;
   authorPicture: Uint8Array | null;
-  /** Null while the photo is still queued for download — see attachments.ts. */
-  photo: Uint8Array | null;
+  /**
+   * Whether this post's photo has landed. The bytes themselves are
+   * deliberately *not* selected: a feed row only needs to know a photo
+   * exists, and the renderer reads it from the photo cache by id. Pulling
+   * hundreds of KB per post out of SQLite to decide whether to show an
+   * image was most of what made navigating into a feed expensive.
+   */
+  hasPhoto: boolean;
   photoStatus: Attachment['status'] | null;
 };
 
@@ -71,7 +77,6 @@ export async function getCircleFeed(circleId: string): Promise<FeedPost[]> {
       authorPublicKey: posts.authorPublicKey,
       authorName: circleMembers.name,
       authorPicture: circleMembers.picture,
-      photo: attachments.bytes,
       photoStatus: attachments.status,
     })
     .from(posts)
@@ -86,6 +91,43 @@ export async function getCircleFeed(circleId: string): Promise<FeedPost[]> {
   return rows.map((row) => ({
     ...row,
     authorPicture: normalizeBlob(row.authorPicture),
-    photo: normalizeBlob(row.photo),
+    hasPhoto: row.photoStatus === 'fetched',
   }));
+}
+
+/**
+ * The newest post's photo in a circle, or null — the circle list's cover
+ * fallback, and nothing more.
+ *
+ * Exists because that list used to call `getCircleFeed` per circle, which
+ * returns every post with its full photo bytes, to read exactly one
+ * thumbnail. On a device with a few circles that dragged megabytes out of
+ * SQLite and across the bridge on every visit to the list.
+ */
+/**
+ * The newest post that actually has its photo — id only, no bytes. The
+ * circle list uses this as a cover fallback and resolves it through the
+ * photo cache, so a screen that only needs a thumbnail never pulls the
+ * blob across again. See getNewestPostPhoto for the bytes.
+ */
+export async function getNewestFetchedPostId(circleId: string): Promise<string | null> {
+  const rows = await db
+    .select({ id: posts.id })
+    .from(posts)
+    .innerJoin(attachments, and(eq(attachments.circleId, posts.circleId), eq(attachments.entryId, posts.id)))
+    .where(and(eq(posts.circleId, circleId), eq(attachments.status, 'fetched')))
+    .orderBy(desc(posts.createdAt))
+    .limit(1);
+  return rows[0]?.id ?? null;
+}
+
+export async function getNewestPostPhoto(circleId: string): Promise<Uint8Array | null> {
+  const rows = await db
+    .select({ bytes: attachments.bytes })
+    .from(posts)
+    .innerJoin(attachments, and(eq(attachments.circleId, posts.circleId), eq(attachments.entryId, posts.id)))
+    .where(eq(posts.circleId, circleId))
+    .orderBy(desc(posts.createdAt))
+    .limit(1);
+  return rows[0] ? normalizeBlob(rows[0].bytes) : null;
 }
