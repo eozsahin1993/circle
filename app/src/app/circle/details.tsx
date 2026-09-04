@@ -1,9 +1,11 @@
+import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ActionSheet, type ActionSheetOption } from '@/components/action-sheet';
 import { Avatar } from '@/components/avatar';
 import { BackButton } from '@/components/back-button';
 import { PrimaryButton } from '@/components/primary-button';
@@ -11,11 +13,16 @@ import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Radius, Spacing, Tints } from '@/constants/theme';
-import { getCircleSummary, getCircleMembers, MemberRoles, type CircleListRow, type Member } from '@/data/db';
+import { getCircleSummary, getCircleMembers, MemberRoles, type CircleListRow, type Member, type MemberRole } from '@/data/db';
+import { setMemberRole } from '@/domain/usecases/circle/change-member-role';
 import { buildDebugKeysetFlags } from '@/domain/usecases/circle/debug-keyset';
 import { getOrCreateInvite, isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
 import { deleteCircleForEveryone, leaveCircle } from '@/domain/usecases/circle/leave-circle';
+import { removeMember } from '@/domain/usecases/circle/remove-member';
+import { useTheme } from '@/hooks/use-theme';
+import { getCircleIdentity } from '@/services/keystore';
 import { bytesToDataUri } from '@/services/image';
+import { bytesToHex } from '@noble/curves/utils.js';
 
 function inviteLink(code: string): string {
   return `circle://join/${code}`;
@@ -26,12 +33,20 @@ function formatJoined(joinedAt: number): string {
 }
 
 export default function CircleDetailsScreen() {
+  const theme = useTheme();
   const { circleId } = useLocalSearchParams<{ circleId: string }>();
   const [circle, setCircle] = useState<CircleListRow | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [admin, setAdmin] = useState(false);
+  const [ownPublicKey, setOwnPublicKey] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [memberMenu, setMemberMenu] = useState<Member | null>(null);
+
+  const loadMembers = useCallback(async () => {
+    if (!circleId) return;
+    setMembers(await getCircleMembers(circleId));
+  }, [circleId]);
 
   // Encoded once per roster change rather than on every render. Member
   // pictures are avatar-sized thumbnails, so a data URI is cheap here —
@@ -49,15 +64,60 @@ export default function CircleDetailsScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!circleId) return;
-      Promise.all([getCircleSummary(circleId), getCircleMembers(circleId), isCircleAdmin(circleId)]).then(
-        ([circleRow, memberRows, isAdmin]) => {
+      Promise.all([getCircleSummary(circleId), getCircleMembers(circleId), isCircleAdmin(circleId), getCircleIdentity(circleId)]).then(
+        ([circleRow, memberRows, isAdmin, identity]) => {
           setCircle(circleRow);
           setMembers(memberRows);
           setAdmin(isAdmin);
+          setOwnPublicKey(identity ? bytesToHex(identity.publicKey) : null);
         },
       );
     }, [circleId]),
   );
+
+  function handleRemoveMember(member: Member) {
+    if (!circleId) return;
+    Alert.alert(
+      `Remove ${member.name || 'this member'}?`,
+      "They'll disappear from the roster and lose the ability to decrypt anything new, once this and everyone else's devices sync. They keep what they already downloaded.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeMember(circleId, member.identityPublicKey);
+              await loadMembers();
+            } catch (err) {
+              console.error('Failed to remove member', err);
+              setError("Couldn't remove that member — try again.");
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  async function handleSetRole(member: Member, role: MemberRole) {
+    if (!circleId) return;
+    try {
+      await setMemberRole(circleId, member.identityPublicKey, role);
+      await loadMembers();
+    } catch (err) {
+      console.error('Failed to change member role', err);
+      setError("Couldn't change that member's role — try again.");
+    }
+  }
+
+  const memberMenuOptions: ActionSheetOption[] = memberMenu
+    ? [
+        memberMenu.role === MemberRoles.admin
+          ? { label: 'Remove as admin', icon: 'shield-off', onPress: () => handleSetRole(memberMenu, MemberRoles.member) }
+          : { label: 'Make admin', icon: 'shield', onPress: () => handleSetRole(memberMenu, MemberRoles.admin) },
+        { label: 'Remove from circle', icon: 'user-x', destructive: true, onPress: () => handleRemoveMember(memberMenu) },
+      ]
+    : [];
 
   async function handleShareLink() {
     if (!circleId) return;
@@ -184,6 +244,11 @@ export default function CircleDetailsScreen() {
                   Joined {formatJoined(member.joinedAt)}
                 </ThemedText>
               </View>
+              {admin && member.identityPublicKey !== ownPublicKey ? (
+                <Pressable hitSlop={12} style={styles.memberMenuButton} onPress={() => setMemberMenu(member)}>
+                  <Feather name="more-vertical" size={20} color={theme.muted} />
+                </Pressable>
+              ) : null}
             </View>
           ))}
 
@@ -220,6 +285,14 @@ export default function CircleDetailsScreen() {
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      <ActionSheet
+        visible={memberMenu !== null}
+        onClose={() => setMemberMenu(null)}
+        title={memberMenu?.name || 'This member'}
+        avatarUri={memberMenu ? avatarUris.get(memberMenu.identityPublicKey) : undefined}
+        options={memberMenuOptions}
+      />
     </ThemedView>
   );
 }
@@ -275,6 +348,9 @@ const styles = StyleSheet.create({
   memberInfo: {
     flex: 1,
     gap: 2,
+  },
+  memberMenuButton: {
+    padding: 4,
   },
   memberNameRow: {
     flexDirection: 'row',

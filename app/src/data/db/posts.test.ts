@@ -80,6 +80,7 @@ describe('posts CRUD', () => {
       name: 'Priya Raman',
       picture: null,
       joinedAt: 100,
+      removedAt: null,
     });
     await insertPost(post, makeAttachment(post));
 

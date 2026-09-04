@@ -1,9 +1,12 @@
 import { EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { commentHandler } from '@/sync/entry-handlers/comment';
+import { keyRotationHandler } from '@/sync/entry-handlers/key-rotation';
 import { memberAddedHandler } from '@/sync/entry-handlers/member-added';
+import { memberRemovedHandler } from '@/sync/entry-handlers/member-removed';
 import { postHandler } from '@/sync/entry-handlers/post';
 import { profileUpdateHandler } from '@/sync/entry-handlers/profile-update';
 import { reactionHandler } from '@/sync/entry-handlers/reaction';
+import { roleChangeHandler } from '@/sync/entry-handlers/role-change';
 import type { EntryHandler } from '@/sync/entry-handlers/types';
 
 export type { EntryHandler } from '@/sync/entry-handlers/types';
@@ -16,12 +19,14 @@ export type { EntryHandler } from '@/sync/entry-handlers/types';
  * later build that understands the type rebuilds it by replaying from
  * epoch 0.
  *
- * Not yet here, because nothing writes them yet: `key_rotation`,
- * `role_change`, `circle_renamed`.
+ * Not yet here, because nothing writes it yet: `circle_renamed`.
  */
 export const metaHandlers: Record<string, EntryHandler> = {
   [EntryTypes.MEMBER_ADDED]: memberAddedHandler,
   [EntryTypes.PROFILE_UPDATE]: profileUpdateHandler,
+  [EntryTypes.MEMBER_REMOVED]: memberRemovedHandler,
+  [EntryTypes.ROLE_CHANGE]: roleChangeHandler,
+  [EntryTypes.KEY_ROTATION]: keyRotationHandler,
 };
 
 /** Content entry types this build understands. `delete` will join these when tombstones are built. */

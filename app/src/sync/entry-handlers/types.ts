@@ -35,10 +35,10 @@ export function asRecord(payload: unknown): Record<string, unknown> | null {
  * The predicate nearly every content type wants: the author is someone
  * this device has seen join. Membership is "has ever been a member", not
  * "is one now" — removing someone doesn't retract their old content
- * (server/SYNC_DESIGN.md's ever-member set). Those two sets are the same
- * table today, because nothing removes a roster row yet; when removal
- * lands it must mark rows rather than delete them, or this starts
- * rejecting history.
+ * (server/SYNC_DESIGN.md's ever-member set). `getMemberByPublicKey` reads
+ * the same `circle_members` table `getCircleMembers` does, but
+ * deliberately doesn't filter out removed rows the way that one does —
+ * see `removedAt` on the schema and member-removed.ts's handler.
  */
 export async function authoredByMember(circleId: string, envelope: LogEntryEnvelope): Promise<boolean> {
   return (await getMemberByPublicKey(circleId, envelope.authorPubkey)) !== null;

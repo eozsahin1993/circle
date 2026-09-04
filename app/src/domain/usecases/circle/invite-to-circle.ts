@@ -52,10 +52,15 @@ export async function isCircleAdmin(circleId: string): Promise<boolean> {
   return own?.member.role === MemberRoles.admin;
 }
 
-/** Resolves this device's own public key in the circle, and confirms it's an admin. */
-async function requireAdminPublicKey(circleId: string): Promise<string> {
+/**
+ * Resolves this device's own public key in the circle, and confirms it's
+ * an admin. `message` lets callers outside the invite flow (e.g.
+ * `remove-member.ts`) surface an error that names their own operation
+ * rather than the invite one.
+ */
+export async function requireAdminPublicKey(circleId: string, message = "Only an admin can manage this circle's invite."): Promise<string> {
   const own = await getOwnMember(circleId);
-  if (own?.member.role !== MemberRoles.admin) throw new Error("Only an admin can manage this circle's invite.");
+  if (own?.member.role !== MemberRoles.admin) throw new Error(message);
 
   return own.publicKey;
 }
@@ -282,6 +287,7 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
     name: selfReportedName,
     picture: picture ?? null,
     joinedAt: Date.now(),
+    removedAt: null,
   });
 
   drainOutbox(circleId).catch((err) => console.error('Failed to push member_added', err));

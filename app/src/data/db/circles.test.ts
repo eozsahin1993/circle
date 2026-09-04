@@ -72,6 +72,7 @@ describe('circles CRUD', () => {
       name: 'Grandma',
       picture: null,
       joinedAt: Date.now(),
+      removedAt: null,
     };
     await insertMember(member);
 

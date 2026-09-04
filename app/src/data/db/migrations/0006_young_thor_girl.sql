@@ -1,0 +1,1 @@
+ALTER TABLE `circle_members` ADD `removed_at` integer DEFAULT null;

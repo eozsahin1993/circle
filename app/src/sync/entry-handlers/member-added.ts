@@ -89,6 +89,7 @@ export const memberAddedHandler: EntryHandler = {
       name: payload.name,
       picture: payload.picture ?? null,
       joinedAt: Date.now(),
+      removedAt: null,
     });
   },
 };

@@ -15,6 +15,9 @@ export const EntryTypes = {
   REACTION: 'reaction',
   MEMBER_ADDED: 'member_added',
   PROFILE_UPDATE: 'profile_update',
+  MEMBER_REMOVED: 'member_removed',
+  ROLE_CHANGE: 'role_change',
+  KEY_ROTATION: 'key_rotation',
 } as const;
 
 export type EntryType = (typeof EntryTypes)[keyof typeof EntryTypes];

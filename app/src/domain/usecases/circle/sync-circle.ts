@@ -7,9 +7,17 @@ import { appendEntry, BlobAlreadyExistsError, getUploadTarget, uploadBlob, type 
 import { getPendingOutboxEntries, markOutboxEntrySynced, type OutboxEntry } from '@/data/db';
 import { getAttachment } from '@/data/db/attachments';
 
-/** Which relay namespace a locally-queued entry type belongs in — see server/SYNC_DESIGN.md's "meta"/"content" split. */
+/**
+ * Which relay namespace a locally-queued entry type belongs in — see
+ * server/SYNC_DESIGN.md's "meta"/"content" split. Only entry types the
+ * outbox actually queues belong here — `member_removed`/`key_rotation`
+ * go straight to the relay from remove-member.ts instead (rotateLog's
+ * write-token swap doesn't fit the generic outbox/appendEntry path).
+ */
+const META_ENTRY_TYPES: OutboxEntry['entryType'][] = [EntryTypes.MEMBER_ADDED, EntryTypes.ROLE_CHANGE];
+
 function namespaceFor(entryType: OutboxEntry['entryType']): Namespace {
-  return entryType === EntryTypes.MEMBER_ADDED ? 'meta' : 'content';
+  return META_ENTRY_TYPES.includes(entryType) ? 'meta' : 'content';
 }
 
 /**

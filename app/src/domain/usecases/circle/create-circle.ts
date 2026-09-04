@@ -120,6 +120,7 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
     name: profile?.name ?? '',
     picture: profile?.picture ?? null,
     joinedAt: now,
+    removedAt: null,
   });
 
   await syncAccountManifestBestEffort();

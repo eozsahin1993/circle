@@ -39,6 +39,14 @@ export const circleMembers = sqliteTable(
     name: text('name').notNull(),
     picture: blob('picture').$type<Uint8Array>(),
     joinedAt: integer('joined_at').notNull(),
+    /**
+     * Set when an admin removes this member — kept, never deleted (see
+     * `authoredByMember` in sync/entry-handlers/types.ts): the row is
+     * still the "ever-member" proof that a post/comment/reaction authored
+     * before removal must keep passing. `getCircleMembers` filters this
+     * out; `getMemberByPublicKey` deliberately doesn't.
+     */
+    removedAt: integer('removed_at').default(sql`null`),
   },
   (t) => [
     primaryKey({ columns: [t.circleId, t.identityPublicKey] }),
@@ -220,7 +228,9 @@ export const outbox = sqliteTable(
     circleId: text('circle_id')
       .notNull()
       .references(() => circles.id, { onDelete: 'cascade' }),
-    entryType: text('entry_type', { enum: ['post', 'comment', 'reaction', 'member_added', 'profile_update'] }).notNull(),
+    entryType: text('entry_type', {
+      enum: ['post', 'comment', 'reaction', 'member_added', 'profile_update', 'member_removed', 'role_change', 'key_rotation'],
+    }).notNull(),
     /**
      * The id this entry is appended under at the relay — passed straight
      * to `appendEntry`, which makes it the relay's idempotency key, and
