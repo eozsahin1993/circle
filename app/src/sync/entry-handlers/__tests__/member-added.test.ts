@@ -104,6 +104,7 @@ describe('predicate', () => {
       name: 'Marcus',
       picture: null,
       joinedAt: Date.now(),
+      removedAt: null,
     });
     const joiner = generateIdentity();
 

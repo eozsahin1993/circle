@@ -1,3 +1,5 @@
+import { Buffer } from 'buffer';
+
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import {
@@ -13,6 +15,7 @@ import {
 import { getProfile, insertCircle, insertMember, MemberRoles } from '@/data/db';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
+import { compressToThumbnail } from '@/services/image';
 import { writeCoverFile } from '@/services/photo-cache';
 import { bootstrapCircle, appendEntry } from '@/services/relay';
 import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap } from '@/services/keystore';
@@ -53,6 +56,19 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
   await bootstrapCircle(syncId, authorityKeypair.publicKey, hashWriteToken(writeToken));
 
   const profile = await getProfile();
+
+  // Best-effort, same as requestToJoin's own thumbnail — a compression
+  // failure shouldn't block creating the circle itself; other devices
+  // just show the hatch placeholder for this member instead.
+  let pictureThumbnail: string | undefined;
+  if (profile?.picture) {
+    try {
+      pictureThumbnail = Buffer.from(await compressToThumbnail(profile.picture)).toString('base64');
+    } catch (err) {
+      console.error('Failed to compress profile picture for member_added', err);
+    }
+  }
+
   const memberAddedEntry = buildAndEncryptLogEntry(
     EntryTypes.MEMBER_ADDED,
     {
@@ -62,6 +78,7 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
       role: MemberRoles.admin,
       keyVersion: 1,
       sealedContentKey: bytesToHex(sealToPublicKey(contentKey, sealingKeypair.publicKey)),
+      picture: pictureThumbnail,
     },
     identity,
     contentKey
@@ -103,6 +120,7 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
     name: profile?.name ?? '',
     picture: profile?.picture ?? null,
     joinedAt: now,
+    removedAt: null,
   });
 
   await syncAccountManifestBestEffort();

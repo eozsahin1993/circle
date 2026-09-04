@@ -1,4 +1,4 @@
-import { and, asc, count, eq } from 'drizzle-orm';
+import { and, asc, count, eq, isNull } from 'drizzle-orm';
 
 import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
@@ -58,12 +58,12 @@ export async function getMemberByMemberId(circleId: string, memberId: string): P
   return rows[0] ? normalizeMember(rows[0]) : null;
 }
 
-/** Returns every member of a circle, in join order — this is the roster. */
+/** Returns every *current* member of a circle, in join order — this is the roster. Excludes removed members; see `getMemberByPublicKey` for the ever-member view. */
 export async function getCircleMembers(circleId: string): Promise<Member[]> {
   const members = await db
     .select()
     .from(circleMembers)
-    .where(eq(circleMembers.circleId, circleId))
+    .where(and(eq(circleMembers.circleId, circleId), isNull(circleMembers.removedAt)))
     .orderBy(asc(circleMembers.joinedAt));
   return members.map(normalizeMember);
 }
@@ -79,15 +79,36 @@ export async function updateMemberProfile(
     .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey)));
 }
 
-/** Removes a member from a circle's roster (e.g. after a kick + rotation). */
-export async function deleteMember(circleId: string, identityPublicKey: string): Promise<void> {
+/**
+ * Changes a member's role — how `role-change.ts`'s handler applies a
+ * `role_change` entry. A no-op against a removed or nonexistent member,
+ * same idempotent shape as `markMemberRemoved`.
+ */
+export async function updateMemberRole(circleId: string, identityPublicKey: string, role: MemberRole): Promise<void> {
   await db
-    .delete(circleMembers)
-    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey)));
+    .update(circleMembers)
+    .set({ role })
+    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey), isNull(circleMembers.removedAt)));
 }
 
-/** Just the count — the circle list shows "N people" and never needs the rows. */
+/**
+ * Removes a member from a circle's roster — a soft removal, not a delete
+ * (see `removedAt` on the schema): the row stays so this member's past
+ * posts/comments/reactions keep passing `authoredByMember`. Idempotent —
+ * removing an already-removed (or never-existing) row is a no-op.
+ */
+export async function markMemberRemoved(circleId: string, identityPublicKey: string): Promise<void> {
+  await db
+    .update(circleMembers)
+    .set({ removedAt: Date.now() })
+    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey), isNull(circleMembers.removedAt)));
+}
+
+/** Just the count of *current* members — the circle list shows "N people" and never needs the rows. */
 export async function getCircleMemberCount(circleId: string): Promise<number> {
-  const rows = await db.select({ count: count() }).from(circleMembers).where(eq(circleMembers.circleId, circleId));
+  const rows = await db
+    .select({ count: count() })
+    .from(circleMembers)
+    .where(and(eq(circleMembers.circleId, circleId), isNull(circleMembers.removedAt)));
   return rows[0]?.count ?? 0;
 }

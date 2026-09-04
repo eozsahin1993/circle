@@ -207,6 +207,7 @@ describe('pullMeta', () => {
       name: 'Me',
       picture: null,
       joinedAt: Date.now(),
+      removedAt: null,
     });
 
     onePage([

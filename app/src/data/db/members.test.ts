@@ -2,11 +2,11 @@ import { generateUUID } from '@/services/crypto';
 import { initDatabase } from '@/data/db';
 import { insertCircle } from '@/data/db/circles';
 import {
-  deleteMember,
   getCircleMembers,
   getMemberByMemberId,
   getMemberByPublicKey,
   insertMember,
+  markMemberRemoved,
   MemberRole,
   MemberRoles,
   updateMemberProfile,
@@ -42,6 +42,7 @@ function makeMember(
     name: overrides.name ?? 'Grandma',
     picture: null,
     joinedAt: overrides.joinedAt ?? Date.now(),
+    removedAt: null,
   };
 }
 
@@ -95,13 +96,25 @@ describe('members CRUD', () => {
     expect(updated?.picture).toEqual(picture);
   });
 
-  test('deleteMember removes the row', async () => {
+  test('markMemberRemoved sets removedAt but keeps the row', async () => {
     const circle = await makeCircle();
     const member = makeMember(circle.id);
     await insertMember(member);
 
-    await deleteMember(circle.id, member.identityPublicKey);
+    await markMemberRemoved(circle.id, member.identityPublicKey);
 
-    await expect(getMemberByPublicKey(circle.id, member.identityPublicKey)).resolves.toBeNull();
+    const row = await getMemberByPublicKey(circle.id, member.identityPublicKey);
+    expect(row?.removedAt).not.toBeNull();
+  });
+
+  test('markMemberRemoved excludes the member from getCircleMembers', async () => {
+    const circle = await makeCircle();
+    const member = makeMember(circle.id);
+    await insertMember(member);
+
+    await markMemberRemoved(circle.id, member.identityPublicKey);
+
+    const roster = await getCircleMembers(circle.id);
+    expect(roster.find((m) => m.identityPublicKey === member.identityPublicKey)).toBeUndefined();
   });
 });

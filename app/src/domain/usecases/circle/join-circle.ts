@@ -205,6 +205,7 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
     name: profile?.name ?? '',
     picture: profile?.picture ?? null,
     joinedAt: now,
+    removedAt: null,
   });
 
   await syncAccountManifestBestEffort();

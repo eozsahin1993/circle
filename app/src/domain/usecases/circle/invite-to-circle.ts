@@ -52,10 +52,15 @@ export async function isCircleAdmin(circleId: string): Promise<boolean> {
   return own?.member.role === MemberRoles.admin;
 }
 
-/** Resolves this device's own public key in the circle, and confirms it's an admin. */
-async function requireAdminPublicKey(circleId: string): Promise<string> {
+/**
+ * Resolves this device's own public key in the circle, and confirms it's
+ * an admin. `message` lets callers outside the invite flow (e.g.
+ * `remove-member.ts`) surface an error that names their own operation
+ * rather than the invite one.
+ */
+export async function requireAdminPublicKey(circleId: string, message = "Only an admin can manage this circle's invite."): Promise<string> {
   const own = await getOwnMember(circleId);
-  if (own?.member.role !== MemberRoles.admin) throw new Error("Only an admin can manage this circle's invite.");
+  if (own?.member.role !== MemberRoles.admin) throw new Error(message);
 
   return own.publicKey;
 }
@@ -210,7 +215,7 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   if (!request) throw new Error('That join request is no longer available.');
 
   const requestKey = deriveJoinRequestKey(invite.code);
-  const { ephemeralPublicKey, identityPublicKey, encPublicKey, selfReportedName } = JSON.parse(
+  const { ephemeralPublicKey, identityPublicKey, encPublicKey, selfReportedName, pictureThumbnail } = JSON.parse(
     new TextDecoder().decode(decrypt(request.encryptedRequest, requestKey))
   ) as JoinRequestPayload;
 
@@ -241,7 +246,14 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   const currentVersion = Math.max(...Object.keys(keyMap).map(Number));
   const memberAddedEntry = buildAndEncryptLogEntry(
     EntryTypes.MEMBER_ADDED,
-    { identityPublicKey, encPublicKey, name: selfReportedName, role: MemberRoles.member, keyVersion: currentVersion },
+    {
+      identityPublicKey,
+      encPublicKey,
+      name: selfReportedName,
+      role: MemberRoles.member,
+      keyVersion: currentVersion,
+      picture: pictureThumbnail,
+    },
     identity,
     keyMap[currentVersion]
   );
@@ -264,8 +276,9 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
     memberId: generateUUID(),
     role: MemberRoles.member,
     name: selfReportedName,
-    picture: null,
+    picture: pictureThumbnail ? new Uint8Array(Buffer.from(pictureThumbnail, 'base64')) : null,
     joinedAt: Date.now(),
+    removedAt: null,
   });
 
   drainOutbox(circleId).catch((err) => console.error('Failed to push member_added', err));
