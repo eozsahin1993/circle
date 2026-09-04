@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
@@ -13,6 +13,8 @@ import { Spacing } from '@/constants/theme';
 import { getAllCircles, getAllPendingJoinRequests, getCircleFeed, getCircleMembers, getProfile, type Circle } from '@/data/db';
 import { checkPendingJoinRequest } from '@/domain/usecases/circle/join-circle';
 import { bytesToDataUri } from '@/services/image';
+import { nudgePhotoQueue } from '@/sync/photo-queue';
+import { syncAllCircles } from '@/sync/sync-circles';
 
 type CircleListItem = Circle & { memberCount: number; photoUri?: string };
 
@@ -21,33 +23,36 @@ export default function CircleListScreen() {
   const [circles, setCircles] = useState<CircleListItem[]>([]);
   // Avoids flashing the empty state before the first load resolves.
   const [loaded, setLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Re-check on every focus, not just mount — picture/circles may have just
+  // changed on a screen this one returns to (profile, new circle, a post).
+  /** Re-reads the circle list from the local database. No network. */
+  const loadFromDatabase = useCallback(async () => {
+    const profile = await getProfile();
+    setAvatarUri(profile?.picture ? bytesToDataUri(profile.picture) : undefined);
+
+    const allCircles = await getAllCircles();
+    const withCounts = await Promise.all(
+      allCircles.map(async (circle) => {
+        const [members, posts] = await Promise.all([getCircleMembers(circle.id), getCircleFeed(circle.id)]);
+        const coverBytes = circle.picture ?? posts[0]?.photo ?? undefined;
+        return {
+          ...circle,
+          memberCount: members.length,
+          photoUri: coverBytes ? bytesToDataUri(coverBytes) : undefined,
+        };
+      }),
+    );
+    setCircles(withCounts);
+    setLoaded(true);
+  }, []);
 
   // Re-check on every focus, not just mount — picture/circles may have just
   // changed on a screen this one returns to (profile, new circle, a post).
   useFocusEffect(
     useCallback(() => {
-      getProfile().then((profile) => {
-        setAvatarUri(profile?.picture ? bytesToDataUri(profile.picture) : undefined);
-      });
-
-      getAllCircles().then(async (allCircles) => {
-        const withCounts = await Promise.all(
-          allCircles.map(async (circle) => {
-            const [members, posts] = await Promise.all([
-              getCircleMembers(circle.id),
-              getCircleFeed(circle.id),
-            ]);
-            const coverBytes = circle.picture ?? posts[0]?.photo ?? undefined;
-            return {
-              ...circle,
-              memberCount: members.length,
-              photoUri: coverBytes ? bytesToDataUri(coverBytes) : undefined,
-            };
-          }),
-        );
-        setCircles(withCounts);
-        setLoaded(true);
-      });
+      loadFromDatabase().catch((err) => console.error('Failed to load circles', err));
 
       // Opportunistically completes a join even if the user never reopens
       // /join/pending directly — same app-lifecycle-triggered polling as
@@ -57,8 +62,20 @@ export default function CircleListScreen() {
           checkPendingJoinRequest(request.id).catch((err) => console.error('Failed to check a pending join request', err));
         });
       });
-    }, []),
+    }, [loadFromDatabase]),
   );
+
+  /** Syncs every circle, then re-reads. Photos are left to their own queue. */
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await syncAllCircles();
+      nudgePhotoQueue();
+    } finally {
+      await loadFromDatabase().catch((err) => console.error('Failed to reload circles', err));
+      setRefreshing(false);
+    }
+  }, [loadFromDatabase]);
 
   return (
     <ThemedView style={styles.screen}>
@@ -76,28 +93,36 @@ export default function CircleListScreen() {
           </Pressable>
         </View>
 
-        {loaded && circles.length === 0 ? (
-          <View style={styles.empty}>
-            <EmptyCirclesIcon />
-            <ThemedText type="screenTitle" style={styles.emptyTitle}>
-              No circles yet
-            </ThemedText>
-            <ThemedText type="captionFeed" themeColor="muted" style={styles.emptyBody}>
-              Create one to share memories with the people in it — or join with a key someone sent
-              you.
-            </ThemedText>
-          </View>
-        ) : (
-          circles.map((circle) => (
+        <FlatList
+          data={loaded ? circles : []}
+          keyExtractor={(circle) => circle.id}
+          contentContainerStyle={styles.list}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          renderItem={({ item }) => (
             <CircleCard
-              key={circle.id}
-              name={circle.name}
-              memberCount={circle.memberCount}
-              photoUri={circle.photoUri}
-              onPress={() => router.push({ pathname: '/feed', params: { circleId: circle.id } })}
+              name={item.name}
+              memberCount={item.memberCount}
+              photoUri={item.photoUri}
+              onPress={() => router.push({ pathname: '/feed', params: { circleId: item.id } })}
             />
-          ))
-        )}
+          )}
+          // Only once the first read has resolved — otherwise the empty
+          // state flashes before the circles arrive.
+          ListEmptyComponent={
+            loaded ? (
+              <View style={styles.empty}>
+                <EmptyCirclesIcon />
+                <ThemedText type="screenTitle" style={styles.emptyTitle}>
+                  No circles yet
+                </ThemedText>
+                <ThemedText type="captionFeed" themeColor="muted" style={styles.emptyBody}>
+                  Create one to share memories with the people in it — or join with a key someone
+                  sent you.
+                </ThemedText>
+              </View>
+            ) : null
+          }
+        />
 
         <FabButton
           icon="plus"
@@ -126,6 +151,14 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     marginBottom: 2,
+  },
+  list: {
+    // Grows to fill the screen so the empty state's `flex: 1` still has
+    // height to centre itself in — a content container is otherwise only
+    // as tall as its content, leaving the message pinned under the header.
+    flexGrow: 1,
+    gap: Spacing.cardListGap,
+    paddingBottom: Spacing.cardListGap,
   },
   empty: {
     flex: 1,

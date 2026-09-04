@@ -1,6 +1,6 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, StyleSheet } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CircleHeader } from '@/components/circle-header';
@@ -23,6 +23,8 @@ import {
 import { addComment } from '@/domain/usecases/post/comment-on-post';
 import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
 import { bytesToDataUri } from '@/services/image';
+import { nudgePhotoQueue } from '@/sync/photo-queue';
+import { syncCircle } from '@/sync/sync-circles';
 
 /**
  * Author names on comments resolve live from the roster, so a member
@@ -65,55 +67,92 @@ export default function FeedScreen() {
   const [profileName, setProfileName] = useState<string | undefined>();
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [actioningId, setActioningId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  /**
+   * Re-reads everything this screen shows from the local database. Never
+   * touches the network: sync writes to SQLite and this renders what's
+   * there, so the two stay independent and a slow relay can't stall a
+   * repaint.
+   */
+  const loadFromDatabase = useCallback(async () => {
+    if (!circleId) return;
+
+    const [circle, members, circlePosts, profile] = await Promise.all([
+      getCircle(circleId),
+      getCircleMembers(circleId),
+      getCircleFeed(circleId),
+      getProfile(),
+    ]);
+
+    setCircleName(circle?.name ?? '');
+    setMemberCount(members.length);
+    setProfileName(profile?.name);
+
+    const [reactionsByPost, commentsByPost] = await Promise.all([
+      Promise.all(circlePosts.map((post) => getReactionsForPost(circleId, post.id))),
+      Promise.all(circlePosts.map((post) => getPostComments(circleId, post.id))),
+    ]);
+
+    // Author name/picture already came resolved from the roster by
+    // `getCircleFeed` — this screen only turns bytes into data URIs
+    // and timestamps into strings. Falls back to this device's own
+    // profile for a post whose author has no roster row yet.
+    setPosts(
+      circlePosts.map((post, index) => ({
+        id: post.id,
+        authorName: post.authorName || profile?.name || 'Unknown member',
+        authorPhotoUri: (post.authorPicture ?? profile?.picture)
+          ? bytesToDataUri(post.authorPicture ?? profile!.picture!)
+          : undefined,
+        timestamp: formatTimestamp(post.createdAt),
+        // Undefined while the photo is still queued for download —
+        // PostCard renders its placeholder rather than a broken image.
+        photoUri: post.photo ? bytesToDataUri(post.photo) : undefined,
+        caption: post.caption,
+        reactions: reactionsByPost[index],
+        comments: toCommentItems(commentsByPost[index], profile?.name),
+      })),
+    );
+
+    // Only ever resolves non-empty for this invite's actual creator (see
+    // discoverPendingRequests's creator-only gate) — silently shows
+    // nothing for anyone else, same as circle/invite.tsx's own section.
+    discoverPendingRequests(circleId)
+      .then(setPendingRequests)
+      .catch(() => setPendingRequests([]));
+  }, [circleId]);
 
   useFocusEffect(
     useCallback(() => {
-      if (!circleId) return;
-
-      Promise.all([
-        getCircle(circleId),
-        getCircleMembers(circleId),
-        getCircleFeed(circleId),
-        getProfile(),
-      ]).then(async ([circle, members, circlePosts, profile]) => {
-        setCircleName(circle?.name ?? '');
-        setMemberCount(members.length);
-        setProfileName(profile?.name);
-        const [reactionsByPost, commentsByPost] = await Promise.all([
-          Promise.all(circlePosts.map((post) => getReactionsForPost(circleId, post.id))),
-          Promise.all(circlePosts.map((post) => getPostComments(circleId, post.id))),
-        ]);
-
-        // Author name/picture already came resolved from the roster by
-        // `getCircleFeed` — this screen only turns bytes into data URIs
-        // and timestamps into strings. Falls back to this device's own
-        // profile for a post whose author has no roster row yet.
-        setPosts(
-          circlePosts.map((post, index) => ({
-            id: post.id,
-            authorName: post.authorName || profile?.name || 'Unknown member',
-            authorPhotoUri: (post.authorPicture ?? profile?.picture)
-              ? bytesToDataUri(post.authorPicture ?? profile!.picture!)
-              : undefined,
-            timestamp: formatTimestamp(post.createdAt),
-            // Undefined while the photo is still queued for download —
-            // PostCard renders its placeholder rather than a broken image.
-            photoUri: post.photo ? bytesToDataUri(post.photo) : undefined,
-            caption: post.caption,
-            reactions: reactionsByPost[index],
-            comments: toCommentItems(commentsByPost[index], profile?.name),
-          })),
-        );
-      });
-
-      // Only ever resolves non-empty for this invite's actual creator (see
-      // discoverPendingRequests's creator-only gate) — silently shows
-      // nothing for anyone else, same as circle/invite.tsx's own section.
-      discoverPendingRequests(circleId)
-        .then(setPendingRequests)
-        .catch(() => setPendingRequests([]));
-    }, [circleId]),
+      loadFromDatabase().catch((err) => console.error('Failed to load the feed', err));
+    }, [loadFromDatabase]),
   );
+
+  /**
+   * Pull-to-refresh: sync this circle, then re-read. Without it the only
+   * triggers are app start, returning to the foreground, and a 45s timer,
+   * so someone sitting on the feed waiting for a post has no way to ask.
+   *
+   * Only the log pass is awaited. Photos are nudged and left to their own
+   * queue, so the spinner ends when captions and roster are current rather
+   * than when the last photo finishes downloading.
+   */
+  const handleRefresh = useCallback(async () => {
+    if (!circleId) return;
+    setRefreshing(true);
+    try {
+      await syncCircle(circleId);
+      nudgePhotoQueue();
+    } catch (err) {
+      // An offline pull still re-reads below, so it shows whatever landed
+      // last rather than an error over stale-but-valid content.
+      console.error('Failed to sync on pull-to-refresh', err);
+    } finally {
+      await loadFromDatabase().catch((err) => console.error('Failed to reload the feed', err));
+      setRefreshing(false);
+    }
+  }, [circleId, loadFromDatabase]);
 
   async function handleApprove(requesterId: string) {
     if (!circleId) return;
@@ -177,6 +216,7 @@ export default function FeedScreen() {
       <SafeAreaView style={styles.safeArea}>
         <FlatList
           data={rows}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           keyExtractor={(row) => {
             if (row.kind === 'post') return row.post.id;
             if (row.kind === 'pending-request') return row.request.requesterId;

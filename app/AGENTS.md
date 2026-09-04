@@ -50,3 +50,27 @@ npx jest --ci --forceExit --runInBand --no-cache
 ```
 
 Everyday runs (no migration changes) don't need it.
+
+## Always add a new migration — never edit an existing one
+
+`migrations/run.ts` tracks applied migrations by **index**, so editing a
+migration that a device has already run does nothing: the index is
+recorded, the file is skipped, and the schema silently stays behind. The
+symptom is a confusing runtime error naming a column the migration file
+plainly declares:
+
+```
+table outbox has no column named entry_id
+```
+
+Migrations `0000`–`0005` were deliberately consolidated so each declares
+its table's final shape, and that's the baseline. From there on, a schema
+change means editing `schema.ts` and running:
+
+```bash
+npm run db:generate
+```
+
+which writes the next numbered migration. Don't reach for the old
+consolidate-in-place habit to keep the history tidy — it costs every
+device a wipe, and eventually one you can't reach.
