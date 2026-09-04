@@ -1,3 +1,4 @@
+import { getMemberByPublicKey } from '@/data/db';
 import type { LogEntryEnvelope } from '@/domain/usecases/circle/log-entry';
 
 /**
@@ -28,4 +29,30 @@ export type EntryHandler = {
 /** Convenience for handlers, which all start by narrowing `payload` from `unknown`. */
 export function asRecord(payload: unknown): Record<string, unknown> | null {
   return typeof payload === 'object' && payload !== null ? (payload as Record<string, unknown>) : null;
+}
+
+/**
+ * The predicate nearly every content type wants: the author is someone
+ * this device has seen join. Membership is "has ever been a member", not
+ * "is one now" — removing someone doesn't retract their old content
+ * (server/SYNC_DESIGN.md's ever-member set). Those two sets are the same
+ * table today, because nothing removes a roster row yet; when removal
+ * lands it must mark rows rather than delete them, or this starts
+ * rejecting history.
+ */
+export async function authoredByMember(circleId: string, envelope: LogEntryEnvelope): Promise<boolean> {
+  return (await getMemberByPublicKey(circleId, envelope.authorPubkey)) !== null;
+}
+
+/** Narrows a payload field, returning null the moment anything is the wrong shape. */
+export function stringField(record: Record<string, unknown>, key: string, { allowEmpty = false } = {}): string | null {
+  const value = record[key];
+  if (typeof value !== 'string') return null;
+  if (!allowEmpty && !value) return null;
+  return value;
+}
+
+export function numberField(record: Record<string, unknown>, key: string): number | null {
+  const value = record[key];
+  return typeof value === 'number' ? value : null;
 }

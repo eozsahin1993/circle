@@ -1,5 +1,5 @@
-import { getMemberByPublicKey, insertCommentIfAbsent } from '@/data/db';
-import { asRecord, type EntryHandler } from '@/sync/entry-handlers/types';
+import { insertCommentIfAbsent } from '@/data/db';
+import { asRecord, authoredByMember, type EntryHandler } from '@/sync/entry-handlers/types';
 
 /** What `addComment` puts in a `comment` entry. The author rides on the envelope, not in here. */
 type CommentPayload = {
@@ -34,10 +34,9 @@ export const commentHandler: EntryHandler = {
    * without every handler having to pre-verify its own dependencies.
    */
   async predicate(circleId, envelope) {
-    const payload = parse(envelope.payload);
-    if (!payload) return false;
+    if (!parse(envelope.payload)) return false;
 
-    return (await getMemberByPublicKey(circleId, envelope.authorPubkey)) !== null;
+    return authoredByMember(circleId, envelope);
   },
 
   async apply(_circleId, envelope) {

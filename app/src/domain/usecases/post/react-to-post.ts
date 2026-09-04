@@ -1,32 +1,70 @@
-import { addReaction, getPostReactionSummary, hasReacted, removeReaction, type ReactionSummary } from '@/data/db';
-import { getCircleIdentity } from '@/services/keystore';
+import { bytesToHex } from '@noble/curves/utils.js';
 
-/** Resolves this device's own memberId for a circle, or null before it has an identity there. */
-async function getOwnMemberId(circleId: string): Promise<string | null> {
+import {
+  addReaction,
+  getPostReactionSummary,
+  hasReacted,
+  insertOutboxEntry,
+  OutboxStatuses,
+  removeReaction,
+  type ReactionSummary,
+} from '@/data/db';
+import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
+import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
+import { generateUUID } from '@/services/crypto';
+import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
+
+/** Resolves this device's own circle identity public key, or null before it has one here. */
+async function getOwnPublicKey(circleId: string): Promise<string | null> {
   const identity = await getCircleIdentity(circleId);
-  return identity?.memberId ?? null;
+  return identity ? bytesToHex(identity.publicKey) : null;
 }
 
 /**
  * Adds this device's reaction if it isn't already there, or removes it if
  * it is — a single tap always flips the current state, matching how a
  * reaction chip actually gets used.
+ *
+ * Both directions append an entry, because the log is append-only: a
+ * reaction can't be retracted, only superseded. So the entry carries
+ * `reacted`, and replaying content in epoch order leaves whichever came
+ * last as the final state on every device.
  */
 export async function toggleReaction(circleId: string, postId: string, emoji: string): Promise<void> {
-  const memberId = await getOwnMemberId(circleId);
-  if (!memberId) throw new Error('No identity for this circle on this device.');
+  const publicKey = await getOwnPublicKey(circleId);
+  if (!publicKey) throw new Error('No identity for this circle on this device.');
+  const identity = (await getCircleIdentity(circleId))!;
+  const current = await getCurrentContentKey(circleId);
+  if (!current) throw new Error('No content key on this device.');
 
-  if (await hasReacted(postId, memberId, emoji)) {
-    await removeReaction(postId, memberId, emoji);
+  const reacted = !(await hasReacted(postId, publicKey, emoji));
+  const createdAt = Date.now();
+
+  if (reacted) {
+    await addReaction({ postId, authorPublicKey: publicKey, emoji, createdAt });
   } else {
-    await addReaction({ postId, memberId, emoji, createdAt: Date.now() });
+    await removeReaction(postId, publicKey, emoji);
   }
+
+  await insertOutboxEntry({
+    circleId,
+    entryType: 'reaction',
+    // A fresh id per toggle: the relay dedupes on entryId, so reusing one
+    // would make a re-reaction look like a retry of the removal and be
+    // silently dropped.
+    localId: generateUUID(),
+    status: OutboxStatuses.pending,
+    epoch: null,
+    encryptedMeta: buildAndEncryptLogEntry('reaction', { postId, emoji, reacted, createdAt }, identity, current.key),
+  });
+
+  drainOutbox(circleId).catch((err) => console.error('Failed to drain outbox', err));
 }
 
 /** Reaction summary for a post, from this device's point of view. */
 export async function getReactionsForPost(circleId: string, postId: string): Promise<ReactionSummary[]> {
-  const memberId = await getOwnMemberId(circleId);
-  if (!memberId) return [];
+  const publicKey = await getOwnPublicKey(circleId);
+  if (!publicKey) return [];
 
-  return getPostReactionSummary(postId, memberId);
+  return getPostReactionSummary(postId, publicKey);
 }

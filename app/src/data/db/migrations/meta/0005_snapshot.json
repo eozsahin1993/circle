@@ -640,8 +640,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "member_id": {
-          "name": "member_id",
+        "author_public_key": {
+          "name": "author_public_key",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -687,13 +687,13 @@
         }
       },
       "compositePrimaryKeys": {
-        "post_reactions_post_id_member_id_emoji_pk": {
+        "post_reactions_post_id_author_public_key_emoji_pk": {
           "columns": [
             "post_id",
-            "member_id",
+            "author_public_key",
             "emoji"
           ],
-          "name": "post_reactions_post_id_member_id_emoji_pk"
+          "name": "post_reactions_post_id_author_public_key_emoji_pk"
         }
       },
       "uniqueConstraints": {},

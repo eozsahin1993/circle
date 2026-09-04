@@ -1,5 +1,5 @@
-import { AttachmentKinds, AttachmentStatuses, getMemberByPublicKey, insertPost } from '@/data/db';
-import { asRecord, type EntryHandler } from '@/sync/entry-handlers/types';
+import { AttachmentKinds, AttachmentStatuses, insertPost } from '@/data/db';
+import { asRecord, authoredByMember, type EntryHandler } from '@/sync/entry-handlers/types';
 
 /** What `createPost` puts in a `post` entry — the photo itself is a separate blob. */
 type PostPayload = {
@@ -36,10 +36,9 @@ export const postHandler: EntryHandler = {
    * check starts rejecting history.
    */
   async predicate(circleId, envelope) {
-    const payload = parse(envelope.payload);
-    if (!payload) return false;
+    if (!parse(envelope.payload)) return false;
 
-    return (await getMemberByPublicKey(circleId, envelope.authorPubkey)) !== null;
+    return authoredByMember(circleId, envelope);
   },
 
   /**

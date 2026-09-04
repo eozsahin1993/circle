@@ -1,6 +1,7 @@
 import { commentHandler } from '@/sync/entry-handlers/comment';
 import { memberAddedHandler } from '@/sync/entry-handlers/member-added';
 import { postHandler } from '@/sync/entry-handlers/post';
+import { reactionHandler } from '@/sync/entry-handlers/reaction';
 import type { EntryHandler } from '@/sync/entry-handlers/types';
 
 export type { EntryHandler } from '@/sync/entry-handlers/types';
@@ -20,8 +21,9 @@ export const metaHandlers: Record<string, EntryHandler> = {
   member_added: memberAddedHandler,
 };
 
-/** Content entry types this build understands. `reaction`/`delete` will join these when they start syncing. */
+/** Content entry types this build understands. `delete` will join these when tombstones are built. */
 export const contentHandlers: Record<string, EntryHandler> = {
   post: postHandler,
   comment: commentHandler,
+  reaction: reactionHandler,
 };

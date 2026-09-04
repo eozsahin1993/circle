@@ -170,13 +170,13 @@ export const postReactions = sqliteTable(
       .notNull()
       .references(() => posts.id, { onDelete: 'cascade' }),
     /**
-     * The reacting member's compact self-reference (see `memberId` on
-     * circleMembers) — not their public key. A reaction is exactly the
-     * "member self-assigns a reference to their own action" case that
-     * field exists for; it doesn't need cryptographic verification the
-     * way a post signature would.
+     * The reacting member's circle identity public key (hex, Ed25519) —
+     * same identifier posts and comments use. It was `memberId`, which
+     * is self-assigned per device and never travels on the wire, so a
+     * synced reaction could not be attributed anywhere but its author's
+     * own phone.
      */
-    memberId: text('member_id').notNull(),
+    authorPublicKey: text('author_public_key').notNull(),
     /**
      * One grapheme cluster (a single emoji, however many UTF-16 code
      * units that takes for ZWJ sequences/skin tones/flags) — not
@@ -186,10 +186,10 @@ export const postReactions = sqliteTable(
     createdAt: integer('created_at').notNull(),
   },
   (t) => [
-    // One row per (post, member, emoji) — reacting again with the same
+    // One row per (post, author, emoji) — reacting again with the same
     // emoji is a toggle-off (delete the row), not a duplicate; the same
     // member can still hold several different emoji on one post.
-    primaryKey({ columns: [t.postId, t.memberId, t.emoji] }),
+    primaryKey({ columns: [t.postId, t.authorPublicKey, t.emoji] }),
     index('post_reactions_post_id').on(t.postId),
   ]
 );
@@ -211,7 +211,7 @@ export const outbox = sqliteTable(
     circleId: text('circle_id')
       .notNull()
       .references(() => circles.id, { onDelete: 'cascade' }),
-    entryType: text('entry_type', { enum: ['post', 'comment', 'member_added'] }).notNull(),
+    entryType: text('entry_type', { enum: ['post', 'comment', 'reaction', 'member_added'] }).notNull(),
     localId: text('local_id').notNull(),
     /**
      * The exact ciphertext `drainOutbox` will POST as-is — built and

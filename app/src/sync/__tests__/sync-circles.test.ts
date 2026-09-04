@@ -11,6 +11,7 @@ import type { JoinRequestPayload } from '@/domain/usecases/circle/invite-payload
 import { buildAndEncryptLogEntry, verifyLogEntry } from '@/domain/usecases/circle/log-entry';
 import { addComment } from '@/domain/usecases/post/comment-on-post';
 import { createPost } from '@/domain/usecases/post/create-post';
+import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
 import {
   deriveJoinRequestKey,
   encrypt,
@@ -291,4 +292,51 @@ test('a comment written here is pushed, and one from another device arrives', as
   expect(comments.map((c) => c.body)).toEqual(expect.arrayContaining(['Nice one', 'From Marcus']));
   // Names resolve from the roster, not from anything stored on the comment.
   expect(comments.find((c) => c.body === 'From Marcus')?.authorName).toBe('Marcus');
+});
+
+test('a reaction toggled here is pushed, and one from another device arrives', async () => {
+  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const founder = (await getCircleIdentity(circleId))!;
+  const contentKey = (await getCurrentContentKey(circleId))!.key;
+  await createPost({ circleId, caption: 'Mine', photo: new Uint8Array([1, 2, 3]) });
+  const [{ id: postId }] = await getCircleFeed(circleId);
+
+  await toggleReaction(circleId, postId, '❤️');
+  (appendEntry as jest.Mock).mockClear();
+  await drainOutbox(circleId);
+
+  const pushed = (appendEntry as jest.Mock).mock.calls
+    .filter((call) => call[1] === 'content')
+    .map((call) => verifyLogEntry(call[3], contentKey));
+  expect(pushed.filter((entry) => entry?.type === 'reaction')).toEqual([
+    expect.objectContaining({ payload: expect.objectContaining({ postId, emoji: '❤️', reacted: true }) }),
+  ]);
+
+  const other = generateIdentity();
+  await memberAddedHandler.apply(circleId, {
+    type: 'member_added',
+    payload: { identityPublicKey: bytesToHex(other.publicKey), encPublicKey: 'cc', name: 'Marcus', role: 'member' },
+    authorPubkey: bytesToHex(founder.publicKey),
+    signature: 'unused',
+  });
+  relayServes({
+    content: [
+      {
+        epoch: 9,
+        keyVersion: 1,
+        receivedAt: Date.now(),
+        encryptedMeta: buildAndEncryptLogEntry(
+          'reaction',
+          { postId, emoji: '❤️', reacted: true, createdAt: 9000 },
+          other,
+          contentKey
+        ),
+      },
+    ],
+  });
+
+  await syncCircle(circleId);
+
+  const [summary] = await getReactionsForPost(circleId, postId);
+  expect(summary).toMatchObject({ emoji: '❤️', count: 2, reactedByMe: true });
 });

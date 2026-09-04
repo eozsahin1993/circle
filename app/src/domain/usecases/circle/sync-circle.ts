@@ -7,7 +7,7 @@ import { getAttachment } from '@/data/db/attachments';
 
 /** Which relay namespace a locally-queued entry type belongs in — see server/SYNC_DESIGN.md's "meta"/"content" split. */
 function namespaceFor(entryType: OutboxEntry['entryType']): Namespace {
-  return entryType === 'post' || entryType === 'comment' ? 'content' : 'meta';
+  return entryType === 'member_added' ? 'meta' : 'content';
 }
 
 /**
