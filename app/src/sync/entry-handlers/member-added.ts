@@ -1,5 +1,6 @@
 import { getCircleMembers, insertMemberIfAbsent, MemberRoles, type MemberRole } from '@/data/db';
 import { generateUUID } from '@/services/crypto';
+import { parsePictureThumbnail } from '@/services/image';
 import { asRecord, type EntryHandler } from '@/sync/entry-handlers/types';
 
 /** What `createCircle` and `invite-to-circle.ts`'s `approveJoinRequest` put in a `member_added` entry. */
@@ -9,27 +10,26 @@ type MemberAddedPayload = {
   name: string;
   role: MemberRole;
   /**
-   * Base64-encoded avatar-sized JPEG thumbnail (see `compressToThumbnail`),
-   * if the member had a picture at join time — optional, same bytes as
-   * `JoinRequestPayload.pictureThumbnail`, carried forward from it. Kept
-   * thumbnail-sized rather than the full picture because this rides in a
-   * meta log entry stored directly as a DynamoDB item (400KB hard limit),
-   * not the S3 blob path posts use. Not updated by anything after this
-   * entry; a later picture change has no propagation mechanism yet.
+   * Already validated and decoded — see `parsePictureThumbnail`. Whatever
+   * the wire format was (base64 avatar-sized JPEG, per
+   * `compressToThumbnail`), a malformed, oversized, or non-JPEG value
+   * degrades to `undefined` here rather than rejecting the whole entry:
+   * name/role are essential to admitting this member at all, a picture
+   * isn't. Not updated by anything after this entry; a later picture
+   * change has no propagation mechanism yet.
    */
-  picture?: string;
+  picture?: Uint8Array;
 };
 
 function parse(payload: unknown): MemberAddedPayload | null {
   const record = asRecord(payload);
   if (!record) return null;
-  const { identityPublicKey, encPublicKey, name, role, picture } = record;
+  const { identityPublicKey, encPublicKey, name, role } = record;
   if (typeof identityPublicKey !== 'string' || !identityPublicKey) return null;
   if (typeof encPublicKey !== 'string') return null;
   if (typeof name !== 'string') return null;
   if (role !== MemberRoles.admin && role !== MemberRoles.member) return null;
-  if (picture !== undefined && typeof picture !== 'string') return null;
-  return { identityPublicKey, encPublicKey, name, role: role as MemberRole, picture };
+  return { identityPublicKey, encPublicKey, name, role: role as MemberRole, picture: parsePictureThumbnail(record.picture) ?? undefined };
 }
 
 export const memberAddedHandler: EntryHandler = {
@@ -87,7 +87,7 @@ export const memberAddedHandler: EntryHandler = {
       memberId: generateUUID(),
       role: payload.role,
       name: payload.name,
-      picture: payload.picture ? Buffer.from(payload.picture, 'base64') : null,
+      picture: payload.picture ?? null,
       joinedAt: Date.now(),
     });
   },

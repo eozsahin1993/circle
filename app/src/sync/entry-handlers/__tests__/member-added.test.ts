@@ -178,4 +178,34 @@ describe('apply', () => {
 
     expect(await getCircleMembers(circleId)).toHaveLength(before.length);
   });
+
+  test('persists a valid picture thumbnail', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    const founder = (await getCircleIdentity(circleId))!;
+    const joiner = generateIdentity();
+    const joinerKey = bytesToHex(joiner.publicKey);
+    const picture = Buffer.from([0xff, 0xd8, 0xff, 1, 2, 3]).toString('base64');
+
+    await memberAddedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), { ...payloadFor(joinerKey, 'Priya'), picture }));
+
+    const added = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === joinerKey);
+    expect(added?.picture).toEqual(new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3]));
+  });
+
+  // picture is optional/decorative, unlike identityPublicKey/name/role — an
+  // invalid one drops just the picture (see services/image.ts's
+  // parsePictureThumbnail), it doesn't block admitting the member at all.
+  test('an invalid picture is dropped without blocking the rest of the entry', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    const founder = (await getCircleIdentity(circleId))!;
+    const joiner = generateIdentity();
+    const joinerKey = bytesToHex(joiner.publicKey);
+    const notAJpeg = Buffer.from([1, 2, 3]).toString('base64');
+
+    await memberAddedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), { ...payloadFor(joinerKey, 'Priya'), picture: notAJpeg }));
+
+    const added = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === joinerKey);
+    expect(added?.name).toBe('Priya');
+    expect(added?.picture).toBeNull();
+  });
 });

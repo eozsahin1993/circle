@@ -1,3 +1,5 @@
+import { Buffer } from 'buffer';
+
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { Directory, File, Paths } from 'expo-file-system';
@@ -23,6 +25,45 @@ const JPEG_QUALITY = 0.65;
  */
 const THUMBNAIL_MAX_DIMENSION = 96;
 const THUMBNAIL_JPEG_QUALITY = 0.5;
+
+/**
+ * Generous headroom over what `compressToThumbnail` actually produces
+ * (typically a few KB) — high enough that a real 96px thumbnail never
+ * gets rejected, low enough to reject anything that isn't one. Bounds
+ * what an untrusted peer's `pictureThumbnail`/`picture` field can cost:
+ * without this, whoever sends it — a join requester, an existing member
+ * broadcasting a profile_update — could hand-craft an oversized value
+ * that never actually went through this module's own compression at
+ * all, defeating the entire point of using a small thumbnail in the
+ * first place (see member-added.ts's doc comment on the DynamoDB
+ * per-item limit this exists to stay well under).
+ */
+const MAX_THUMBNAIL_BYTES = 32 * 1024;
+
+const BASE64_SYNTAX = /^[A-Za-z0-9+/]*={0,2}$/;
+
+/** First three bytes of every JPEG file — the SOI marker plus the start of the mandatory APP0/EXIF segment. */
+const JPEG_MAGIC = [0xff, 0xd8, 0xff];
+
+/**
+ * Validates and decodes a base64-encoded picture thumbnail from an
+ * untrusted peer — never assume whoever sent it actually ran it through
+ * `compressToThumbnail` themselves. Returns null for anything that fails
+ * any check (wrong type, malformed base64, oversized once decoded, not
+ * actually a JPEG) — every caller treats null the same as "no picture
+ * sent," not as an error, so a bad value degrades gracefully instead of
+ * discarding whatever else the entry carries.
+ */
+export function parsePictureThumbnail(value: unknown): Uint8Array | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  if (value.length % 4 !== 0 || !BASE64_SYNTAX.test(value)) return null;
+
+  const bytes = new Uint8Array(Buffer.from(value, 'base64'));
+  if (bytes.length === 0 || bytes.length > MAX_THUMBNAIL_BYTES) return null;
+  if (!JPEG_MAGIC.every((magicByte, i) => bytes[i] === magicByte)) return null;
+
+  return bytes;
+}
 
 /** Opens the system image picker. Returns the picked file's local URI, or null if cancelled. */
 export async function pickImage(): Promise<string | null> {

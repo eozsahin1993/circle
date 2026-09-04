@@ -1,4 +1,5 @@
 import { updateMemberProfile } from '@/data/db';
+import { parsePictureThumbnail } from '@/services/image';
 import { authoredByMember, asRecord, stringField, type EntryHandler } from '@/sync/entry-handlers/types';
 
 /**
@@ -12,13 +13,13 @@ import { authoredByMember, asRecord, stringField, type EntryHandler } from '@/sy
 type ProfileUpdatePayload = {
   name: string;
   /**
-   * Base64-encoded avatar-sized JPEG thumbnail, same shape as
-   * `member_added`'s own `picture` field — see `compressToThumbnail`.
-   * Absent means "no picture", not "leave whatever's there" — a member
-   * clearing their picture sends this with no `picture` field at all, and
-   * `apply` below treats that as clearing it, not skipping it.
+   * Already validated and decoded — see `parsePictureThumbnail`. Absent
+   * means "no picture", not "leave whatever's there" — a member clearing
+   * their picture sends this with no `picture` field at all (or one that
+   * fails validation), and `apply` below treats that as clearing it, not
+   * skipping it.
    */
-  picture?: string;
+  picture?: Uint8Array;
 };
 
 function parse(payload: unknown): ProfileUpdatePayload | null {
@@ -28,9 +29,7 @@ function parse(payload: unknown): ProfileUpdatePayload | null {
   // legitimate update, not a malformed entry.
   const name = stringField(record, 'name', { allowEmpty: true });
   if (name === null) return null;
-  const { picture } = record;
-  if (picture !== undefined && typeof picture !== 'string') return null;
-  return { name, picture };
+  return { name, picture: parsePictureThumbnail(record.picture) ?? undefined };
 }
 
 export const profileUpdateHandler: EntryHandler = {
@@ -55,7 +54,7 @@ export const profileUpdateHandler: EntryHandler = {
 
     await updateMemberProfile(circleId, envelope.authorPubkey, {
       name: payload.name,
-      picture: payload.picture ? Buffer.from(payload.picture, 'base64') : null,
+      picture: payload.picture ?? null,
     });
   },
 };

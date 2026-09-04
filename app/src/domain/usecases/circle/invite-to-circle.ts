@@ -29,7 +29,7 @@ import {
 import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinApprovalPayload, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
-import { bytesToDataUri } from '@/services/image';
+import { bytesToDataUri, parsePictureThumbnail } from '@/services/image';
 import { pullMeta } from '@/sync/pull-log';
 import { getCircleIdentity, getCircleKeyMap } from '@/services/keystore';
 import { deleteJoinRequest, listJoinRequests, putInvitePreview, putJoinApproval } from '@/services/mailbox-relay';
@@ -163,10 +163,11 @@ export async function discoverPendingRequests(circleId: string): Promise<Pending
     if (request.encryptedApproval) continue;
     try {
       const payload = JSON.parse(new TextDecoder().decode(decrypt(request.encryptedRequest, key))) as JoinRequestPayload;
+      const picture = parsePictureThumbnail(payload.pictureThumbnail);
       pending.push({
         requesterId: request.requesterId,
         selfReportedName: payload.selfReportedName,
-        pictureUri: payload.pictureThumbnail ? bytesToDataUri(Buffer.from(payload.pictureThumbnail, 'base64')) : undefined,
+        pictureUri: picture ? bytesToDataUri(picture) : undefined,
         createdAt: request.createdAt,
       });
     } catch (err) {
@@ -213,6 +214,14 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   const { ephemeralPublicKey, identityPublicKey, encPublicKey, selfReportedName, pictureThumbnail } = JSON.parse(
     new TextDecoder().decode(decrypt(request.encryptedRequest, requestKey))
   ) as JoinRequestPayload;
+  // Validated once here, not trusted as-is — a requester's own device is
+  // the one that's supposed to have run this through compressToThumbnail,
+  // but nothing stops a malicious or buggy client sending something else
+  // entirely. Re-encoding from the validated bytes (rather than forwarding
+  // the original string) means what actually goes out on the wire is
+  // always exactly what was validated, never the untrusted input itself.
+  const picture = parsePictureThumbnail(pictureThumbnail);
+  const picturePayload = picture ? Buffer.from(picture).toString('base64') : undefined;
 
   // Catch up on meta before sealing (server/SYNC_DESIGN.md "Add a member"):
   // a stale approver would otherwise hand over an incomplete key map, and
@@ -247,7 +256,7 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
       name: selfReportedName,
       role: MemberRoles.member,
       keyVersion: currentVersion,
-      picture: pictureThumbnail,
+      picture: picturePayload,
     },
     identity,
     keyMap[currentVersion]
@@ -271,7 +280,7 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
     memberId: generateUUID(),
     role: MemberRoles.member,
     name: selfReportedName,
-    picture: pictureThumbnail ? Buffer.from(pictureThumbnail, 'base64') : null,
+    picture: picture ?? null,
     joinedAt: Date.now(),
   });
 

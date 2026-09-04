@@ -68,7 +68,7 @@ test('discoverPendingRequests decodes the self-reported name, picture, and creat
     identityPublicKey: 'aa'.repeat(32),
     encPublicKey: 'bb'.repeat(32),
     selfReportedName: 'Priya Raman',
-    pictureThumbnail: Buffer.from([1, 2, 3]).toString('base64'),
+    pictureThumbnail: Buffer.from([0xff, 0xd8, 0xff, 1, 2, 3]).toString('base64'),
   };
   const createdAt = Date.now();
   (listJoinRequests as jest.Mock).mockResolvedValue([
