@@ -211,7 +211,7 @@ export const outbox = sqliteTable(
     circleId: text('circle_id')
       .notNull()
       .references(() => circles.id, { onDelete: 'cascade' }),
-    entryType: text('entry_type', { enum: ['post', 'member_added'] }).notNull(),
+    entryType: text('entry_type', { enum: ['post', 'comment', 'member_added'] }).notNull(),
     localId: text('local_id').notNull(),
     /**
      * The exact ciphertext `drainOutbox` will POST as-is — built and
@@ -288,16 +288,18 @@ export const postComments = sqliteTable(
     postId: text('post_id')
       .notNull()
       .references(() => posts.id, { onDelete: 'cascade' }),
-    /** Compact self-reference, same as postReactions.memberId — see that column's comment. */
-    memberId: text('member_id').notNull(),
     /**
-     * The author's display name at the moment they commented, copied
-     * here rather than joined from circleMembers — same denormalization
-     * circleMembers itself already uses for its own name/picture. Avoids
-     * an N+1 lookup per comment, and means a later name change doesn't
-     * retroactively rewrite what old comments show.
+     * The author's circle identity public key (hex, Ed25519) — the same
+     * identifier posts use, and for the same reason: it is what a synced
+     * entry's signature is verified against, and the `circleMembers` row
+     * key. Replaced `memberId` + `authorName`, neither of which could
+     * survive syncing — `memberId` is self-assigned per device and never
+     * travels on the wire, and a denormalized name froze whatever the
+     * author was called at the time (literally "You" when they had no
+     * profile name yet). Both now resolve live from the roster, so
+     * renaming yourself updates every comment you ever made.
      */
-    authorName: text('author_name').notNull(),
+    authorPublicKey: text('author_public_key').notNull(),
     body: text('body').notNull(),
     createdAt: integer('created_at').notNull(),
   },

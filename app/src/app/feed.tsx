@@ -6,13 +6,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CircleHeader } from '@/components/circle-header';
 import { FabButton } from '@/components/fab-button';
 import { PendingJoinRequestCard } from '@/components/pending-join-request-card';
+import { type CommentItem } from '@/components/post-comments';
 import { PostCard, type Post } from '@/components/post-card';
 import { PrivacyInfoModal } from '@/components/privacy-info-modal';
 import { PrivacyNotice } from '@/components/privacy-notice';
 import { Radius, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { getCircle, getCircleFeed, getCircleMembers, getPostComments, getProfile } from '@/data/db';
+import { getCircle, getCircleFeed, getCircleMembers, getPostComments, getProfile, type CommentWithAuthor } from '@/data/db';
 import {
   approveJoinRequest,
   denyJoinRequest,
@@ -22,6 +23,20 @@ import {
 import { addComment } from '@/domain/usecases/post/comment-on-post';
 import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
 import { bytesToDataUri } from '@/services/image';
+
+/**
+ * Author names on comments resolve live from the roster, so a member
+ * renaming themselves updates every comment they wrote. Falls back to this
+ * device's own profile for a comment written before its author's roster
+ * row arrived — which is the local author's own comments, pre-sync.
+ */
+function toCommentItems(comments: CommentWithAuthor[], ownName?: string): CommentItem[] {
+  return comments.map((comment) => ({
+    id: comment.id,
+    authorName: comment.authorName || ownName || 'Unknown member',
+    body: comment.body,
+  }));
+}
 
 function formatTimestamp(ms: number): string {
   const date = new Date(ms);
@@ -45,6 +60,9 @@ export default function FeedScreen() {
   const [memberCount, setMemberCount] = useState(0);
   const [posts, setPosts] = useState<Post[]>([]);
   const [showPrivacyInfo, setShowPrivacyInfo] = useState(false);
+  // Kept at component scope so re-reading one post's comments after adding
+  // one can resolve the local author's name the same way the initial load does.
+  const [profileName, setProfileName] = useState<string | undefined>();
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [actioningId, setActioningId] = useState<string | null>(null);
 
@@ -60,9 +78,10 @@ export default function FeedScreen() {
       ]).then(async ([circle, members, circlePosts, profile]) => {
         setCircleName(circle?.name ?? '');
         setMemberCount(members.length);
+        setProfileName(profile?.name);
         const [reactionsByPost, commentsByPost] = await Promise.all([
           Promise.all(circlePosts.map((post) => getReactionsForPost(circleId, post.id))),
-          Promise.all(circlePosts.map((post) => getPostComments(post.id))),
+          Promise.all(circlePosts.map((post) => getPostComments(circleId, post.id))),
         ]);
 
         // Author name/picture already came resolved from the roster by
@@ -82,7 +101,7 @@ export default function FeedScreen() {
             photoUri: post.photo ? bytesToDataUri(post.photo) : undefined,
             caption: post.caption,
             reactions: reactionsByPost[index],
-            comments: commentsByPost[index],
+            comments: toCommentItems(commentsByPost[index], profile?.name),
           })),
         );
       });
@@ -132,8 +151,10 @@ export default function FeedScreen() {
   async function handleAddComment(postId: string, body: string) {
     if (!circleId) return;
     await addComment(circleId, postId, body);
-    const comments = await getPostComments(postId);
-    setPosts((current) => current.map((post) => (post.id === postId ? { ...post, comments } : post)));
+    const comments = await getPostComments(circleId, postId);
+    setPosts((current) =>
+      current.map((post) => (post.id === postId ? { ...post, comments: toCommentItems(comments, profileName) } : post)),
+    );
   }
 
   // A fresh joiner has the circle secret and roster access but no history

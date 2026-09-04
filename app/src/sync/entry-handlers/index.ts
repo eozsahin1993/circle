@@ -1,3 +1,4 @@
+import { commentHandler } from '@/sync/entry-handlers/comment';
 import { memberAddedHandler } from '@/sync/entry-handlers/member-added';
 import { postHandler } from '@/sync/entry-handlers/post';
 import type { EntryHandler } from '@/sync/entry-handlers/types';
@@ -19,7 +20,8 @@ export const metaHandlers: Record<string, EntryHandler> = {
   member_added: memberAddedHandler,
 };
 
-/** Content entry types this build understands. `comment`/`reaction`/`delete` will join `post` when they start syncing. */
+/** Content entry types this build understands. `reaction`/`delete` will join these when they start syncing. */
 export const contentHandlers: Record<string, EntryHandler> = {
   post: postHandler,
+  comment: commentHandler,
 };

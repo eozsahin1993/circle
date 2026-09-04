@@ -4,11 +4,12 @@ jest.mock('@/services/mailbox-relay');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { getCircleFeed, getCircleMembers, initDatabase } from '@/data/db';
+import { getCircleFeed, getCircleMembers, getPostComments, initDatabase } from '@/data/db';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import { approveJoinRequest, getOrCreateInvite } from '@/domain/usecases/circle/invite-to-circle';
 import type { JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
 import { buildAndEncryptLogEntry, verifyLogEntry } from '@/domain/usecases/circle/log-entry';
+import { addComment } from '@/domain/usecases/post/comment-on-post';
 import { createPost } from '@/domain/usecases/post/create-post';
 import {
   deriveJoinRequestKey,
@@ -30,6 +31,7 @@ import {
   uploadBlob,
   type Namespace,
 } from '@/services/relay';
+import { memberAddedHandler } from '@/sync/entry-handlers/member-added';
 import { drainPhotoQueue } from '@/sync/photo-queue';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { syncCircle } from '@/sync/sync-circles';
@@ -230,4 +232,63 @@ test('approving a join makes the new member visible to everyone, not just to the
     authorPubkey: bytesToHex(founder.publicKey),
     payload: { identityPublicKey: joinerKey, name: 'Marcus', role: 'member' },
   });
+});
+
+test('a comment written here is pushed, and one from another device arrives', async () => {
+  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const founder = (await getCircleIdentity(circleId))!;
+  const contentKey = (await getCurrentContentKey(circleId))!.key;
+  await createPost({ circleId, caption: 'Mine', photo: new Uint8Array([1, 2, 3]) });
+  const [{ id: postId }] = await getCircleFeed(circleId);
+
+  // Written here: lands locally and goes out to the relay as content.
+  await addComment(circleId, postId, 'Nice one');
+  (appendEntry as jest.Mock).mockClear();
+  await drainOutbox(circleId);
+
+  // The post's own entry may still have been queued, so look for the
+  // comment among what went out rather than assuming it was alone.
+  const pushed = (appendEntry as jest.Mock).mock.calls
+    .filter((call) => call[1] === 'content')
+    .map((call) => verifyLogEntry(call[3], contentKey));
+  expect(pushed.filter((entry) => entry?.type === 'comment')).toEqual([
+    expect.objectContaining({
+      authorPubkey: bytesToHex(founder.publicKey),
+      payload: expect.objectContaining({ postId, body: 'Nice one' }),
+    }),
+  ]);
+
+  // Arriving from elsewhere: applied on the next content pass.
+  const other = generateIdentity();
+  await memberAddedHandler.apply(
+    circleId,
+    {
+      type: 'member_added',
+      payload: { identityPublicKey: bytesToHex(other.publicKey), encPublicKey: 'cc', name: 'Marcus', role: 'member' },
+      authorPubkey: bytesToHex(founder.publicKey),
+      signature: 'unused',
+    },
+  );
+  relayServes({
+    content: [
+      {
+        epoch: 9,
+        keyVersion: 1,
+        receivedAt: Date.now(),
+        encryptedMeta: buildAndEncryptLogEntry(
+          'comment',
+          { commentId: generateUUID(), postId, body: 'From Marcus', createdAt: 8000 },
+          other,
+          contentKey
+        ),
+      },
+    ],
+  });
+
+  await syncCircle(circleId);
+
+  const comments = await getPostComments(circleId, postId);
+  expect(comments.map((c) => c.body)).toEqual(expect.arrayContaining(['Nice one', 'From Marcus']));
+  // Names resolve from the roster, not from anything stored on the comment.
+  expect(comments.find((c) => c.body === 'From Marcus')?.authorName).toBe('Marcus');
 });

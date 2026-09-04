@@ -580,15 +580,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "member_id": {
-          "name": "member_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "author_name": {
-          "name": "author_name",
+        "author_public_key": {
+          "name": "author_public_key",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
