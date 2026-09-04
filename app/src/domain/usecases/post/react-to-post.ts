@@ -9,7 +9,7 @@ import {
   removeReaction,
   type ReactionSummary,
 } from '@/data/db';
-import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { generateUUID } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
@@ -48,14 +48,14 @@ export async function toggleReaction(circleId: string, postId: string, emoji: st
 
   await insertOutboxEntry({
     circleId,
-    entryType: 'reaction',
+    entryType: EntryTypes.REACTION,
     // A fresh id per toggle: the relay dedupes on entryId, so reusing one
     // would make a re-reaction look like a retry of the removal and be
     // silently dropped.
     localId: generateUUID(),
     status: OutboxStatuses.pending,
     epoch: null,
-    encryptedMeta: buildAndEncryptLogEntry('reaction', { postId, emoji, reacted, createdAt }, identity, current.key),
+    encryptedMeta: buildAndEncryptLogEntry(EntryTypes.REACTION, { postId, emoji, reacted, createdAt }, identity, current.key),
   });
 
   drainOutbox(circleId).catch((err) => console.error('Failed to drain outbox', err));

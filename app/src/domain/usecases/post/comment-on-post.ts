@@ -1,7 +1,7 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { insertCommentAndEnqueue, OutboxStatuses } from '@/data/db';
-import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { generateUUID } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
@@ -32,7 +32,7 @@ export async function addComment(circleId: string, postId: string, body: string)
   const commentId = generateUUID();
   const createdAt = Date.now();
   const encryptedMeta = buildAndEncryptLogEntry(
-    'comment',
+    EntryTypes.COMMENT,
     { commentId, postId, body: trimmed, createdAt },
     identity,
     current.key
@@ -48,7 +48,7 @@ export async function addComment(circleId: string, postId: string, body: string)
     },
     {
       circleId,
-      entryType: 'comment',
+      entryType: EntryTypes.COMMENT,
       localId: commentId,
       status: OutboxStatuses.pending,
       epoch: null,

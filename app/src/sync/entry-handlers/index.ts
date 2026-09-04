@@ -1,3 +1,4 @@
+import { EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { commentHandler } from '@/sync/entry-handlers/comment';
 import { memberAddedHandler } from '@/sync/entry-handlers/member-added';
 import { postHandler } from '@/sync/entry-handlers/post';
@@ -18,12 +19,12 @@ export type { EntryHandler } from '@/sync/entry-handlers/types';
  * `role_change`, `profile_update`, `circle_renamed`.
  */
 export const metaHandlers: Record<string, EntryHandler> = {
-  member_added: memberAddedHandler,
+  [EntryTypes.MEMBER_ADDED]: memberAddedHandler,
 };
 
 /** Content entry types this build understands. `delete` will join these when tombstones are built. */
 export const contentHandlers: Record<string, EntryHandler> = {
-  post: postHandler,
-  comment: commentHandler,
-  reaction: reactionHandler,
+  [EntryTypes.POST]: postHandler,
+  [EntryTypes.COMMENT]: commentHandler,
+  [EntryTypes.REACTION]: reactionHandler,
 };

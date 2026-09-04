@@ -11,7 +11,7 @@ import {
   sealToPublicKey,
 } from '@/services/crypto';
 import { getProfile, insertCircle, insertMember, MemberRoles } from '@/data/db';
-import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { bootstrapCircle, appendEntry } from '@/services/relay';
 import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap } from '@/services/keystore';
@@ -53,7 +53,7 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
 
   const profile = await getProfile();
   const memberAddedEntry = buildAndEncryptLogEntry(
-    'member_added',
+    EntryTypes.MEMBER_ADDED,
     {
       identityPublicKey: bytesToHex(identity.publicKey),
       encPublicKey: bytesToHex(sealingKeypair.publicKey),

@@ -27,7 +27,7 @@ import {
   type Invite,
 } from '@/data/db';
 import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinApprovalPayload, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
-import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { bytesToDataUri } from '@/services/image';
 import { pullMeta } from '@/sync/pull-log';
@@ -240,14 +240,14 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   // the public halves, and this signature is the circle vouching for them.
   const currentVersion = Math.max(...Object.keys(keyMap).map(Number));
   const memberAddedEntry = buildAndEncryptLogEntry(
-    'member_added',
+    EntryTypes.MEMBER_ADDED,
     { identityPublicKey, encPublicKey, name: selfReportedName, role: MemberRoles.member, keyVersion: currentVersion },
     identity,
     keyMap[currentVersion]
   );
   await insertOutboxEntry({
     circleId,
-    entryType: 'member_added',
+    entryType: EntryTypes.MEMBER_ADDED,
     localId: generateUUID(),
     status: OutboxStatuses.pending,
     epoch: null,

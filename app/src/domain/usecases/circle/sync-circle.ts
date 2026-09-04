@@ -1,4 +1,5 @@
 import { getCircle } from '@/data/db';
+import { EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { getCurrentContentKey } from '@/services/keystore';
 import { deriveWriteToken, encrypt } from '@/services/crypto';
 import { appendEntry, BlobAlreadyExistsError, getUploadTarget, uploadBlob, type Namespace } from '@/services/relay';
@@ -7,7 +8,7 @@ import { getAttachment } from '@/data/db/attachments';
 
 /** Which relay namespace a locally-queued entry type belongs in — see server/SYNC_DESIGN.md's "meta"/"content" split. */
 function namespaceFor(entryType: OutboxEntry['entryType']): Namespace {
-  return entryType === 'member_added' ? 'meta' : 'content';
+  return entryType === EntryTypes.MEMBER_ADDED ? 'meta' : 'content';
 }
 
 /**
@@ -79,7 +80,9 @@ async function pushPendingEntries(circleId: string): Promise<void> {
   for (const entry of pending) {
     const namespace = namespaceFor(entry.entryType);
 
-    if (entry.entryType === 'post') {
+    // Only posts carry a blob; comments and reactions are entry-only, so
+    // they fall straight through to the append below.
+    if (entry.entryType === EntryTypes.POST) {
       // The bytes live on the attachment, not the post — and they're
       // encrypted under the version that attachment recorded, not
       // whatever is current now, so the blob can never disagree with the

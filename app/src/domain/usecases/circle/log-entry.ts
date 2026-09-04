@@ -3,6 +3,22 @@ import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 import { type Keypair, decrypt, encrypt, sign, verify } from '@/services/crypto';
 
 /**
+ * Every entry type this app writes. Named so no call site hand-types the
+ * raw string — the same reason `OutboxStatuses` and `MemberRoles` exist.
+ * These values are wire format: they're inside signed, encrypted entries
+ * that live forever in an append-only log, so a value here can be added
+ * but never renamed.
+ */
+export const EntryTypes = {
+  POST: 'post',
+  COMMENT: 'comment',
+  REACTION: 'reaction',
+  MEMBER_ADDED: 'member_added',
+} as const;
+
+export type EntryType = (typeof EntryTypes)[keyof typeof EntryTypes];
+
+/**
  * Every log entry's plaintext envelope, before encryption — see
  * server/SYNC_DESIGN.md's "Entry shape". `signature` covers `{type,
  * payload}` together, not `payload` alone, so a signature can't be

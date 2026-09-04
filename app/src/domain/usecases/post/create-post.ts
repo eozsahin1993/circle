@@ -1,7 +1,7 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { generateUUID, hashBytes } from '@/services/crypto';
-import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
 import { AttachmentKinds, AttachmentStatuses, insertPostAndEnqueue, OutboxStatuses } from '@/data/db';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
@@ -43,7 +43,7 @@ export async function createPost(input: CreatePostInput): Promise<void> {
   const createdAt = Date.now();
   const photoHash = hashBytes(input.photo);
   const encryptedMeta = buildAndEncryptLogEntry(
-    'post',
+    EntryTypes.POST,
     { postId, caption: input.caption, photoHash, createdAt, keyVersion: current.version },
     identity,
     current.key
@@ -75,7 +75,7 @@ export async function createPost(input: CreatePostInput): Promise<void> {
     },
     {
       circleId: input.circleId,
-      entryType: 'post',
+      entryType: EntryTypes.POST,
       localId: postId,
       status: OutboxStatuses.pending,
       epoch: null,
