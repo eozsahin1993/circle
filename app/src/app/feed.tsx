@@ -33,7 +33,6 @@ import { addComment } from '@/domain/usecases/post/comment-on-post';
 import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
 import { bytesToDataUri } from '@/services/image';
 import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
-import { timed, timedSync } from '@/services/timing';
 import { nudgePhotoQueue } from '@/sync/photo-queue';
 import { syncCircle } from '@/sync/sync-circles';
 
@@ -112,29 +111,29 @@ export default function FeedScreen() {
   const loadFromDatabase = useCallback(async () => {
     if (!circleId) return;
 
-    const [circle, members, circlePosts, profile] = await timed('feed.read', () =>
-      Promise.all([getCircleSummary(circleId), getCircleMembers(circleId), getCircleFeed(circleId), getProfile()]),
-    );
+    const [circle, members, circlePosts, profile] = await Promise.all([
+      getCircleSummary(circleId),
+      getCircleMembers(circleId),
+      getCircleFeed(circleId),
+      getProfile(),
+    ]);
 
     setCircleName(circle?.name ?? '');
     setMemberCount(members.length);
     setProfileName(profile?.name);
 
-    const photoUris = await timed('feed.photoUris', () => resolvePhotoUris(circleId, circlePosts));
+    const photoUris = await resolvePhotoUris(circleId, circlePosts);
 
-    const [reactionsByPost, commentsByPost] = await timed('feed.reactionsAndComments', () =>
-      Promise.all([
-        Promise.all(circlePosts.map((post) => getReactionsForPost(circleId, post.id))),
-        Promise.all(circlePosts.map((post) => getPostComments(circleId, post.id))),
-      ]),
-    );
+    const [reactionsByPost, commentsByPost] = await Promise.all([
+      Promise.all(circlePosts.map((post) => getReactionsForPost(circleId, post.id))),
+      Promise.all(circlePosts.map((post) => getPostComments(circleId, post.id))),
+    ]);
 
     // Author name/picture already came resolved from the roster by
     // `getCircleFeed` — this screen only turns bytes into data URIs
     // and timestamps into strings. Falls back to this device's own
     // profile for a post whose author has no roster row yet.
     setPosts(
-      timedSync(`feed.toDataUris(${circlePosts.length} posts)`, () =>
       circlePosts.map((post, index) => ({
         id: post.id,
         authorName: post.authorName || profile?.name || 'Unknown member',
@@ -150,7 +149,7 @@ export default function FeedScreen() {
         caption: post.caption,
         reactions: reactionsByPost[index],
         comments: toCommentItems(commentsByPost[index], profile?.name),
-      }))),
+      })),
     );
 
     // Only ever resolves non-empty for this invite's actual creator (see

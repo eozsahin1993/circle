@@ -14,7 +14,6 @@ import { getCircleSummary, getCircleMembers, MemberRoles, type CircleListRow, ty
 import { buildDebugKeysetFlags } from '@/domain/usecases/circle/debug-keyset';
 import { getOrCreateInvite, isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
 import { deleteCircleForEveryone, leaveCircle } from '@/domain/usecases/circle/leave-circle';
-import { timed } from '@/services/timing';
 
 function inviteLink(code: string): string {
   return `circle://join/${code}`;
@@ -35,9 +34,7 @@ export default function CircleDetailsScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!circleId) return;
-      timed('details.load', () =>
-        Promise.all([getCircleSummary(circleId), getCircleMembers(circleId), isCircleAdmin(circleId)]),
-      ).then(
+      Promise.all([getCircleSummary(circleId), getCircleMembers(circleId), isCircleAdmin(circleId)]).then(
         ([circleRow, memberRows, isAdmin]) => {
           setCircle(circleRow);
           setMembers(memberRows);

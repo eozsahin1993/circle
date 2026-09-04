@@ -1,7 +1,6 @@
 import { advanceCircleCursor, getCircle } from '@/data/db';
 import { isPermanentWriteFailure } from '@/sync/write-failure';
 import { verifyLogEntry } from '@/domain/usecases/circle/log-entry';
-import { timedSync } from '@/services/timing';
 import { getCircleKeyMap } from '@/services/keystore';
 import { fetchEntries, type Namespace } from '@/services/relay';
 import { contentHandlers, metaHandlers, type EntryHandler } from '@/sync/entry-handlers';
@@ -41,9 +40,7 @@ async function pull(circleId: string, namespace: Namespace, handlers: Record<str
 
     for (const entry of entries) {
       const key = keyMap[entry.keyVersion];
-      const envelope = key
-        ? timedSync(`  verify(${namespace} ${entry.epoch})`, () => verifyLogEntry(entry.encryptedMeta, key))
-        : null;
+      const envelope = key ? verifyLogEntry(entry.encryptedMeta, key) : null;
       const handler = envelope ? handlers[envelope.type] : undefined;
 
       if (!key) {
