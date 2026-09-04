@@ -4,6 +4,7 @@ import { getAllCircles, initDatabase, insertCircle } from '@/data/db';
 import { decrypt, deriveManifestKey, encryptJSON } from '@/services/crypto';
 import {
   fetchAccountManifest,
+  ForeignManifestError,
   recordSignInProviderBestEffort,
   syncAccountManifest,
   syncAccountManifestBestEffort,
@@ -108,6 +109,47 @@ describe('recordSignInProviderBestEffort', () => {
     (putManifest as jest.Mock).mockRejectedValue(new Error('offline'));
 
     await expect(recordSignInProviderBestEffort('google')).resolves.toBeUndefined();
+  });
+});
+
+describe('a manifest written under a different seed', () => {
+  // The scenario is a real one: signing in on a new phone mints a fresh
+  // seed (onboarding.ts), so the blob already on the relay is the only
+  // remaining pointer to that account's circles. Overwriting it would
+  // make even the correct recovery phrase useless afterwards.
+  async function storeForeignManifest() {
+    const theirSeed = new Uint8Array(16).fill(7);
+    const blob = encryptJSON({ circleIds: ['their-circle'] }, deriveManifestKey(theirSeed));
+    (getManifest as jest.Mock).mockResolvedValue(blob);
+    await saveMasterSeed(new Uint8Array(16).fill(8));
+  }
+
+  test('syncAccountManifest refuses to overwrite it', async () => {
+    await storeForeignManifest();
+    await addCircle('mine');
+
+    await expect(syncAccountManifest()).rejects.toThrow(ForeignManifestError);
+    expect(putManifest).not.toHaveBeenCalled();
+  });
+
+  test('the best-effort variant still never writes, even though it swallows', async () => {
+    await storeForeignManifest();
+
+    await expect(syncAccountManifestBestEffort()).resolves.toBeUndefined();
+    expect(putManifest).not.toHaveBeenCalled();
+  });
+
+  test('recordSignInProviderBestEffort does not clobber it either', async () => {
+    await storeForeignManifest();
+
+    await expect(recordSignInProviderBestEffort('google')).resolves.toBeUndefined();
+    expect(putManifest).not.toHaveBeenCalled();
+  });
+
+  test('fetchAccountManifest reports it rather than reading it as empty', async () => {
+    await storeForeignManifest();
+
+    await expect(fetchAccountManifest()).rejects.toThrow(ForeignManifestError);
   });
 });
 

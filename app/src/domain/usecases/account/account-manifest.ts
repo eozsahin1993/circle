@@ -1,4 +1,4 @@
-import { getAllCircles } from '@/data/db';
+import { listCircles } from '@/data/db';
 import { decrypt, deriveManifestKey, encryptJSON } from '@/services/crypto';
 import { getMasterSeed } from '@/services/keystore';
 import { getManifest, putManifest } from '@/services/relay';
@@ -17,23 +17,74 @@ export type ManifestPayload = {
 };
 
 /**
+ * Raised when the relay holds a manifest this device's seed can't open.
+ * That means the blob belongs to a different seed — the same account on a
+ * phone whose seed this one has no way to reproduce — so it is the *only*
+ * record of which circles that account belongs to. Overwriting it would
+ * destroy the pointer permanently, and no recovery phrase could bring it
+ * back afterwards, so every write path treats this as fatal rather than
+ * as "no manifest yet".
+ */
+export class ForeignManifestError extends Error {
+  constructor() {
+    super("The stored manifest was written by a seed this device doesn't have.");
+    this.name = 'ForeignManifestError';
+  }
+}
+
+type ManifestState =
+  | { status: 'absent' }
+  | { status: 'ours'; payload: ManifestPayload }
+  | { status: 'foreign' };
+
+/**
+ * What the relay currently holds for this account, as one of three
+ * states rather than a value-or-throw. The distinction that matters is
+ * absent vs. foreign: both leave this device with nothing readable, but
+ * only the first makes it safe to write.
+ */
+async function readAccountManifest(masterSeed: Uint8Array): Promise<ManifestState> {
+  const blob = await getManifest();
+  if (!blob) return { status: 'absent' };
+
+  try {
+    const key = deriveManifestKey(masterSeed);
+    const payload = JSON.parse(new TextDecoder().decode(decrypt(blob, key))) as ManifestPayload;
+    // decrypt() already rules out tampering; this just covers a missing field.
+    return { status: 'ours', payload: { ...payload, circleIds: payload.circleIds ?? [] } };
+  } catch {
+    // AEAD authentication failed, or the plaintext wasn't our JSON — either
+    // way this blob isn't ours to read, and it isn't ours to replace.
+    return { status: 'foreign' };
+  }
+}
+
+/**
  * Fetches and decrypts this account's manifest — `{ circleIds: [] }`
  * before this account has ever stored one, same shape as an empty one.
+ * Throws `ForeignManifestError` if one exists under a different seed.
  */
 export async function fetchAccountManifest(): Promise<ManifestPayload> {
   const masterSeed = await getMasterSeed();
   if (!masterSeed) throw new Error("Can't decrypt the manifest without a master seed.");
 
-  const blob = await getManifest();
-  if (!blob) return { circleIds: [] };
-
-  const key = deriveManifestKey(masterSeed);
-  const payload = JSON.parse(new TextDecoder().decode(decrypt(blob, key))) as ManifestPayload;
-  // decrypt() already rules out tampering; this just covers a missing field.
-  return { ...payload, circleIds: payload.circleIds ?? [] };
+  const state = await readAccountManifest(masterSeed);
+  if (state.status === 'foreign') throw new ForeignManifestError();
+  return state.status === 'ours' ? state.payload : { circleIds: [] };
 }
 
-async function putAccountManifest(masterSeed: Uint8Array, payload: ManifestPayload): Promise<void> {
+/**
+ * Writes the manifest. `state` is the read this payload was built from,
+ * and is required rather than re-fetched so a caller cannot write without
+ * having established what it is overwriting — see ForeignManifestError.
+ */
+async function putAccountManifest(
+  masterSeed: Uint8Array,
+  payload: ManifestPayload,
+  state: ManifestState,
+): Promise<void> {
+  if (state.status === 'foreign') throw new ForeignManifestError();
+
   const key = deriveManifestKey(masterSeed);
   await putManifest(encryptJSON(payload, key));
 }
@@ -51,9 +102,14 @@ export async function syncAccountManifest(): Promise<void> {
   const masterSeed = await getMasterSeed();
   if (!masterSeed) return;
 
-  const current = await fetchAccountManifest();
-  const circles = await getAllCircles();
-  await putAccountManifest(masterSeed, { ...current, circleIds: circles.map((circle) => circle.id) });
+  const state = await readAccountManifest(masterSeed);
+  if (state.status === 'foreign') throw new ForeignManifestError();
+
+  const current = state.status === 'ours' ? state.payload : { circleIds: [] };
+  // listCircles, not getAllCircles: this runs on create/join/leave and
+  // only needs ids, so there's no reason to drag cover blobs through it.
+  const circles = await listCircles();
+  await putAccountManifest(masterSeed, { ...current, circleIds: circles.map((circle) => circle.id) }, state);
 }
 
 /**
@@ -83,10 +139,13 @@ export async function recordSignInProviderBestEffort(provider: 'google' | 'apple
     const masterSeed = await getMasterSeed();
     if (!masterSeed) return;
 
-    const current = await fetchAccountManifest();
+    const state = await readAccountManifest(masterSeed);
+    if (state.status === 'foreign') throw new ForeignManifestError();
+
+    const current = state.status === 'ours' ? state.payload : { circleIds: [] };
     if (current.provider === provider) return;
 
-    await putAccountManifest(masterSeed, { ...current, provider });
+    await putAccountManifest(masterSeed, { ...current, provider }, state);
   } catch (err) {
     console.error('Failed to record sign-in provider', err);
   }
