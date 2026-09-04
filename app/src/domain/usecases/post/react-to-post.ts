@@ -1,12 +1,12 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import {
-  addReaction,
   getPostReactionSummary,
   hasReacted,
-  insertOutboxEntry,
   OutboxStatuses,
-  removeReaction,
+  toggleReactionAndEnqueue,
+  type NewOutboxEntry,
+  type PostReaction,
   type ReactionSummary,
 } from '@/data/db';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
@@ -31,32 +31,35 @@ async function getOwnPublicKey(circleId: string): Promise<string | null> {
  * last as the final state on every device.
  */
 export async function toggleReaction(circleId: string, postId: string, emoji: string): Promise<void> {
-  const publicKey = await getOwnPublicKey(circleId);
-  if (!publicKey) throw new Error('No identity for this circle on this device.');
-  const identity = (await getCircleIdentity(circleId))!;
+  const identity = await getCircleIdentity(circleId);
+  if (!identity) throw new Error('No identity for this circle on this device.');
   const current = await getCurrentContentKey(circleId);
   if (!current) throw new Error('No content key on this device.');
 
-  const reacted = !(await hasReacted(postId, publicKey, emoji));
+  const authorPublicKey = bytesToHex(identity.publicKey);
+  const reacted = !(await hasReacted(postId, authorPublicKey, emoji));
   const createdAt = Date.now();
 
-  if (reacted) {
-    await addReaction({ postId, authorPublicKey: publicKey, emoji, createdAt });
-  } else {
-    await removeReaction(postId, publicKey, emoji);
-  }
+  const reaction: PostReaction = { postId, authorPublicKey, emoji, createdAt };
 
-  await insertOutboxEntry({
+  const outboxEntry: NewOutboxEntry = {
     circleId,
     entryType: EntryTypes.REACTION,
     // A fresh id per toggle: the relay dedupes on entryId, so reusing one
     // would make a re-reaction look like a retry of the removal and be
     // silently dropped.
-    localId: generateUUID(),
+    entryId: generateUUID(),
     status: OutboxStatuses.pending,
     epoch: null,
-    encryptedMeta: buildAndEncryptLogEntry(EntryTypes.REACTION, { postId, emoji, reacted, createdAt }, identity, current.key),
-  });
+    encryptedMeta: buildAndEncryptLogEntry(
+      EntryTypes.REACTION,
+      { postId, emoji, reacted, createdAt },
+      identity,
+      current.key
+    ),
+  };
+
+  await toggleReactionAndEnqueue(reaction, reacted, outboxEntry);
 
   drainOutbox(circleId).catch((err) => console.error('Failed to drain outbox', err));
 }

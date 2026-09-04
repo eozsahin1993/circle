@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS `outbox` (
 	`sequence_num` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`circle_id` text NOT NULL,
 	`entry_type` text NOT NULL,
-	`local_id` text NOT NULL,
+	`entry_id` text NOT NULL,
 	`encrypted_meta` blob NOT NULL,
 	`status` text NOT NULL,
 	`epoch` integer,

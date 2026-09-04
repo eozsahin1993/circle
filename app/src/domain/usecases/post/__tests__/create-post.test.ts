@@ -46,7 +46,7 @@ test('createPost queues an outbox entry whose encryptedMeta decrypts to a signed
 
   const [post] = await getCircleFeed(circleId);
   const [entry] = await getPendingOutboxEntries(circleId);
-  expect(entry.localId).toBe(post.id);
+  expect(entry.entryId).toBe(post.id);
 
   const current = (await getCurrentContentKey(circleId))!;
   const envelope = JSON.parse(new TextDecoder().decode(decrypt(entry.encryptedMeta, current.key)));

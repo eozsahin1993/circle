@@ -132,6 +132,17 @@ export const attachments = sqliteTable(
      * no second identity to keep in sync — and it's what makes
      * re-applying an already-seen entry a no-op instead of a duplicate.
      */
+    /**
+     * The id this entry is appended under at the relay — passed straight
+     * to `appendEntry`, which makes it the relay's idempotency key, and
+     * for a post also its blob address (`{syncId}/{entryId}` in S3).
+     *
+     * For posts and comments it's the same id as the local row, so every
+     * device ends up naming that content identically. For reactions it's
+     * a fresh id per toggle that refers to nothing local: reusing one
+     * would let the relay read a re-reaction as a retry of the removal
+     * and drop it.
+     */
     entryId: text('entry_id').notNull(),
     /**
      * What this blob is for — decides where the bytes get rendered once
@@ -212,7 +223,18 @@ export const outbox = sqliteTable(
       .notNull()
       .references(() => circles.id, { onDelete: 'cascade' }),
     entryType: text('entry_type', { enum: ['post', 'comment', 'reaction', 'member_added'] }).notNull(),
-    localId: text('local_id').notNull(),
+    /**
+     * The id this entry is appended under at the relay — passed straight
+     * to `appendEntry`, which makes it the relay's idempotency key, and
+     * for a post also its blob address (`{syncId}/{entryId}` in S3).
+     *
+     * For posts and comments it's the same id as the local row, so every
+     * device ends up naming that content identically. For reactions it's
+     * a fresh id per toggle that refers to nothing local: reusing one
+     * would let the relay read a re-reaction as a retry of the removal
+     * and drop it.
+     */
+    entryId: text('entry_id').notNull(),
     /**
      * The exact ciphertext `drainOutbox` will POST as-is — built and
      * encrypted once, at enqueue time, not re-derived from `posts` when

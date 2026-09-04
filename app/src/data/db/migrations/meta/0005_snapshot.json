@@ -431,8 +431,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "local_id": {
-          "name": "local_id",
+        "entry_id": {
+          "name": "entry_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,

@@ -56,7 +56,7 @@ async function enqueuePost(circleId: string, photo: Uint8Array): Promise<Post> {
     {
       circleId,
       entryType: 'post',
-      localId: postId,
+      entryId: postId,
       status: OutboxStatuses.pending,
       epoch: null,
       encryptedMeta,

@@ -87,10 +87,10 @@ async function pushPendingEntries(circleId: string): Promise<void> {
       // encrypted under the version that attachment recorded, not
       // whatever is current now, so the blob can never disagree with the
       // entry that references it.
-      const attachment = await getAttachment(circleId, entry.localId);
+      const attachment = await getAttachment(circleId, entry.entryId);
       if (attachment?.bytes) {
         try {
-          const target = await getUploadTarget(circle.syncId, entry.localId, writeToken);
+          const target = await getUploadTarget(circle.syncId, entry.entryId, writeToken);
           await uploadBlob(target, encrypt(attachment.bytes, current.key));
         } catch (err) {
           if (!(err instanceof BlobAlreadyExistsError)) throw err;
@@ -98,7 +98,7 @@ async function pushPendingEntries(circleId: string): Promise<void> {
       }
     }
 
-    const { epoch } = await appendEntry(circle.syncId, namespace, entry.localId, entry.encryptedMeta, current.version, writeToken);
+    const { epoch } = await appendEntry(circle.syncId, namespace, entry.entryId, entry.encryptedMeta, current.version, writeToken);
     await markOutboxEntrySynced(entry.sequenceNum, epoch);
   }
 }

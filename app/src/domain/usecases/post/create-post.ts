@@ -85,7 +85,7 @@ export async function createPost(input: CreatePostInput): Promise<void> {
   const outboxEntry: NewOutboxEntry = {
     circleId: input.circleId,
     entryType: EntryTypes.POST,
-    localId: postId,
+    entryId: postId,
     status: OutboxStatuses.pending,
     epoch: null,
     encryptedMeta,

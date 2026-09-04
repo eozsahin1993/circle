@@ -248,7 +248,7 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   await insertOutboxEntry({
     circleId,
     entryType: EntryTypes.MEMBER_ADDED,
-    localId: generateUUID(),
+    entryId: generateUUID(),
     status: OutboxStatuses.pending,
     epoch: null,
     encryptedMeta: memberAddedEntry,

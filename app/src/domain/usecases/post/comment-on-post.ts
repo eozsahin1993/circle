@@ -49,7 +49,7 @@ export async function addComment(circleId: string, postId: string, body: string)
   const outboxEntry: NewOutboxEntry = {
     circleId,
     entryType: EntryTypes.COMMENT,
-    localId: commentId,
+    entryId: commentId,
     status: OutboxStatuses.pending,
     epoch: null,
     encryptedMeta,

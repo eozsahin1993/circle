@@ -32,8 +32,8 @@ function makeAttachment(post: { id: string; circleId: string; createdAt: number 
   };
 }
 
-function makeOutboxEntry(circleId: string, localId: string): NewOutboxEntry {
-  return { circleId, entryType: 'post', localId, status: 'pending', epoch: null, encryptedMeta: new Uint8Array([9, 9, 9]) };
+function makeOutboxEntry(circleId: string, entryId: string): NewOutboxEntry {
+  return { circleId, entryType: 'post', entryId, status: 'pending', epoch: null, encryptedMeta: new Uint8Array([9, 9, 9]) };
 }
 
 describe('outbox', () => {
@@ -51,7 +51,7 @@ describe('outbox', () => {
 
     const pending = await getPendingOutboxEntries(circle.id);
     expect(pending).toHaveLength(1);
-    expect(pending[0]).toMatchObject({ circleId: circle.id, entryType: 'post', localId: post.id, status: 'pending', epoch: null });
+    expect(pending[0]).toMatchObject({ circleId: circle.id, entryType: 'post', entryId: post.id, status: 'pending', epoch: null });
     expect(pending[0].encryptedMeta).toEqual(new Uint8Array([9, 9, 9]));
 
     const posts = await getCircleFeed(circle.id);
@@ -71,7 +71,7 @@ describe('outbox', () => {
     await insertPostAndEnqueue(third, makeAttachment(third), makeOutboxEntry(circle.id, third.id));
 
     const pending = await getPendingOutboxEntries(circle.id);
-    expect(pending.map((e) => e.localId)).toEqual([first.id, second.id, third.id]);
+    expect(pending.map((e) => e.entryId)).toEqual([first.id, second.id, third.id]);
   });
 
   test('markOutboxEntrySynced removes the entry from the pending list', async () => {
