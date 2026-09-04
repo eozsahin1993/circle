@@ -17,7 +17,7 @@ import {
   getAttachment,
   getCircleSummary,
   getCircleFeed,
-  getCircleMembers,
+  getCircleMemberCount,
   getPostComments,
   getProfile,
   type CommentWithAuthor,
@@ -111,15 +111,15 @@ export default function FeedScreen() {
   const loadFromDatabase = useCallback(async () => {
     if (!circleId) return;
 
-    const [circle, members, circlePosts, profile] = await Promise.all([
+    const [circle, memberCount, circlePosts, profile] = await Promise.all([
       getCircleSummary(circleId),
-      getCircleMembers(circleId),
+      getCircleMemberCount(circleId),
       getCircleFeed(circleId),
       getProfile(),
     ]);
 
     setCircleName(circle?.name ?? '');
-    setMemberCount(members.length);
+    setMemberCount(memberCount);
     setProfileName(profile?.name);
 
     const photoUris = await resolvePhotoUris(circleId, circlePosts);

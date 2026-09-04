@@ -1,9 +1,10 @@
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Avatar } from '@/components/avatar';
 import { BackButton } from '@/components/back-button';
 import { PrimaryButton } from '@/components/primary-button';
 import { SecondaryButton } from '@/components/secondary-button';
@@ -14,6 +15,7 @@ import { getCircleSummary, getCircleMembers, MemberRoles, type CircleListRow, ty
 import { buildDebugKeysetFlags } from '@/domain/usecases/circle/debug-keyset';
 import { getOrCreateInvite, isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
 import { deleteCircleForEveryone, leaveCircle } from '@/domain/usecases/circle/leave-circle';
+import { bytesToDataUri } from '@/services/image';
 
 function inviteLink(code: string): string {
   return `circle://join/${code}`;
@@ -30,6 +32,19 @@ export default function CircleDetailsScreen() {
   const [admin, setAdmin] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Encoded once per roster change rather than on every render. Member
+  // pictures are avatar-sized thumbnails, so a data URI is cheap here —
+  // unlike a circle cover, which goes through the photo cache instead.
+  const avatarUris = useMemo(
+    () =>
+      new Map(
+        members
+          .filter((member) => member.picture)
+          .map((member) => [member.identityPublicKey, bytesToDataUri(member.picture!)]),
+      ),
+    [members],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -153,6 +168,7 @@ export default function CircleDetailsScreen() {
 
           {members.map((member) => (
             <View key={member.identityPublicKey} style={styles.memberRow}>
+              <Avatar size={44} uri={avatarUris.get(member.identityPublicKey)} />
               <View style={styles.memberInfo}>
                 <View style={styles.memberNameRow}>
                   <ThemedText type="postAuthor">{member.name || 'Unnamed member'}</ThemedText>
@@ -251,6 +267,7 @@ const styles = StyleSheet.create({
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: Tints.chipIdleBorder,

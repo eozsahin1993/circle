@@ -28,12 +28,17 @@ export function Avatar({ size = 44, ringColor, uri }: AvatarProps) {
           borderColor: ringColor,
         },
       ]}>
-      {uri ? (
-        <Image source={{ uri }} style={StyleSheet.absoluteFill} />
-      ) : (
-        // Wrapped so the node Fabric moves is a plain view, never the
-        // SvgView — see photo-placeholder.tsx for why that matters.
-        <View style={StyleSheet.absoluteFill}>
+      {/*
+        The Svg placeholder stays permanently mounted, `uri` arriving or not
+        — see photo-placeholder.tsx for why an SvgView can never be
+        conditionally added/removed under Fabric. `uri` usually starts null
+        and flips true once an async download finishes (e.g. a Google
+        sign-in profile photo), which used to swap the SvgView out for an
+        Image at the same slot and crash with "already has a parent". Now
+        the Image just layers on top as an extra sibling instead of
+        replacing anything.
+      */}
+      <View style={StyleSheet.absoluteFill}>
         <Svg width="100%" height="100%">
           <Defs>
             <Pattern
@@ -48,8 +53,8 @@ export function Avatar({ size = 44, ringColor, uri }: AvatarProps) {
           </Defs>
           <Rect width="100%" height="100%" fill={`url(#avatarHatch-${size})`} />
         </Svg>
-        </View>
-      )}
+      </View>
+      {uri ? <Image source={{ uri }} style={StyleSheet.absoluteFill} /> : null}
     </View>
   );
 }
