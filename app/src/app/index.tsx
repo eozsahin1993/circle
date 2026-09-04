@@ -1,6 +1,6 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { Redirect, router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Redirect, router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -34,13 +34,13 @@ export default function WelcomeScreen() {
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
 
-  useEffect(() => {
-    getProfile().then((profile) => setHasProfile(profile !== null));
-  }, []);
-
-  useEffect(() => {
-    getAuthToken().then((token) => setHasSession(token !== null));
-  }, []);
+  // Re-checked on focus, not just mount, so navigating back here post-sign-in still redirects away.
+  useFocusEffect(
+    useCallback(() => {
+      getProfile().then((profile) => setHasProfile(profile !== null));
+      getAuthToken().then((token) => setHasSession(token !== null));
+    }, []),
+  );
 
   useEffect(() => {
     // Sign in with Apple only exists as a concept on Apple's own
@@ -62,7 +62,7 @@ export default function WelcomeScreen() {
       // A returning device (local profile already exists — e.g. this was
       // just a re-auth after signing out) has nothing new to fill in.
       if (hasProfile) {
-        router.replace(await postAuthDestination());
+        router.push(await postAuthDestination());
         return;
       }
 
@@ -76,7 +76,7 @@ export default function WelcomeScreen() {
         try {
           const { bytes } = await downloadAndCompressImage(result.suggestedPictureUrl);
           await completeProfileSetup({ name: result.suggestedName, picture: bytes });
-          router.replace(await postAuthDestination());
+          router.push(await postAuthDestination());
           return;
         } catch (err) {
           console.error('Failed to auto-complete profile from sign-in', err);
