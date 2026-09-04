@@ -3,10 +3,12 @@ name: App Unit Tests
 on:
   push:
     branches: [main]
-    paths: ['app/**']
+    # Includes this workflow itself, so a change to it is validated by
+    # the run it defines rather than waiting for the next app/ commit.
+    paths: ['app/**', '.github/workflows/app-unit-test.yml']
   pull_request:
     branches: [main]
-    paths: ['app/**']
+    paths: ['app/**', '.github/workflows/app-unit-test.yml']
 
 jobs:
   test:
