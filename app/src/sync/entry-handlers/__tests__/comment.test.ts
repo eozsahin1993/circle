@@ -78,19 +78,6 @@ describe('predicate', () => {
     ).resolves.toBe(false);
   });
 
-  test('rejects a comment on a post this device does not hold', async () => {
-    // The post was skipped — unknown key version, bad signature — so its
-    // comments must be discarded too. Without this the insert would hit
-    // post_comments' foreign key and throw, which the walker reads as a
-    // transient local failure and stops the entire pass on, letting one
-    // unusable post wedge the circle.
-    const { circleId, author } = await circleWithPost();
-
-    await expect(
-      commentHandler.predicate(circleId, envelope(bytesToHex(author.publicKey), payloadFor(generateUUID())))
-    ).resolves.toBe(false);
-  });
-
   test.each([
     ['a non-object payload', 'nope'],
     ['a missing commentId', { postId: 'p', body: 'x', createdAt: 1 }],

@@ -1,4 +1,4 @@
-import { getMemberByPublicKey, getPost, insertCommentIfAbsent } from '@/data/db';
+import { getMemberByPublicKey, insertCommentIfAbsent } from '@/data/db';
 import { asRecord, type EntryHandler } from '@/sync/entry-handlers/types';
 
 /** What `addComment` puts in a `comment` entry. The author rides on the envelope, not in here. */
@@ -22,29 +22,22 @@ function parse(payload: unknown): CommentPayload | null {
 
 export const commentHandler: EntryHandler = {
   /**
-   * Two conditions, and the second one is about robustness rather than
-   * authorization.
-   *
    * The author must be someone this device has seen join — the same
    * ever-member rule posts use, so a stranger can't comment even holding
    * the content key.
    *
-   * The commented-on post must also already exist locally. Normally it
-   * does: a comment is always appended after its post, and content is
-   * replayed in epoch order. But if that post was skipped — an unknown
-   * key version, a failed signature — its comments would otherwise hit
-   * `post_comments`' foreign key and throw, which the walker reads as a
-   * *transient* local-write failure and stops the whole pass on. Checking
-   * here turns "the post never landed" into an ordinary discard that the
-   * walk moves past, rather than one bad post wedging the circle.
+   * Deliberately does *not* check that the commented-on post exists.
+   * Normally it does — a comment is appended after its post and content
+   * replays in epoch order — but if that post was skipped, the insert
+   * hits `post_comments`' foreign key. The walker classifies that as a
+   * permanent write failure and moves past it, so the case is handled
+   * without every handler having to pre-verify its own dependencies.
    */
   async predicate(circleId, envelope) {
     const payload = parse(envelope.payload);
     if (!payload) return false;
 
-    if (!(await getMemberByPublicKey(circleId, envelope.authorPubkey))) return false;
-
-    return (await getPost(payload.postId)) !== null;
+    return (await getMemberByPublicKey(circleId, envelope.authorPubkey)) !== null;
   },
 
   async apply(_circleId, envelope) {

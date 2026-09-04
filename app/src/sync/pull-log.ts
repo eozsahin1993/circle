@@ -1,4 +1,5 @@
 import { advanceCircleCursor, getCircle } from '@/data/db';
+import { isPermanentWriteFailure } from '@/sync/write-failure';
 import { verifyLogEntry } from '@/domain/usecases/circle/log-entry';
 import { getCircleKeyMap } from '@/services/keystore';
 import { fetchEntries, type Namespace } from '@/services/relay';
@@ -51,10 +52,22 @@ async function pull(circleId: string, namespace: Namespace, handlers: Record<str
       } else if (!(await handler.predicate(circleId, envelope))) {
         console.warn(`Skipping ${namespace} entry ${entry.epoch}: ${envelope.type} rejected by its predicate`);
       } else {
-        // Anything thrown here is transient (a local write failing), so
-        // it propagates and ends the pass with the cursor still behind
-        // this entry — it gets retried, not skipped.
-        await handler.apply(circleId, envelope);
+        try {
+          await handler.apply(circleId, envelope);
+        } catch (err) {
+          // A constraint violation can never succeed on retry — the entry
+          // refers to something this device will never have, usually
+          // because whatever it depends on was itself skipped. Treat it
+          // like any other permanently-invalid entry: log and walk past.
+          //
+          // Everything else is assumed transient (SQLite busy, disk
+          // pressure) and propagates, ending the pass with the cursor
+          // still behind this entry. That distinction is load-bearing:
+          // skipping a transient failure would advance past the entry
+          // for good, and cursors never rewind.
+          if (!isPermanentWriteFailure(err)) throw err;
+          console.warn(`Skipping ${namespace} entry ${entry.epoch}: ${envelope.type} could not be applied`, err);
+        }
       }
 
       cursor = entry.epoch;

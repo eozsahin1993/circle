@@ -23,6 +23,7 @@ import {
   saveMasterSeed,
 } from '@/services/keystore';
 import { appendEntry, bootstrapCircle, fetchEntries, type LogEntry } from '@/services/relay';
+import * as postsDb from '@/data/db/posts';
 import { pullContent, pullMeta } from '@/sync/pull-log';
 
 beforeAll(async () => {
@@ -290,5 +291,42 @@ describe('pullContent', () => {
 
     expect(await getCircleFeed(circleId)).toHaveLength(0);
     await expect(getCircle(circleId)).resolves.toMatchObject({ contentCursor: 6 });
+  });
+  test('walks past an entry whose local write can never succeed', async () => {
+    // A comment whose post was skipped hits post_comments' foreign key.
+    // That can never succeed on retry, so it must not stop the pass —
+    // otherwise one unusable post wedges the circle permanently.
+    const { circleId, identity, contentKey } = await makeCircle();
+    const encrypted = buildAndEncryptLogEntry(
+      'comment',
+      { commentId: generateUUID(), postId: 'a-post-that-was-skipped', body: 'orphan', createdAt: 1 },
+      identity,
+      contentKey
+    );
+    onePage([entry(3, encrypted)]);
+
+    await expect(pullContent(circleId)).resolves.toBeUndefined();
+
+    await expect(getCircle(circleId)).resolves.toMatchObject({ contentCursor: 3 });
+  });
+
+  test('stops on a local write that could succeed later, keeping the cursor behind it', async () => {
+    // The mirror case, and the reason the two are told apart: a transient
+    // failure must not advance the cursor, or the entry is lost for good.
+    const { circleId, identity, contentKey } = await makeCircle();
+    const encrypted = buildAndEncryptLogEntry(
+      'post',
+      { postId: generateUUID(), caption: 'x', photoHash: 'aa', createdAt: 1, keyVersion: 1 },
+      identity,
+      contentKey
+    );
+    onePage([entry(5, encrypted)]);
+    const busy = Object.assign(new Error('database is locked'), { code: 'SQLITE_BUSY' });
+    const insertSpy = jest.spyOn(postsDb, 'insertPost').mockRejectedValueOnce(busy);
+
+    await expect(pullContent(circleId)).rejects.toThrow('database is locked');
+
+    await expect(getCircle(circleId)).resolves.toMatchObject({ contentCursor: 0 });
+    insertSpy.mockRestore();
   });
 });
