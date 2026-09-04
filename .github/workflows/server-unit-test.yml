@@ -37,6 +37,19 @@ jobs:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
 
+      # Runs before Build, because an untidy go.mod fails the build here
+      # with "updates to go.mod needed" — which reads as a broken build
+      # rather than a missing requirement. A warm module cache hides this
+      # locally: `go build` succeeds on the developer's machine using a
+      # package go.mod never recorded, and only a clean checkout notices.
+      - name: Check go.mod is tidy
+        run: |
+          go mod tidy
+          if ! git diff --exit-code go.mod go.sum; then
+            echo "::error::go.mod/go.sum are not tidy — run 'go mod tidy' in server/ and commit the result"
+            exit 1
+          fi
+
       - name: Build
         run: go build ./...
 
