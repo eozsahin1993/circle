@@ -210,7 +210,7 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   if (!request) throw new Error('That join request is no longer available.');
 
   const requestKey = deriveJoinRequestKey(invite.code);
-  const { ephemeralPublicKey, identityPublicKey, encPublicKey, selfReportedName } = JSON.parse(
+  const { ephemeralPublicKey, identityPublicKey, encPublicKey, selfReportedName, pictureThumbnail } = JSON.parse(
     new TextDecoder().decode(decrypt(request.encryptedRequest, requestKey))
   ) as JoinRequestPayload;
 
@@ -241,7 +241,14 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   const currentVersion = Math.max(...Object.keys(keyMap).map(Number));
   const memberAddedEntry = buildAndEncryptLogEntry(
     EntryTypes.MEMBER_ADDED,
-    { identityPublicKey, encPublicKey, name: selfReportedName, role: MemberRoles.member, keyVersion: currentVersion },
+    {
+      identityPublicKey,
+      encPublicKey,
+      name: selfReportedName,
+      role: MemberRoles.member,
+      keyVersion: currentVersion,
+      picture: pictureThumbnail,
+    },
     identity,
     keyMap[currentVersion]
   );
@@ -264,7 +271,7 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
     memberId: generateUUID(),
     role: MemberRoles.member,
     name: selfReportedName,
-    picture: null,
+    picture: pictureThumbnail ? Buffer.from(pictureThumbnail, 'base64') : null,
     joinedAt: Date.now(),
   });
 

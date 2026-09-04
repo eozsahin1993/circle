@@ -211,9 +211,7 @@ export const postReactions = sqliteTable(
  * `drainOutbox` pushes in order: a DB-assigned autoincrement is gap-free
  * and unambiguous by construction, where comparing timestamps across
  * (eventually several) locally-originated entry types would not be.
- * `epoch` stays null until the relay confirms the push; entryType is
- * 'post' only for now but kept generic since comments/reactions will
- * eventually queue through here too.
+ * `epoch` stays null until the relay confirms the push.
  */
 export const outbox = sqliteTable(
   'outbox',
@@ -222,7 +220,7 @@ export const outbox = sqliteTable(
     circleId: text('circle_id')
       .notNull()
       .references(() => circles.id, { onDelete: 'cascade' }),
-    entryType: text('entry_type', { enum: ['post', 'comment', 'reaction', 'member_added'] }).notNull(),
+    entryType: text('entry_type', { enum: ['post', 'comment', 'reaction', 'member_added', 'profile_update'] }).notNull(),
     /**
      * The id this entry is appended under at the relay — passed straight
      * to `appendEntry`, which makes it the relay's idempotency key, and

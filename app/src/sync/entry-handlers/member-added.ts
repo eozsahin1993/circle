@@ -2,23 +2,34 @@ import { getCircleMembers, insertMemberIfAbsent, MemberRoles, type MemberRole } 
 import { generateUUID } from '@/services/crypto';
 import { asRecord, type EntryHandler } from '@/sync/entry-handlers/types';
 
-/** What `createCircle` and `completeJoin` put in a `member_added` entry. */
+/** What `createCircle` and `invite-to-circle.ts`'s `approveJoinRequest` put in a `member_added` entry. */
 type MemberAddedPayload = {
   identityPublicKey: string;
   encPublicKey: string;
   name: string;
   role: MemberRole;
+  /**
+   * Base64-encoded avatar-sized JPEG thumbnail (see `compressToThumbnail`),
+   * if the member had a picture at join time — optional, same bytes as
+   * `JoinRequestPayload.pictureThumbnail`, carried forward from it. Kept
+   * thumbnail-sized rather than the full picture because this rides in a
+   * meta log entry stored directly as a DynamoDB item (400KB hard limit),
+   * not the S3 blob path posts use. Not updated by anything after this
+   * entry; a later picture change has no propagation mechanism yet.
+   */
+  picture?: string;
 };
 
 function parse(payload: unknown): MemberAddedPayload | null {
   const record = asRecord(payload);
   if (!record) return null;
-  const { identityPublicKey, encPublicKey, name, role } = record;
+  const { identityPublicKey, encPublicKey, name, role, picture } = record;
   if (typeof identityPublicKey !== 'string' || !identityPublicKey) return null;
   if (typeof encPublicKey !== 'string') return null;
   if (typeof name !== 'string') return null;
   if (role !== MemberRoles.admin && role !== MemberRoles.member) return null;
-  return { identityPublicKey, encPublicKey, name, role: role as MemberRole };
+  if (picture !== undefined && typeof picture !== 'string') return null;
+  return { identityPublicKey, encPublicKey, name, role: role as MemberRole, picture };
 }
 
 export const memberAddedHandler: EntryHandler = {
@@ -76,7 +87,7 @@ export const memberAddedHandler: EntryHandler = {
       memberId: generateUUID(),
       role: payload.role,
       name: payload.name,
-      picture: null,
+      picture: payload.picture ? Buffer.from(payload.picture, 'base64') : null,
       joinedAt: Date.now(),
     });
   },

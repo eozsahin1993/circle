@@ -14,6 +14,7 @@ export const EntryTypes = {
   COMMENT: 'comment',
   REACTION: 'reaction',
   MEMBER_ADDED: 'member_added',
+  PROFILE_UPDATE: 'profile_update',
 } as const;
 
 export type EntryType = (typeof EntryTypes)[keyof typeof EntryTypes];
