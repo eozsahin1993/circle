@@ -3,7 +3,15 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { generateUUID, hashBytes } from '@/services/crypto';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
-import { AttachmentKinds, AttachmentStatuses, insertPostAndEnqueue, OutboxStatuses } from '@/data/db';
+import {
+  AttachmentKinds,
+  AttachmentStatuses,
+  insertPostAndEnqueue,
+  OutboxStatuses,
+  type NewAttachment,
+  type NewOutboxEntry,
+  type Post,
+} from '@/data/db';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 
 export type CreatePostInput = {
@@ -49,39 +57,41 @@ export async function createPost(input: CreatePostInput): Promise<void> {
     current.key
   );
 
-  await insertPostAndEnqueue(
-    {
-      id: postId,
-      circleId: input.circleId,
-      caption: input.caption,
-      authorPublicKey: bytesToHex(identity.publicKey),
-      createdAt,
-    },
-    {
-      circleId: input.circleId,
-      // A post photo's blob address is the postId — the same id
-      // `drainOutbox` uploads it under (see services/relay.ts's
-      // getUploadTarget).
-      entryId: postId,
-      kind: AttachmentKinds.POST_PHOTO,
-      bytes: input.photo,
-      hash: photoHash,
-      keyVersion: current.version,
-      // Created here, so there is nothing to download.
-      status: AttachmentStatuses.FETCHED,
-      fetchAttempts: 0,
-      nextAttemptAt: null,
-      createdAt,
-    },
-    {
-      circleId: input.circleId,
-      entryType: EntryTypes.POST,
-      localId: postId,
-      status: OutboxStatuses.pending,
-      epoch: null,
-      encryptedMeta,
-    }
-  );
+  const post: Post = {
+    id: postId,
+    circleId: input.circleId,
+    caption: input.caption,
+    authorPublicKey: bytesToHex(identity.publicKey),
+    createdAt,
+  };
+
+  const attachment: NewAttachment = {
+    circleId: input.circleId,
+    // A post photo's blob address is the postId — the same id
+    // `drainOutbox` uploads it under (see services/relay.ts's
+    // getUploadTarget).
+    entryId: postId,
+    kind: AttachmentKinds.POST_PHOTO,
+    bytes: input.photo,
+    hash: photoHash,
+    keyVersion: current.version,
+    // Created here, so there is nothing to download.
+    status: AttachmentStatuses.FETCHED,
+    fetchAttempts: 0,
+    nextAttemptAt: null,
+    createdAt,
+  };
+
+  const outboxEntry: NewOutboxEntry = {
+    circleId: input.circleId,
+    entryType: EntryTypes.POST,
+    localId: postId,
+    status: OutboxStatuses.pending,
+    epoch: null,
+    encryptedMeta,
+  };
+
+  await insertPostAndEnqueue(post, attachment, outboxEntry);
 
   drainOutbox(input.circleId).catch((err) => console.error('Failed to drain outbox', err));
 }

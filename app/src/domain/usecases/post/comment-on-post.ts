@@ -1,6 +1,6 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { insertCommentAndEnqueue, OutboxStatuses } from '@/data/db';
+import { insertCommentAndEnqueue, OutboxStatuses, type Comment, type NewOutboxEntry } from '@/data/db';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { generateUUID } from '@/services/crypto';
@@ -38,23 +38,24 @@ export async function addComment(circleId: string, postId: string, body: string)
     current.key
   );
 
-  await insertCommentAndEnqueue(
-    {
-      id: commentId,
-      postId,
-      authorPublicKey: bytesToHex(identity.publicKey),
-      body: trimmed,
-      createdAt,
-    },
-    {
-      circleId,
-      entryType: EntryTypes.COMMENT,
-      localId: commentId,
-      status: OutboxStatuses.pending,
-      epoch: null,
-      encryptedMeta,
-    }
-  );
+  const comment: Comment = {
+    id: commentId,
+    postId,
+    authorPublicKey: bytesToHex(identity.publicKey),
+    body: trimmed,
+    createdAt,
+  };
+
+  const outboxEntry: NewOutboxEntry = {
+    circleId,
+    entryType: EntryTypes.COMMENT,
+    localId: commentId,
+    status: OutboxStatuses.pending,
+    epoch: null,
+    encryptedMeta,
+  };
+
+  await insertCommentAndEnqueue(comment, outboxEntry);
 
   drainOutbox(circleId).catch((err) => console.error('Failed to drain outbox', err));
 }
