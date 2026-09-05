@@ -183,8 +183,13 @@ test('requestToJoin compresses the profile picture into a thumbnail and includes
 });
 
 test('requestToJoin omits pictureThumbnail when the profile has no picture', async () => {
-  const { invite } = await makeCircleWithInvite('Family Circle');
+  // Reset the profile to no-picture *before* makeCircleWithInvite, not
+  // after — it calls createCircle, which reads the profile too (for its
+  // own member_added entry), and a picture left over from an earlier test
+  // would make that call compress a thumbnail before this test even gets
+  // to requestToJoin, breaking the not-called assertion below.
   await saveProfile({ name: 'Tomás Ruiz', picture: null, createdAt: Date.now(), updatedAt: Date.now() });
+  const { invite } = await makeCircleWithInvite('Family Circle');
   (putJoinRequest as jest.Mock).mockResolvedValue(undefined);
 
   await requestToJoin(invite.code);
