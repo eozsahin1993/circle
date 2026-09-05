@@ -68,8 +68,9 @@ export type FeedPost = {
  * each log entry's order at append time, so ordering should come from
  * that server-assigned sequence instead (see server/SYNC_DESIGN.md).
  */
-export async function getCircleFeed(circleId: string): Promise<FeedPost[]> {
-  const rows = await db
+/** Shared by `getCircleFeed` and `getFeedPost` — see the column-collision warning above. */
+function feedPostQuery() {
+  return db
     .select({
       id: posts.id,
       caption: posts.caption,
@@ -84,15 +85,24 @@ export async function getCircleFeed(circleId: string): Promise<FeedPost[]> {
       circleMembers,
       and(eq(circleMembers.circleId, posts.circleId), eq(circleMembers.identityPublicKey, posts.authorPublicKey))
     )
-    .leftJoin(attachments, and(eq(attachments.circleId, posts.circleId), eq(attachments.entryId, posts.id)))
-    .where(eq(posts.circleId, circleId))
-    .orderBy(desc(posts.createdAt));
+    .leftJoin(attachments, and(eq(attachments.circleId, posts.circleId), eq(attachments.entryId, posts.id)));
+}
 
-  return rows.map((row) => ({
-    ...row,
-    authorPicture: normalizeBlob(row.authorPicture),
-    hasPhoto: row.photoStatus === 'fetched',
-  }));
+function toFeedPost<T extends { authorPicture: Uint8Array | Buffer | null; photoStatus: Attachment['status'] | null }>(
+  row: T
+): T & { authorPicture: Uint8Array | null; hasPhoto: boolean } {
+  return { ...row, authorPicture: normalizeBlob(row.authorPicture), hasPhoto: row.photoStatus === 'fetched' };
+}
+
+export async function getCircleFeed(circleId: string): Promise<FeedPost[]> {
+  const rows = await feedPostQuery().where(eq(posts.circleId, circleId)).orderBy(desc(posts.createdAt));
+  return rows.map(toFeedPost);
+}
+
+/** A single feed row, for the post details screen — same shape `getCircleFeed` renders, just one post. */
+export async function getFeedPost(circleId: string, postId: string): Promise<FeedPost | null> {
+  const rows = await feedPostQuery().where(and(eq(posts.circleId, circleId), eq(posts.id, postId)));
+  return rows[0] ? toFeedPost(rows[0]) : null;
 }
 
 /**

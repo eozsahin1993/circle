@@ -288,6 +288,7 @@ export default function FeedScreen() {
                 post={item.post}
                 onToggleReaction={(emoji) => handleToggleReaction(item.post.id, emoji)}
                 onAddComment={(body) => handleAddComment(item.post.id, body)}
+                onPressPhoto={() => router.push({ pathname: '/post/[id]', params: { id: item.post.id, circleId } })}
               />
             );
           }}

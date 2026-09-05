@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { type CommentItem, PostComments } from '@/components/post-comments';
@@ -35,9 +35,10 @@ export type PostCardProps = {
   post: Post;
   onToggleReaction?: (emoji: string) => void;
   onAddComment?: (body: string) => void;
+  onPressPhoto?: () => void;
 };
 
-export function PostCard({ post, onToggleReaction, onAddComment }: PostCardProps) {
+export function PostCard({ post, onToggleReaction, onAddComment, onPressPhoto }: PostCardProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [showComments, setShowComments] = useState(false);
 
@@ -58,7 +59,7 @@ export function PostCard({ post, onToggleReaction, onAddComment }: PostCardProps
         </View>
       </View>
 
-      <View style={styles.photoWrap}>
+      <Pressable style={styles.photoWrap} onPress={onPressPhoto} disabled={!onPressPhoto}>
         {post.photoUri ? (
           <Image source={{ uri: post.photoUri }} style={styles.photo} contentFit="cover" />
         ) : (
@@ -69,7 +70,7 @@ export function PostCard({ post, onToggleReaction, onAddComment }: PostCardProps
             {post.photoLabel}
           </ThemedText>
         ) : null}
-      </View>
+      </Pressable>
 
       <ThemedText type="captionFeed" style={styles.caption}>
         {post.caption}
