@@ -9,7 +9,7 @@ import { ReactionChip } from '@/components/reaction-chip';
 import { ReactionPicker } from '@/components/reaction-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { PhotoAspect, Spacing } from '@/constants/theme';
+import { Colors, PhotoAspect, Radius, Spacing } from '@/constants/theme';
 
 export type Reaction = {
   emoji: string;
@@ -29,6 +29,8 @@ export type Post = {
   caption: string;
   reactions: Reaction[];
   comments: CommentItem[];
+  /** A comment landed on this post since it was last scrolled into view or opened — shown as a small dot on the comments chip. */
+  hasUnseenComments?: boolean;
 };
 
 export type PostCardProps = {
@@ -36,15 +38,24 @@ export type PostCardProps = {
   onToggleReaction?: (emoji: string) => void;
   onAddComment?: (body: string) => void;
   onPressPhoto?: () => void;
+  /** Fires the moment comments are expanded — this is genuinely seeing them, same as opening the post itself. */
+  onExpandComments?: () => void;
 };
 
-export function PostCard({ post, onToggleReaction, onAddComment, onPressPhoto }: PostCardProps) {
+export function PostCard({ post, onToggleReaction, onAddComment, onPressPhoto, onExpandComments }: PostCardProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [showComments, setShowComments] = useState(false);
 
   function handleSelect(emoji: string) {
     onToggleReaction?.(emoji);
     setShowPicker(false);
+  }
+
+  function handleToggleComments() {
+    setShowComments((v) => {
+      if (!v) onExpandComments?.();
+      return !v;
+    });
   }
 
   return (
@@ -87,10 +98,13 @@ export function PostCard({ post, onToggleReaction, onAddComment, onPressPhoto }:
           />
         ))}
         <ReactionChip label="+" onPress={() => setShowPicker((v) => !v)} />
-        <ReactionChip
-          label={`${post.comments.length} comment${post.comments.length === 1 ? '' : 's'}`}
-          onPress={() => setShowComments((v) => !v)}
-        />
+        <View style={styles.commentsChipWrap}>
+          <ReactionChip
+            label={`${post.comments.length} comment${post.comments.length === 1 ? '' : 's'}`}
+            onPress={handleToggleComments}
+          />
+          {post.hasUnseenComments ? <View style={styles.unseenDot} /> : null}
+        </View>
       </View>
 
       {showPicker ? (
@@ -141,6 +155,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.screenPadding,
     paddingTop: 12,
     paddingBottom: 4,
+  },
+  commentsChipWrap: {
+    position: 'relative',
+  },
+  unseenDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 9,
+    height: 9,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.dark.accentBright,
   },
   picker: {
     paddingHorizontal: Spacing.screenPadding,

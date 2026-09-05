@@ -20,7 +20,7 @@ beforeAll(() => initDatabase());
 beforeEach(() => jest.resetAllMocks());
 
 async function addCircle(id: string) {
-  await insertCircle({ id, name: id, picture: null, syncId: `sync-${id}`, createdAt: Date.now(), leftAt: null, metaCursor: 0, contentCursor: 0 });
+  await insertCircle({ id, name: id, picture: null, syncId: `sync-${id}`, createdAt: Date.now(), leftAt: null, metaCursor: 0, contentCursor: 0, lastViewedAt: 0 });
 }
 
 describe('syncAccountManifest', () => {

@@ -18,6 +18,15 @@ export const circles = sqliteTable('circles', {
   /** How far this device has synced each namespace — see server/SYNC_DESIGN.md's "Read / sync". 0 means never synced. */
   metaCursor: integer('meta_cursor').notNull().default(0),
   contentCursor: integer('content_cursor').notNull().default(0),
+  /**
+   * When this device last opened this circle's feed — the unread-count
+   * badge's floor for "new post". Set to `createdAt` at insert time (this
+   * device's own join/creation moment), never left null: a fresh join's
+   * entire pulled-in history must never look unread, and `createdAt`
+   * already means "when this device first knew about this circle" (see
+   * create-circle.ts and join-circle.ts).
+   */
+  lastViewedAt: integer('last_viewed_at').notNull().default(0),
 });
 
 export const circleMembers = sqliteTable(
@@ -99,6 +108,14 @@ export const posts = sqliteTable(
      */
     authorPublicKey: text('author_public_key').notNull(),
     createdAt: integer('created_at').notNull(),
+    /**
+     * When this device last scrolled this post into view, or opened its
+     * details screen — null means never. Backs the "has new comments"
+     * marker: a comment only counts as unseen if it postdates this (see
+     * getUnseenCommentPostIds), so viewing the post again always covers
+     * whatever comments existed on it up to that moment.
+     */
+    lastViewedAt: integer('last_viewed_at'),
   },
   (t) => [index('posts_circle_id').on(t.circleId)]
 );

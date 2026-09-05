@@ -1,8 +1,8 @@
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, count, eq, gt, isNull, ne, or } from 'drizzle-orm';
 
 import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
-import { circles } from '@/data/db/schema';
+import { circles, postComments, posts } from '@/data/db/schema';
 
 export type Circle = typeof circles.$inferSelect;
 
@@ -33,11 +33,11 @@ export async function getCircle(id: string): Promise<Circle | null> {
  * A screen that needs the cover's *pixels* should read it once through the
  * photo cache, not pull the bytes through this query.
  */
-export type CircleListRow = Pick<Circle, 'id' | 'name' | 'createdAt'>;
+export type CircleListRow = Pick<Circle, 'id' | 'name' | 'createdAt' | 'lastViewedAt'>;
 
 export async function listCircles(): Promise<CircleListRow[]> {
   return db
-    .select({ id: circles.id, name: circles.name, createdAt: circles.createdAt })
+    .select({ id: circles.id, name: circles.name, createdAt: circles.createdAt, lastViewedAt: circles.lastViewedAt })
     .from(circles)
     .where(isNull(circles.leftAt))
     .orderBy(asc(circles.createdAt));
@@ -51,7 +51,7 @@ export async function listCircles(): Promise<CircleListRow[]> {
  */
 export async function getCircleSummary(id: string): Promise<CircleListRow | null> {
   const rows = await db
-    .select({ id: circles.id, name: circles.name, createdAt: circles.createdAt })
+    .select({ id: circles.id, name: circles.name, createdAt: circles.createdAt, lastViewedAt: circles.lastViewedAt })
     .from(circles)
     .where(eq(circles.id, id));
   return rows[0] ?? null;
@@ -83,6 +83,55 @@ export async function getAllCircles(): Promise<Circle[]> {
 export async function advanceCircleCursor(id: string, namespace: 'meta' | 'content', epoch: number): Promise<void> {
   const column = namespace === 'meta' ? { metaCursor: epoch } : { contentCursor: epoch };
   await db.update(circles).set(column).where(eq(circles.id, id));
+}
+
+/** Marks this circle as opened just now — the circle-list badge's "new post" floor. */
+export async function markCircleViewed(id: string): Promise<void> {
+  await db.update(circles).set({ lastViewedAt: Date.now() }).where(eq(circles.id, id));
+}
+
+/**
+ * The circle-list badge's count: new posts plus new comments, excluding
+ * `ownPublicKey` (no badge for your own actions) and never touching
+ * `post_reactions` — reactions are too low-effort a signal, and there's no
+ * "who reacted" UI to attribute one with (see the design discussion this
+ * came out of).
+ *
+ * `circleCreatedAt`/`circleLastViewedAt` come from the caller's own
+ * `CircleListRow` rather than being looked up again here — `listCircles()`
+ * already has them, and this runs once per circle in the list.
+ *
+ * A comment floors against `circleCreatedAt`, not just the post's own
+ * `lastViewedAt`: a post that's never been individually scrolled past or
+ * opened has a permanently-null `lastViewedAt`, and without this floor its
+ * entire pre-join comment history would count as unread forever for a
+ * freshly-joined circle.
+ */
+export async function getUnreadCount(
+  circleId: string,
+  ownPublicKey: string,
+  circleCreatedAt: number,
+  circleLastViewedAt: number
+): Promise<number> {
+  const newPosts = await db
+    .select({ count: count() })
+    .from(posts)
+    .where(and(eq(posts.circleId, circleId), ne(posts.authorPublicKey, ownPublicKey), gt(posts.createdAt, circleLastViewedAt)));
+
+  const newComments = await db
+    .select({ count: count() })
+    .from(postComments)
+    .innerJoin(posts, eq(posts.id, postComments.postId))
+    .where(
+      and(
+        eq(posts.circleId, circleId),
+        ne(postComments.authorPublicKey, ownPublicKey),
+        gt(postComments.createdAt, circleCreatedAt),
+        or(isNull(posts.lastViewedAt), gt(postComments.createdAt, posts.lastViewedAt))
+      )
+    );
+
+  return (newPosts[0]?.count ?? 0) + (newComments[0]?.count ?? 0);
 }
 
 export async function updateCircleName(id: string, name: string): Promise<void> {

@@ -66,6 +66,7 @@ export async function createPost(input: CreatePostInput): Promise<void> {
     caption: input.caption,
     authorPublicKey: bytesToHex(identity.publicKey),
     createdAt,
+    lastViewedAt: null,
   };
 
   const attachment: NewAttachment = {

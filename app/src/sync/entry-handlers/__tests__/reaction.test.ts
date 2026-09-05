@@ -31,7 +31,7 @@ async function circleWithPost() {
   const author = (await getCircleIdentity(circleId))!;
   const postId = generateUUID();
   await insertPost(
-    { id: postId, circleId, caption: 'c', authorPublicKey: bytesToHex(author.publicKey), createdAt: 1000 },
+    { id: postId, circleId, caption: 'c', authorPublicKey: bytesToHex(author.publicKey), createdAt: 1000, lastViewedAt: null },
     {
       circleId, entryId: postId, kind: AttachmentKinds.POST_PHOTO, bytes: null, hash: 'h', keyVersion: 1,
       status: AttachmentStatuses.PENDING, fetchAttempts: 0, nextAttemptAt: null, createdAt: 1000,

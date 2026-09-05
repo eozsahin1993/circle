@@ -63,6 +63,7 @@ export const postHandler: EntryHandler = {
         caption: payload.caption,
         authorPublicKey: envelope.authorPubkey,
         createdAt: payload.createdAt,
+        lastViewedAt: null,
       },
       {
         circleId,

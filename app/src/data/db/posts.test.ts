@@ -1,14 +1,18 @@
 import { generateUUID } from '@/services/crypto';
 import { initDatabase } from '@/data/db';
 import { AttachmentKinds, AttachmentStatuses, type NewAttachment } from '@/data/db/attachments';
+import { insertComment } from '@/data/db/comments';
 import { insertMember } from '@/data/db/members';
 import { deleteCircle, insertCircle } from '@/data/db/circles';
-import { getCircleFeed, insertPost } from '@/data/db/posts';
+import { getCircleFeed, getPost, getUnseenCommentPostIds, insertPost, markPostViewed } from '@/data/db/posts';
+
+const OWN_KEY = 'aa'.repeat(32);
+const OTHER_KEY = 'bb'.repeat(32);
 
 beforeAll(() => initDatabase());
 
 async function makeCircle() {
-  const circle = { id: generateUUID(), name: 'Test Circle', picture: null, syncId: generateUUID(), createdAt: Date.now(), leftAt: null, metaCursor: 0, contentCursor: 0 };
+  const circle = { id: generateUUID(), name: 'Test Circle', picture: null, syncId: generateUUID(), createdAt: Date.now(), leftAt: null, metaCursor: 0, contentCursor: 0, lastViewedAt: 0 };
   await insertCircle(circle);
   return circle;
 }
@@ -20,6 +24,7 @@ function makePost(circleId: string, overrides: Partial<{ caption: string; create
     caption: overrides.caption ?? 'Nana in the kitchen.',
     authorPublicKey: 'aa'.repeat(32),
     createdAt: overrides.createdAt ?? Date.now(),
+    lastViewedAt: null,
   };
 }
 
@@ -113,5 +118,58 @@ describe('posts CRUD', () => {
     await deleteCircle(circle.id);
 
     await expect(getCircleFeed(circle.id)).resolves.toEqual([]);
+  });
+});
+
+describe('markPostViewed / getUnseenCommentPostIds', () => {
+  test('markPostViewed bumps lastViewedAt to roughly now', async () => {
+    const circle = await makeCircle();
+    const post = makePost(circle.id, { createdAt: 1000 });
+    await insertPost(post);
+
+    await markPostViewed(post.id);
+
+    const stored = await getPost(post.id);
+    expect(stored!.lastViewedAt).toBeGreaterThan(1000);
+    expect(stored!.lastViewedAt).toBeLessThanOrEqual(Date.now());
+  });
+
+  test('a comment from someone else past the join floor makes its post unseen', async () => {
+    const circle = await makeCircle();
+    const post = makePost(circle.id, { createdAt: 500 });
+    await insertPost(post);
+    await insertComment({ id: generateUUID(), postId: post.id, authorPublicKey: OTHER_KEY, body: 'hey', createdAt: 2000 });
+
+    await expect(getUnseenCommentPostIds(circle.id, OWN_KEY, 1000)).resolves.toEqual([post.id]);
+  });
+
+  test("excludes a post whose only new comment is the viewer's own", async () => {
+    const circle = await makeCircle();
+    const post = makePost(circle.id, { createdAt: 500 });
+    await insertPost(post);
+    await insertComment({ id: generateUUID(), postId: post.id, authorPublicKey: OWN_KEY, body: 'hey', createdAt: 2000 });
+
+    await expect(getUnseenCommentPostIds(circle.id, OWN_KEY, 1000)).resolves.toEqual([]);
+  });
+
+  test('excludes a comment predating the join floor, even on a never-viewed post', async () => {
+    const circle = await makeCircle();
+    const post = makePost(circle.id, { createdAt: 100 });
+    await insertPost(post);
+    await insertComment({ id: generateUUID(), postId: post.id, authorPublicKey: OTHER_KEY, body: 'hey', createdAt: 900 });
+
+    await expect(getUnseenCommentPostIds(circle.id, OWN_KEY, 1000)).resolves.toEqual([]);
+  });
+
+  test('markPostViewed clears a post from the unseen list once its comments predate that view', async () => {
+    const circle = await makeCircle();
+    const post = makePost(circle.id, { createdAt: 500 });
+    await insertPost(post);
+    await insertComment({ id: generateUUID(), postId: post.id, authorPublicKey: OTHER_KEY, body: 'hey', createdAt: 2000 });
+    await expect(getUnseenCommentPostIds(circle.id, OWN_KEY, 1000)).resolves.toEqual([post.id]);
+
+    await markPostViewed(post.id);
+
+    await expect(getUnseenCommentPostIds(circle.id, OWN_KEY, 1000)).resolves.toEqual([]);
   });
 });

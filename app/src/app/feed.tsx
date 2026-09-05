@@ -1,6 +1,7 @@
+import { bytesToHex } from '@noble/curves/utils.js';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, type ViewToken } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CircleHeader } from '@/components/circle-header';
@@ -20,6 +21,9 @@ import {
   getCircleMemberCount,
   getPostComments,
   getProfile,
+  getUnseenCommentPostIds,
+  markCircleViewed,
+  markPostViewed,
   type CommentWithAuthor,
   type FeedPost,
 } from '@/data/db';
@@ -31,6 +35,7 @@ import {
 } from '@/domain/usecases/circle/invite-to-circle';
 import { addComment } from '@/domain/usecases/post/comment-on-post';
 import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
+import { getCircleIdentity } from '@/services/keystore';
 import { bytesToDataUri } from '@/services/image';
 import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
 import { nudgePhotoQueue } from '@/sync/photo-queue';
@@ -111,16 +116,24 @@ export default function FeedScreen() {
   const loadFromDatabase = useCallback(async () => {
     if (!circleId) return;
 
-    const [circle, memberCount, circlePosts, profile] = await Promise.all([
+    const [circle, memberCount, circlePosts, profile, identity] = await Promise.all([
       getCircleSummary(circleId),
       getCircleMemberCount(circleId),
       getCircleFeed(circleId),
       getProfile(),
+      getCircleIdentity(circleId),
     ]);
 
     setCircleName(circle?.name ?? '');
     setMemberCount(memberCount);
     setProfileName(profile?.name);
+
+    // No identity yet briefly happens between joining and that join
+    // actually completing — no posts have "new comments" to mark in that
+    // window either.
+    const unseenCommentPostIds = identity
+      ? new Set(await getUnseenCommentPostIds(circleId, bytesToHex(identity.publicKey), circle?.createdAt ?? 0))
+      : new Set<string>();
 
     const photoUris = await resolvePhotoUris(circleId, circlePosts);
 
@@ -149,6 +162,7 @@ export default function FeedScreen() {
         caption: post.caption,
         reactions: reactionsByPost[index],
         comments: toCommentItems(commentsByPost[index], profile?.name),
+        hasUnseenComments: unseenCommentPostIds.has(post.id),
       })),
     );
 
@@ -163,8 +177,33 @@ export default function FeedScreen() {
   useFocusEffect(
     useCallback(() => {
       loadFromDatabase().catch((err) => console.error('Failed to load the feed', err));
-    }, [loadFromDatabase]),
+      // A new post sorts to the top of the feed, so simply opening it is
+      // genuine proof it was seen — unlike a comment, which can land on any
+      // post regardless of age (see markPostViewed / the viewability
+      // tracking below for that half).
+      if (circleId) markCircleViewed(circleId).catch((err) => console.error('Failed to mark the circle viewed', err));
+    }, [circleId, loadFromDatabase]),
   );
+
+  /**
+   * Marks a post's comments seen as it's actually scrolled into view, not
+   * only when its details screen is opened — nobody should have to tap
+   * into every post they've already scrolled past just to clear its "new
+   * comments" marker. Deduped per screen instance: a post sitting in view
+   * shouldn't be re-written on every viewability recompute.
+   */
+  const [viewedPostIds] = useState(() => new Set<string>());
+  const [onViewableItemsChanged] = useState(
+    () =>
+      ({ viewableItems }: { viewableItems: ViewToken<FeedRow>[] }) => {
+        for (const { item } of viewableItems) {
+          if (item.kind !== 'post' || viewedPostIds.has(item.post.id)) continue;
+          viewedPostIds.add(item.post.id);
+          markPostViewed(item.post.id).catch((err) => console.error('Failed to mark a post viewed', err));
+        }
+      },
+  );
+  const [viewabilityConfig] = useState(() => ({ itemVisiblePercentThreshold: 50 }));
 
   /**
    * Pull-to-refresh: sync this circle, then re-read. Without it the only
@@ -233,6 +272,16 @@ export default function FeedScreen() {
     );
   }
 
+  /**
+   * Expanding a post's comments is genuinely seeing them — same as opening
+   * post/[id] — so it clears the "new comments" dot immediately rather than
+   * waiting for the next full reload to notice `markPostViewed` already ran.
+   */
+  function handleExpandComments(postId: string) {
+    markPostViewed(postId).catch((err) => console.error('Failed to mark a post viewed', err));
+    setPosts((current) => current.map((post) => (post.id === postId ? { ...post, hasUnseenComments: false } : post)));
+  }
+
   // A fresh joiner has the circle secret and roster access but no history
   // yet — pullCircle (syncing an existing circle's past entries) doesn't
   // exist yet (see server/INVITE_FLOW.md's "what this flow depends on
@@ -289,6 +338,7 @@ export default function FeedScreen() {
                 onToggleReaction={(emoji) => handleToggleReaction(item.post.id, emoji)}
                 onAddComment={(body) => handleAddComment(item.post.id, body)}
                 onPressPhoto={() => router.push({ pathname: '/post/[id]', params: { id: item.post.id, circleId } })}
+                onExpandComments={() => handleExpandComments(item.post.id)}
               />
             );
           }}
@@ -304,6 +354,8 @@ export default function FeedScreen() {
           stickyHeaderIndices={[0]}
           ItemSeparatorComponent={() => <ThemedView style={{ height: Spacing.gapBetweenPosts }} />}
           contentContainerStyle={styles.list}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
         />
         <FabButton
           icon="plus"

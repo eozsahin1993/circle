@@ -109,6 +109,7 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
     // nothing to gain by re-fetching what it already knows.
     metaCursor: 1,
     contentCursor: 0,
+    lastViewedAt: now,
   });
 
   await insertMember({

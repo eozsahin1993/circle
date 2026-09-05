@@ -27,7 +27,7 @@ test('toggling a reaction stores it and queues it together', async () => {
   const me = (await getCircleIdentity(circleId))!;
   const postId = generateUUID();
   await insertPost(
-    { id: postId, circleId, caption: 'c', authorPublicKey: bytesToHex(me.publicKey), createdAt: 1 },
+    { id: postId, circleId, caption: 'c', authorPublicKey: bytesToHex(me.publicKey), createdAt: 1, lastViewedAt: null },
     {
       circleId,
       entryId: postId,

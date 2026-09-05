@@ -8,13 +8,13 @@ import { getPendingOutboxEntries, insertPostAndEnqueue, markOutboxEntrySynced, t
 beforeAll(() => initDatabase());
 
 async function makeCircle() {
-  const circle = { id: generateUUID(), name: 'Test Circle', picture: null, syncId: generateUUID(), createdAt: Date.now(), leftAt: null, metaCursor: 0, contentCursor: 0 };
+  const circle = { id: generateUUID(), name: 'Test Circle', picture: null, syncId: generateUUID(), createdAt: Date.now(), leftAt: null, metaCursor: 0, contentCursor: 0, lastViewedAt: 0 };
   await insertCircle(circle);
   return circle;
 }
 
 function makePost(circleId: string) {
-  return { id: generateUUID(), circleId, caption: 'Nana in the kitchen.', authorPublicKey: 'aa'.repeat(32), createdAt: Date.now() };
+  return { id: generateUUID(), circleId, caption: 'Nana in the kitchen.', authorPublicKey: 'aa'.repeat(32), createdAt: Date.now(), lastViewedAt: null };
 }
 
 function makeAttachment(post: { id: string; circleId: string; createdAt: number }): NewAttachment {

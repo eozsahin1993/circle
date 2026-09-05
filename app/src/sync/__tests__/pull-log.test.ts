@@ -197,6 +197,7 @@ describe('pullMeta', () => {
       leftAt: null,
       metaCursor: 0,
       contentCursor: 0,
+      lastViewedAt: 0,
     });
     await insertMember({
       circleId,

@@ -50,6 +50,13 @@
       "when": 1788556772101,
       "tag": "0006_young_thor_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788645143290,
+      "tag": "0007_wooden_warhawk",
+      "breakpoints": true
     }
   ]
 }

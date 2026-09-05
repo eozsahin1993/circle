@@ -1,3 +1,4 @@
+import { bytesToHex } from '@noble/curves/utils.js';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
@@ -15,17 +16,44 @@ import {
   getCircleCoverBytes,
   getCircleMemberCount,
   getNewestFetchedPostId,
+  getNewestPostCreatedAt,
   getProfile,
+  getUnreadCount,
   listCircles,
   type CircleListRow,
 } from '@/data/db';
 import { checkPendingJoinRequest } from '@/domain/usecases/circle/join-circle';
+import { getCircleIdentity } from '@/services/keystore';
 import { bytesToDataUri } from '@/services/image';
 import { cachedCoverUri, ensurePhotoUri, writeCoverFile } from '@/services/photo-cache';
+import { formatRelativeTime } from '@/services/relative-time';
 import { nudgePhotoQueue } from '@/sync/photo-queue';
 import { syncAllCircles } from '@/sync/sync-circles';
 
-type CircleListItem = CircleListRow & { memberCount: number; photoUri?: string };
+type CircleListItem = CircleListRow & {
+  memberCount: number;
+  photoUri?: string;
+  newCount: number;
+  latestActivity?: string;
+};
+
+/**
+ * The unread badge's count — 0 (not shown at all) whenever this device has
+ * no circle identity yet, which briefly happens between joining and that
+ * join actually completing. No badge is the honest state there, not an
+ * error to surface.
+ */
+async function resolveUnreadCount(circle: CircleListRow): Promise<number> {
+  const identity = await getCircleIdentity(circle.id);
+  if (!identity) return 0;
+  return getUnreadCount(circle.id, bytesToHex(identity.publicKey), circle.createdAt, circle.lastViewedAt);
+}
+
+/** "Last added just now" / "…3 hours ago" / "…6 days ago" — undefined for a circle with no posts yet. */
+async function resolveLatestActivity(circleId: string): Promise<string | undefined> {
+  const newestPostCreatedAt = await getNewestPostCreatedAt(circleId);
+  return newestPostCreatedAt === null ? undefined : `Last added ${formatRelativeTime(newestPostCreatedAt)}`;
+}
 
 /**
  * The circle's cover as a cached `file://` path. Only a circle whose file
@@ -66,11 +94,13 @@ export default function CircleListScreen() {
     const allCircles = await listCircles();
     const withCounts = await Promise.all(
       allCircles.map(async (circle) => {
-        const [memberCount, photoUri] = await Promise.all([
+        const [memberCount, photoUri, newCount, latestActivity] = await Promise.all([
           getCircleMemberCount(circle.id),
           resolveCoverUri(circle.id),
+          resolveUnreadCount(circle),
+          resolveLatestActivity(circle.id),
         ]);
-        return { ...circle, memberCount, photoUri };
+        return { ...circle, memberCount, photoUri, newCount, latestActivity };
       }),
     );
     setCircles(withCounts);
@@ -132,6 +162,8 @@ export default function CircleListScreen() {
               name={item.name}
               memberCount={item.memberCount}
               photoUri={item.photoUri}
+              newCount={item.newCount}
+              latestActivity={item.latestActivity}
               onPress={() => router.push({ pathname: '/feed', params: { circleId: item.id } })}
             />
           )}

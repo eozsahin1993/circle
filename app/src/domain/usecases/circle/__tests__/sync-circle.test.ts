@@ -38,7 +38,7 @@ async function enqueuePost(circleId: string, photo: Uint8Array): Promise<Post> {
   const postId = generateUUID();
   const createdAt = Date.now();
   const encryptedMeta = buildAndEncryptLogEntry('post', { postId, caption: 'hi', createdAt }, identity, current.key);
-  const post = { id: postId, circleId, caption: 'hi', authorPublicKey: bytesToHex(identity.publicKey), createdAt };
+  const post = { id: postId, circleId, caption: 'hi', authorPublicKey: bytesToHex(identity.publicKey), createdAt, lastViewedAt: null };
   await insertPostAndEnqueue(
     post,
     {

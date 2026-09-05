@@ -103,6 +103,7 @@ test('a circle with no identity/content key on this device is skipped without bl
     leftAt: null,
     metaCursor: 0,
     contentCursor: 0,
+    lastViewedAt: 0,
   });
 
   await expect(broadcastProfileUpdate('New Name', null)).resolves.toBeUndefined();

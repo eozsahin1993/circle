@@ -48,6 +48,7 @@ async function emptyCircle(): Promise<string> {
     leftAt: null,
     metaCursor: 0,
     contentCursor: 0,
+    lastViewedAt: 0,
   });
   return circleId;
 }

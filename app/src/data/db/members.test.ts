@@ -24,6 +24,7 @@ async function makeCircle() {
     leftAt: null,
     metaCursor: 0,
     contentCursor: 0,
+    lastViewedAt: 0,
   };
   await insertCircle(circle);
   return circle;

@@ -1,9 +1,9 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, ne, or } from 'drizzle-orm';
 
 import { type Attachment, type NewAttachment } from '@/data/db/attachments';
 import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
-import { attachments, circleMembers, posts } from '@/data/db/schema';
+import { attachments, circleMembers, postComments, posts } from '@/data/db/schema';
 
 export type Post = typeof posts.$inferSelect;
 
@@ -140,4 +140,47 @@ export async function getNewestPostPhoto(circleId: string): Promise<Uint8Array |
     .orderBy(desc(posts.createdAt))
     .limit(1);
   return rows[0] ? normalizeBlob(rows[0].bytes) : null;
+}
+
+/** When the newest post in a circle was made — the circle list's "Last added…" line. Null for a circle with no posts yet. */
+export async function getNewestPostCreatedAt(circleId: string): Promise<number | null> {
+  const rows = await db
+    .select({ createdAt: posts.createdAt })
+    .from(posts)
+    .where(eq(posts.circleId, circleId))
+    .orderBy(desc(posts.createdAt))
+    .limit(1);
+  return rows[0]?.createdAt ?? null;
+}
+
+/** Marks a post as scrolled into view (or opened) just now — clears its "new comments" marker up to this moment. */
+export async function markPostViewed(id: string): Promise<void> {
+  await db.update(posts).set({ lastViewedAt: Date.now() }).where(eq(posts.id, id));
+}
+
+/**
+ * Which posts in this circle have a comment worth a "new comments" marker
+ * on their feed card — same rule `getUnreadCount` sums for the circle-list
+ * badge, but returning which posts qualify instead of a total. Kept
+ * separate from `feedPostQuery` rather than folded into it, given that
+ * query's column-collision fragility (see its doc comment above).
+ */
+export async function getUnseenCommentPostIds(
+  circleId: string,
+  ownPublicKey: string,
+  circleCreatedAt: number
+): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ postId: postComments.postId })
+    .from(postComments)
+    .innerJoin(posts, eq(posts.id, postComments.postId))
+    .where(
+      and(
+        eq(posts.circleId, circleId),
+        ne(postComments.authorPublicKey, ownPublicKey),
+        gt(postComments.createdAt, circleCreatedAt),
+        or(isNull(posts.lastViewedAt), gt(postComments.createdAt, posts.lastViewedAt))
+      )
+    );
+  return rows.map((row) => row.postId);
 }

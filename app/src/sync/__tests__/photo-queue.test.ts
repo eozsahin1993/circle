@@ -30,7 +30,7 @@ beforeEach(() => {
 async function makePendingPost(circleId: string, photo: Uint8Array, createdAt: number) {
   const postId = generateUUID();
   await insertPost(
-    { id: postId, circleId, caption: 'c', authorPublicKey: 'aa', createdAt },
+    { id: postId, circleId, caption: 'c', authorPublicKey: 'aa', createdAt, lastViewedAt: null },
     {
       circleId,
       entryId: postId,

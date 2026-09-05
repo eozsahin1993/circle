@@ -191,6 +191,7 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
     leftAt: null,
     metaCursor: 0,
     contentCursor: 0,
+    lastViewedAt: now,
   });
 
   const profile = await getProfile();

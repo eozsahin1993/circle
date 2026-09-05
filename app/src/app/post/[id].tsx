@@ -20,6 +20,7 @@ import {
   getFeedPost,
   getPostComments,
   getProfile,
+  markPostViewed,
   type CommentWithAuthor,
   type FeedPost,
   type ReactionSummary,
@@ -80,6 +81,11 @@ export default function PostDetailsScreen() {
     } else {
       setPhotoUri(undefined);
     }
+
+    // Covers a post the feed hasn't rendered yet (e.g. a future deep link
+    // straight into one) — the feed's own scroll-viewability tracking
+    // already covers the ordinary case of getting here from it.
+    markPostViewed(postId).catch((err) => console.error('Failed to mark the post viewed', err));
   }, [circleId, postId]);
 
   useFocusEffect(

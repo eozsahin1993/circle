@@ -33,7 +33,7 @@ async function circleWithPost() {
   const identity = (await getCircleIdentity(circleId))!;
   const postId = generateUUID();
   await insertPost(
-    { id: postId, circleId, caption: 'c', authorPublicKey: bytesToHex(identity.publicKey), createdAt: 1 },
+    { id: postId, circleId, caption: 'c', authorPublicKey: bytesToHex(identity.publicKey), createdAt: 1, lastViewedAt: null },
     {
       circleId,
       entryId: postId,
