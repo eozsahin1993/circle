@@ -49,6 +49,14 @@ export class BlobAlreadyExistsError extends Error {
   }
 }
 
+/** Thrown on HTTP 429 (see server/internal/api/ratelimit) — not handled specially, just identifiable in logs. Callers already retry any thrown error later (outbox, pullMeta, photo-queue.ts), and the budget is sized to make this rare. */
+export class RateLimitedError extends Error {
+  constructor() {
+    super('Rate limit exceeded — try again shortly.');
+    this.name = 'RateLimitedError';
+  }
+}
+
 function baseUrl(): string {
   const url = process.env.EXPO_PUBLIC_RELAY_URL;
   if (!url) throw new Error('EXPO_PUBLIC_RELAY_URL is not set.');
@@ -148,6 +156,9 @@ export async function appendEntry(
       writeToken: bytesToHex(writeToken),
     }),
   });
+  if (response.status === 429) {
+    throw new RateLimitedError();
+  }
   if (!response.ok) {
     throw new Error(await describeError(response, 'Failed to append entry'));
   }
@@ -185,6 +196,9 @@ export async function rotateLog(
       signature: bytesToHex(signature),
     }),
   });
+  if (response.status === 429) {
+    throw new RateLimitedError();
+  }
   if (!response.ok) {
     throw new Error(await describeError(response, 'Failed to rotate'));
   }
@@ -195,6 +209,9 @@ export async function rotateLog(
 /** Fetches every entry in `namespace` after `since` — GET /v1/circles/{syncId}/entries?namespace=&since=. */
 export async function fetchEntries(syncId: string, namespace: Namespace, since: number): Promise<FetchEntriesResult> {
   const response = await authorizedFetch(`/v1/circles/${syncId}/entries?namespace=${namespace}&since=${since}`);
+  if (response.status === 429) {
+    throw new RateLimitedError();
+  }
   if (!response.ok) {
     throw new Error(await describeError(response, 'Failed to fetch entries'));
   }
@@ -228,6 +245,9 @@ export async function getUploadTarget(syncId: string, entryId: string, writeToke
   });
   if (response.status === 409) {
     throw new BlobAlreadyExistsError();
+  }
+  if (response.status === 429) {
+    throw new RateLimitedError();
   }
   if (!response.ok) {
     throw new Error(await describeError(response, 'Failed to get upload target'));
@@ -279,6 +299,9 @@ export async function getCoverPhotoUploadTarget(
 export async function getBlob(syncId: string, entryId: string): Promise<Uint8Array | null> {
   const response = await authorizedFetch(`/v1/circles/${syncId}/entries/${entryId}/blob`);
   if (response.status === 404) return null;
+  if (response.status === 429) {
+    throw new RateLimitedError();
+  }
   if (!response.ok) {
     throw new Error(await describeError(response, 'Failed to download blob'));
   }

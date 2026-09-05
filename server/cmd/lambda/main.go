@@ -23,6 +23,7 @@ import (
 	invitedynamodb "circle-relay/internal/storage/invitestore/dynamodb"
 	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
 	manifestdynamodb "circle-relay/internal/storage/manifeststore/dynamodb"
+	ratelimitdynamodb "circle-relay/internal/storage/ratelimitstore/dynamodb"
 )
 
 const (
@@ -47,10 +48,12 @@ func main() {
 	authStore := authdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.SessionsTableName)
 	manifestStore := manifestdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.AccountsTableName)
 	inviteStore := invitedynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.InviteTableName, cfg.InviteRetentionDays)
+	writeRateLimitStore := ratelimitdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.RateLimitTableName, "write", int(cfg.RateLimitWriteMaxRequests), cfg.RateLimitWindow())
+	readRateLimitStore := ratelimitdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.RateLimitTableName, "read", int(cfg.RateLimitReadMaxRequests), cfg.RateLimitWindow())
 	googleVerifier := oidcverify.New(googleIssuer, googleJWKSURL, nonEmpty(cfg.GoogleClientIDIOS, cfg.GoogleClientIDAndroid, cfg.GoogleClientIDWeb))
 	appleVerifier := oidcverify.New(appleIssuer, appleJWKSURL, nonEmpty(cfg.AppleClientIDIOS))
 
-	mux := api.NewRouter(logStore, blobStore, authStore, manifestStore, inviteStore, googleVerifier, appleVerifier)
+	mux := api.NewRouter(logStore, blobStore, authStore, manifestStore, inviteStore, writeRateLimitStore, readRateLimitStore, googleVerifier, appleVerifier)
 
 	// NewV2, not New: provision/lambda_url.tf fronts this with a Lambda
 	// Function URL, which uses the same v2.0 Lambda payload format as an

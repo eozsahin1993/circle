@@ -55,3 +55,21 @@ variable "apple_client_id_ios" {
   type        = string
   default     = ""
 }
+
+variable "rate_limit_write_max_requests" {
+  description = "Per-account write-budget size for the fixed window below (appendlog/rotatelog/createlog/getuploadtarget/getcoverphotouploadtarget) — see internal/storage/ratelimitstore. A starting guess sized to tolerate a large offline-catch-up burst, not a measurement; expected to be retuned from the near-limit warnings the store logs once real traffic exists."
+  type        = number
+  default     = 500
+}
+
+variable "rate_limit_read_max_requests" {
+  description = "Per-account read-budget size for the fixed window below (getlog/getblob) — see internal/storage/ratelimitstore. Set much higher than the write budget since ordinary sync reads far more often than it writes."
+  type        = number
+  default     = 2000
+}
+
+variable "rate_limit_window_minutes" {
+  description = "Fixed window both rate-limit budgets above reset on."
+  type        = number
+  default     = 10
+}

@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 )
 
 type Config struct {
@@ -27,6 +28,18 @@ type Config struct {
 	// server/INVITE_FLOW.md and
 	// server/provision/modules/storage/dynamodb.tf's invites resource.
 	InviteTableName string
+	// RateLimitTableName is the standalone per-account request-budget
+	// table — see server/provision/rate_limit_table.tf. Shared by the write
+	// and read budgets below; ratelimitdynamodb.New's keyPrefix keeps their
+	// rows from colliding.
+	RateLimitTableName string
+	// RateLimitWriteMaxRequests/RateLimitReadMaxRequests are starting
+	// guesses, not measurements — env-tunable so they can be adjusted from
+	// real traffic without a redeploy.
+	RateLimitWriteMaxRequests int64
+	RateLimitReadMaxRequests  int64
+	// RateLimitWindowMinutes is the fixed window both budgets reset on.
+	RateLimitWindowMinutes int64
 	// GoogleClientIDIOS/Android/Web are the accepted "aud" values for
 	// Google Sign-In ID tokens, one per platform client registered in
 	// Google Cloud Console — named per-platform (mirroring app/.env.local's
@@ -67,20 +80,30 @@ type Config struct {
 // limp along with a zero value.
 func Load() Config {
 	return Config{
-		TableName:             mustEnv("TABLE_NAME"),
-		BucketName:            mustEnv("BUCKET_NAME"),
-		SessionsTableName:     mustEnv("SESSIONS_TABLE_NAME"),
-		AccountsTableName:     mustEnv("ACCOUNTS_TABLE_NAME"),
-		InviteTableName:       mustEnv("INVITE_TABLE_NAME"),
-		GoogleClientIDIOS:     envOr("GOOGLE_CLIENT_ID_IOS", ""),
-		GoogleClientIDAndroid: envOr("GOOGLE_CLIENT_ID_ANDROID", ""),
-		GoogleClientIDWeb:     envOr("GOOGLE_CLIENT_ID_WEB", ""),
-		AppleClientIDIOS:      envOr("APPLE_CLIENT_ID_IOS", ""),
-		MaxBlobSize:           intEnv("MAX_BLOB_SIZE_BYTES", 0),
-		InviteRetentionDays:   intEnv("INVITE_RETENTION_DAYS", 0),
-		Port:                  envOr("PORT", "8080"),
-		S3ForcePathStyle:      envOr("S3_FORCE_PATH_STYLE", "false") == "true",
+		TableName:                 mustEnv("TABLE_NAME"),
+		BucketName:                mustEnv("BUCKET_NAME"),
+		SessionsTableName:         mustEnv("SESSIONS_TABLE_NAME"),
+		AccountsTableName:         mustEnv("ACCOUNTS_TABLE_NAME"),
+		InviteTableName:           mustEnv("INVITE_TABLE_NAME"),
+		RateLimitTableName:        mustEnv("RATE_LIMIT_TABLE_NAME"),
+		RateLimitWriteMaxRequests: intEnv("RATE_LIMIT_WRITE_MAX_REQUESTS", 500),
+		RateLimitReadMaxRequests:  intEnv("RATE_LIMIT_READ_MAX_REQUESTS", 2000),
+		RateLimitWindowMinutes:    intEnv("RATE_LIMIT_WINDOW_MINUTES", 10),
+		GoogleClientIDIOS:         envOr("GOOGLE_CLIENT_ID_IOS", ""),
+		GoogleClientIDAndroid:     envOr("GOOGLE_CLIENT_ID_ANDROID", ""),
+		GoogleClientIDWeb:         envOr("GOOGLE_CLIENT_ID_WEB", ""),
+		AppleClientIDIOS:          envOr("APPLE_CLIENT_ID_IOS", ""),
+		MaxBlobSize:               intEnv("MAX_BLOB_SIZE_BYTES", 0),
+		InviteRetentionDays:       intEnv("INVITE_RETENTION_DAYS", 0),
+		Port:                      envOr("PORT", "8080"),
+		S3ForcePathStyle:          envOr("S3_FORCE_PATH_STYLE", "false") == "true",
 	}
+}
+
+// RateLimitWindow is RateLimitWindowMinutes as a time.Duration, for
+// passing straight into ratelimitdynamodb.New.
+func (c Config) RateLimitWindow() time.Duration {
+	return time.Duration(c.RateLimitWindowMinutes) * time.Minute
 }
 
 func mustEnv(name string) string {

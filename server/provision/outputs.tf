@@ -22,3 +22,7 @@ output "accounts_table_name" {
 output "invite_table_name" {
   value = module.storage.invite_table_name
 }
+
+output "rate_limit_table_name" {
+  value = aws_dynamodb_table.rate_limit.name
+}

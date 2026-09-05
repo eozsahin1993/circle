@@ -21,12 +21,14 @@ import (
 	"circle-relay/internal/api/getlog"
 	"circle-relay/internal/api/getuploadtarget"
 	"circle-relay/internal/api/invite"
+	"circle-relay/internal/api/ratelimit"
 	"circle-relay/internal/api/rotatelog"
 	"circle-relay/internal/storage/authstore"
 	"circle-relay/internal/storage/blobstore"
 	"circle-relay/internal/storage/invitestore"
 	"circle-relay/internal/storage/logstore"
 	"circle-relay/internal/storage/manifeststore"
+	"circle-relay/internal/storage/ratelimitstore"
 )
 
 func NewRouter(
@@ -35,11 +37,13 @@ func NewRouter(
 	authStore authstore.Store,
 	manifestStore manifeststore.Store,
 	inviteStore invitestore.Store,
+	writeRateLimitStore ratelimitstore.Store,
+	readRateLimitStore ratelimitstore.Store,
 	googleVerifier *oidcverify.Verifier,
 	appleVerifier *oidcverify.Verifier,
 ) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.Handle("/v1/", http.StripPrefix("/v1", newV1Mux(logStore, blobStore, authStore, manifestStore, inviteStore, googleVerifier, appleVerifier)))
+	mux.Handle("/v1/", http.StripPrefix("/v1", newV1Mux(logStore, blobStore, authStore, manifestStore, inviteStore, writeRateLimitStore, readRateLimitStore, googleVerifier, appleVerifier)))
 	return mux
 }
 
@@ -53,23 +57,30 @@ func newV1Mux(
 	authStore authstore.Store,
 	manifestStore manifeststore.Store,
 	inviteStore invitestore.Store,
+	writeRateLimitStore ratelimitstore.Store,
+	readRateLimitStore ratelimitstore.Store,
 	googleVerifier *oidcverify.Verifier,
 	appleVerifier *oidcverify.Verifier,
 ) *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// Grouped under one sub-mux so RequireSession wraps all six at once —
+	// Grouped under one sub-mux so RequireSession wraps all seven at once —
 	// each endpoint also checks its own write token/authority signature
 	// beyond this shared session check (server/SYNC_DESIGN.md's
-	// "Authorization" section).
+	// "Authorization" section). Rate limiting wraps each handler
+	// individually instead of circleMux as a whole, since writes and reads
+	// carry different budgets (see internal/api/ratelimit).
+	writeLimit := func(h http.Handler) http.Handler { return ratelimit.Require(writeRateLimitStore, h) }
+	readLimit := func(h http.Handler) http.Handler { return ratelimit.Require(readRateLimitStore, h) }
+
 	circleMux := http.NewServeMux()
-	createlog.Register(circleMux, &createlog.Service{LogStore: logStore})
-	appendlog.Register(circleMux, &appendlog.Service{LogStore: logStore})
-	rotatelog.Register(circleMux, &rotatelog.Service{LogStore: logStore})
-	getlog.Register(circleMux, &getlog.Service{LogStore: logStore})
-	getblob.Register(circleMux, &getblob.Service{BlobStore: blobStore})
-	getuploadtarget.Register(circleMux, &getuploadtarget.Service{BlobStore: blobStore, LogStore: logStore})
-	getcoverphotouploadtarget.Register(circleMux, &getcoverphotouploadtarget.Service{BlobStore: blobStore, LogStore: logStore})
+	createlog.Register(circleMux, &createlog.Service{LogStore: logStore}, writeLimit)
+	appendlog.Register(circleMux, &appendlog.Service{LogStore: logStore}, writeLimit)
+	rotatelog.Register(circleMux, &rotatelog.Service{LogStore: logStore}, writeLimit)
+	getlog.Register(circleMux, &getlog.Service{LogStore: logStore}, readLimit)
+	getblob.Register(circleMux, &getblob.Service{BlobStore: blobStore}, readLimit)
+	getuploadtarget.Register(circleMux, &getuploadtarget.Service{BlobStore: blobStore, LogStore: logStore}, writeLimit)
+	getcoverphotouploadtarget.Register(circleMux, &getcoverphotouploadtarget.Service{BlobStore: blobStore, LogStore: logStore}, writeLimit)
 	mux.Handle("/circles/", auth.RequireSession(authStore, circleMux))
 
 	// Account-scoped, not circle-scoped — its own sub-mux, same

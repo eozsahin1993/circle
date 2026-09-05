@@ -23,10 +23,12 @@ import {
   BlobAlreadyExistsError,
   bootstrapCircle,
   fetchEntries,
+  getBlob,
   getCoverPhotoUploadTarget,
   getManifest,
   getUploadTarget,
   putManifest,
+  RateLimitedError,
   rotateLog,
   uploadBlob,
 } from '@/services/relay';
@@ -102,6 +104,14 @@ describe('appendEntry', () => {
     await expect(appendEntry('sync-a', 'content', 'post-1', new Uint8Array([1]), 1, new Uint8Array([1]))).rejects.toThrow('Not signed in.');
     expect(global.fetch).not.toHaveBeenCalled();
   });
+
+  test('throws RateLimitedError specifically on a 429', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
+
+    await expect(appendEntry('sync-a', 'content', 'post-1', new Uint8Array([1]), 1, new Uint8Array([1]))).rejects.toBeInstanceOf(
+      RateLimitedError
+    );
+  });
 });
 
 describe('rotateLog', () => {
@@ -133,6 +143,14 @@ describe('rotateLog', () => {
       rotateLog('sync-a', 'rotate-1', new Uint8Array([1]), 1, new Uint8Array([1]), 'h', new Uint8Array([1]), new Uint8Array([1]))
     ).rejects.toThrow();
   });
+
+  test('throws RateLimitedError specifically on a 429', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
+
+    await expect(
+      rotateLog('sync-a', 'rotate-1', new Uint8Array([1]), 1, new Uint8Array([1]), 'h', new Uint8Array([1]), new Uint8Array([1]))
+    ).rejects.toBeInstanceOf(RateLimitedError);
+  });
 });
 
 describe('fetchEntries', () => {
@@ -155,6 +173,12 @@ describe('fetchEntries', () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 404));
 
     await expect(fetchEntries('sync-a', 'content', 0)).rejects.toThrow();
+  });
+
+  test('throws RateLimitedError specifically on a 429', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
+
+    await expect(fetchEntries('sync-a', 'content', 0)).rejects.toBeInstanceOf(RateLimitedError);
   });
 });
 
@@ -185,6 +209,12 @@ describe('getUploadTarget', () => {
     const err = await getUploadTarget('sync-a', 'post-1', new Uint8Array([1])).catch((e) => e);
     expect(err).not.toBeInstanceOf(BlobAlreadyExistsError);
   });
+
+  test('throws RateLimitedError specifically on a 429', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
+
+    await expect(getUploadTarget('sync-a', 'post-1', new Uint8Array([1]))).rejects.toBeInstanceOf(RateLimitedError);
+  });
 });
 
 describe('getCoverPhotoUploadTarget', () => {
@@ -212,6 +242,14 @@ describe('getCoverPhotoUploadTarget', () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 403));
 
     await expect(getCoverPhotoUploadTarget('sync-a', new Uint8Array([1]), new Uint8Array([2]), new Uint8Array([3]))).rejects.toThrow();
+  });
+});
+
+describe('getBlob', () => {
+  test('throws RateLimitedError specifically on a 429', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
+
+    await expect(getBlob('sync-a', 'post-1')).rejects.toBeInstanceOf(RateLimitedError);
   });
 });
 

@@ -3,10 +3,16 @@ package testsupport
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"circle-relay/internal/api"
 	"circle-relay/internal/api/auth/oidcverify"
 )
+
+// testRateLimitMaxRequests is deliberately huge — end-to-end router tests
+// exercise real request flows, not the rate limiter itself (that's
+// ratelimitstore/dynamodb's own tests), so it should never trip here.
+const testRateLimitMaxRequests = 1_000_000
 
 // NewRouterWithAuth builds the full api.NewRouter against real
 // LocalStack-backed adapters, plus fake (but real-HTTP, real-JWT)
@@ -23,6 +29,8 @@ func NewRouterWithAuth(t testing.TB) (mux *http.ServeMux, google, apple *FakeOID
 		NewAuthStore(t),
 		NewManifestStore(t),
 		NewInviteStore(t, 0),
+		NewRateLimitStore(t, "write", testRateLimitMaxRequests, time.Hour),
+		NewRateLimitStore(t, "read", testRateLimitMaxRequests, time.Hour),
 		oidcverify.New(google.Issuer, google.JWKSURL, []string{TestGoogleClientID}),
 		oidcverify.New(apple.Issuer, apple.JWKSURL, []string{TestAppleClientID}),
 	)

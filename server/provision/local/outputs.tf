@@ -22,3 +22,8 @@ output "invite_table_name" {
   description = "Set as INVITE_TABLE_NAME when running cmd/server against LocalStack."
   value       = module.storage.invite_table_name
 }
+
+output "rate_limit_table_name" {
+  description = "Set as RATE_LIMIT_TABLE_NAME when running cmd/server against LocalStack."
+  value       = aws_dynamodb_table.rate_limit.name
+}

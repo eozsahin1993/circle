@@ -94,6 +94,17 @@ data "aws_iam_policy_document" "lambda_storage_access" {
     resources = [module.storage.invite_table_arn]
   }
 
+  # Also separate from every table above — its own table (see
+  # rate_limit_table.tf). Matches ratelimitstore.Store's one method
+  # exactly — Allow's two-attempt CAS is entirely UpdateItem, no GetItem.
+  statement {
+    sid = "RateLimitTableAccess"
+    actions = [
+      "dynamodb:UpdateItem",
+    ]
+    resources = [aws_dynamodb_table.rate_limit.arn]
+  }
+
   statement {
     sid       = "KMSAccess"
     actions   = ["kms:Decrypt"]
@@ -131,17 +142,21 @@ resource "aws_lambda_function" "relay" {
 
   environment {
     variables = {
-      TABLE_NAME               = module.storage.table_name
-      BUCKET_NAME              = module.storage.bucket_name
-      SESSIONS_TABLE_NAME      = aws_dynamodb_table.sessions.name
-      ACCOUNTS_TABLE_NAME      = aws_dynamodb_table.accounts.name
-      INVITE_TABLE_NAME        = module.storage.invite_table_name
-      GOOGLE_CLIENT_ID_IOS     = var.google_client_id_ios
-      GOOGLE_CLIENT_ID_ANDROID = var.google_client_id_android
-      GOOGLE_CLIENT_ID_WEB     = var.google_client_id_web
-      APPLE_CLIENT_ID_IOS      = var.apple_client_id_ios
-      MAX_BLOB_SIZE_BYTES      = tostring(var.max_blob_size_bytes)
-      INVITE_RETENTION_DAYS    = tostring(var.invite_retention_days)
+      TABLE_NAME                    = module.storage.table_name
+      BUCKET_NAME                   = module.storage.bucket_name
+      SESSIONS_TABLE_NAME           = aws_dynamodb_table.sessions.name
+      ACCOUNTS_TABLE_NAME           = aws_dynamodb_table.accounts.name
+      INVITE_TABLE_NAME             = module.storage.invite_table_name
+      RATE_LIMIT_TABLE_NAME         = aws_dynamodb_table.rate_limit.name
+      GOOGLE_CLIENT_ID_IOS          = var.google_client_id_ios
+      GOOGLE_CLIENT_ID_ANDROID      = var.google_client_id_android
+      GOOGLE_CLIENT_ID_WEB          = var.google_client_id_web
+      APPLE_CLIENT_ID_IOS           = var.apple_client_id_ios
+      MAX_BLOB_SIZE_BYTES           = tostring(var.max_blob_size_bytes)
+      INVITE_RETENTION_DAYS         = tostring(var.invite_retention_days)
+      RATE_LIMIT_WRITE_MAX_REQUESTS = tostring(var.rate_limit_write_max_requests)
+      RATE_LIMIT_READ_MAX_REQUESTS  = tostring(var.rate_limit_read_max_requests)
+      RATE_LIMIT_WINDOW_MINUTES     = tostring(var.rate_limit_window_minutes)
     }
   }
 }
