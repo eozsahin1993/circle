@@ -4,8 +4,8 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
-import { BackButton } from '@/components/back-button';
 import { PrimaryButton } from '@/components/primary-button';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, Radius, Spacing, Tints } from '@/constants/theme';
@@ -76,9 +76,7 @@ export default function ProfileSetupScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.back}>
-          <BackButton />
-        </View>
+        <ScreenHeader label="Your profile" />
 
         <KeyboardAvoidingView style={styles.form} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
@@ -136,11 +134,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
     paddingTop: Spacing.topPadUnderStatusBar,
-  },
-  back: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    marginBottom: Spacing.cardListGap,
   },
   form: {
     flex: 1,

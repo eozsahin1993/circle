@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { BackButton } from '@/components/back-button';
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Tints } from '@/constants/theme';
+import { Icons, Radius, Tints } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type CircleHeaderProps = {
@@ -30,7 +30,7 @@ export function CircleHeader({ name, memberCount, onPressDetails }: CircleHeader
       </Pressable>
 
       <Pressable style={styles.detailsButton} onPress={onPressDetails} hitSlop={8}>
-        <Feather name="more-horizontal" size={18} color={theme.secondary} />
+        <Feather name={Icons.more} size={18} color={theme.secondary} />
       </Pressable>
     </View>
   );

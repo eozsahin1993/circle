@@ -6,12 +6,12 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
-import { BackButton } from '@/components/back-button';
 import { PrivacyInfoModal } from '@/components/privacy-info-modal';
 import { ReactionChip } from '@/components/reaction-chip';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Tints } from '@/constants/theme';
+import { Colors, Icons, Radius, Spacing, Tints } from '@/constants/theme';
 import { getProfile, type Profile } from '@/data/db';
 import { resetLocalDataForTesting } from '@/domain/usecases/dev-reset';
 import { signOut } from '@/domain/usecases/account/sign-in';
@@ -92,9 +92,7 @@ export default function AccountScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.back}>
-          <BackButton label="Your account" />
-        </View>
+        <ScreenHeader label="Your account" />
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.profileRow}>
@@ -147,7 +145,7 @@ export default function AccountScreen() {
                 <ThemedText type="postAuthor" themeColor="accentBright">
                   Add another device
                 </ThemedText>
-                <Feather name="chevron-right" size={18} color={theme.accentBright} />
+                <Feather name={Icons.disclosure} size={18} color={theme.accentBright} />
               </Pressable>
             </ThemedView>
 
@@ -216,7 +214,7 @@ export default function AccountScreen() {
                     12 words that restore your circles on a new phone
                   </ThemedText>
                 </View>
-                <Feather name="chevron-right" size={18} color={theme.muted} />
+                <Feather name={Icons.disclosure} size={18} color={theme.muted} />
               </Pressable>
 
               <Pressable style={styles.linkRowLast} onPress={() => setPrivacyVisible(true)}>
@@ -226,7 +224,7 @@ export default function AccountScreen() {
                     What end-to-end encrypted means here
                   </ThemedText>
                 </View>
-                <Feather name="chevron-right" size={18} color={theme.muted} />
+                <Feather name={Icons.disclosure} size={18} color={theme.muted} />
               </Pressable>
             </ThemedView>
           </View>
@@ -293,11 +291,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
     paddingTop: Spacing.topPadUnderStatusBar,
-  },
-  back: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    marginBottom: Spacing.cardListGap,
   },
   content: {
     paddingBottom: Spacing.cardListGap * 2,
