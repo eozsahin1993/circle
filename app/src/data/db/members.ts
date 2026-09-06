@@ -40,6 +40,23 @@ export async function insertMemberIfAbsent(member: Member): Promise<void> {
   await db.insert(circleMembers).values(member).onConflictDoNothing();
 }
 
+/**
+ * Corrects an existing member's join time to the one the `member_added`
+ * entry carries. `completeJoin` writes the joiner's own row optimistically
+ * with that device's clock, well before the approver's entry arrives —
+ * `insertMemberIfAbsent` then leaves that row alone, so without this the
+ * joiner's device would be the only one dating the join differently from
+ * everyone else's. Only ever touches `joinedAt`: the local row's name and
+ * picture are the full-resolution originals, better than the thumbnail on
+ * the entry.
+ */
+export async function reconcileMemberJoinedAt(circleId: string, identityPublicKey: string, joinedAt: number): Promise<void> {
+  await db
+    .update(circleMembers)
+    .set({ joinedAt })
+    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey)));
+}
+
 /** Looks up a member by their identity (Ed25519 signing) public key — used to verify a post's signature. */
 export async function getMemberByPublicKey(circleId: string, identityPublicKey: string): Promise<Member | null> {
   const rows = await db

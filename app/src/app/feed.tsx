@@ -100,6 +100,13 @@ type FeedRow =
 /** Posts and roster changes share one timeline, newest first — this is what they're sorted on. */
 type DatedRow = { at: number; row: FeedRow };
 
+function rowKey(row: FeedRow): string {
+  if (row.kind === 'post') return row.post.id;
+  if (row.kind === 'event') return row.event.id;
+  if (row.kind === 'pending-request') return row.request.requesterId;
+  return row.kind;
+}
+
 export default function FeedScreen() {
   const { circleId, justJoined } = useLocalSearchParams<{ circleId: string; justJoined?: string }>();
   const [circleName, setCircleName] = useState('');
@@ -329,18 +336,24 @@ export default function FeedScreen() {
     ...timeline.map((dated) => dated.row),
   ];
 
+  // FlatList hands a separator only its *leading* row (there's no
+  // trailingItem on a FlatList separator), so the gap that belongs
+  // between each pair is worked out here, where both rows are in hand: a
+  // membership event is one quiet line and doesn't want the full
+  // between-photos gap on either side of it.
+  const gapAfterRow = new Map<string, number>();
+  for (let i = 0; i < rows.length - 1; i++) {
+    const touchesEvent = rows[i].kind === 'event' || rows[i + 1].kind === 'event';
+    gapAfterRow.set(rowKey(rows[i]), touchesEvent ? Spacing.cardListGap : Spacing.gapBetweenPosts);
+  }
+
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
         <FlatList
           data={rows}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-          keyExtractor={(row) => {
-            if (row.kind === 'post') return row.post.id;
-            if (row.kind === 'event') return row.event.id;
-            if (row.kind === 'pending-request') return row.request.requesterId;
-            return row.kind;
-          }}
+          keyExtractor={rowKey}
           renderItem={({ item }) => {
             if (item.kind === 'privacy') return <PrivacyNotice onPress={() => setShowPrivacyInfo(true)} />;
             if (item.kind === 'just-joined') {
@@ -386,16 +399,9 @@ export default function FeedScreen() {
             </ThemedView>
           }
           stickyHeaderIndices={[0]}
-          // A membership event is one quiet line, so it doesn't need the
-          // full between-photos gap on either side of it.
-          ItemSeparatorComponent={({ leadingItem, trailingItem }) => (
+          ItemSeparatorComponent={({ leadingItem }: { leadingItem?: FeedRow }) => (
             <ThemedView
-              style={{
-                height:
-                  (leadingItem as FeedRow | undefined)?.kind === 'event' || (trailingItem as FeedRow | undefined)?.kind === 'event'
-                    ? Spacing.cardListGap
-                    : Spacing.gapBetweenPosts,
-              }}
+              style={{ height: (leadingItem && gapAfterRow.get(rowKey(leadingItem))) ?? Spacing.gapBetweenPosts }}
             />
           )}
           contentContainerStyle={styles.list}

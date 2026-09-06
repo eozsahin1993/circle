@@ -1,4 +1,4 @@
-import { getCircleMembers, insertMemberIfAbsent, MemberRoles, type MemberRole } from '@/data/db';
+import { getCircleMembers, insertMemberIfAbsent, MemberRoles, reconcileMemberJoinedAt, type MemberRole } from '@/data/db';
 import { generateUUID } from '@/services/crypto';
 import { parsePictureThumbnail } from '@/services/image';
 import { asRecord, numberField, type EntryHandler } from '@/sync/entry-handlers/types';
@@ -105,5 +105,13 @@ export const memberAddedHandler: EntryHandler = {
       joinedAt: payload.createdAt ?? Date.now(),
       removedAt: null,
     });
+
+    // The joiner's own device already wrote this row in `completeJoin`,
+    // stamped with its own clock at the moment it noticed the approval —
+    // which can be long after the approval itself. The entry is the one
+    // version every device agrees on, so it wins where it exists.
+    if (payload.createdAt !== undefined) {
+      await reconcileMemberJoinedAt(circleId, payload.identityPublicKey, payload.createdAt);
+    }
   },
 };

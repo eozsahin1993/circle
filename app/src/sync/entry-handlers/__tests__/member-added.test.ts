@@ -229,6 +229,36 @@ describe('apply', () => {
     expect(added?.joinedAt).toBe(joinedLongAgo);
   });
 
+  // completeJoin writes the joiner's own row when it notices the approval,
+  // which can be well after the approval itself — the entry is the version
+  // every device agrees on, so it corrects the local guess.
+  test('corrects a row this device wrote before the entry arrived', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    const founder = (await getCircleIdentity(circleId))!;
+    const joiner = generateIdentity();
+    const joinerKey = bytesToHex(joiner.publicKey);
+    const approvedAt = Date.now() - 2 * 60 * 60 * 1000;
+    await insertMember({
+      circleId,
+      identityPublicKey: joinerKey,
+      encPublicKey: 'cc',
+      memberId: generateUUID(),
+      role: MemberRoles.member,
+      name: 'Priya',
+      picture: null,
+      joinedAt: Date.now(),
+      removedAt: null,
+    });
+
+    await memberAddedHandler.apply(
+      circleId,
+      envelope(bytesToHex(founder.publicKey), { ...payloadFor(joinerKey, 'Priya'), createdAt: approvedAt })
+    );
+
+    const added = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === joinerKey);
+    expect(added?.joinedAt).toBe(approvedAt);
+  });
+
   test('falls back to receipt time for an entry written before createdAt existed', async () => {
     const { id: circleId } = await createCircle({ name: 'Family Circle' });
     const founder = (await getCircleIdentity(circleId))!;
