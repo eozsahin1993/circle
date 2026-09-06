@@ -459,6 +459,32 @@ func TestLogStore_Peek_OmitsAnUnknownSyncIDWithoutErroringTheWholeBatch(t *testi
 	}
 }
 
+// BatchGetItem rejects a request containing the same key twice with a
+// ValidationException, failing the whole batch — so a repeated syncID has
+// to collapse before the call, not blow up the request.
+func TestLogStore_Peek_ToleratesRepeatedSyncIDs(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	founder := newAuthorityKey(t)
+	syncID := testsupport.UniqueSyncID(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceMeta, "m-1", []byte("m"), 1, token); err != nil {
+		t.Fatal(err)
+	}
+
+	epochs, err := store.Peek(ctx, []string{syncID, syncID, syncID})
+	if err != nil {
+		t.Fatalf("a repeated syncID must not fail the batch: %v", err)
+	}
+	if len(epochs) != 1 {
+		t.Fatalf("expected one circle in the result, got %d", len(epochs))
+	}
+	if got := epochs[syncID]; got.Meta != 1 {
+		t.Fatalf("expected meta epoch 1, got %d", got.Meta)
+	}
+}
+
 func TestLogStore_Peek_EmptyInputReturnsEmptyResult(t *testing.T) {
 	store := testsupport.NewLogStore(t)
 

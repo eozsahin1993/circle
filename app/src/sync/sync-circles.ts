@@ -61,7 +61,15 @@ export async function syncStaleCircles(): Promise<void> {
   const circles = await getAllCircles();
   if (circles.length === 0) return;
 
-  const remote = await fetchEpochs(circles.map((circle) => circle.syncId));
+  // A failed epoch check must not strand the push side: an outbox entry
+  // that hasn't gone out yet needs its retry whether or not this
+  // particular endpoint answered (it has its own rate-limit budget, and
+  // could fail while appends would still succeed). Carry on with no
+  // epochs — every circle then syncs only if it has something queued.
+  const remote = await fetchEpochs(circles.map((circle) => circle.syncId)).catch((err) => {
+    console.error('Failed to check circle epochs', err);
+    return [];
+  });
   const remoteBySyncId = new Map(remote.map((epochs) => [epochs.syncId, epochs]));
 
   await Promise.all(

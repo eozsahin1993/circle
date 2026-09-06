@@ -403,9 +403,15 @@ describe('syncStaleCircles', () => {
 
   test('still syncs a circle with nothing new remotely but something queued locally', async () => {
     const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    // createPost kicks off its own drain fire-and-forget. Let that one
+    // fail and settle, so the entry is still pending and every append
+    // seen below belongs to syncStaleCircles rather than to that drain.
+    (appendEntry as jest.Mock).mockRejectedValue(new Error('offline'));
     await createPost({ circleId, caption: 'Mine', photo: new Uint8Array([1, 2, 3]) });
+    await drainOutbox(circleId).catch(() => {});
     const { syncId, metaCursor, contentCursor } = (await getAllCircles()).find((circle) => circle.id === circleId)!;
-    (appendEntry as jest.Mock).mockClear();
+    (appendEntry as jest.Mock).mockReset();
+    (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
 
     // Reports no new content at all — the only reason to sync is the
     // locally-queued post drainOutbox hasn't pushed yet.
