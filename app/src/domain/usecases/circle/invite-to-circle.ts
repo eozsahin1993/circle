@@ -253,6 +253,10 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   // makes the new member visible to everyone else: the joiner supplied
   // the public halves, and this signature is the circle vouching for them.
   const currentVersion = Math.max(...Object.keys(keyMap).map(Number));
+  // Carried on the entry so every device dates this join the same way —
+  // a device replaying meta from epoch 0 would otherwise stamp it with
+  // its own "now" and sort it to the top of the feed.
+  const joinedAt = Date.now();
   const memberAddedEntry = buildAndEncryptLogEntry(
     EntryTypes.MEMBER_ADDED,
     {
@@ -262,6 +266,7 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
       role: MemberRoles.member,
       keyVersion: currentVersion,
       picture: picturePayload,
+      createdAt: joinedAt,
     },
     identity,
     keyMap[currentVersion]
@@ -286,7 +291,7 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
     role: MemberRoles.member,
     name: selfReportedName,
     picture: picture ?? null,
-    joinedAt: Date.now(),
+    joinedAt,
     removedAt: null,
   });
 

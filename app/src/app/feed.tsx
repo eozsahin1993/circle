@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CircleHeader } from '@/components/circle-header';
 import { FabButton } from '@/components/fab-button';
+import { MembershipEventRow, type MembershipEventItem } from '@/components/membership-event-row';
 import { PendingJoinRequestCard } from '@/components/pending-join-request-card';
 import { type CommentItem } from '@/components/post-comments';
 import { PostCard, type Post } from '@/components/post-card';
@@ -19,6 +20,7 @@ import {
   getCircleSummary,
   getCircleFeed,
   getCircleMemberCount,
+  getCircleMembershipEvents,
   getPostComments,
   getProfile,
   getUnseenCommentPostIds,
@@ -92,13 +94,22 @@ type FeedRow =
   | { kind: 'privacy' }
   | { kind: 'just-joined' }
   | { kind: 'pending-request'; request: PendingRequest }
-  | { kind: 'post'; post: Post };
+  | { kind: 'post'; post: Post }
+  | { kind: 'event'; event: MembershipEventItem };
+
+/** Posts and roster changes share one timeline, newest first — this is what they're sorted on. */
+type DatedRow = { at: number; row: FeedRow };
 
 export default function FeedScreen() {
   const { circleId, justJoined } = useLocalSearchParams<{ circleId: string; justJoined?: string }>();
   const [circleName, setCircleName] = useState('');
   const [memberCount, setMemberCount] = useState(0);
   const [posts, setPosts] = useState<Post[]>([]);
+  // Kept out of `Post` itself: PostCard only ever shows the preformatted
+  // `timestamp` string, and this is purely the key posts get merged with
+  // membership events on.
+  const [postTimes, setPostTimes] = useState<Map<string, number>>(new Map());
+  const [membershipEvents, setMembershipEvents] = useState<{ item: MembershipEventItem; at: number }[]>([]);
   const [showPrivacyInfo, setShowPrivacyInfo] = useState(false);
   // Kept at component scope so re-reading one post's comments after adding
   // one can resolve the local author's name the same way the initial load does.
@@ -116,17 +127,31 @@ export default function FeedScreen() {
   const loadFromDatabase = useCallback(async () => {
     if (!circleId) return;
 
-    const [circle, memberCount, circlePosts, profile, identity] = await Promise.all([
+    const [circle, memberCount, circlePosts, profile, identity, events] = await Promise.all([
       getCircleSummary(circleId),
       getCircleMemberCount(circleId),
       getCircleFeed(circleId),
       getProfile(),
       getCircleIdentity(circleId),
+      getCircleMembershipEvents(circleId),
     ]);
 
     setCircleName(circle?.name ?? '');
     setMemberCount(memberCount);
     setProfileName(profile?.name);
+    setMembershipEvents(
+      events.map((event) => ({
+        at: event.at,
+        item: {
+          id: event.id,
+          kind: event.kind,
+          name: event.name || 'Someone',
+          photoUri: event.picture ? bytesToDataUri(event.picture) : undefined,
+          timestamp: formatTimestamp(event.at),
+        },
+      })),
+    );
+    setPostTimes(new Map(circlePosts.map((post) => [post.id, post.createdAt])));
 
     // No identity yet briefly happens between joining and that join
     // actually completing — no posts have "new comments" to mark in that
@@ -290,11 +315,18 @@ export default function FeedScreen() {
   // for good once any post shows up.
   const showJustJoinedBanner = justJoined === '1' && posts.length === 0;
 
+  // Posts and roster changes are one timeline sorted newest-first; the
+  // pinned rows above it aren't dated and always lead.
+  const timeline: DatedRow[] = [
+    ...posts.map((post) => ({ at: postTimes.get(post.id) ?? 0, row: { kind: 'post' as const, post } })),
+    ...membershipEvents.map(({ at, item }) => ({ at, row: { kind: 'event' as const, event: item } })),
+  ].sort((a, b) => b.at - a.at);
+
   const rows: FeedRow[] = [
     ...pendingRequests.map((request) => ({ kind: 'pending-request' as const, request })),
     { kind: 'privacy' },
     ...(showJustJoinedBanner ? [{ kind: 'just-joined' as const }] : []),
-    ...posts.map((post) => ({ kind: 'post' as const, post })),
+    ...timeline.map((dated) => dated.row),
   ];
 
   return (
@@ -305,6 +337,7 @@ export default function FeedScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           keyExtractor={(row) => {
             if (row.kind === 'post') return row.post.id;
+            if (row.kind === 'event') return row.event.id;
             if (row.kind === 'pending-request') return row.request.requesterId;
             return row.kind;
           }}
@@ -320,6 +353,7 @@ export default function FeedScreen() {
                 </ThemedView>
               );
             }
+            if (item.kind === 'event') return <MembershipEventRow event={item.event} />;
             if (item.kind === 'pending-request') {
               return (
                 <ThemedView style={styles.pendingRequestRow}>
@@ -352,7 +386,18 @@ export default function FeedScreen() {
             </ThemedView>
           }
           stickyHeaderIndices={[0]}
-          ItemSeparatorComponent={() => <ThemedView style={{ height: Spacing.gapBetweenPosts }} />}
+          // A membership event is one quiet line, so it doesn't need the
+          // full between-photos gap on either side of it.
+          ItemSeparatorComponent={({ leadingItem, trailingItem }) => (
+            <ThemedView
+              style={{
+                height:
+                  (leadingItem as FeedRow | undefined)?.kind === 'event' || (trailingItem as FeedRow | undefined)?.kind === 'event'
+                    ? Spacing.cardListGap
+                    : Spacing.gapBetweenPosts,
+              }}
+            />
+          )}
           contentContainerStyle={styles.list}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}

@@ -210,4 +210,35 @@ describe('apply', () => {
     expect(added?.name).toBe('Priya');
     expect(added?.picture).toBeNull();
   });
+
+  // Without this, a device replaying meta from epoch 0 would date every
+  // historical join "now" and sort them all to the top of its feed.
+  test('dates the join from the entry, not from when this device applied it', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    const founder = (await getCircleIdentity(circleId))!;
+    const joiner = generateIdentity();
+    const joinerKey = bytesToHex(joiner.publicKey);
+    const joinedLongAgo = Date.now() - 5 * 24 * 60 * 60 * 1000;
+
+    await memberAddedHandler.apply(
+      circleId,
+      envelope(bytesToHex(founder.publicKey), { ...payloadFor(joinerKey, 'Priya'), createdAt: joinedLongAgo })
+    );
+
+    const added = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === joinerKey);
+    expect(added?.joinedAt).toBe(joinedLongAgo);
+  });
+
+  test('falls back to receipt time for an entry written before createdAt existed', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    const founder = (await getCircleIdentity(circleId))!;
+    const joiner = generateIdentity();
+    const joinerKey = bytesToHex(joiner.publicKey);
+    const before = Date.now();
+
+    await memberAddedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payloadFor(joinerKey, 'Priya')));
+
+    const added = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === joinerKey);
+    expect(added?.joinedAt).toBeGreaterThanOrEqual(before);
+  });
 });
