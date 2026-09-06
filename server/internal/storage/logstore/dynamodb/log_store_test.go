@@ -388,3 +388,85 @@ func TestLogStore_Read_PaginatesPastASinglePageAndResumesCorrectly(t *testing.T)
 		t.Fatalf("expected the second page to reach the true latest epoch %d, got %d", totalEntries, second.Entries[len(second.Entries)-1].Epoch)
 	}
 }
+
+// Proves Peek reports the same counters Read itself would, for every
+// namespace, across several circles in a single call — the whole point of
+// exposing it separately is that a poller shouldn't need one call per circle.
+func TestLogStore_Peek_ReportsCurrentEpochsAcrossMultipleCircles(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	founder := newAuthorityKey(t)
+
+	syncIDA := testsupport.UniqueSyncID(t)
+	tokenA := newToken(t)
+	bootstrap(t, store, syncIDA, founder, tokenA)
+	if _, err := store.Append(ctx, syncIDA, logstore.NamespaceMeta, "a-meta-1", []byte("m"), 1, tokenA); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Append(ctx, syncIDA, logstore.NamespaceContent, "a-content-1", []byte("c"), 1, tokenA); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Append(ctx, syncIDA, logstore.NamespaceContent, "a-content-2", []byte("c"), 1, tokenA); err != nil {
+		t.Fatal(err)
+	}
+
+	syncIDB := testsupport.UniqueSyncID(t)
+	tokenB := newToken(t)
+	bootstrap(t, store, syncIDB, founder, tokenB)
+	if _, err := store.Append(ctx, syncIDB, logstore.NamespaceMeta, "b-meta-1", []byte("m"), 1, tokenB); err != nil {
+		t.Fatal(err)
+	}
+
+	epochs, err := store.Peek(ctx, []string{syncIDA, syncIDB})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := epochs[syncIDA]; got.Meta != 1 || got.Content != 2 {
+		t.Fatalf("circle A: expected meta=1 content=2, got meta=%d content=%d", got.Meta, got.Content)
+	}
+	if got := epochs[syncIDB]; got.Meta != 1 || got.Content != 0 {
+		t.Fatalf("circle B: expected meta=1 content=0, got meta=%d content=%d", got.Meta, got.Content)
+	}
+}
+
+// A syncID with no #control item (never bootstrapped) is simply absent
+// from the result — one bad/stale id in a batch must not fail the rest.
+func TestLogStore_Peek_OmitsAnUnknownSyncIDWithoutErroringTheWholeBatch(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	founder := newAuthorityKey(t)
+
+	knownSyncID := testsupport.UniqueSyncID(t)
+	token := newToken(t)
+	bootstrap(t, store, knownSyncID, founder, token)
+	if _, err := store.Append(ctx, knownSyncID, logstore.NamespaceMeta, "m-1", []byte("m"), 1, token); err != nil {
+		t.Fatal(err)
+	}
+	unknownSyncID := testsupport.UniqueSyncID(t)
+
+	epochs, err := store.Peek(ctx, []string{knownSyncID, unknownSyncID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(epochs) != 1 {
+		t.Fatalf("expected exactly one circle in the result, got %d", len(epochs))
+	}
+	if got := epochs[knownSyncID]; got.Meta != 1 {
+		t.Fatalf("expected the known circle's meta epoch to be 1, got %d", got.Meta)
+	}
+	if _, ok := epochs[unknownSyncID]; ok {
+		t.Fatal("expected the unknown syncID to be omitted, not present with a zero value")
+	}
+}
+
+func TestLogStore_Peek_EmptyInputReturnsEmptyResult(t *testing.T) {
+	store := testsupport.NewLogStore(t)
+
+	epochs, err := store.Peek(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(epochs) != 0 {
+		t.Fatalf("expected an empty result for no syncIDs, got %d entries", len(epochs))
+	}
+}

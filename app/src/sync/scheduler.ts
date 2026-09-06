@@ -1,26 +1,28 @@
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { nudgePhotoQueue } from '@/sync/photo-queue';
-import { syncAllCircles } from '@/sync/sync-circles';
+import { syncStaleCircles } from '@/sync/sync-circles';
 
-/** How often to re-sync while the app is open. Timers don't fire in the background, so this is a foreground cadence. */
-const FOREGROUND_INTERVAL_MS = 45_000;
+/** How often to check in while the app is open. Timers don't fire in the background, so this is a foreground cadence. */
+const FOREGROUND_INTERVAL_MS = 30_000;
 
-/** Only one log pass at a time; concurrent triggers await the running one instead of starting a second. */
+/** Only one pass at a time; concurrent triggers await the running one instead of starting a second. */
 let inFlight: Promise<void> | null = null;
 
 /**
- * Runs a log pass across every circle, then sets the photo queue going
- * without waiting for it.
+ * Cheaply checks every circle for new content (see syncStaleCircles),
+ * running a real sync only where one's actually needed, then sets the
+ * photo queue going without waiting for it.
  *
- * Deduped: the app has several independent reasons to sync (foreground,
- * a timer, a pull-to-refresh, a background task) and they routinely
- * coincide. A second caller joins the pass already running rather than
- * racing it — two concurrent walks would fight over the same cursors.
+ * Deduped: the app has several independent reasons to check in
+ * (foreground, a timer, a pull-to-refresh, a background task) and they
+ * routinely coincide. A second caller joins the pass already running
+ * rather than racing it — two concurrent walks would fight over the same
+ * cursors.
  */
 export function runSync(): Promise<void> {
   if (!inFlight) {
-    inFlight = syncAllCircles()
+    inFlight = syncStaleCircles()
       .catch((err) => console.error('Sync pass failed', err))
       .finally(() => {
         inFlight = null;

@@ -341,20 +341,69 @@ func (s *Store) getControlState(ctx context.Context, syncID string, consistent b
 		}
 	}
 	writeTokenHash, _ := dynamoutil.AttrString(out.Item, "writeTokenHash")
-	metaCounter, err := dynamoutil.AttrInt(out.Item, "metaCounter")
-	if err != nil {
-		return nil, err
-	}
-	contentCounter, err := dynamoutil.AttrInt(out.Item, "contentCounter")
+	epochs, err := parseControlEpochs(out.Item)
 	if err != nil {
 		return nil, err
 	}
 	return &controlState{
 		authoritySet:   authoritySet,
 		writeTokenHash: writeTokenHash,
-		metaCounter:    metaCounter,
-		contentCounter: contentCounter,
+		metaCounter:    epochs.Meta,
+		contentCounter: epochs.Content,
 	}, nil
+}
+
+// parseControlEpochs reads just the two counters off a #control item —
+// shared by getControlState (which also needs the rest of the item) and
+// Peek (which needs only this).
+func parseControlEpochs(item map[string]types.AttributeValue) (logstore.Epochs, error) {
+	metaCounter, err := dynamoutil.AttrInt(item, "metaCounter")
+	if err != nil {
+		return logstore.Epochs{}, err
+	}
+	contentCounter, err := dynamoutil.AttrInt(item, "contentCounter")
+	if err != nil {
+		return logstore.Epochs{}, err
+	}
+	return logstore.Epochs{Meta: metaCounter, Content: contentCounter}, nil
+}
+
+// Peek is Read's cheap half exposed for polling — see logstore.Store.Peek.
+// A requested syncID with no #control item is simply absent from the
+// result, the per-item analog of getControlState's ErrCircleNotFound.
+func (s *Store) Peek(ctx context.Context, syncIDs []string) (map[string]logstore.Epochs, error) {
+	result := make(map[string]logstore.Epochs, len(syncIDs))
+	if len(syncIDs) == 0 {
+		return result, nil
+	}
+
+	keys := make([]map[string]types.AttributeValue, len(syncIDs))
+	for i, syncID := range syncIDs {
+		keys[i] = controlKey(syncID)
+	}
+
+	requestItems := map[string]types.KeysAndAttributes{
+		s.tableName: {Keys: keys, ConsistentRead: aws.Bool(false)},
+	}
+	for len(requestItems) > 0 {
+		out, err := s.client.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{RequestItems: requestItems})
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range out.Responses[s.tableName] {
+			syncID, ok := dynamoutil.AttrString(item, dynamoutil.PKAttr)
+			if !ok {
+				continue
+			}
+			epochs, err := parseControlEpochs(item)
+			if err != nil {
+				return nil, err
+			}
+			result[syncID] = epochs
+		}
+		requestItems = out.UnprocessedKeys
+	}
+	return result, nil
 }
 
 func (s *Store) lookupIdempotencyMarker(ctx context.Context, syncID string, ns logstore.Namespace, entryID string) (*logstore.CommitResult, error) {
