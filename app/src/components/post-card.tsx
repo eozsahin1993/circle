@@ -1,4 +1,3 @@
-import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -10,8 +9,7 @@ import { ReactionChip } from '@/components/reaction-chip';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Icons, PhotoAspect, Radius, Spacing, Tints } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Colors, Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
 
 export type Reaction = {
   emoji: string;
@@ -73,7 +71,6 @@ export function PostCard({
   selfPhotoUri,
   onToggleAlbum,
 }: PostCardProps) {
-  const theme = useTheme();
   const [showPicker, setShowPicker] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
 
@@ -114,15 +111,6 @@ export function PostCard({
             {post.timestamp}
           </ThemedText>
         </View>
-        {onToggleAlbum ? (
-          <Pressable
-            style={styles.albumButton}
-            onPress={onToggleAlbum}
-            hitSlop={8}
-            accessibilityLabel={post.inAlbum ? 'Remove from album' : 'Add to album'}>
-            <Feather name={Icons.inAlbum} size={18} color={post.inAlbum ? theme.accentBright : theme.secondary} />
-          </Pressable>
-        ) : null}
       </View>
 
       <Pressable style={styles.photoWrap} onPress={onPressPhoto} disabled={!onPressPhoto}>
@@ -151,9 +139,13 @@ export function PostCard({
         </Pressable>
       ) : null}
 
-      {/* One pill for every reaction, not one per emoji: the feed shows
-          the three most-used and the total, and the post's own screen
-          carries the breakdown. Tinted when any of them is yours. */}
+      {/* Three named actions, one tone. Each is tinted by the reader's own
+          state — the reactions they left, the composer they opened, the
+          album they filed this in — never by what the post as a whole has.
+
+          The first swaps its name for the reactions themselves once there
+          are any: one pill for all of them, showing the three most-used
+          and the total, with the post's own screen carrying the breakdown. */}
       <View style={styles.reactionsRow}>
         {totalReactions > 0 ? (
           <ReactionChip
@@ -164,13 +156,23 @@ export function PostCard({
             onPress={() => setShowPicker((v) => !v)}
           />
         ) : (
-          <ReactionChip label="+" accessibilityLabel="React" onPress={() => setShowPicker((v) => !v)} />
+          <ReactionChip icon={Icons.add} label="React" onPress={() => setShowPicker((v) => !v)} />
         )}
 
         <View style={styles.commentsChipWrap}>
-          <ReactionChip icon={Icons.comment} accessibilityLabel="Comment" onPress={handleToggleComposer} />
+          <ReactionChip icon={Icons.comment} label="Comment" reacted={composerOpen} onPress={handleToggleComposer} />
           {post.hasUnseenComments ? <View style={styles.unseenDot} /> : null}
         </View>
+
+        {onToggleAlbum ? (
+          <ReactionChip
+            icon={Icons.inAlbum}
+            label="Album"
+            reacted={post.inAlbum}
+            accessibilityLabel={post.inAlbum ? 'Remove from album' : 'Add to album'}
+            onPress={onToggleAlbum}
+          />
+        ) : null}
       </View>
 
       {showPicker ? (
@@ -206,16 +208,6 @@ const styles = StyleSheet.create({
   },
   byline: {
     flex: 1,
-  },
-  /** The circle every other icon button in the app sits in — see circle-header.tsx. */
-  albumButton: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Tints.secondaryButtonBorder,
   },
   photoWrap: {
     justifyContent: 'flex-end',
