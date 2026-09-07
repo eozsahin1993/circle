@@ -1,7 +1,7 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 
 import { db } from '@/data/db/connection';
-import { outbox, postReactions } from '@/data/db/schema';
+import { circleMembers, outbox, postReactions } from '@/data/db/schema';
 import type { NewOutboxEntry } from '@/data/db/outbox';
 
 export type PostReaction = typeof postReactions.$inferSelect;
@@ -32,7 +32,14 @@ export type ReactionSummary = {
   reactedByMe: boolean;
 };
 
-/** Reactions for a post, grouped by emoji — what the feed actually renders. */
+/**
+ * Reactions for a post, grouped by emoji, in the order each emoji was
+ * first used. The ordering is load-bearing rather than cosmetic: the post
+ * screen renders these as chips directly above `getPostReactionDetails`'s
+ * breakdown of the same reactions, and without an explicit `ORDER BY`
+ * SQLite is free to return the groups however its grouping strategy
+ * happens to produce them — so the two lists would disagree.
+ */
 export async function getPostReactionSummary(postId: string, ownPublicKey: string): Promise<ReactionSummary[]> {
   const rows = await db
     .select({
@@ -42,9 +49,45 @@ export async function getPostReactionSummary(postId: string, ownPublicKey: strin
     })
     .from(postReactions)
     .where(eq(postReactions.postId, postId))
-    .groupBy(postReactions.emoji);
+    .groupBy(postReactions.emoji)
+    .orderBy(asc(sql`min(${postReactions.createdAt})`));
 
   return rows.map((row) => ({ emoji: row.emoji, count: row.count, reactedByMe: row.reactedByMe === 1 }));
+}
+
+/**
+ * Everyone who reacted to a post, in the order they first did, each named
+ * once however many emoji they used — the post screen lists people, not
+ * reactions, so someone who left both a ❤️ and a 🙏 is one name.
+ *
+ * Deliberately a second query rather than fields on
+ * `getPostReactionSummary`: the feed reads that one for every post it
+ * renders and needs no names, so the join belongs only here.
+ *
+ * A reactor with no roster row on this device contributes no name rather
+ * than an "Unknown member" placeholder — the chips' counts already
+ * account for them, and a list of real names reads better than one padded
+ * with apologies.
+ */
+export async function getPostReactors(circleId: string, postId: string): Promise<string[]> {
+  const rows = await db
+    .select({ authorPublicKey: postReactions.authorPublicKey, name: circleMembers.name })
+    .from(postReactions)
+    .leftJoin(
+      circleMembers,
+      and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, postReactions.authorPublicKey))
+    )
+    .where(eq(postReactions.postId, postId))
+    .orderBy(asc(postReactions.createdAt));
+
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const row of rows) {
+    if (!row.name || seen.has(row.authorPublicKey)) continue;
+    seen.add(row.authorPublicKey);
+    names.push(row.name);
+  }
+  return names;
 }
 
 /**

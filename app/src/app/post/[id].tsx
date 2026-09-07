@@ -10,7 +10,7 @@ import { BackButton } from '@/components/back-button';
 import { FabButton } from '@/components/fab-button';
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
 import { ReactionChip } from '@/components/reaction-chip';
-import { ReactionPicker } from '@/components/reaction-picker';
+import { EmojiPicker } from '@/components/emoji-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Icons, PhotoAspect, Spacing } from '@/constants/theme';
@@ -22,6 +22,7 @@ import {
   getPostComments,
   getProfile,
   markPostViewed,
+  getPostReactors,
   type CommentWithAuthor,
   type FeedPost,
   type ReactionSummary,
@@ -31,6 +32,23 @@ import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/reac
 import { useTheme } from '@/hooks/use-theme';
 import { bytesToDataUri } from '@/services/image';
 import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+/** Names shown before the rest become "& N others" — enough to recognise who, not a roster dump. */
+const PREVIEW_NAMES = 2;
+
+/** Short and relative beside a comment's author — the post's own byline carries the absolute date. */
+function formatRelative(ms: number): string {
+  const elapsed = Date.now() - ms;
+  if (elapsed < MINUTE) return 'now';
+  if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)}m`;
+  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h`;
+  if (elapsed < 7 * DAY) return `${Math.floor(elapsed / DAY)}d`;
+  return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
 function formatTimestamp(ms: number): string {
   const date = new Date(ms);
@@ -49,19 +67,22 @@ export default function PostDetailsScreen() {
   const [photoUri, setPhotoUri] = useState<string | undefined>();
   const [profileName, setProfileName] = useState<string | undefined>();
   const [reactions, setReactions] = useState<ReactionSummary[]>([]);
+  const [reactors, setReactors] = useState<string[]>([]);
   const [comments, setComments] = useState<CommentWithAuthor[]>([]);
   const [showPicker, setShowPicker] = useState(false);
+  const [showAllReactors, setShowAllReactors] = useState(false);
   const [commentText, setCommentText] = useState('');
 
   const load = useCallback(async () => {
     if (!circleId || !postId) return;
 
-    const [circle, count, feedPost, profile, reactionSummary, postComments] = await Promise.all([
+    const [circle, count, feedPost, profile, reactionSummary, details, postComments] = await Promise.all([
       getCircleSummary(circleId),
       getCircleMemberCount(circleId),
       getFeedPost(circleId, postId),
       getProfile(),
       getReactionsForPost(circleId, postId),
+      getPostReactors(circleId, postId),
       getPostComments(circleId, postId),
     ]);
 
@@ -70,6 +91,7 @@ export default function PostDetailsScreen() {
     setPost(feedPost);
     setProfileName(profile?.name);
     setReactions(reactionSummary);
+    setReactors(details);
     setComments(postComments);
 
     if (feedPost?.hasPhoto) {
@@ -98,7 +120,12 @@ export default function PostDetailsScreen() {
   async function handleSelectReaction(emoji: string) {
     if (!circleId || !postId) return;
     await toggleReaction(circleId, postId, emoji);
-    setReactions(await getReactionsForPost(circleId, postId));
+    const [summary, details] = await Promise.all([
+      getReactionsForPost(circleId, postId),
+      getPostReactors(circleId, postId),
+    ]);
+    setReactions(summary);
+    setReactors(details);
     setShowPicker(false);
   }
 
@@ -154,9 +181,32 @@ export default function PostDetailsScreen() {
 
             {showPicker ? (
               <View style={styles.picker}>
-                <ReactionPicker onSelect={handleSelectReaction} />
+                <EmojiPicker onSelect={handleSelectReaction} onClose={() => setShowPicker(false)} />
               </View>
             ) : null}
+
+            {/* Who reacted, as people rather than per emoji — the chips
+                above already carry which emoji and how many. */}
+            {reactors.length > 0 ? (
+              <ThemedText type="comment" themeColor="secondary" style={styles.reactors}>
+                {(showAllReactors ? reactors : reactors.slice(0, PREVIEW_NAMES)).join(', ')}
+                {!showAllReactors && reactors.length > PREVIEW_NAMES
+                  ? ` & ${reactors.length - PREVIEW_NAMES} other${reactors.length - PREVIEW_NAMES === 1 ? '' : 's'}`
+                  : null}
+                {reactors.length > PREVIEW_NAMES ? (
+                  <>
+                    {'. '}
+                    {/* Nested so it flows with the names instead of being
+                        pinned somewhere a long list can't wrap to. */}
+                    <ThemedText type="comment" themeColor="accentBright" onPress={() => setShowAllReactors((v) => !v)}>
+                      {showAllReactors ? 'See less' : 'See all'}
+                    </ThemedText>
+                  </>
+                ) : null}
+              </ThemedText>
+            ) : null}
+
+            {comments.length > 0 ? <View style={[styles.divider, { backgroundColor: theme.faintest }]} /> : null}
 
             <View style={styles.comments}>
               {comments.map((comment) => (
@@ -166,7 +216,12 @@ export default function PostDetailsScreen() {
                     uri={comment.authorPicture ? bytesToDataUri(comment.authorPicture) : undefined}
                   />
                   <View style={styles.commentBody}>
-                    <ThemedText type="postAuthor">{comment.authorName || profileName || 'Unknown member'}</ThemedText>
+                    <View style={styles.commentByline}>
+                      <ThemedText type="postAuthor">{comment.authorName || profileName || 'Unknown member'}</ThemedText>
+                      <ThemedText type="meta" themeColor="faint">
+                        {formatRelative(comment.createdAt)}
+                      </ThemedText>
+                    </View>
                     <ThemedText type="comment" themeColor="secondary">
                       {comment.body}
                     </ThemedText>
@@ -246,6 +301,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.screenPadding,
     paddingTop: 12,
   },
+  reactors: {
+    paddingHorizontal: Spacing.screenPadding,
+    paddingTop: 14,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: Spacing.screenPadding,
+    marginTop: Spacing.cardListGap + 4,
+  },
   comments: {
     gap: 14,
     paddingHorizontal: Spacing.screenPadding,
@@ -254,6 +318,11 @@ const styles = StyleSheet.create({
   commentRow: {
     flexDirection: 'row',
     gap: 12,
+  },
+  commentByline: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
   },
   commentBody: {
     flex: 1,

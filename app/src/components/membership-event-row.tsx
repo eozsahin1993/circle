@@ -21,9 +21,10 @@ export type MembershipEventItem = {
 };
 
 /**
- * A run of text, optionally a person's name. Names render at full text
- * colour against the muted rest of the line, which is the whole reason
- * the phrasing is returned in pieces instead of as one string.
+ * A run of text, optionally a person's name. Names sit one step above
+ * the rest of the line rather than at full text colour, which is the
+ * whole reason the phrasing is returned in pieces instead of as one
+ * string.
  */
 type Segment = { text: string; name?: true };
 
@@ -94,6 +95,9 @@ export function describeMembershipEvent(event: MembershipEventItem): Segment[] {
  */
 export function MembershipEventRow({ event }: { event: MembershipEventItem }) {
   const theme = useTheme();
+  // In light mode muted/faint/faintest are the same value, so the token
+  // ramp alone can't recede any further there — the opacity below is what
+  // makes the row equally quiet in both.
   const rule = { backgroundColor: theme.faintest };
 
   return (
@@ -102,10 +106,10 @@ export function MembershipEventRow({ event }: { event: MembershipEventItem }) {
       {/* Two lines is enough for the longest realistic pair of full
           names; past that the tail is dropped rather than pushing the
           feed around. */}
-      <ThemedText type="meta" themeColor="muted" style={styles.text} numberOfLines={2}>
+      <ThemedText type="meta" themeColor="faintest" style={styles.text} numberOfLines={2}>
         {describeMembershipEvent(event).map((segment, index) =>
           segment.name ? (
-            <ThemedText key={index} type="meta">
+            <ThemedText key={index} type="meta" themeColor="muted">
               {segment.text}
             </ThemedText>
           ) : (
@@ -125,7 +129,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: Spacing.screenPadding,
+    paddingHorizontal: Spacing.feedTextPadding,
+    opacity: 0.75,
   },
   /**
    * Both rules take whatever the text leaves. `flexShrink` on the text

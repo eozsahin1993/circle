@@ -53,8 +53,28 @@ function toCommentItems(comments: CommentWithAuthor[], ownName?: string): Commen
   return comments.map((comment) => ({
     id: comment.id,
     authorName: comment.authorName || ownName || 'Unknown member',
+    authorPhotoUri: comment.authorPicture ? bytesToDataUri(comment.authorPicture) : undefined,
     body: comment.body,
+    timestamp: formatRelative(comment.createdAt),
   }));
+}
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+/**
+ * Short and relative — "3d", "6h" — for a comment sitting under a post
+ * that already carries the absolute date. Falls back to that same date
+ * past a week, where "31d" stops meaning anything.
+ */
+function formatRelative(ms: number): string {
+  const elapsed = Date.now() - ms;
+  if (elapsed < MINUTE) return 'now';
+  if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)}m`;
+  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h`;
+  if (elapsed < 7 * DAY) return `${Math.floor(elapsed / DAY)}d`;
+  return formatDay(ms);
 }
 
 /**
@@ -126,6 +146,7 @@ export default function FeedScreen() {
   // Kept at component scope so re-reading one post's comments after adding
   // one can resolve the local author's name the same way the initial load does.
   const [profileName, setProfileName] = useState<string | undefined>();
+  const [profilePhotoUri, setProfilePhotoUri] = useState<string | undefined>();
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -154,6 +175,7 @@ export default function FeedScreen() {
     setCircleName(circle?.name ?? '');
     setMemberCount(memberCount);
     setProfileName(profile?.name);
+    setProfilePhotoUri(profile?.picture ? bytesToDataUri(profile.picture) : undefined);
     setMembershipEvents(
       events.map((event) => ({
         at: event.occurredAt,
@@ -408,6 +430,8 @@ export default function FeedScreen() {
                 onToggleReaction={(emoji) => handleToggleReaction(item.post.id, emoji)}
                 onAddComment={(body) => handleAddComment(item.post.id, body)}
                 onPressPhoto={() => router.push({ pathname: '/post/[id]', params: { id: item.post.id, circleId } })}
+                onPressComments={() => router.push({ pathname: '/post/[id]', params: { id: item.post.id, circleId } })}
+                selfPhotoUri={profilePhotoUri}
                 onExpandComments={() => handleExpandComments(item.post.id)}
               />
             );
@@ -455,7 +479,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: Spacing.screenPadding,
+    paddingHorizontal: Spacing.feedTextPadding,
     paddingTop: 6,
     paddingBottom: Spacing.gapBetweenPosts,
   },
@@ -463,7 +487,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   justJoined: {
-    marginHorizontal: Spacing.screenPadding,
+    marginHorizontal: Spacing.feedTextPadding,
     marginTop: Spacing.gapBetweenPosts,
     padding: 16,
     borderRadius: Radius.panel,

@@ -114,6 +114,7 @@ export const Icons = {
   /** Trailing affordance on a row that navigates somewhere. */
   disclosure: 'chevron-right',
   add: 'plus',
+  comment: 'message-circle',
   send: 'arrow-up',
   locked: 'lock',
   promote: 'shield',
@@ -133,6 +134,12 @@ export const Radius = {
 export const Spacing = {
   screenPadding: 22,
   cardListGap: 16,
+  /**
+   * The feed column's inset — captions, action chips, comments, roster
+   * rows, and the header above them. Narrower than `screenPadding` so the
+   * photographs, which run edge to edge, aren't squeezed by text margins
+   * meant for a form.
+   */
   feedTextPadding: 18,
   topPadUnderStatusBar: 58,
   gapBetweenPosts: 34,

@@ -6,10 +6,10 @@ import { Avatar } from '@/components/avatar';
 import { type CommentItem, PostComments } from '@/components/post-comments';
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
 import { ReactionChip } from '@/components/reaction-chip';
-import { ReactionPicker } from '@/components/reaction-picker';
+import { EmojiPicker } from '@/components/emoji-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, PhotoAspect, Radius, Spacing } from '@/constants/theme';
+import { Colors, Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
 
 export type Reaction = {
   emoji: string;
@@ -38,23 +38,61 @@ export type PostCardProps = {
   onToggleReaction?: (emoji: string) => void;
   onAddComment?: (body: string) => void;
   onPressPhoto?: () => void;
+  /** Opens the post's own screen, where the whole thread is. */
+  onPressComments?: () => void;
   /** Fires the moment comments are expanded — this is genuinely seeing them, same as opening the post itself. */
   onExpandComments?: () => void;
+  /** The reader's own picture, for the composer — the same on every card, so it rides on the card rather than each post. */
+  selfPhotoUri?: string;
 };
 
-export function PostCard({ post, onToggleReaction, onAddComment, onPressPhoto, onExpandComments }: PostCardProps) {
+/** How many distinct emoji the feed's single pill shows before the count speaks for the rest. */
+const TOP_EMOJI = 3;
+
+/**
+ * The gap between the card's horizontal bands — caption, chips, comments.
+ * One value rather than a number per style: they read as a stack, and a
+ * stack with three different gaps in it looks like a mistake even when
+ * nobody can say which gap is wrong.
+ */
+const BAND_GAP = 16;
+
+export function PostCard({
+  post,
+  onToggleReaction,
+  onAddComment,
+  onPressPhoto,
+  onPressComments,
+  onExpandComments,
+  selfPhotoUri,
+}: PostCardProps) {
   const [showPicker, setShowPicker] = useState(false);
-  const [showComments, setShowComments] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
+
+  const totalReactions = post.reactions.reduce((sum, reaction) => sum + reaction.count, 0);
+  const reactedByMe = post.reactions.some((reaction) => reaction.reactedByMe);
+  // Most-used first, so the pill says what the reaction was and not just
+  // how much of it there was.
+  const topEmoji = [...post.reactions]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, TOP_EMOJI)
+    .map((reaction) => reaction.emoji)
+    .join('');
 
   function handleSelect(emoji: string) {
     onToggleReaction?.(emoji);
     setShowPicker(false);
   }
 
-  function handleToggleComments() {
-    setShowComments((v) => {
-      if (!v) onExpandComments?.();
-      return !v;
+  function handleShowAll() {
+    onExpandComments?.();
+    onPressComments?.();
+  }
+
+  function handleToggleComposer() {
+    setComposerOpen((open) => {
+      if (!open) onExpandComments?.();
+      return !open;
     });
   }
 
@@ -83,41 +121,52 @@ export function PostCard({ post, onToggleReaction, onAddComment, onPressPhoto, o
         ) : null}
       </Pressable>
 
-      <ThemedText type="captionFeed" style={styles.caption}>
-        {post.caption}
-      </ThemedText>
+      {/* Two lines in the feed; the post's own screen carries the rest.
+          Tappable as well as the photo, since the ellipsis is what
+          promises there's more to read. */}
+      <Pressable onPress={onPressPhoto} disabled={!onPressPhoto}>
+        <ThemedText type="captionFeed" style={styles.caption} numberOfLines={2}>
+          {post.caption}
+        </ThemedText>
+      </Pressable>
 
-      <View style={styles.reactions}>
-        {post.reactions.map((reaction) => (
+      {/* One pill for every reaction, not one per emoji: the feed shows
+          the three most-used and the total, and the post's own screen
+          carries the breakdown. Tinted when any of them is yours. */}
+      <View style={styles.reactionsRow}>
+        {totalReactions > 0 ? (
           <ReactionChip
-            key={reaction.emoji}
-            emoji={reaction.emoji}
-            label={String(reaction.count)}
-            reacted={reaction.reactedByMe}
-            onPress={() => onToggleReaction?.(reaction.emoji)}
+            emoji={topEmoji}
+            label={String(totalReactions)}
+            reacted={reactedByMe}
+            accessibilityLabel={`${totalReactions} reaction${totalReactions === 1 ? '' : 's'}`}
+            onPress={() => setShowPicker((v) => !v)}
           />
-        ))}
-        <ReactionChip label="+" onPress={() => setShowPicker((v) => !v)} />
+        ) : (
+          <ReactionChip label="+" accessibilityLabel="React" onPress={() => setShowPicker((v) => !v)} />
+        )}
+
         <View style={styles.commentsChipWrap}>
-          <ReactionChip
-            label={`${post.comments.length} comment${post.comments.length === 1 ? '' : 's'}`}
-            onPress={handleToggleComments}
-          />
+          <ReactionChip icon={Icons.comment} accessibilityLabel="Comment" onPress={handleToggleComposer} />
           {post.hasUnseenComments ? <View style={styles.unseenDot} /> : null}
         </View>
       </View>
 
       {showPicker ? (
         <View style={styles.picker}>
-          <ReactionPicker onSelect={handleSelect} />
+          <EmojiPicker onSelect={handleSelect} onClose={() => setShowPicker(false)} />
         </View>
       ) : null}
 
-      {showComments ? (
-        <View style={styles.comments}>
-          <PostComments comments={post.comments} onSubmit={(body) => onAddComment?.(body)} />
-        </View>
-      ) : null}
+      <View style={styles.comments}>
+        <PostComments
+          comments={post.comments}
+          onSubmit={(body) => onAddComment?.(body)}
+          composerOpen={composerOpen}
+          onPressShowAll={handleShowAll}
+          selfPhotoUri={selfPhotoUri}
+        />
+      </View>
     </ThemedView>
   );
 }
@@ -126,11 +175,12 @@ const styles = StyleSheet.create({
   card: {
     gap: 0,
   },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: Spacing.screenPadding,
+    paddingHorizontal: Spacing.feedTextPadding,
     paddingVertical: 14,
   },
   photoWrap: {
@@ -141,20 +191,12 @@ const styles = StyleSheet.create({
   },
   photoLabel: {
     position: 'absolute',
-    left: Spacing.screenPadding,
+    left: Spacing.feedTextPadding,
     bottom: 16,
   },
   caption: {
-    paddingHorizontal: Spacing.screenPadding,
-    paddingTop: 14,
-  },
-  reactions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingHorizontal: Spacing.screenPadding,
-    paddingTop: 12,
-    paddingBottom: 4,
+    paddingHorizontal: Spacing.feedTextPadding,
+    paddingTop: BAND_GAP,
   },
   commentsChipWrap: {
     position: 'relative',
@@ -168,12 +210,25 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     backgroundColor: Colors.dark.accentBright,
   },
+  reactionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: Spacing.feedTextPadding,
+    paddingTop: BAND_GAP,
+  },
   picker: {
-    paddingHorizontal: Spacing.screenPadding,
-    paddingBottom: 12,
+    paddingHorizontal: Spacing.feedTextPadding,
+    // Was missing its top gap entirely, so the panel opened flush against
+    // the chips that opened it.
+    paddingTop: BAND_GAP,
   },
   comments: {
-    paddingHorizontal: Spacing.screenPadding,
-    paddingBottom: 12,
+    paddingHorizontal: Spacing.feedTextPadding,
+    paddingTop: BAND_GAP,
+    // The feed's own gap follows this card; only enough here to keep the
+    // last line off the join.
+    paddingBottom: 4,
   },
 });
