@@ -3,11 +3,18 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { getCircleMembers, markCircleLeft, markMemberRemoved, MemberRoles } from '@/data/db';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { deleteCircleKeys, getCircleIdentity } from '@/services/keystore';
-import { asRecord, stringField, type EntryHandler } from '@/sync/entry-handlers/types';
+import { asRecord, numberField, stringField, type EntryHandler } from '@/sync/entry-handlers/types';
 
 /** What `remove-member.ts` puts in a `member_removed` entry. */
 type MemberRemovedPayload = {
   identityPublicKey: string;
+  /**
+   * When the removing admin wrote this entry, on their clock — so every
+   * device dates the removal the same way instead of using its own
+   * receipt time. Absent on entries written before this field existed,
+   * which fall back to receipt time (see `apply`).
+   */
+  createdAt?: number;
 };
 
 function parse(payload: unknown): MemberRemovedPayload | null {
@@ -15,7 +22,7 @@ function parse(payload: unknown): MemberRemovedPayload | null {
   if (!record) return null;
   const identityPublicKey = stringField(record, 'identityPublicKey');
   if (!identityPublicKey) return null;
-  return { identityPublicKey };
+  return { identityPublicKey, createdAt: numberField(record, 'createdAt') ?? undefined };
 }
 
 export const memberRemovedHandler: EntryHandler = {
@@ -43,7 +50,7 @@ export const memberRemovedHandler: EntryHandler = {
     const payload = parse(envelope.payload);
     if (!payload) return;
 
-    await markMemberRemoved(circleId, payload.identityPublicKey);
+    await markMemberRemoved(circleId, payload.identityPublicKey, payload.createdAt ?? Date.now());
 
     const identity = await getCircleIdentity(circleId);
     if (identity && bytesToHex(identity.publicKey) === payload.identityPublicKey) {

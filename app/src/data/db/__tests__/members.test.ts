@@ -3,6 +3,7 @@ import { initDatabase } from '@/data/db';
 import { insertCircle } from '@/data/db/circles';
 import {
   getCircleMembers,
+  getCircleMembershipEvents,
   getMemberByMemberId,
   getMemberByPublicKey,
   insertMember,
@@ -117,5 +118,57 @@ describe('members CRUD', () => {
 
     const roster = await getCircleMembers(circle.id);
     expect(roster.find((m) => m.identityPublicKey === member.identityPublicKey)).toBeUndefined();
+  });
+
+  test('markMemberRemoved records the timestamp it is given, not this device’s clock', async () => {
+    const circle = await makeCircle();
+    const member = makeMember(circle.id);
+    await insertMember(member);
+    const removedAt = Date.now() - 90_000;
+
+    await markMemberRemoved(circle.id, member.identityPublicKey, removedAt);
+
+    const row = await getMemberByPublicKey(circle.id, member.identityPublicKey);
+    expect(row?.removedAt).toBe(removedAt);
+  });
+});
+
+describe('getCircleMembershipEvents', () => {
+  test('reports a joined event for every member', async () => {
+    const circle = await makeCircle();
+    const member = makeMember(circle.id, { name: 'Marcus', joinedAt: 1_000 });
+    await insertMember(member);
+
+    const events = await getCircleMembershipEvents(circle.id);
+
+    expect(events).toEqual([
+      { id: `${member.identityPublicKey}:joined`, kind: 'joined', name: 'Marcus', picture: null, at: 1_000 },
+    ]);
+  });
+
+  test('reports both events for someone who joined and was later removed', async () => {
+    const circle = await makeCircle();
+    const member = makeMember(circle.id, { name: 'Marcus', joinedAt: 1_000 });
+    await insertMember(member);
+    await markMemberRemoved(circle.id, member.identityPublicKey, 5_000);
+
+    const events = await getCircleMembershipEvents(circle.id);
+
+    expect(events.map((event) => [event.kind, event.at])).toEqual([
+      ['removed', 5_000],
+      ['joined', 1_000],
+    ]);
+  });
+
+  test('orders newest first across members, and ignores other circles', async () => {
+    const circle = await makeCircle();
+    const other = await makeCircle();
+    await insertMember(makeMember(circle.id, { name: 'First', joinedAt: 1_000 }));
+    await insertMember(makeMember(circle.id, { name: 'Second', joinedAt: 3_000 }));
+    await insertMember(makeMember(other.id, { name: 'Elsewhere', joinedAt: 2_000 }));
+
+    const events = await getCircleMembershipEvents(circle.id);
+
+    expect(events.map((event) => event.name)).toEqual(['Second', 'First']);
   });
 });

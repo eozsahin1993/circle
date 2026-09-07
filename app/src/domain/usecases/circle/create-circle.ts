@@ -79,6 +79,7 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
       keyVersion: 1,
       sealedContentKey: bytesToHex(sealToPublicKey(contentKey, sealingKeypair.publicKey)),
       picture: pictureThumbnail,
+      createdAt: now,
     },
     identity,
     contentKey

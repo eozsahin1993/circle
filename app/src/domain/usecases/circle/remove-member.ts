@@ -71,7 +71,11 @@ export async function removeMember(circleId: string, identityPublicKey: string):
     wraps[member.identityPublicKey] = bytesToHex(sealToPublicKey(newKey, hexToBytes(member.encPublicKey)));
   }
 
-  const removedEntry = buildAndEncryptLogEntry(EntryTypes.MEMBER_REMOVED, { identityPublicKey }, identity, current.key);
+  // Carried on the entry for the same reason member_added carries it —
+  // so every device dates this removal identically instead of stamping
+  // its own receipt time when it replays meta.
+  const removedAt = Date.now();
+  const removedEntry = buildAndEncryptLogEntry(EntryTypes.MEMBER_REMOVED, { identityPublicKey, createdAt: removedAt }, identity, current.key);
   const rotationEntry = buildAndEncryptLogEntry(EntryTypes.KEY_ROTATION, { version: newVersion, wraps }, identity, current.key);
 
   const currentWriteToken = deriveWriteToken(current.key);
@@ -83,6 +87,6 @@ export async function removeMember(circleId: string, identityPublicKey: string):
   await appendEntry(circle.syncId, 'meta', generateUUID(), removedEntry, current.version, currentWriteToken);
   await rotateLog(circle.syncId, rotationEntryId, rotationEntry, current.version, currentWriteToken, newWriteTokenHash, authorityKeypair.publicKey, signature);
 
-  await markMemberRemoved(circleId, identityPublicKey);
+  await markMemberRemoved(circleId, identityPublicKey, removedAt);
   await addCircleKeyVersion(circleId, newVersion, newKey);
 }
