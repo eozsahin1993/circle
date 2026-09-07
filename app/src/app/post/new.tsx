@@ -45,7 +45,7 @@ export default function NewPostScreen() {
     setPosting(true);
     setError(null);
     try {
-      await createPost({ circleId, caption: caption.trim(), photo: picture.bytes });
+      await createPost({ circleId, caption: caption.trim(), photo: picture.bytes, inAlbum: addToAlbum });
       router.back();
     } catch (err) {
       console.error('Failed to create post', err);

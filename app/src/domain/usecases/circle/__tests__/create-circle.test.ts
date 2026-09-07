@@ -34,7 +34,7 @@ test('createCircle inserts a circle and makes this device its first member', asy
 test('createCircle then createPost end to end matches what the feed screen reads back', async () => {
   const { id: circleId } = await createCircle({ name: 'Test Circle' });
 
-  await createPost({ circleId, caption: 'Hello from the test', photo: new Uint8Array([1, 2, 3]) });
+  await createPost({ circleId, caption: 'Hello from the test', photo: new Uint8Array([1, 2, 3]), inAlbum: true });
 
   const posts = await getCircleFeed(circleId);
   expect(posts).toHaveLength(1);

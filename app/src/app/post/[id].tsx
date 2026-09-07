@@ -29,6 +29,7 @@ import {
 } from '@/data/db';
 import { addComment } from '@/domain/usecases/post/comment-on-post';
 import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
+import { setAlbumVisibility } from '@/domain/usecases/post/set-album-visibility';
 import { useTheme } from '@/hooks/use-theme';
 import { bytesToDataUri } from '@/services/image';
 import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
@@ -109,6 +110,21 @@ export default function PostDetailsScreen() {
     setShowPicker(false);
   }
 
+  async function handleToggleAlbum() {
+    if (!circleId || !postId || !post) return;
+    const next = !post.inAlbum;
+    // Optimistic: the write is local-first and the entry is queued, so
+    // the only thing left to wait on is a network push that must never
+    // hold the chip up.
+    setPost({ ...post, inAlbum: next });
+    try {
+      await setAlbumVisibility(circleId, postId, next);
+    } catch (err) {
+      console.error('Failed to change album visibility', err);
+      setPost({ ...post, inAlbum: post.inAlbum });
+    }
+  }
+
   async function handleSubmitComment() {
     if (!circleId || !postId || !commentText.trim()) return;
     const body = commentText;
@@ -157,6 +173,15 @@ export default function PostDetailsScreen() {
                 />
               ))}
               <ReactionChip label="+" onPress={() => setShowPicker((v) => !v)} />
+              {/* Anyone in the circle can re-file a photo — the album is
+                  the circle's shared archive, not the author's own. */}
+              {post ? (
+                <ReactionChip
+                  label={post.inAlbum ? 'In album' : 'Add to album'}
+                  reacted={post.inAlbum}
+                  onPress={handleToggleAlbum}
+                />
+              ) : null}
             </View>
 
             {showPicker ? (

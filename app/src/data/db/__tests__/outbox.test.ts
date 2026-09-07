@@ -14,7 +14,7 @@ async function makeCircle() {
 }
 
 function makePost(circleId: string) {
-  return { id: generateUUID(), circleId, caption: 'Nana in the kitchen.', authorPublicKey: 'aa'.repeat(32), createdAt: Date.now(), lastViewedAt: null };
+  return { id: generateUUID(), circleId, caption: 'Nana in the kitchen.', authorPublicKey: 'aa'.repeat(32), createdAt: Date.now(), lastViewedAt: null, inAlbum: true };
 }
 
 function makeAttachment(post: { id: string; circleId: string; createdAt: number }): NewAttachment {

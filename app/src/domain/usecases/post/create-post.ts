@@ -21,6 +21,8 @@ export type CreatePostInput = {
   circleId: string;
   caption: string;
   photo: Uint8Array;
+  /** Whether this photo joins the circle's album — see the album screen. */
+  inAlbum: boolean;
 };
 
 /**
@@ -55,7 +57,7 @@ export async function createPost(input: CreatePostInput): Promise<void> {
   const photoHash = timedSync(`post.hash(${Math.round(input.photo.length / 1024)}KB)`, () => hashBytes(input.photo));
   const encryptedMeta = buildAndEncryptLogEntry(
     EntryTypes.POST,
-    { postId, caption: input.caption, photoHash, createdAt, keyVersion: current.version },
+    { postId, caption: input.caption, photoHash, createdAt, keyVersion: current.version, inAlbum: input.inAlbum },
     identity,
     current.key
   );
@@ -67,6 +69,7 @@ export async function createPost(input: CreatePostInput): Promise<void> {
     authorPublicKey: bytesToHex(identity.publicKey),
     createdAt,
     lastViewedAt: null,
+    inAlbum: input.inAlbum,
   };
 
   const attachment: NewAttachment = {

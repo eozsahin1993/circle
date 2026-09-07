@@ -158,6 +158,38 @@ describe('apply', () => {
     expect(attachment?.bytes).toEqual(new Uint8Array([1, 2, 3]));
   });
 
+  test('carries an explicit inAlbum: false through to the row', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    const founder = (await getCircleIdentity(circleId))!;
+
+    await postHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payloadFor({ inAlbum: false })), 1);
+
+    const [post] = await getCircleFeed(circleId);
+    expect(post.inAlbum).toBe(false);
+  });
+
+  /**
+   * The replay-safety guard. Entries are immutable and replay must be
+   * deterministic (SYNC_DESIGN invariant 1), so an entry written before
+   * `inAlbum` existed has to keep applying forever — if parse ever starts
+   * demanding the field, every one of those posts silently disappears on
+   * the next replay, permanently.
+   */
+  test('an entry predating inAlbum still applies, and lands in the album', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    const founder = (await getCircleIdentity(circleId))!;
+    const payload = payloadFor();
+    expect(payload).not.toHaveProperty('inAlbum');
+
+    await expect(
+      postHandler.predicate(circleId, envelope(bytesToHex(founder.publicKey), payload))
+    ).resolves.toBe(true);
+    await postHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payload), 1);
+
+    const [post] = await getCircleFeed(circleId);
+    expect(post.inAlbum).toBe(true);
+  });
+
   test('a malformed payload is a no-op rather than a crash', async () => {
     const { id: circleId } = await createCircle({ name: 'Family Circle' });
 

@@ -3,7 +3,8 @@ import { and, desc, eq, gt, isNull, ne, or } from 'drizzle-orm';
 import { type Attachment, type NewAttachment } from '@/data/db/attachments';
 import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
-import { attachments, circleMembers, postComments, posts } from '@/data/db/schema';
+import { attachments, circleMembers, outbox, postComments, posts } from '@/data/db/schema';
+import type { NewOutboxEntry } from '@/data/db/outbox';
 
 export type Post = typeof posts.$inferSelect;
 
@@ -44,6 +45,8 @@ export type FeedPost = {
    */
   hasPhoto: boolean;
   photoStatus: Attachment['status'] | null;
+  /** Whether this photo is in the circle's album — see set-album-visibility.ts. */
+  inAlbum: boolean;
 };
 
 /**
@@ -79,6 +82,7 @@ function feedPostQuery() {
       authorName: circleMembers.name,
       authorPicture: circleMembers.picture,
       photoStatus: attachments.status,
+      inAlbum: posts.inAlbum,
     })
     .from(posts)
     .leftJoin(
@@ -156,6 +160,54 @@ export async function getNewestPostCreatedAt(circleId: string): Promise<number |
 /** Marks a post as scrolled into view (or opened) just now — clears its "new comments" marker up to this moment. */
 export async function markPostViewed(id: string): Promise<void> {
   await db.update(posts).set({ lastViewedAt: Date.now() }).where(eq(posts.id, id));
+}
+
+/** One photo in the album grid — id and date only; the pixels come from the photo cache by id. */
+export type AlbumPhoto = {
+  id: string;
+  createdAt: number;
+};
+
+/**
+ * Every photo in this circle's album, newest first.
+ *
+ * Ids and timestamps only, never `attachments.bytes` — see getCircleFeed's
+ * doc comment on what pulling blobs through this driver costs. The grid
+ * resolves each one through the photo cache instead, same as the feed.
+ *
+ * Inner-joined on a `fetched` attachment because a photo still downloading
+ * has nothing to show yet; it appears once its bytes land.
+ */
+export async function getAlbumPhotos(circleId: string): Promise<AlbumPhoto[]> {
+  return db
+    .select({ id: posts.id, createdAt: posts.createdAt })
+    .from(posts)
+    .innerJoin(attachments, and(eq(attachments.circleId, posts.circleId), eq(attachments.entryId, posts.id)))
+    .where(and(eq(posts.circleId, circleId), eq(posts.inAlbum, true), eq(attachments.status, 'fetched')))
+    .orderBy(desc(posts.createdAt));
+}
+
+/**
+ * Adds or removes a post from its circle's album and queues the change for
+ * every other device, atomically — same reasoning as
+ * `toggleReactionAndEnqueue`: split across two writes, a crash between
+ * them leaves the change showing here and queued nowhere, with no pending
+ * row left to notice it never went out.
+ */
+export async function setPostInAlbumAndEnqueue(
+  id: string,
+  inAlbum: boolean,
+  outboxEntry: NewOutboxEntry
+): Promise<void> {
+  db.transaction((tx) => {
+    tx.update(posts).set({ inAlbum }).where(eq(posts.id, id)).run();
+    tx.insert(outbox).values(outboxEntry).run();
+  });
+}
+
+/** Adds or removes a post from the album locally — the sync path's half of the above. */
+export async function setPostInAlbum(id: string, inAlbum: boolean): Promise<void> {
+  await db.update(posts).set({ inAlbum }).where(eq(posts.id, id));
 }
 
 /**

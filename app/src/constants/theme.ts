@@ -120,6 +120,8 @@ export const Icons = {
   promote: 'shield',
   demote: 'shield-off',
   removeMember: 'user-x',
+  /** The circle's album — every photo it holds, not just what's in the feed. */
+  album: 'image',
 } as const satisfies Record<string, keyof typeof Feather.glyphMap>;
 
 export const Radius = {

@@ -1,4 +1,5 @@
 import { EntryTypes } from '@/domain/usecases/circle/log-entry';
+import { albumVisibilityHandler } from '@/sync/entry-handlers/album-visibility';
 import { commentHandler } from '@/sync/entry-handlers/comment';
 import { coverPhotoSetHandler } from '@/sync/entry-handlers/cover-photo-set';
 import { keyRotationHandler } from '@/sync/entry-handlers/key-rotation';
@@ -37,4 +38,5 @@ export const contentHandlers: Record<string, EntryHandler> = {
   [EntryTypes.POST]: postHandler,
   [EntryTypes.COMMENT]: commentHandler,
   [EntryTypes.REACTION]: reactionHandler,
+  [EntryTypes.ALBUM_VISIBILITY]: albumVisibilityHandler,
 };

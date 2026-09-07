@@ -69,6 +69,7 @@ export default function FeedScreen() {
                 name={circleName}
                 memberCount={memberCount}
                 onPressDetails={() => router.push({ pathname: '/circle/details', params: { circleId } })}
+                onPressAlbum={() => router.push({ pathname: '/circle/album', params: { circleId } })}
               />
             </ThemedView>
           }

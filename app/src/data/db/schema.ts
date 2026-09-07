@@ -192,6 +192,15 @@ export const posts = sqliteTable(
      * whatever comments existed on it up to that moment.
      */
     lastViewedAt: integer('last_viewed_at'),
+    /**
+     * Whether this photo belongs in the circle's album — the archive view
+     * every member shares, rather than only appearing in the feed as it
+     * scrolls past. Chosen when posting and changeable afterwards (see
+     * set-album-visibility.ts). Defaults true so a row that predates the
+     * column, or an entry whose payload lacks the field, reads as
+     * included rather than silently vanishing from the album.
+     */
+    inAlbum: integer('in_album', { mode: 'boolean' }).notNull().default(true),
   },
   (t) => [index('posts_circle_id').on(t.circleId)]
 );
@@ -332,6 +341,7 @@ export const outbox = sqliteTable(
         'role_change',
         'key_rotation',
         'cover_photo_set',
+        'album_visibility',
       ],
     }).notNull(),
     /**

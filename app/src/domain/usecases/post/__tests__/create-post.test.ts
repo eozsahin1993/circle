@@ -26,7 +26,7 @@ beforeEach(() => {
 test('createPost triggers a drain of the circle it just posted to', async () => {
   const { id: circleId } = await createCircle({ name: 'Test Circle' });
 
-  await createPost({ circleId, caption: 'Hello', photo: new Uint8Array([1]) });
+  await createPost({ circleId, caption: 'Hello', photo: new Uint8Array([1]), inAlbum: true });
 
   expect(drainOutbox).toHaveBeenCalledWith(circleId);
 });
@@ -35,14 +35,14 @@ test('createPost still succeeds even if the triggered drain fails', async () => 
   (drainOutbox as jest.Mock).mockRejectedValue(new Error('offline'));
   const { id: circleId } = await createCircle({ name: 'Test Circle' });
 
-  await expect(createPost({ circleId, caption: 'Hello', photo: new Uint8Array([1]) })).resolves.toBeUndefined();
+  await expect(createPost({ circleId, caption: 'Hello', photo: new Uint8Array([1]), inAlbum: true })).resolves.toBeUndefined();
 });
 
 test('createPost queues an outbox entry whose encryptedMeta decrypts to a signed, verifiable post envelope', async () => {
   const { id: circleId } = await createCircle({ name: 'Test Circle' });
 
   const photo = new Uint8Array([1, 2, 3]);
-  await createPost({ circleId, caption: 'Hello from the test', photo });
+  await createPost({ circleId, caption: 'Hello from the test', photo, inAlbum: true });
 
   const [post] = await getCircleFeed(circleId);
   const [entry] = await getPendingOutboxEntries(circleId);
@@ -57,6 +57,7 @@ test('createPost queues an outbox entry whose encryptedMeta decrypts to a signed
     photoHash: hashBytes(photo),
     createdAt: post.createdAt,
     keyVersion: current.version,
+    inAlbum: true,
   });
 
   // The signature must verify against the envelope's own claimed author,
@@ -70,5 +71,21 @@ test('createPost queues an outbox entry whose encryptedMeta decrypts to a signed
 });
 
 test('createPost throws without a content key on this device', async () => {
-  await expect(createPost({ circleId: generateUUID(), caption: 'x', photo: new Uint8Array([1]) })).rejects.toThrow();
+  await expect(createPost({ circleId: generateUUID(), caption: 'x', photo: new Uint8Array([1]), inAlbum: true })).rejects.toThrow();
+});
+
+test('the album choice made when posting rides inside the signed payload', async () => {
+  const { id: circleId } = await createCircle({ name: 'Test Circle' });
+
+  await createPost({ circleId, caption: 'Just for the feed', photo: new Uint8Array([1]), inAlbum: false });
+
+  const [post] = await getCircleFeed(circleId);
+  expect(post.inAlbum).toBe(false);
+
+  // Signed rather than a local-only flag, so every other device files it
+  // the same way this one did.
+  const [entry] = await getPendingOutboxEntries(circleId);
+  const current = (await getCurrentContentKey(circleId))!;
+  const envelope = JSON.parse(new TextDecoder().decode(decrypt(entry.encryptedMeta, current.key)));
+  expect(envelope.payload).toMatchObject({ inAlbum: false });
 });

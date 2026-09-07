@@ -11,9 +11,11 @@ export type CircleHeaderProps = {
   memberCount: number;
   /** Opens the circle's Details sheet — members, invite, settings. */
   onPressDetails?: () => void;
+  /** Opens the circle's album — every photo it holds, not just what's in view. */
+  onPressAlbum?: () => void;
 };
 
-export function CircleHeader({ name, memberCount, onPressDetails }: CircleHeaderProps) {
+export function CircleHeader({ name, memberCount, onPressDetails, onPressAlbum }: CircleHeaderProps) {
   const theme = useTheme();
 
   return (
@@ -29,7 +31,11 @@ export function CircleHeader({ name, memberCount, onPressDetails }: CircleHeader
         </ThemedText>
       </Pressable>
 
-      <Pressable style={styles.detailsButton} onPress={onPressDetails} hitSlop={8}>
+      <Pressable style={styles.circleButton} onPress={onPressAlbum} hitSlop={8}>
+        <Feather name={Icons.album} size={18} color={theme.secondary} />
+      </Pressable>
+
+      <Pressable style={styles.circleButton} onPress={onPressDetails} hitSlop={8}>
         <Feather name={Icons.more} size={18} color={theme.secondary} />
       </Pressable>
     </View>
@@ -50,7 +56,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
-  detailsButton: {
+  circleButton: {
     width: 36,
     height: 36,
     borderRadius: Radius.pill,

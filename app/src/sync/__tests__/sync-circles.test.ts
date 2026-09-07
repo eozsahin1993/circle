@@ -136,7 +136,7 @@ test('syncCircle picks up another member and their post, photo and all', async (
 
 test('syncCircle pushes the queued posts this device made while pulling', async () => {
   const { id: circleId } = await createCircle({ name: 'Family Circle' });
-  await createPost({ circleId, caption: 'Mine', photo: new Uint8Array([1, 2, 3]) });
+  await createPost({ circleId, caption: 'Mine', photo: new Uint8Array([1, 2, 3]), inAlbum: true });
   (appendEntry as jest.Mock).mockClear();
 
   await syncCircle(circleId);
@@ -169,7 +169,7 @@ test('a post this device just pushed comes straight back on the same pass withou
   const founder = (await getCircleIdentity(circleId))!;
   const contentKey = (await getCurrentContentKey(circleId))!.key;
   const photo = new Uint8Array([1, 2, 3]);
-  await createPost({ circleId, caption: 'Mine', photo });
+  await createPost({ circleId, caption: 'Mine', photo, inAlbum: true });
 
   const [{ id: postId }] = await getCircleFeed(circleId);
   relayServes({
@@ -316,7 +316,7 @@ test('a comment written here is pushed, and one from another device arrives', as
   const { id: circleId } = await createCircle({ name: 'Family Circle' });
   const founder = (await getCircleIdentity(circleId))!;
   const contentKey = (await getCurrentContentKey(circleId))!.key;
-  await createPost({ circleId, caption: 'Mine', photo: new Uint8Array([1, 2, 3]) });
+  await createPost({ circleId, caption: 'Mine', photo: new Uint8Array([1, 2, 3]), inAlbum: true });
   const [{ id: postId }] = await getCircleFeed(circleId);
 
   // Written here: lands locally and goes out to the relay as content.
@@ -376,7 +376,7 @@ test('a reaction toggled here is pushed, and one from another device arrives', a
   const { id: circleId } = await createCircle({ name: 'Family Circle' });
   const founder = (await getCircleIdentity(circleId))!;
   const contentKey = (await getCurrentContentKey(circleId))!.key;
-  await createPost({ circleId, caption: 'Mine', photo: new Uint8Array([1, 2, 3]) });
+  await createPost({ circleId, caption: 'Mine', photo: new Uint8Array([1, 2, 3]), inAlbum: true });
   const [{ id: postId }] = await getCircleFeed(circleId);
 
   await toggleReaction(circleId, postId, '❤️');
@@ -483,7 +483,7 @@ describe('syncStaleCircles', () => {
     // fail and settle, so the entry is still pending and every append
     // seen below belongs to syncStaleCircles rather than to that drain.
     (appendEntry as jest.Mock).mockRejectedValue(new Error('offline'));
-    await createPost({ circleId, caption: 'Mine', photo: new Uint8Array([1, 2, 3]) });
+    await createPost({ circleId, caption: 'Mine', photo: new Uint8Array([1, 2, 3]), inAlbum: true });
     await drainOutbox(circleId).catch(() => {});
     const { syncId, metaCursor, contentCursor } = (await getAllCircles()).find((circle) => circle.id === circleId)!;
     (appendEntry as jest.Mock).mockReset();

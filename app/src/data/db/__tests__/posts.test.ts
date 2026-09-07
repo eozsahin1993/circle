@@ -4,7 +4,15 @@ import { AttachmentKinds, AttachmentStatuses, type NewAttachment } from '@/data/
 import { insertComment } from '@/data/db/comments';
 import { insertMember } from '@/data/db/members';
 import { deleteCircle, insertCircle } from '@/data/db/circles';
-import { getCircleFeed, getPost, getUnseenCommentPostIds, insertPost, markPostViewed } from '@/data/db/posts';
+import {
+  getAlbumPhotos,
+  getCircleFeed,
+  getPost,
+  getUnseenCommentPostIds,
+  insertPost,
+  markPostViewed,
+  setPostInAlbum,
+} from '@/data/db/posts';
 
 const OWN_KEY = 'aa'.repeat(32);
 const OTHER_KEY = 'bb'.repeat(32);
@@ -17,7 +25,7 @@ async function makeCircle() {
   return circle;
 }
 
-function makePost(circleId: string, overrides: Partial<{ caption: string; createdAt: number }> = {}) {
+function makePost(circleId: string, overrides: Partial<{ caption: string; createdAt: number; inAlbum: boolean }> = {}) {
   return {
     id: generateUUID(),
     circleId,
@@ -25,6 +33,7 @@ function makePost(circleId: string, overrides: Partial<{ caption: string; create
     authorPublicKey: 'aa'.repeat(32),
     createdAt: overrides.createdAt ?? Date.now(),
     lastViewedAt: null,
+    inAlbum: overrides.inAlbum ?? true,
   };
 }
 
@@ -171,5 +180,63 @@ describe('markPostViewed / getUnseenCommentPostIds', () => {
     await markPostViewed(post.id);
 
     await expect(getUnseenCommentPostIds(circle.id, OWN_KEY, 1000)).resolves.toEqual([]);
+  });
+});
+
+describe('getAlbumPhotos', () => {
+  test('returns in-album photos whose bytes have landed, newest first', async () => {
+    const circle = await makeCircle();
+    const older = makePost(circle.id, { createdAt: 1000 });
+    const newer = makePost(circle.id, { createdAt: 2000 });
+    await insertPost(older, makeAttachment(older));
+    await insertPost(newer, makeAttachment(newer));
+
+    await expect(getAlbumPhotos(circle.id)).resolves.toEqual([
+      { id: newer.id, createdAt: 2000 },
+      { id: older.id, createdAt: 1000 },
+    ]);
+  });
+
+  test('leaves out a post that was never added to the album', async () => {
+    const circle = await makeCircle();
+    const kept = makePost(circle.id);
+    const excluded = makePost(circle.id, { inAlbum: false });
+    await insertPost(kept, makeAttachment(kept));
+    await insertPost(excluded, makeAttachment(excluded));
+
+    const photos = await getAlbumPhotos(circle.id);
+    expect(photos.map((photo) => photo.id)).toEqual([kept.id]);
+  });
+
+  test('leaves out a photo still downloading — there is nothing to show yet', async () => {
+    const circle = await makeCircle();
+    const pending = makePost(circle.id);
+    await insertPost(pending, { ...makeAttachment(pending), bytes: null, status: AttachmentStatuses.PENDING });
+
+    await expect(getAlbumPhotos(circle.id)).resolves.toEqual([]);
+  });
+
+  test("leaves out another circle's photos", async () => {
+    const circle = await makeCircle();
+    const other = await makeCircle();
+    const mine = makePost(circle.id);
+    const theirs = makePost(other.id);
+    await insertPost(mine, makeAttachment(mine));
+    await insertPost(theirs, makeAttachment(theirs));
+
+    const photos = await getAlbumPhotos(circle.id);
+    expect(photos.map((photo) => photo.id)).toEqual([mine.id]);
+  });
+
+  test('setPostInAlbum moves a photo in and out', async () => {
+    const circle = await makeCircle();
+    const post = makePost(circle.id);
+    await insertPost(post, makeAttachment(post));
+
+    await setPostInAlbum(post.id, false);
+    await expect(getAlbumPhotos(circle.id)).resolves.toEqual([]);
+
+    await setPostInAlbum(post.id, true);
+    expect((await getAlbumPhotos(circle.id)).map((photo) => photo.id)).toEqual([post.id]);
   });
 });

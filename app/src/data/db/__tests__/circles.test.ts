@@ -24,6 +24,7 @@ function makePost(circleId: string, overrides: Partial<{ id: string; authorPubli
     authorPublicKey: OTHER_KEY,
     createdAt: Date.now(),
     lastViewedAt: null,
+    inAlbum: true,
     ...overrides,
   };
 }

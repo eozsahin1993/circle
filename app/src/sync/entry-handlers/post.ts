@@ -8,6 +8,7 @@ type PostPayload = {
   photoHash: string;
   createdAt: number;
   keyVersion: number;
+  inAlbum: boolean;
 };
 
 function parse(payload: unknown): PostPayload | null {
@@ -19,7 +20,13 @@ function parse(payload: unknown): PostPayload | null {
   if (typeof photoHash !== 'string') return null;
   if (typeof createdAt !== 'number') return null;
   if (typeof keyVersion !== 'number') return null;
-  return { postId, caption, photoHash, createdAt, keyVersion };
+  // Deliberately not a rejecting check, unlike every field above it.
+  // Entries are immutable and replay must be deterministic (invariant 1),
+  // so an entry written before this field existed has to keep applying
+  // forever — demanding a boolean here would drop those posts on every
+  // future replay, permanently. Absent means "in the album", the same
+  // default the toggle offers. Same shape as profile-update.ts's picture.
+  return { postId, caption, photoHash, createdAt, keyVersion, inAlbum: record.inAlbum !== false };
 }
 
 export const postHandler: EntryHandler = {
@@ -64,6 +71,7 @@ export const postHandler: EntryHandler = {
         authorPublicKey: envelope.authorPubkey,
         createdAt: payload.createdAt,
         lastViewedAt: null,
+        inAlbum: payload.inAlbum,
       },
       {
         circleId,
