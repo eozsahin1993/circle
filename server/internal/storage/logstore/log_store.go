@@ -93,6 +93,12 @@ type FetchResult struct {
 	CurrentEpoch int64
 }
 
+// Epochs is one circle's latest epoch per namespace — see Peek.
+type Epochs struct {
+	Meta    int64
+	Content int64
+}
+
 // Store is storage for the append-only per-circle log, plus the small
 // piece of relay-visible control state (see server/SYNC_DESIGN.md's
 // "#control") that authorizes writes to it. Bootstrap/Append/Rotate are
@@ -134,6 +140,14 @@ type Store interface {
 
 	// Read never deletes or evicts — retention is permanent (invariant 1).
 	Read(ctx context.Context, syncID string, ns Namespace, since int64) (FetchResult, error)
+
+	// Peek is the cheap half of Read — the same control-state check Read
+	// itself starts with, without the entries Query that follows it. Meant
+	// for a client that just wants to know whether a real Read is worth
+	// making, polled far more often than Read itself. A syncID with no
+	// control state is simply absent from the result map, not an error —
+	// one bad/stale id in a multi-circle batch shouldn't fail the rest.
+	Peek(ctx context.Context, syncIDs []string) (map[string]Epochs, error)
 
 	// VerifyWriteToken checks writeToken against what's on file, without
 	// mutating anything — exposed standalone for operations that need to
