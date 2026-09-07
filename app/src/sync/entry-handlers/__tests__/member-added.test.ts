@@ -210,4 +210,65 @@ describe('apply', () => {
     expect(added?.name).toBe('Priya');
     expect(added?.picture).toBeNull();
   });
+
+  // Without this, a device replaying meta from epoch 0 would date every
+  // historical join "now" and sort them all to the top of its feed.
+  test('dates the join from the entry, not from when this device applied it', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    const founder = (await getCircleIdentity(circleId))!;
+    const joiner = generateIdentity();
+    const joinerKey = bytesToHex(joiner.publicKey);
+    const joinedLongAgo = Date.now() - 5 * 24 * 60 * 60 * 1000;
+
+    await memberAddedHandler.apply(
+      circleId,
+      envelope(bytesToHex(founder.publicKey), { ...payloadFor(joinerKey, 'Priya'), createdAt: joinedLongAgo })
+    );
+
+    const added = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === joinerKey);
+    expect(added?.joinedAt).toBe(joinedLongAgo);
+  });
+
+  // completeJoin writes the joiner's own row when it notices the approval,
+  // which can be well after the approval itself — the entry is the version
+  // every device agrees on, so it corrects the local guess.
+  test('corrects a row this device wrote before the entry arrived', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    const founder = (await getCircleIdentity(circleId))!;
+    const joiner = generateIdentity();
+    const joinerKey = bytesToHex(joiner.publicKey);
+    const approvedAt = Date.now() - 2 * 60 * 60 * 1000;
+    await insertMember({
+      circleId,
+      identityPublicKey: joinerKey,
+      encPublicKey: 'cc',
+      memberId: generateUUID(),
+      role: MemberRoles.member,
+      name: 'Priya',
+      picture: null,
+      joinedAt: Date.now(),
+      removedAt: null,
+    });
+
+    await memberAddedHandler.apply(
+      circleId,
+      envelope(bytesToHex(founder.publicKey), { ...payloadFor(joinerKey, 'Priya'), createdAt: approvedAt })
+    );
+
+    const added = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === joinerKey);
+    expect(added?.joinedAt).toBe(approvedAt);
+  });
+
+  test('falls back to receipt time for an entry written before createdAt existed', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    const founder = (await getCircleIdentity(circleId))!;
+    const joiner = generateIdentity();
+    const joinerKey = bytesToHex(joiner.publicKey);
+    const before = Date.now();
+
+    await memberAddedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payloadFor(joinerKey, 'Priya')));
+
+    const added = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === joinerKey);
+    expect(added?.joinedAt).toBeGreaterThanOrEqual(before);
+  });
 });

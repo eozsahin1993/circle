@@ -227,6 +227,31 @@ export async function fetchEntries(syncId: string, namespace: Namespace, since: 
   };
 }
 
+export type CircleEpochs = {
+  syncId: string;
+  metaEpoch: number;
+  contentEpoch: number;
+};
+
+/**
+ * Cheap "has anything changed" check across many circles in one call — GET
+ * /v1/epochs?syncId=&syncId=..., meant to be polled far more often than
+ * fetchEntries itself. A circle with no server-side state yet (never
+ * bootstrapped) is simply absent from the result, not an error.
+ */
+export async function fetchEpochs(syncIds: string[]): Promise<CircleEpochs[]> {
+  const query = syncIds.map((id) => `syncId=${encodeURIComponent(id)}`).join('&');
+  const response = await authorizedFetch(`/v1/epochs?${query}`);
+  if (response.status === 429) {
+    throw new RateLimitedError();
+  }
+  if (!response.ok) {
+    throw new Error(await describeError(response, 'Failed to fetch epochs'));
+  }
+  const body = await response.json();
+  return body.circles;
+}
+
 /**
  * Obtains a presigned upload target for one entry's blob — POST
  * /v1/circles/{syncId}/entries/{entryId}/upload (POST despite not

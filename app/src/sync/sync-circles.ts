@@ -1,5 +1,6 @@
-import { getAllCircles } from '@/data/db';
+import { getAllCircles, getPendingOutboxEntries } from '@/data/db';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
+import { fetchEpochs } from '@/services/relay';
 import { timed } from '@/services/timing';
 import { pullContent, pullMeta } from '@/sync/pull-log';
 
@@ -35,4 +36,54 @@ export async function syncAllCircles(): Promise<void> {
       console.error(`Failed to sync circle ${circle.id}`, err);
     }
   }
+}
+
+/**
+ * The scheduler's own periodic pass: cheaply checks every circle's current
+ * epoch first, and only runs a real syncCircle for one that actually needs
+ * it — either the relay has something new (its epoch is ahead of this
+ * device's own cursor), or this device still has something queued to push.
+ *
+ * The pending-push check matters and is easy to miss: gating only on the
+ * relay's epoch would silently stop retrying a locally-queued post/comment
+ * that failed to push, for any circle where nobody else's content ever
+ * changes again — syncCircle is what actually retries drainOutbox, so a
+ * circle with something still queued locally needs a real pass even when
+ * the relay has nothing new to offer. getPendingOutboxEntries is a local
+ * SQLite read, not a network call, so checking it costs nothing extra.
+ *
+ * Unlike syncAllCircles, this is meant only for the scheduler's own
+ * automatic trigger — a manual pull-to-refresh should still mean "sync
+ * everything for real," never a conditional check, and keeps calling
+ * syncAllCircles directly.
+ */
+export async function syncStaleCircles(): Promise<void> {
+  const circles = await getAllCircles();
+  if (circles.length === 0) return;
+
+  // A failed epoch check must not strand the push side: an outbox entry
+  // that hasn't gone out yet needs its retry whether or not this
+  // particular endpoint answered (it has its own rate-limit budget, and
+  // could fail while appends would still succeed). Carry on with no
+  // epochs — every circle then syncs only if it has something queued.
+  const remote = await fetchEpochs(circles.map((circle) => circle.syncId)).catch((err) => {
+    console.error('Failed to check circle epochs', err);
+    return [];
+  });
+  const remoteBySyncId = new Map(remote.map((epochs) => [epochs.syncId, epochs]));
+
+  await Promise.all(
+    circles.map(async (circle) => {
+      const epochs = remoteBySyncId.get(circle.syncId);
+      const hasNewContent = epochs !== undefined && (epochs.metaEpoch > circle.metaCursor || epochs.contentEpoch > circle.contentCursor);
+      const hasPendingPush = (await getPendingOutboxEntries(circle.id)).length > 0;
+      if (!hasNewContent && !hasPendingPush) return;
+
+      try {
+        await syncCircle(circle.id);
+      } catch (err) {
+        console.error(`Failed to sync circle ${circle.id}`, err);
+      }
+    }),
+  );
 }

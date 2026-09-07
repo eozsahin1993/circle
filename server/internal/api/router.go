@@ -18,6 +18,7 @@ import (
 	"circle-relay/internal/api/createlog"
 	"circle-relay/internal/api/getblob"
 	"circle-relay/internal/api/getcoverphotouploadtarget"
+	"circle-relay/internal/api/getepochs"
 	"circle-relay/internal/api/getlog"
 	"circle-relay/internal/api/getuploadtarget"
 	"circle-relay/internal/api/invite"
@@ -98,6 +99,15 @@ func newV1Mux(
 	invitesMux := http.NewServeMux()
 	invite.Register(invitesMux, &invite.Service{InviteStore: inviteStore})
 	mux.Handle("/invites/", auth.RequireSession(authStore, invitesMux))
+
+	// Not circle-scoped in the path (it spans however many circles a
+	// device is in, in one call) — its own sub-mux rather than nested
+	// under circleMux, same RequireSession wrapping as the others above.
+	// readLimit for now, same budget as getlog/getblob — worth revisiting
+	// once this is actually polled on its intended ~30s cadence.
+	epochsMux := http.NewServeMux()
+	getepochs.Register(epochsMux, &getepochs.Service{LogStore: logStore}, readLimit)
+	mux.Handle("/epochs", auth.RequireSession(authStore, epochsMux))
 
 	google.Register(mux, &google.Service{AuthStore: authStore, Verifier: googleVerifier})
 	apple.Register(mux, &apple.Service{AuthStore: authStore, Verifier: appleVerifier})

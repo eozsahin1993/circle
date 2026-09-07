@@ -3,7 +3,7 @@ jest.mock('@/domain/usecases/account/account-manifest');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { getCircle, getCircleMembers, initDatabase, insertMember, MemberRoles } from '@/data/db';
+import { getCircle, getCircleMembers, getMemberByPublicKey, initDatabase, insertMember, MemberRoles } from '@/data/db';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import type { LogEntryEnvelope } from '@/domain/usecases/circle/log-entry';
@@ -97,6 +97,24 @@ describe('apply', () => {
     await memberRemovedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), { identityPublicKey: targetKey }));
 
     expect((await getCircleMembers(circleId)).find((m) => m.identityPublicKey === targetKey)).toBeUndefined();
+  });
+
+  // Same reason member_added carries its own timestamp: a replaying
+  // device must not date every historical removal "now".
+  test('dates the removal from the entry, not from when this device applied it', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    const founder = (await getCircleIdentity(circleId))!;
+    const target = generateIdentity();
+    const targetKey = bytesToHex(target.publicKey);
+    await addPlainMember(circleId, targetKey);
+    const removedLongAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+
+    await memberRemovedHandler.apply(
+      circleId,
+      envelope(bytesToHex(founder.publicKey), { identityPublicKey: targetKey, createdAt: removedLongAgo })
+    );
+
+    expect(await getMemberByPublicKey(circleId, targetKey)).toMatchObject({ removedAt: removedLongAgo });
   });
 
   test('a malformed payload is a no-op rather than a crash', async () => {

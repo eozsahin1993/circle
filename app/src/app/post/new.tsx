@@ -1,9 +1,10 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, TextInput, View, StyleSheet } from 'react-native';
+import { Pressable, ScrollView, Switch, TextInput, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
 import { PrimaryButton } from '@/components/primary-button';
 import { ScreenHeader } from '@/components/screen-header';
@@ -68,7 +69,7 @@ export default function NewPostScreen() {
           </ThemedText>
         </View>
 
-        <KeyboardAvoidingView style={styles.form} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoider style={styles.form}>
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
             <Pressable onPress={handlePickPhoto}>
               {picture ? (
@@ -119,7 +120,7 @@ export default function NewPostScreen() {
             onPress={handlePost}
             style={styles.postButton}
           />
-        </KeyboardAvoidingView>
+        </KeyboardAvoider>
       </SafeAreaView>
     </ThemedView>
   );

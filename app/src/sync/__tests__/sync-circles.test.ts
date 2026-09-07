@@ -4,7 +4,7 @@ jest.mock('@/services/mailbox-relay');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { getCircleFeed, getCircleMembers, getPostComments, initDatabase } from '@/data/db';
+import { getAllCircles, getCircleFeed, getCircleMembers, getPostComments, initDatabase } from '@/data/db';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import { approveJoinRequest, getOrCreateInvite } from '@/domain/usecases/circle/invite-to-circle';
 import type { JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
@@ -27,6 +27,7 @@ import {
   appendEntry,
   bootstrapCircle,
   fetchEntries,
+  fetchEpochs,
   getBlob,
   getUploadTarget,
   uploadBlob,
@@ -35,7 +36,7 @@ import {
 import { memberAddedHandler } from '@/sync/entry-handlers/member-added';
 import { drainPhotoQueue } from '@/sync/photo-queue';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
-import { syncCircle } from '@/sync/sync-circles';
+import { syncCircle, syncStaleCircles } from '@/sync/sync-circles';
 
 beforeAll(async () => {
   await initDatabase();
@@ -49,6 +50,7 @@ beforeEach(() => {
   (getUploadTarget as jest.Mock).mockResolvedValue({ url: 'https://s3', fields: {} });
   (uploadBlob as jest.Mock).mockResolvedValue(undefined);
   (fetchEntries as jest.Mock).mockResolvedValue({ entries: [], currentEpoch: 0 });
+  (fetchEpochs as jest.Mock).mockResolvedValue([]);
   (putInvitePreview as jest.Mock).mockResolvedValue(undefined);
 });
 
@@ -339,4 +341,85 @@ test('a reaction toggled here is pushed, and one from another device arrives', a
 
   const [summary] = await getReactionsForPost(circleId, postId);
   expect(summary).toMatchObject({ emoji: '❤️', count: 2, reactedByMe: true });
+});
+
+describe('syncStaleCircles', () => {
+  test('runs a real sync for a circle whose remote epoch is ahead of its local cursor', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    const founder = (await getCircleIdentity(circleId))!;
+    const contentKey = (await getCurrentContentKey(circleId))!.key;
+    // getAllCircles returns every circle from every earlier test too, ordered
+    // by createdAt — must find this test's own circle, not assume it's first.
+    const { syncId } = (await getAllCircles()).find((circle) => circle.id === circleId)!;
+    const other = generateIdentity();
+    const postId = generateUUID();
+    const photo = new Uint8Array([1, 2, 3]);
+
+    // contentCursor starts at 0 for a fresh circle — 1 is ahead of it.
+    (fetchEpochs as jest.Mock).mockResolvedValue([{ syncId, metaEpoch: 1, contentEpoch: 1 }]);
+    relayServes({
+      content: [
+        {
+          epoch: 1,
+          keyVersion: 1,
+          receivedAt: Date.now(),
+          encryptedMeta: buildAndEncryptLogEntry(
+            'post',
+            { postId, caption: 'From elsewhere', photoHash: hashBytes(photo), createdAt: 1, keyVersion: 1 },
+            other,
+            contentKey
+          ),
+        },
+      ],
+    });
+    // The author must be a known member for the content entry's predicate to accept it.
+    await memberAddedHandler.apply(circleId, {
+      type: 'member_added',
+      payload: { identityPublicKey: bytesToHex(other.publicKey), encPublicKey: 'cc', name: 'Marcus', role: 'member' },
+      authorPubkey: bytesToHex(founder.publicKey),
+      signature: 'unused',
+    });
+
+    await syncStaleCircles();
+
+    const [post] = await getCircleFeed(circleId);
+    expect(post).toMatchObject({ caption: 'From elsewhere' });
+  });
+
+  test('skips a circle whose remote epoch matches its local cursor and has nothing queued', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    const { syncId, metaCursor, contentCursor } = (await getAllCircles()).find((circle) => circle.id === circleId)!;
+
+    // Reports exactly what this device already has — nothing new, nothing queued.
+    (fetchEpochs as jest.Mock).mockResolvedValue([{ syncId, metaEpoch: metaCursor, contentEpoch: contentCursor }]);
+
+    await syncStaleCircles();
+
+    // A real sync pass would have called fetchEntries at least once (meta,
+    // then content) — it must never have run at all.
+    expect(fetchEntries).not.toHaveBeenCalled();
+    await expect(getCircleFeed(circleId)).resolves.toEqual([]);
+  });
+
+  test('still syncs a circle with nothing new remotely but something queued locally', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    // createPost kicks off its own drain fire-and-forget. Let that one
+    // fail and settle, so the entry is still pending and every append
+    // seen below belongs to syncStaleCircles rather than to that drain.
+    (appendEntry as jest.Mock).mockRejectedValue(new Error('offline'));
+    await createPost({ circleId, caption: 'Mine', photo: new Uint8Array([1, 2, 3]) });
+    await drainOutbox(circleId).catch(() => {});
+    const { syncId, metaCursor, contentCursor } = (await getAllCircles()).find((circle) => circle.id === circleId)!;
+    (appendEntry as jest.Mock).mockReset();
+    (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
+
+    // Reports no new content at all — the only reason to sync is the
+    // locally-queued post drainOutbox hasn't pushed yet.
+    (fetchEpochs as jest.Mock).mockResolvedValue([{ syncId, metaEpoch: metaCursor, contentEpoch: contentCursor }]);
+
+    await syncStaleCircles();
+
+    const pushedTypes = (appendEntry as jest.Mock).mock.calls.map((call) => call[1]);
+    expect(pushedTypes).toContain('content');
+  });
 });

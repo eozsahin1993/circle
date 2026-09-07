@@ -40,6 +40,23 @@ export async function insertMemberIfAbsent(member: Member): Promise<void> {
   await db.insert(circleMembers).values(member).onConflictDoNothing();
 }
 
+/**
+ * Corrects an existing member's join time to the one the `member_added`
+ * entry carries. `completeJoin` writes the joiner's own row optimistically
+ * with that device's clock, well before the approver's entry arrives —
+ * `insertMemberIfAbsent` then leaves that row alone, so without this the
+ * joiner's device would be the only one dating the join differently from
+ * everyone else's. Only ever touches `joinedAt`: the local row's name and
+ * picture are the full-resolution originals, better than the thumbnail on
+ * the entry.
+ */
+export async function reconcileMemberJoinedAt(circleId: string, identityPublicKey: string, joinedAt: number): Promise<void> {
+  await db
+    .update(circleMembers)
+    .set({ joinedAt })
+    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey)));
+}
+
 /** Looks up a member by their identity (Ed25519 signing) public key — used to verify a post's signature. */
 export async function getMemberByPublicKey(circleId: string, identityPublicKey: string): Promise<Member | null> {
   const rows = await db
@@ -96,12 +113,62 @@ export async function updateMemberRole(circleId: string, identityPublicKey: stri
  * (see `removedAt` on the schema): the row stays so this member's past
  * posts/comments/reactions keep passing `authoredByMember`. Idempotent —
  * removing an already-removed (or never-existing) row is a no-op.
+ *
+ * `removedAt` is the removing admin's clock, carried on the entry, not
+ * this device's receipt time — otherwise a device replaying history from
+ * epoch 0 would date every past removal "now" and sort it to the top of
+ * the feed. Defaults to now for the local writer, which is the author.
  */
-export async function markMemberRemoved(circleId: string, identityPublicKey: string): Promise<void> {
+export async function markMemberRemoved(circleId: string, identityPublicKey: string, removedAt = Date.now()): Promise<void> {
   await db
     .update(circleMembers)
-    .set({ removedAt: Date.now() })
+    .set({ removedAt })
     .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey), isNull(circleMembers.removedAt)));
+}
+
+/** One thing that happened to the roster, for the feed timeline — see `getCircleMembershipEvents`. */
+export type MembershipEvent = {
+  /** Stable and unique across both kinds, so the feed's keyExtractor can use it directly. */
+  id: string;
+  kind: 'joined' | 'removed';
+  name: string;
+  picture: Uint8Array | null;
+  at: number;
+};
+
+/**
+ * Every join and removal this circle has seen, newest first — derived
+ * from the roster rather than a separate event log, since `joinedAt` and
+ * `removedAt` already record exactly these two moments and removed rows
+ * are kept (see `markMemberRemoved`). A member who joined and later left
+ * produces both events.
+ *
+ * Deliberately its own query rather than something the feed's post query
+ * unions in: `feedPostQuery` can't select a column whose source name
+ * collides across its joined tables (see posts.ts), and the feed already
+ * merges independently-fetched pieces in JS.
+ */
+export async function getCircleMembershipEvents(circleId: string): Promise<MembershipEvent[]> {
+  const rows = await db
+    .select({
+      identityPublicKey: circleMembers.identityPublicKey,
+      name: circleMembers.name,
+      picture: circleMembers.picture,
+      joinedAt: circleMembers.joinedAt,
+      removedAt: circleMembers.removedAt,
+    })
+    .from(circleMembers)
+    .where(eq(circleMembers.circleId, circleId));
+
+  const events: MembershipEvent[] = [];
+  for (const row of rows) {
+    const picture = normalizeBlob(row.picture);
+    events.push({ id: `${row.identityPublicKey}:joined`, kind: 'joined', name: row.name, picture, at: row.joinedAt });
+    if (row.removedAt !== null) {
+      events.push({ id: `${row.identityPublicKey}:removed`, kind: 'removed', name: row.name, picture, at: row.removedAt });
+    }
+  }
+  return events.sort((a, b) => b.at - a.at);
 }
 
 /** Just the count of *current* members — the circle list shows "N people" and never needs the rows. */

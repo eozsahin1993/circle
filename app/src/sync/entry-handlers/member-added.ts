@@ -1,7 +1,7 @@
-import { getCircleMembers, insertMemberIfAbsent, MemberRoles, type MemberRole } from '@/data/db';
+import { getCircleMembers, insertMemberIfAbsent, MemberRoles, reconcileMemberJoinedAt, type MemberRole } from '@/data/db';
 import { generateUUID } from '@/services/crypto';
 import { parsePictureThumbnail } from '@/services/image';
-import { asRecord, type EntryHandler } from '@/sync/entry-handlers/types';
+import { asRecord, numberField, type EntryHandler } from '@/sync/entry-handlers/types';
 
 /** What `createCircle` and `invite-to-circle.ts`'s `approveJoinRequest` put in a `member_added` entry. */
 type MemberAddedPayload = {
@@ -19,6 +19,13 @@ type MemberAddedPayload = {
    * change has no propagation mechanism yet.
    */
   picture?: Uint8Array;
+  /**
+   * When the author wrote this entry, on their clock — the same basis
+   * `posts.createdAt` uses, so joins interleave with posts consistently
+   * in the feed. Absent on entries written before this field existed,
+   * which fall back to receipt time (see `apply`).
+   */
+  createdAt?: number;
 };
 
 function parse(payload: unknown): MemberAddedPayload | null {
@@ -29,7 +36,14 @@ function parse(payload: unknown): MemberAddedPayload | null {
   if (typeof encPublicKey !== 'string') return null;
   if (typeof name !== 'string') return null;
   if (role !== MemberRoles.admin && role !== MemberRoles.member) return null;
-  return { identityPublicKey, encPublicKey, name, role: role as MemberRole, picture: parsePictureThumbnail(record.picture) ?? undefined };
+  return {
+    identityPublicKey,
+    encPublicKey,
+    name,
+    role: role as MemberRole,
+    picture: parsePictureThumbnail(record.picture) ?? undefined,
+    createdAt: numberField(record, 'createdAt') ?? undefined,
+  };
 }
 
 export const memberAddedHandler: EntryHandler = {
@@ -88,8 +102,16 @@ export const memberAddedHandler: EntryHandler = {
       role: payload.role,
       name: payload.name,
       picture: payload.picture ?? null,
-      joinedAt: Date.now(),
+      joinedAt: payload.createdAt ?? Date.now(),
       removedAt: null,
     });
+
+    // The joiner's own device already wrote this row in `completeJoin`,
+    // stamped with its own clock at the moment it noticed the approval —
+    // which can be long after the approval itself. The entry is the one
+    // version every device agrees on, so it wins where it exists.
+    if (payload.createdAt !== undefined) {
+      await reconcileMemberJoinedAt(circleId, payload.identityPublicKey, payload.createdAt);
+    }
   },
 };

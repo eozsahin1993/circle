@@ -85,7 +85,9 @@ test('removeMember appends a signed, verifiable member_removed meta entry before
 
   const envelope = JSON.parse(new TextDecoder().decode(decrypt(encryptedMeta, current.key)));
   expect(envelope.type).toBe('member_removed');
-  expect(envelope.payload).toEqual({ identityPublicKey });
+  // createdAt is the removing admin's clock, carried so every device
+  // dates the removal identically rather than using its own receipt time.
+  expect(envelope.payload).toEqual({ identityPublicKey, createdAt: expect.any(Number) });
   const verified = verify(
     hexToBytes(envelope.signature),
     new TextEncoder().encode(JSON.stringify({ type: envelope.type, payload: envelope.payload })),

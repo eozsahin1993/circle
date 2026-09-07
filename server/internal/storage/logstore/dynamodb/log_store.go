@@ -29,6 +29,15 @@ import (
 // page means CurrentEpoch is still ahead of what was actually returned).
 const readPageSize = 200
 
+// peekRetryBaseDelay/peekRetryMaxDelay bound the backoff between Peek's
+// UnprocessedKeys retries — small, because a poll endpoint that stalls is
+// worse than one that returns a partial-batch error the client retries on
+// its own cadence.
+const (
+	peekRetryBaseDelay = 20 * time.Millisecond
+	peekRetryMaxDelay  = 200 * time.Millisecond
+)
+
 // maxCASAttempts bounds the compare-and-swap retry loop Append and Rotate
 // use to keep "check the token/authority" and "bump the counter" atomic
 // (see getControlState). Retries only happen under genuine concurrent
@@ -341,20 +350,105 @@ func (s *Store) getControlState(ctx context.Context, syncID string, consistent b
 		}
 	}
 	writeTokenHash, _ := dynamoutil.AttrString(out.Item, "writeTokenHash")
-	metaCounter, err := dynamoutil.AttrInt(out.Item, "metaCounter")
-	if err != nil {
-		return nil, err
-	}
-	contentCounter, err := dynamoutil.AttrInt(out.Item, "contentCounter")
+	epochs, err := parseControlEpochs(out.Item)
 	if err != nil {
 		return nil, err
 	}
 	return &controlState{
 		authoritySet:   authoritySet,
 		writeTokenHash: writeTokenHash,
-		metaCounter:    metaCounter,
-		contentCounter: contentCounter,
+		metaCounter:    epochs.Meta,
+		contentCounter: epochs.Content,
 	}, nil
+}
+
+// parseControlEpochs reads just the two counters off a #control item —
+// shared by getControlState (which also needs the rest of the item) and
+// Peek (which needs only this).
+func parseControlEpochs(item map[string]types.AttributeValue) (logstore.Epochs, error) {
+	metaCounter, err := dynamoutil.AttrInt(item, "metaCounter")
+	if err != nil {
+		return logstore.Epochs{}, err
+	}
+	contentCounter, err := dynamoutil.AttrInt(item, "contentCounter")
+	if err != nil {
+		return logstore.Epochs{}, err
+	}
+	return logstore.Epochs{Meta: metaCounter, Content: contentCounter}, nil
+}
+
+// Peek is Read's cheap half exposed for polling — see logstore.Store.Peek.
+// A requested syncID with no #control item is simply absent from the
+// result, the per-item analog of getControlState's ErrCircleNotFound.
+func (s *Store) Peek(ctx context.Context, syncIDs []string) (map[string]logstore.Epochs, error) {
+	result := make(map[string]logstore.Epochs, len(syncIDs))
+	if len(syncIDs) == 0 {
+		return result, nil
+	}
+
+	// Deduplicated because BatchGetItem rejects the whole request with a
+	// ValidationException if the same key appears twice — and a caller
+	// asking about the same circle twice wants an answer, not an error.
+	seen := make(map[string]bool, len(syncIDs))
+	keys := make([]map[string]types.AttributeValue, 0, len(syncIDs))
+	for _, syncID := range syncIDs {
+		if seen[syncID] {
+			continue
+		}
+		seen[syncID] = true
+		keys = append(keys, controlKey(syncID))
+	}
+
+	requestItems := map[string]types.KeysAndAttributes{
+		s.tableName: {Keys: keys, ConsistentRead: aws.Bool(false)},
+	}
+	for attempt := 0; len(requestItems) > 0; attempt++ {
+		// UnprocessedKeys means DynamoDB throttled part of the batch.
+		// Resubmitting immediately would add load to a table already
+		// pushing back (and spin a Lambda invocation hot doing it), so
+		// each retry waits a little longer than the last.
+		if attempt > 0 {
+			if err := sleepBackoff(ctx, attempt); err != nil {
+				return nil, err
+			}
+		}
+
+		out, err := s.client.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{RequestItems: requestItems})
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range out.Responses[s.tableName] {
+			syncID, ok := dynamoutil.AttrString(item, dynamoutil.PKAttr)
+			if !ok {
+				continue
+			}
+			epochs, err := parseControlEpochs(item)
+			if err != nil {
+				return nil, err
+			}
+			result[syncID] = epochs
+		}
+		requestItems = out.UnprocessedKeys
+	}
+	return result, nil
+}
+
+// sleepBackoff waits out one retry of an exponential backoff, or returns
+// early if ctx is cancelled first — a request that's already given up
+// shouldn't hold the invocation open sleeping.
+func sleepBackoff(ctx context.Context, attempt int) error {
+	delay := peekRetryBaseDelay << (attempt - 1)
+	if delay > peekRetryMaxDelay {
+		delay = peekRetryMaxDelay
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func (s *Store) lookupIdempotencyMarker(ctx context.Context, syncID string, ns logstore.Namespace, entryID string) (*logstore.CommitResult, error) {
