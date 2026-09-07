@@ -121,8 +121,8 @@ export function PostCard({
                 <ThemedText type="meta" themeColor="muted">
                   ·
                 </ThemedText>
-                <Feather name={Icons.inAlbum} size={12} color={theme.secondary} />
-                <ThemedText type="meta" themeColor="secondary">
+                <Feather name={Icons.inAlbum} size={12} color={theme.muted} />
+                <ThemedText type="meta" themeColor="muted">
                   In the album
                 </ThemedText>
               </>
