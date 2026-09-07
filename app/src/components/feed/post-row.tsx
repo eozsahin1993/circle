@@ -10,6 +10,7 @@ import type { FeedPostView } from '@/domain/usecases/feed/circle-feed';
 import { markPostViewed, getPostComments } from '@/data/db';
 import { addComment } from '@/domain/usecases/post/comment-on-post';
 import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
+import { setAlbumVisibility } from '@/domain/usecases/post/set-album-visibility';
 import { bytesToDataUri } from '@/services/image';
 import { formatRelative, formatTimestamp } from '@/utils/time';
 
@@ -35,6 +36,7 @@ type PostRowActions = {
   onExpandComments: (postId: string) => void;
   /** Scrolled into view — not the same as opening it. */
   onSeen: (postId: string) => void;
+  onToggleAlbum: (view: FeedPostView) => void;
 };
 
 /**
@@ -53,6 +55,22 @@ export function usePostRows({ circleId, patchPost, posts, profile }: PostRowsInp
       onAddComment: async (postId, body) => {
         await addComment(circleId, postId, body);
         patchPost(postId, { comments: await getPostComments(circleId, postId) });
+      },
+      /**
+       * Optimistic, like the post's own screen: the write is local-first
+       * and the entry is queued, so the only thing left to wait on is a
+       * network push that must never hold the bookmark up.
+       */
+      onToggleAlbum: async (view) => {
+        const { id } = view.post;
+        const next = !view.post.inAlbum;
+        patchPost(id, { post: { ...view.post, inAlbum: next } });
+        try {
+          await setAlbumVisibility(circleId, id, next);
+        } catch (err) {
+          console.error('Failed to change album visibility', err);
+          patchPost(id, { post: view.post });
+        }
       },
       onOpenPost: (postId) => router.push({ pathname: '/post/[id]', params: { id: postId, circleId } }),
       onSeen: (postId) => markPostViewed(postId).catch((err) => console.error('Failed to mark a post viewed', err)),
@@ -89,6 +107,7 @@ function postRow(view: FeedPostView, profile: Profile | null, actions: PostRowAc
         onPressPhoto={() => actions.onOpenPost(post.id)}
         onPressComments={() => actions.onOpenPost(post.id)}
         onExpandComments={() => actions.onExpandComments(post.id)}
+        onToggleAlbum={() => actions.onToggleAlbum(view)}
       />
     ),
   };
@@ -134,6 +153,7 @@ function toPostCard(view: FeedPostView, profile: Profile | null): Post {
     reactions: view.reactions,
     comments: toCommentItems(view.comments, profile?.name),
     hasUnseenComments: view.hasUnseenComments,
+    inAlbum: post.inAlbum,
   };
 }
 

@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -10,6 +11,7 @@ import { EmojiPicker } from '@/components/emoji-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export type Reaction = {
   emoji: string;
@@ -31,6 +33,8 @@ export type Post = {
   comments: CommentItem[];
   /** A comment landed on this post since it was last scrolled into view or opened — shown as a small dot on the comments chip. */
   hasUnseenComments?: boolean;
+  /** Whether this photo is kept in the circle's album — lights the bookmark. */
+  inAlbum?: boolean;
 };
 
 export type PostCardProps = {
@@ -44,6 +48,8 @@ export type PostCardProps = {
   onExpandComments?: () => void;
   /** The reader's own picture, for the composer — the same on every card, so it rides on the card rather than each post. */
   selfPhotoUri?: string;
+  /** Adds or removes the photo from the circle's album. */
+  onToggleAlbum?: () => void;
 };
 
 /** How many distinct emoji the feed's single pill shows before the count speaks for the rest. */
@@ -65,7 +71,9 @@ export function PostCard({
   onPressComments,
   onExpandComments,
   selfPhotoUri,
+  onToggleAlbum,
 }: PostCardProps) {
+  const theme = useTheme();
   const [showPicker, setShowPicker] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
 
@@ -100,12 +108,23 @@ export function PostCard({
     <ThemedView style={styles.card}>
       <View style={styles.header}>
         <Avatar uri={post.authorPhotoUri} />
-        <View>
+        <View style={styles.byline}>
           <ThemedText type="postAuthor">{post.authorName}</ThemedText>
           <ThemedText type="meta" themeColor="muted">
             {post.timestamp}
           </ThemedText>
         </View>
+        {/* Bare rather than a bordered pill, unlike the post's own screen:
+            the chips below already carry borders, and a second bordered
+            circle up here would read as one of them. */}
+        {onToggleAlbum ? (
+          <Pressable
+            onPress={onToggleAlbum}
+            hitSlop={10}
+            accessibilityLabel={post.inAlbum ? 'Remove from album' : 'Add to album'}>
+            <Feather name={Icons.inAlbum} size={18} color={post.inAlbum ? theme.accentBright : theme.faint} />
+          </Pressable>
+        ) : null}
       </View>
 
       <Pressable style={styles.photoWrap} onPress={onPressPhoto} disabled={!onPressPhoto}>
@@ -182,6 +201,9 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: Spacing.feedTextPadding,
     paddingVertical: 14,
+  },
+  byline: {
+    flex: 1,
   },
   photoWrap: {
     justifyContent: 'flex-end',
