@@ -1,6 +1,6 @@
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
-import { getCircle, getCircleMembers, markMemberRemoved } from '@/data/db';
+import { getCircle, getCircleMembers, recordMemberRemovedLocally } from '@/data/db';
 import { requireAdminPublicKey } from '@/domain/usecases/circle/invite-to-circle';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import {
@@ -30,7 +30,7 @@ import { pullMeta } from '@/sync/pull-log';
  * atomically with the append, which the generic outbox/appendEntry path
  * has no way to do. Pushing `member_removed` first, awaited, before
  * calling `rotateLog` is what guarantees it lands at a lower epoch than
- * its own rotation. Local state (`markMemberRemoved`/`addCircleKeyVersion`)
+ * its own rotation. Local state (`recordMemberRemovedLocally`/`addCircleKeyVersion`)
  * only updates once both calls succeed — a failure between them leaves an
  * orphaned `member_removed` with no rotation yet, which a retry heals on
  * its own (a second `member_removed` for the same target is a harmless,
@@ -84,9 +84,14 @@ export async function removeMember(circleId: string, identityPublicKey: string):
   const rotationEntryId = generateUUID();
   const signature = sign(deriveRotateMessage(circle.syncId, rotationEntryId, newWriteTokenHash), authorityKeypair.secretKey);
 
+  // Direct rather than through the outbox — the only reason is the
+  // rotation below. It swaps the relay's stored write-token hash, so
+  // `currentWriteToken` dies the moment it lands and the two calls have
+  // to be one sequence, not two entries a drain pushes minutes apart.
+  // leave-circle.ts queues the same entry type because it doesn't rotate.
   await appendEntry(circle.syncId, 'meta', generateUUID(), removedEntry, current.version, currentWriteToken);
   await rotateLog(circle.syncId, rotationEntryId, rotationEntry, current.version, currentWriteToken, newWriteTokenHash, authorityKeypair.publicKey, signature);
 
-  await markMemberRemoved(circleId, identityPublicKey, removedAt);
+  await recordMemberRemovedLocally({ circleId, subjectPublicKey: identityPublicKey, removedAt });
   await addCircleKeyVersion(circleId, newVersion, newKey);
 }

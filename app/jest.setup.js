@@ -24,3 +24,12 @@ jest.mock(`${__dirname}/node_modules/expo-sqlite/build/SQLiteDevToolsClient`, ()
   unregisterDatabaseForDevToolsAsync: jest.fn(),
   closeDevToolsClientAsync: jest.fn(),
 }));
+
+// AsyncStorage is a native module with no implementation under Jest, and
+// its stub throws on import rather than at first use — so anything that
+// transitively reaches `services/settings.ts` (every component, via
+// use-theme) fails to even load its test file. This is the mock the
+// package ships for exactly this: react-native-async-storage.github.io/async-storage/docs/advanced/jest
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
+);

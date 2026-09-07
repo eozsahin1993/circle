@@ -142,7 +142,15 @@ export default function CircleDetailsScreen() {
         text: 'Leave',
         style: 'destructive',
         onPress: async () => {
-          await leaveCircle(circleId);
+          // All local: the entry announcing the departure is queued, not
+          // pushed, so this works offline and can't fail on a connection.
+          try {
+            await leaveCircle(circleId);
+          } catch (err) {
+            console.error('Failed to leave circle', err);
+            Alert.alert("Couldn't leave", String(err));
+            return;
+          }
           router.dismissTo('/circle');
         },
       },

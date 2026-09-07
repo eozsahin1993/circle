@@ -12,7 +12,7 @@ import {
   hashWriteToken,
   sealToPublicKey,
 } from '@/services/crypto';
-import { getProfile, insertCircle, insertMember, MemberRoles } from '@/data/db';
+import { getProfile, insertCircle, MemberRoles, recordMemberAddedLocally } from '@/data/db';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { compressToThumbnail } from '@/services/image';
@@ -106,23 +106,26 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
     syncId,
     createdAt: now,
     leftAt: null,
-    // Caught up through the entry this device just wrote itself —
-    // nothing to gain by re-fetching what it already knows.
-    metaCursor: 1,
+    // Deliberately *not* 1, though this device wrote epoch 1 itself. The
+    // roster it already has, but the `member_events` row behind it only
+    // exists once the entry is applied, and skipping it is why the
+    // founder alone never saw "created this circle" in their own feed.
+    metaCursor: 0,
     contentCursor: 0,
     lastViewedAt: now,
   });
 
-  await insertMember({
+  await recordMemberAddedLocally({
     circleId,
-    identityPublicKey: bytesToHex(identity.publicKey),
-    encPublicKey: bytesToHex(sealingKeypair.publicKey),
-    memberId,
-    role: MemberRoles.admin,
-    name: profile?.name ?? '',
-    picture: profile?.picture ?? null,
+    subjectPublicKey: bytesToHex(identity.publicKey),
     joinedAt: now,
-    removedAt: null,
+    profile: {
+      encPublicKey: bytesToHex(sealingKeypair.publicKey),
+      memberId,
+      role: MemberRoles.admin,
+      name: profile?.name ?? '',
+      picture: profile?.picture ?? null,
+    },
   });
 
   await syncAccountManifestBestEffort();

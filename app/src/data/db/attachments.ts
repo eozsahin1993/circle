@@ -34,6 +34,34 @@ export async function insertAttachment(attachment: NewAttachment): Promise<void>
   await db.insert(attachments).values(attachment).onConflictDoNothing();
 }
 
+/**
+ * Records an attachment that can legitimately be replaced. Only the
+ * circle cover, which always lives at the same fixed `COVER_ENTRY_ID`:
+ * setting a new one must overwrite the old row's hash and send it back
+ * to the queue, where `insertAttachment`'s no-op would leave the
+ * previous image in place forever.
+ *
+ * Replaying the same entry is still harmless — it writes the same hash
+ * and version, and the status reset just re-fetches bytes this device
+ * already has.
+ */
+export async function upsertAttachment(attachment: NewAttachment): Promise<void> {
+  await db
+    .insert(attachments)
+    .values(attachment)
+    .onConflictDoUpdate({
+      target: [attachments.circleId, attachments.entryId],
+      set: {
+        hash: attachment.hash,
+        keyVersion: attachment.keyVersion,
+        bytes: attachment.bytes,
+        status: attachment.status,
+        fetchAttempts: attachment.fetchAttempts,
+        nextAttemptAt: attachment.nextAttemptAt,
+      },
+    });
+}
+
 export async function getAttachment(circleId: string, entryId: string): Promise<Attachment | null> {
   const rows = await db
     .select()

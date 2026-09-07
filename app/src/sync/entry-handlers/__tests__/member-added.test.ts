@@ -3,7 +3,7 @@ jest.mock('@/domain/usecases/account/account-manifest');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { getCircleMembers, initDatabase, insertCircle, insertMember, MemberRoles } from '@/data/db';
+import { getCircleMemberEvents, getCircleMembers, initDatabase, insertCircle, insertMember, MemberRoles } from '@/data/db';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import type { LogEntryEnvelope } from '@/domain/usecases/circle/log-entry';
 import { generateIdentity, generateUUID } from '@/services/crypto';
@@ -141,10 +141,36 @@ describe('apply', () => {
     const joiner = generateIdentity();
     const joinerKey = bytesToHex(joiner.publicKey);
 
-    await memberAddedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payloadFor(joinerKey, 'Priya', 'admin')));
+    await memberAddedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payloadFor(joinerKey, 'Priya', 'admin')), 1);
 
     const added = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === joinerKey);
     expect(added).toMatchObject({ name: 'Priya', role: 'admin', encPublicKey: 'cc' });
+  });
+
+  /**
+   * The founder's own entry is the first thing any device replays, so
+   * every member's feed opens on the circle being created rather than on
+   * the founder appearing to "join" a circle that already existed.
+   */
+  test('a self-authored entry is recorded as the circle being created', async () => {
+    const circleId = await emptyCircle();
+    const founder = generateIdentity();
+    const founderKey = bytesToHex(founder.publicKey);
+
+    await memberAddedHandler.apply(circleId, envelope(founderKey, payloadFor(founderKey, 'Nadia', 'admin')), 1);
+
+    expect((await getCircleMemberEvents(circleId)).map((event) => event.kind)).toEqual(['created']);
+  });
+
+  test('an entry an admin wrote for someone else is an ordinary add', async () => {
+    const { id: circleId } = await createCircle({ name: 'Family Circle' });
+    const founder = (await getCircleIdentity(circleId))!;
+    const joinerKey = bytesToHex(generateIdentity().publicKey);
+
+    await memberAddedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payloadFor(joinerKey, 'Priya', 'member')), 2);
+
+    const [newest] = await getCircleMemberEvents(circleId);
+    expect(newest).toMatchObject({ kind: 'added', subjectName: 'Priya' });
   });
 
   test('applying the same entry twice adds one member, not two', async () => {
@@ -153,8 +179,8 @@ describe('apply', () => {
     const joiner = generateIdentity();
     const entry = envelope(bytesToHex(founder.publicKey), payloadFor(bytesToHex(joiner.publicKey), 'Priya'));
 
-    await memberAddedHandler.apply(circleId, entry);
-    await memberAddedHandler.apply(circleId, entry);
+    await memberAddedHandler.apply(circleId, entry, 1);
+    await memberAddedHandler.apply(circleId, entry, 1);
 
     expect(await getCircleMembers(circleId)).toHaveLength(2);
   });
@@ -166,7 +192,7 @@ describe('apply', () => {
 
     // A joiner walking meta from 0 reaches the founder's own entry; the
     // local row (with its admin role) must survive that replay.
-    await memberAddedHandler.apply(circleId, envelope(founderKey, payloadFor(founderKey, 'Renamed', 'member')));
+    await memberAddedHandler.apply(circleId, envelope(founderKey, payloadFor(founderKey, 'Renamed', 'member')), 1);
 
     const existing = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === founderKey);
     expect(existing?.role).toBe('admin');
@@ -176,7 +202,7 @@ describe('apply', () => {
     const { id: circleId } = await createCircle({ name: 'Family Circle' });
     const before = await getCircleMembers(circleId);
 
-    await expect(memberAddedHandler.apply(circleId, envelope('aa', { nonsense: true }))).resolves.toBeUndefined();
+    await expect(memberAddedHandler.apply(circleId, envelope('aa', { nonsense: true }), 1)).resolves.toBeUndefined();
 
     expect(await getCircleMembers(circleId)).toHaveLength(before.length);
   });
@@ -188,7 +214,7 @@ describe('apply', () => {
     const joinerKey = bytesToHex(joiner.publicKey);
     const picture = Buffer.from([0xff, 0xd8, 0xff, 1, 2, 3]).toString('base64');
 
-    await memberAddedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), { ...payloadFor(joinerKey, 'Priya'), picture }));
+    await memberAddedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), { ...payloadFor(joinerKey, 'Priya'), picture }), 1);
 
     const added = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === joinerKey);
     expect(added?.picture).toEqual(new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3]));
@@ -204,7 +230,7 @@ describe('apply', () => {
     const joinerKey = bytesToHex(joiner.publicKey);
     const notAJpeg = Buffer.from([1, 2, 3]).toString('base64');
 
-    await memberAddedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), { ...payloadFor(joinerKey, 'Priya'), picture: notAJpeg }));
+    await memberAddedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), { ...payloadFor(joinerKey, 'Priya'), picture: notAJpeg }), 1);
 
     const added = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === joinerKey);
     expect(added?.name).toBe('Priya');
@@ -222,7 +248,8 @@ describe('apply', () => {
 
     await memberAddedHandler.apply(
       circleId,
-      envelope(bytesToHex(founder.publicKey), { ...payloadFor(joinerKey, 'Priya'), createdAt: joinedLongAgo })
+      envelope(bytesToHex(founder.publicKey), { ...payloadFor(joinerKey, 'Priya'), createdAt: joinedLongAgo }),
+      1
     );
 
     const added = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === joinerKey);
@@ -252,7 +279,8 @@ describe('apply', () => {
 
     await memberAddedHandler.apply(
       circleId,
-      envelope(bytesToHex(founder.publicKey), { ...payloadFor(joinerKey, 'Priya'), createdAt: approvedAt })
+      envelope(bytesToHex(founder.publicKey), { ...payloadFor(joinerKey, 'Priya'), createdAt: approvedAt }),
+      1
     );
 
     const added = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === joinerKey);
@@ -266,7 +294,7 @@ describe('apply', () => {
     const joinerKey = bytesToHex(joiner.publicKey);
     const before = Date.now();
 
-    await memberAddedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payloadFor(joinerKey, 'Priya')));
+    await memberAddedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payloadFor(joinerKey, 'Priya')), 1);
 
     const added = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === joinerKey);
     expect(added?.joinedAt).toBeGreaterThanOrEqual(before);

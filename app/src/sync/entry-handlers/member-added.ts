@@ -1,4 +1,4 @@
-import { getCircleMembers, insertMemberIfAbsent, MemberRoles, reconcileMemberJoinedAt, type MemberRole } from '@/data/db';
+import { getCircleMembers, MemberRoles, recordMemberAdded, type MemberRole } from '@/data/db';
 import { generateUUID } from '@/services/crypto';
 import { parsePictureThumbnail } from '@/services/image';
 import { asRecord, numberField, type EntryHandler } from '@/sync/entry-handlers/types';
@@ -90,28 +90,29 @@ export const memberAddedHandler: EntryHandler = {
    * the public key instead — see server/SYNC_DESIGN.md's "One identifier,
    * four jobs".
    */
-  async apply(circleId, envelope) {
+  async apply(circleId, envelope, epoch) {
     const payload = parse(envelope.payload);
     if (!payload) return;
 
-    await insertMemberIfAbsent({
+    // The entry's own timestamp wins over this device's clock wherever it
+    // exists: the joiner's device already wrote this row in `completeJoin`
+    // stamped at the moment it noticed the approval, which can be long
+    // after the approval itself, and a device replaying from epoch 0 has
+    // no business dating a years-old join to today. `recordMemberAdded`
+    // writes it to both the event row and the roster, so the two agree.
+    await recordMemberAdded({
       circleId,
-      identityPublicKey: payload.identityPublicKey,
-      encPublicKey: payload.encPublicKey,
-      memberId: generateUUID(),
-      role: payload.role,
-      name: payload.name,
-      picture: payload.picture ?? null,
-      joinedAt: payload.createdAt ?? Date.now(),
-      removedAt: null,
+      epoch,
+      subjectPublicKey: payload.identityPublicKey,
+      actorPublicKey: envelope.authorPubkey,
+      occurredAt: payload.createdAt ?? Date.now(),
+      profile: {
+        encPublicKey: payload.encPublicKey,
+        memberId: generateUUID(),
+        role: payload.role,
+        name: payload.name,
+        picture: payload.picture ?? null,
+      },
     });
-
-    // The joiner's own device already wrote this row in `completeJoin`,
-    // stamped with its own clock at the moment it noticed the approval —
-    // which can be long after the approval itself. The entry is the one
-    // version every device agrees on, so it wins where it exists.
-    if (payload.createdAt !== undefined) {
-      await reconcileMemberJoinedAt(circleId, payload.identityPublicKey, payload.createdAt);
-    }
   },
 };

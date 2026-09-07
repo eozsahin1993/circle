@@ -20,7 +20,7 @@ import {
   getCircleSummary,
   getCircleFeed,
   getCircleMemberCount,
-  getCircleMembershipEvents,
+  getCircleMemberEvents,
   getPostComments,
   getProfile,
   getUnseenCommentPostIds,
@@ -82,9 +82,14 @@ async function resolvePhotoUris(circleId: string, posts: FeedPost[]): Promise<Ma
 
 function formatTimestamp(ms: number): string {
   const date = new Date(ms);
-  const day = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const day = formatDay(ms);
   const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   return `${day}, ${time}`;
+}
+
+/** Day without a time — for roster changes, where the hour someone joined is noise. */
+function formatDay(ms: number): string {
+  return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 // The privacy notice scrolls away with the feed — it's list content, not
@@ -140,21 +145,31 @@ export default function FeedScreen() {
       getCircleFeed(circleId),
       getProfile(),
       getCircleIdentity(circleId),
-      getCircleMembershipEvents(circleId),
+      getCircleMemberEvents(circleId),
     ]);
+
+    // Null only in the gap between joining and that join completing.
+    const ownPublicKey = identity ? bytesToHex(identity.publicKey) : null;
 
     setCircleName(circle?.name ?? '');
     setMemberCount(memberCount);
     setProfileName(profile?.name);
     setMembershipEvents(
       events.map((event) => ({
-        at: event.at,
+        at: event.occurredAt,
         item: {
           id: event.id,
           kind: event.kind,
-          name: event.name || 'Someone',
-          photoUri: event.picture ? bytesToDataUri(event.picture) : undefined,
-          timestamp: formatTimestamp(event.at),
+          // Blank only in the window between an event row landing and
+          // the roster write behind it (see member-events.ts) — the next
+          // replay fills it in.
+          subjectName: event.subjectName || 'Someone',
+          actorName: event.actorName,
+          selfInflicted: event.selfInflicted,
+          subjectIsYou: event.subjectPublicKey === ownPublicKey,
+          actorIsYou: event.actorPublicKey === ownPublicKey,
+          role: event.role,
+          timestamp: formatDay(event.occurredAt),
         },
       })),
     );
@@ -338,13 +353,21 @@ export default function FeedScreen() {
 
   // FlatList hands a separator only its *leading* row (there's no
   // trailingItem on a FlatList separator), so the gap that belongs
-  // between each pair is worked out here, where both rows are in hand: a
-  // membership event is one quiet line and doesn't want the full
-  // between-photos gap on either side of it.
+  // between each pair is worked out here, where both rows are in hand.
+  // A membership event is a rule across the feed rather than a card, so
+  // it takes a tighter gap on both sides — except back-to-back events,
+  // which are a stack of related lines and sit tighter still.
   const gapAfterRow = new Map<string, number>();
   for (let i = 0; i < rows.length - 1; i++) {
-    const touchesEvent = rows[i].kind === 'event' || rows[i + 1].kind === 'event';
-    gapAfterRow.set(rowKey(rows[i]), touchesEvent ? Spacing.cardListGap : Spacing.gapBetweenPosts);
+    const leadingIsEvent = rows[i].kind === 'event';
+    const trailingIsEvent = rows[i + 1].kind === 'event';
+    const gap =
+      leadingIsEvent && trailingIsEvent
+        ? Spacing.cardListGap
+        : leadingIsEvent || trailingIsEvent
+          ? Spacing.gapAroundMemberEvent
+          : Spacing.gapBetweenPosts;
+    gapAfterRow.set(rowKey(rows[i]), gap);
   }
 
   return (

@@ -136,6 +136,13 @@ export const Spacing = {
   feedTextPadding: 18,
   topPadUnderStatusBar: 58,
   gapBetweenPosts: 34,
+  /**
+   * Above and below a roster-change row. Tighter than `gapBetweenPosts`
+   * because that row is itself a rule across the feed — it already reads
+   * as the break between two photographs, and a full gap on both sides
+   * would leave it floating in a band of empty ground.
+   */
+  gapAroundMemberEvent: 20,
   pinnedButtonFromBottom: 34,
 } as const;
 

@@ -22,8 +22,15 @@ export type EntryHandler = {
    * applying an entry and advancing the cursor replays it, and a joiner
    * walking meta from epoch 0 meets its own self-announced entries
    * (server/SYNC_DESIGN.md invariant 8).
+   *
+   * `epoch` is the entry's relay-assigned position in its namespace —
+   * the only per-entry identity a handler gets, since the envelope
+   * carries none and the fetched entry has no id of its own. Handlers
+   * that project into an append-only local table use it as the
+   * idempotency key so a replayed entry overwrites rather than
+   * duplicates; the rest ignore it.
    */
-  apply(circleId: string, envelope: LogEntryEnvelope): Promise<void>;
+  apply(circleId: string, envelope: LogEntryEnvelope, epoch: number): Promise<void>;
 };
 
 /** Convenience for handlers, which all start by narrowing `payload` from `unknown`. */

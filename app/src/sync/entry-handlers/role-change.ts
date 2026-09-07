@@ -1,10 +1,18 @@
-import { getCircleMembers, MemberRoles, updateMemberRole, type MemberRole } from '@/data/db';
-import { asRecord, stringField, type EntryHandler } from '@/sync/entry-handlers/types';
+import { getCircleMembers, MemberRoles, recordRoleChanged, type MemberRole } from '@/data/db';
+import { asRecord, numberField, stringField, type EntryHandler } from '@/sync/entry-handlers/types';
 
 /** What `change-member-role.ts` puts in a `role_change` entry. */
 type RoleChangePayload = {
   identityPublicKey: string;
   role: MemberRole;
+  /**
+   * The acting admin's clock. Optional only for entries written before
+   * this field existed — without it a device replaying from epoch 0 dates
+   * the change to its own "now" and sorts it to the top of the feed, the
+   * same trap `member_added`/`member_removed` already carry `createdAt`
+   * to avoid.
+   */
+  createdAt?: number;
 };
 
 function parse(payload: unknown): RoleChangePayload | null {
@@ -14,7 +22,7 @@ function parse(payload: unknown): RoleChangePayload | null {
   if (!identityPublicKey) return null;
   const { role } = record;
   if (role !== MemberRoles.admin && role !== MemberRoles.member) return null;
-  return { identityPublicKey, role: role as MemberRole };
+  return { identityPublicKey, role: role as MemberRole, createdAt: numberField(record, 'createdAt') ?? undefined };
 }
 
 export const roleChangeHandler: EntryHandler = {
@@ -27,10 +35,17 @@ export const roleChangeHandler: EntryHandler = {
     return admins.some((member) => member.identityPublicKey === envelope.authorPubkey);
   },
 
-  async apply(circleId, envelope) {
+  async apply(circleId, envelope, epoch) {
     const payload = parse(envelope.payload);
     if (!payload) return;
 
-    await updateMemberRole(circleId, payload.identityPublicKey, payload.role);
+    await recordRoleChanged({
+      circleId,
+      epoch,
+      subjectPublicKey: payload.identityPublicKey,
+      actorPublicKey: envelope.authorPubkey,
+      occurredAt: payload.createdAt ?? Date.now(),
+      role: payload.role,
+    });
   },
 };

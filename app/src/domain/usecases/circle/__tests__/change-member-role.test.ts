@@ -72,7 +72,10 @@ test('setMemberRole queues a signed, verifiable role_change meta entry', async (
 
   const envelope = JSON.parse(new TextDecoder().decode(decrypt(queued!.encryptedMeta, current.key)));
   expect(envelope.type).toBe('role_change');
-  expect(envelope.payload).toEqual({ identityPublicKey, role: 'admin' });
+  // `createdAt` is the author's clock, carried so replaying devices date
+  // the change the same way instead of stamping their own receipt time.
+  expect(envelope.payload).toMatchObject({ identityPublicKey, role: 'admin' });
+  expect(typeof envelope.payload.createdAt).toBe('number');
   const verified = verify(
     hexToBytes(envelope.signature),
     new TextEncoder().encode(JSON.stringify({ type: envelope.type, payload: envelope.payload })),

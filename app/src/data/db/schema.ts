@@ -63,6 +63,82 @@ export const circleMembers = sqliteTable(
   ]
 );
 
+/**
+ * Every roster change this circle has seen — one row per event, append-
+ * only, the local projection of the `member_added`/`member_removed`/
+ * `role_change` entries in meta.
+ *
+ * Separate from `circle_members` because that table is *state* (who is
+ * here now, what can they do) while this is *history* (what happened, in
+ * order, and who did it). A single roster row can only hold one
+ * `joinedAt`/`removedAt` pair, so it cannot represent someone leaving and
+ * later rejoining — and attribution is a property of each event, not of
+ * the person: two removals across two stints can have two different
+ * admins behind them.
+ *
+ * Scope is deliberately "things that happen to a member", i.e. exactly
+ * the events whose current-state projection is `circle_members`. A future
+ * `circle_renamed` or `cover_photo_set` projects onto `circles` instead
+ * and belongs elsewhere, or this table grows two unrelated write paths.
+ *
+ * Names are never stored here — `subjectPublicKey`/`actorPublicKey`
+ * resolve against `circle_members` at read time, so a member renaming
+ * themselves updates every line they appear in. Same reasoning
+ * server/SYNC_DESIGN.md gives for posts carrying only `authorPubkey`.
+ */
+export const memberEvents = sqliteTable(
+  'member_events',
+  {
+    /**
+     * Surrogate key, deliberately not `(circleId, epoch)`. A primary key
+     * can't be nullable, and keying on epoch would foreclose ever writing
+     * a *provisional* row — one inserted by the device performing the
+     * action, before its entry has been appended and assigned an epoch.
+     * Uniqueness of `(circleId, epoch)` is enforced by its own index
+     * below, which is what actually makes replay idempotent.
+     */
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    circleId: text('circle_id')
+      .notNull()
+      .references(() => circles.id, { onDelete: 'cascade' }),
+    /**
+     * The relay-assigned epoch of the entry this row came from — unique
+     * within a circle's meta namespace, so it is both the idempotency key
+     * for replay (invariant 8) and the canonical ordering. Entries carry
+     * no id of their own that reaches a handler; epoch is the only
+     * per-entry identity there is.
+     */
+    epoch: integer('epoch').notNull(),
+    /**
+     * Local-only, unlike `EntryTypes` — this table is a disposable
+     * projection rebuilt by replaying from epoch 0, so these values can
+     * be renamed freely. Wire format cannot.
+     */
+    kind: text('kind', { enum: ['created', 'added', 'removed', 'role_changed'] }).notNull(),
+    /** Who it happened to. */
+    subjectPublicKey: text('subject_public_key').notNull(),
+    /**
+     * Who did it — the entry's signer. Equal to `subjectPublicKey` when
+     * the member acted on themselves: the founder's own `member_added`,
+     * or leaving rather than being removed.
+     */
+    actorPublicKey: text('actor_public_key').notNull(),
+    /** The role granted — `role_changed` only, null otherwise. */
+    role: text('role', { enum: ['admin', 'member'] }),
+    /**
+     * The actor's clock, carried on the entry — never this device's
+     * receipt time, or a device replaying from epoch 0 would date every
+     * event to its own "now" and sort them all to the top of the feed.
+     */
+    occurredAt: integer('occurred_at').notNull(),
+  },
+  // The unique index is load-bearing, not just a lookup aid: it's what
+  // `onConflictDoNothing` collides against, so replaying an entry updates
+  // nothing instead of appending a duplicate event. It also covers
+  // circleId-prefixed reads, so no separate index on circleId is needed.
+  (t) => [uniqueIndex('member_events_circle_epoch').on(t.circleId, t.epoch)]
+);
+
 export const deviceProfile = sqliteTable(
   'device_profile',
   {
@@ -246,7 +322,17 @@ export const outbox = sqliteTable(
       .notNull()
       .references(() => circles.id, { onDelete: 'cascade' }),
     entryType: text('entry_type', {
-      enum: ['post', 'comment', 'reaction', 'member_added', 'profile_update', 'member_removed', 'role_change', 'key_rotation'],
+      enum: [
+        'post',
+        'comment',
+        'reaction',
+        'member_added',
+        'profile_update',
+        'member_removed',
+        'role_change',
+        'key_rotation',
+        'cover_photo_set',
+      ],
     }).notNull(),
     /**
      * The id this entry is appended under at the relay — passed straight

@@ -46,7 +46,8 @@ test('applies a reaction from another member', async () => {
 
   await reactionHandler.apply(
     circleId,
-    envelope(bytesToHex(other.publicKey), { postId, emoji: '❤️', reacted: true, createdAt: 1 })
+    envelope(bytesToHex(other.publicKey), { postId, emoji: '❤️', reacted: true, createdAt: 1 }),
+    1
   );
 
   const [summary] = await getReactionsForPost(circleId, postId);
@@ -60,8 +61,8 @@ test('a later un-react supersedes the earlier reaction', async () => {
   const { circleId, postId } = await circleWithPost();
   const other = bytesToHex(generateIdentity().publicKey);
 
-  await reactionHandler.apply(circleId, envelope(other, { postId, emoji: '❤️', reacted: true, createdAt: 1 }));
-  await reactionHandler.apply(circleId, envelope(other, { postId, emoji: '❤️', reacted: false, createdAt: 2 }));
+  await reactionHandler.apply(circleId, envelope(other, { postId, emoji: '❤️', reacted: true, createdAt: 1 }), 1);
+  await reactionHandler.apply(circleId, envelope(other, { postId, emoji: '❤️', reacted: false, createdAt: 2 }), 1);
 
   // Replay order decides the final state — no timestamp comparison needed.
   expect(await getReactionsForPost(circleId, postId)).toHaveLength(0);
@@ -72,8 +73,8 @@ test('replaying the same reaction twice still counts once', async () => {
   const other = bytesToHex(generateIdentity().publicKey);
   const entry = envelope(other, { postId, emoji: '🎉', reacted: true, createdAt: 1 });
 
-  await reactionHandler.apply(circleId, entry);
-  await reactionHandler.apply(circleId, entry);
+  await reactionHandler.apply(circleId, entry, 1);
+  await reactionHandler.apply(circleId, entry, 1);
 
   expect((await getReactionsForPost(circleId, postId))[0].count).toBe(1);
 });
@@ -83,7 +84,7 @@ test('un-reacting something never reacted to is a no-op', async () => {
   const other = bytesToHex(generateIdentity().publicKey);
 
   await expect(
-    reactionHandler.apply(circleId, envelope(other, { postId, emoji: '👍', reacted: false, createdAt: 1 }))
+    reactionHandler.apply(circleId, envelope(other, { postId, emoji: '👍', reacted: false, createdAt: 1 }), 1)
   ).resolves.toBeUndefined();
 
   expect(await getReactionsForPost(circleId, postId)).toHaveLength(0);

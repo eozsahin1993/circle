@@ -20,7 +20,7 @@ import {
   getPendingJoinRequest,
   getProfile,
   insertCircle,
-  insertMember,
+  recordMemberAddedLocally,
   insertPendingJoinRequest,
   MemberRoles,
   type PendingJoinRequest,
@@ -197,16 +197,17 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
   const profile = await getProfile();
   const identityPublicKey = bytesToHex(identity.publicKey);
   const encPublicKey = bytesToHex(sealingKeypair.publicKey);
-  await insertMember({
+  await recordMemberAddedLocally({
     circleId,
-    identityPublicKey,
-    encPublicKey,
-    memberId,
-    role: MemberRoles.member,
-    name: profile?.name ?? '',
-    picture: profile?.picture ?? null,
+    subjectPublicKey: identityPublicKey,
     joinedAt: now,
-    removedAt: null,
+    profile: {
+      encPublicKey,
+      memberId,
+      role: MemberRoles.member,
+      name: profile?.name ?? '',
+      picture: profile?.picture ?? null,
+    },
   });
 
   await syncAccountManifestBestEffort();

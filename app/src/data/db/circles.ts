@@ -1,4 +1,4 @@
-import { and, asc, count, eq, gt, isNull, ne, or } from 'drizzle-orm';
+import { and, asc, count, eq, gt, isNotNull, isNull, ne, or } from 'drizzle-orm';
 
 import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
@@ -70,6 +70,21 @@ export async function getCircleCoverBytes(id: string): Promise<Uint8Array | null
 /** Circles this device is still an active member of — excludes ones it's left. */
 export async function getAllCircles(): Promise<Circle[]> {
   const rows = await db.select().from(circles).where(isNull(circles.leftAt)).orderBy(asc(circles.createdAt));
+  return rows.map(normalizeCircle);
+}
+
+/**
+ * The circles this device has left but still keeps as a local archive —
+ * exactly what `getAllCircles` filters out.
+ *
+ * Needed because leaving is announced on the log: the departure entry is
+ * queued at the moment you leave and pushed whenever there's a
+ * connection, so something has to keep visiting a circle that is no
+ * longer "yours" until that entry has gone out. See
+ * `finishDeparture` in leave-circle.ts.
+ */
+export async function getLeftCircles(): Promise<Circle[]> {
+  const rows = await db.select().from(circles).where(isNotNull(circles.leftAt)).orderBy(asc(circles.createdAt));
   return rows.map(normalizeCircle);
 }
 

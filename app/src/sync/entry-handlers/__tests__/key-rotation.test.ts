@@ -88,7 +88,8 @@ describe('apply', () => {
 
     await keyRotationHandler.apply(
       circleId,
-      envelope(founderKey, { version: 2, wraps: { [founderKey]: bytesToHex(sealToPublicKey(newKey, sealingKeypair.publicKey)) } })
+      envelope(founderKey, { version: 2, wraps: { [founderKey]: bytesToHex(sealToPublicKey(newKey, sealingKeypair.publicKey)) } }),
+      1
     );
 
     const keyMap = await getCircleKeyMap(circleId);
@@ -103,7 +104,8 @@ describe('apply', () => {
 
     await keyRotationHandler.apply(
       circleId,
-      envelope(bytesToHex(founder.publicKey), { version: 2, wraps: { [bytesToHex(stranger.publicKey)]: 'aa'.repeat(48) } })
+      envelope(bytesToHex(founder.publicKey), { version: 2, wraps: { [bytesToHex(stranger.publicKey)]: 'aa'.repeat(48) } }),
+      1
     );
 
     expect(await getCircleKeyMap(circleId)).toEqual(before);
@@ -116,7 +118,7 @@ describe('apply', () => {
     const before = await getCircleKeyMap(circleId);
 
     await expect(
-      keyRotationHandler.apply(circleId, envelope(founderKey, { version: 2, wraps: { [founderKey]: 'not-valid-hex' } }))
+      keyRotationHandler.apply(circleId, envelope(founderKey, { version: 2, wraps: { [founderKey]: 'not-valid-hex' } }), 1)
     ).resolves.toBeUndefined();
 
     expect(await getCircleKeyMap(circleId)).toEqual(before);
@@ -126,7 +128,7 @@ describe('apply', () => {
     const { id: circleId } = await createCircle({ name: 'Family Circle' });
     const before = await getCircleKeyMap(circleId);
 
-    await expect(keyRotationHandler.apply(circleId, envelope('aa', { nonsense: true }))).resolves.toBeUndefined();
+    await expect(keyRotationHandler.apply(circleId, envelope('aa', { nonsense: true }), 1)).resolves.toBeUndefined();
 
     expect(await getCircleKeyMap(circleId)).toEqual(before);
   });

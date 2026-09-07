@@ -1,4 +1,5 @@
 import { getAllCircles, getPendingOutboxEntries } from '@/data/db';
+import { finishPendingDepartures } from '@/domain/usecases/circle/leave-circle';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { fetchEpochs } from '@/services/relay';
 import { timed } from '@/services/timing';
@@ -36,6 +37,10 @@ export async function syncAllCircles(): Promise<void> {
       console.error(`Failed to sync circle ${circle.id}`, err);
     }
   }
+  // Circles this device has left are excluded from getAllCircles, but one
+  // with a departure still queued needs a pass of its own until that
+  // entry has gone out — see finishDeparture.
+  await finishPendingDepartures();
 }
 
 /**
@@ -58,6 +63,8 @@ export async function syncAllCircles(): Promise<void> {
  * syncAllCircles directly.
  */
 export async function syncStaleCircles(): Promise<void> {
+  await finishPendingDepartures();
+
   const circles = await getAllCircles();
   if (circles.length === 0) return;
 

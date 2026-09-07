@@ -36,6 +36,20 @@ export async function getPendingOutboxEntries(circleId: string): Promise<OutboxE
   return rows.map(normalizeOutboxEntry);
 }
 
+/**
+ * Drops a circle's not-yet-pushed entries, leaving pushed ones alone.
+ *
+ * Only for entries that have become impossible rather than merely
+ * failed: today that's a queued departure on a circle this device has
+ * since been removed from by an admin, where the keys needed to sign the
+ * push are already gone and the removal it announces has happened
+ * anyway. Never use it to clear a backlog — a pending entry is content
+ * that exists locally and nowhere else.
+ */
+export async function discardPendingOutboxEntries(circleId: string): Promise<void> {
+  await db.delete(outbox).where(and(eq(outbox.circleId, circleId), eq(outbox.status, OutboxStatuses.pending)));
+}
+
 /** Marks an entry as pushed — called once the relay has confirmed it and assigned an epoch. */
 export async function markOutboxEntrySynced(sequenceNum: number, epoch: number): Promise<void> {
   await db.update(outbox).set({ status: OutboxStatuses.synced, epoch }).where(eq(outbox.sequenceNum, sequenceNum));

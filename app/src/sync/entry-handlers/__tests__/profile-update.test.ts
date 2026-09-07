@@ -86,7 +86,7 @@ describe('apply', () => {
     const founder = (await getCircleIdentity(circleId))!;
     const founderKey = bytesToHex(founder.publicKey);
 
-    await profileUpdateHandler.apply(circleId, envelope(founderKey, { name: 'New Name', picture: validThumbnail(9, 9, 9) }));
+    await profileUpdateHandler.apply(circleId, envelope(founderKey, { name: 'New Name', picture: validThumbnail(9, 9, 9) }), 1);
 
     const updated = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === founderKey);
     expect(updated?.name).toBe('New Name');
@@ -98,8 +98,8 @@ describe('apply', () => {
     const founder = (await getCircleIdentity(circleId))!;
     const founderKey = bytesToHex(founder.publicKey);
 
-    await profileUpdateHandler.apply(circleId, envelope(founderKey, { name: 'Founder', picture: validThumbnail(1) }));
-    await profileUpdateHandler.apply(circleId, envelope(founderKey, { name: 'Founder' }));
+    await profileUpdateHandler.apply(circleId, envelope(founderKey, { name: 'Founder', picture: validThumbnail(1) }), 1);
+    await profileUpdateHandler.apply(circleId, envelope(founderKey, { name: 'Founder' }), 1);
 
     const updated = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === founderKey);
     expect(updated?.picture).toBeNull();
@@ -110,8 +110,8 @@ describe('apply', () => {
     const founder = (await getCircleIdentity(circleId))!;
     const founderKey = bytesToHex(founder.publicKey);
 
-    await profileUpdateHandler.apply(circleId, envelope(founderKey, { name: 'Founder', picture: validThumbnail(1) }));
-    await profileUpdateHandler.apply(circleId, envelope(founderKey, { name: 'Founder', picture: 'not-a-real-thumbnail' }));
+    await profileUpdateHandler.apply(circleId, envelope(founderKey, { name: 'Founder', picture: validThumbnail(1) }), 1);
+    await profileUpdateHandler.apply(circleId, envelope(founderKey, { name: 'Founder', picture: 'not-a-real-thumbnail' }), 1);
 
     const updated = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === founderKey);
     expect(updated?.name).toBe('Founder');
@@ -134,7 +134,7 @@ describe('apply', () => {
     });
     const founder = (await getCircleIdentity(circleId))!;
 
-    await profileUpdateHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), { name: 'Founder Renamed' }));
+    await profileUpdateHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), { name: 'Founder Renamed' }), 1);
 
     const untouched = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === bytesToHex(other.publicKey));
     expect(untouched?.name).toBe('Untouched');
@@ -146,7 +146,7 @@ describe('apply', () => {
     const founderKey = bytesToHex(founder.publicKey);
     const before = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === founderKey);
 
-    await expect(profileUpdateHandler.apply(circleId, envelope(founderKey, { nonsense: true }))).resolves.toBeUndefined();
+    await expect(profileUpdateHandler.apply(circleId, envelope(founderKey, { nonsense: true }), 1)).resolves.toBeUndefined();
 
     const after = (await getCircleMembers(circleId)).find((member) => member.identityPublicKey === founderKey);
     expect(after).toEqual(before);

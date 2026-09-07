@@ -1,4 +1,4 @@
-import { getCircle, insertOutboxEntry, OutboxStatuses, updateMemberRole, type MemberRole } from '@/data/db';
+import { getCircle, insertOutboxEntry, OutboxStatuses, recordRoleChangedLocally, type MemberRole } from '@/data/db';
 import { requireAdminPublicKey } from '@/domain/usecases/circle/invite-to-circle';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
@@ -24,7 +24,12 @@ export async function setMemberRole(circleId: string, identityPublicKey: string,
   const current = await getCurrentContentKey(circleId);
   if (!current) throw new Error('No content key on this device.');
 
-  const entry = buildAndEncryptLogEntry(EntryTypes.ROLE_CHANGE, { identityPublicKey, role }, identity, current.key);
+  const entry = buildAndEncryptLogEntry(
+    EntryTypes.ROLE_CHANGE,
+    { identityPublicKey, role, createdAt: Date.now() },
+    identity,
+    current.key
+  );
   await insertOutboxEntry({
     circleId,
     entryType: EntryTypes.ROLE_CHANGE,
@@ -36,7 +41,7 @@ export async function setMemberRole(circleId: string, identityPublicKey: string,
 
   // Applied locally too, so this device's own roster updates immediately
   // instead of only when its next sync pass walks this entry back.
-  await updateMemberRole(circleId, identityPublicKey, role);
+  await recordRoleChangedLocally({ circleId, subjectPublicKey: identityPublicKey, role });
 
   drainOutbox(circleId).catch((err) => console.error('Failed to push role_change', err));
 }

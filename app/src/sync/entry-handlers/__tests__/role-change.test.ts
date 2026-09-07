@@ -92,7 +92,7 @@ describe('apply', () => {
     const targetKey = bytesToHex(target.publicKey);
     await addPlainMember(circleId, targetKey);
 
-    await roleChangeHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), { identityPublicKey: targetKey, role: 'admin' }));
+    await roleChangeHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), { identityPublicKey: targetKey, role: 'admin' }), 1);
 
     const member = (await getCircleMembers(circleId)).find((m) => m.identityPublicKey === targetKey);
     expect(member?.role).toBe('admin');
@@ -105,9 +105,9 @@ describe('apply', () => {
     const target = generateIdentity();
     const targetKey = bytesToHex(target.publicKey);
     await addPlainMember(circleId, targetKey);
-    await roleChangeHandler.apply(circleId, envelope(founderKey, { identityPublicKey: targetKey, role: 'admin' }));
+    await roleChangeHandler.apply(circleId, envelope(founderKey, { identityPublicKey: targetKey, role: 'admin' }), 1);
 
-    await roleChangeHandler.apply(circleId, envelope(founderKey, { identityPublicKey: targetKey, role: 'member' }));
+    await roleChangeHandler.apply(circleId, envelope(founderKey, { identityPublicKey: targetKey, role: 'member' }), 1);
 
     const member = (await getCircleMembers(circleId)).find((m) => m.identityPublicKey === targetKey);
     expect(member?.role).toBe('member');
@@ -117,7 +117,7 @@ describe('apply', () => {
     const { id: circleId } = await createCircle({ name: 'Family Circle' });
     const before = await getCircleMembers(circleId);
 
-    await expect(roleChangeHandler.apply(circleId, envelope('aa', { nonsense: true }))).resolves.toBeUndefined();
+    await expect(roleChangeHandler.apply(circleId, envelope('aa', { nonsense: true }), 1)).resolves.toBeUndefined();
 
     expect(await getCircleMembers(circleId)).toEqual(before);
   });

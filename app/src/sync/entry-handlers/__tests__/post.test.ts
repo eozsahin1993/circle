@@ -79,7 +79,7 @@ describe('apply', () => {
     const founder = (await getCircleIdentity(circleId))!;
     const payload = payloadFor({ photoHash: 'deadbeef' });
 
-    await postHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payload));
+    await postHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payload), 1);
 
     const [post] = await getCircleFeed(circleId);
     expect(post).toMatchObject({ id: payload.postId, caption: 'Nana in the kitchen', createdAt: 5000 });
@@ -101,7 +101,7 @@ describe('apply', () => {
     const other = generateIdentity();
     const otherKey = bytesToHex(other.publicKey);
 
-    await postHandler.apply(circleId, envelope(otherKey, payloadFor()));
+    await postHandler.apply(circleId, envelope(otherKey, payloadFor()), 1);
 
     const [post] = await getCircleFeed(circleId);
     expect(post.authorPublicKey).toBe(otherKey);
@@ -113,7 +113,7 @@ describe('apply', () => {
     // This device's current version is 1; the entry was written under 3.
     const payload = payloadFor({ keyVersion: 3 });
 
-    await postHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payload));
+    await postHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payload), 1);
 
     const attachment = await getAttachment(circleId, payload.postId as string);
     // The blob was encrypted under version 3 — decrypting it with whatever
@@ -125,7 +125,7 @@ describe('apply', () => {
     const { id: circleId } = await createCircle({ name: 'Family Circle' });
     const founder = (await getCircleIdentity(circleId))!;
 
-    await postHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payloadFor()));
+    await postHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), payloadFor()), 1);
 
     // insertPostAndEnqueue would have echoed it straight back to the relay
     // it just arrived from.
@@ -137,8 +137,8 @@ describe('apply', () => {
     const founder = (await getCircleIdentity(circleId))!;
     const entry = envelope(bytesToHex(founder.publicKey), payloadFor());
 
-    await postHandler.apply(circleId, entry);
-    await postHandler.apply(circleId, entry);
+    await postHandler.apply(circleId, entry, 1);
+    await postHandler.apply(circleId, entry, 1);
 
     expect(await getCircleFeed(circleId)).toHaveLength(1);
   });
@@ -148,10 +148,10 @@ describe('apply', () => {
     const founder = (await getCircleIdentity(circleId))!;
     const payload = payloadFor();
     const entry = envelope(bytesToHex(founder.publicKey), payload);
-    await postHandler.apply(circleId, entry);
+    await postHandler.apply(circleId, entry, 1);
 
     await markAttachmentFetched(circleId, payload.postId as string, new Uint8Array([1, 2, 3]));
-    await postHandler.apply(circleId, entry);
+    await postHandler.apply(circleId, entry, 1);
 
     const attachment = await getAttachment(circleId, payload.postId as string);
     expect(attachment?.status).toBe('fetched');
@@ -161,7 +161,7 @@ describe('apply', () => {
   test('a malformed payload is a no-op rather than a crash', async () => {
     const { id: circleId } = await createCircle({ name: 'Family Circle' });
 
-    await expect(postHandler.apply(circleId, envelope('aa', { nonsense: true }))).resolves.toBeUndefined();
+    await expect(postHandler.apply(circleId, envelope('aa', { nonsense: true }), 1)).resolves.toBeUndefined();
 
     expect(await getCircleFeed(circleId)).toHaveLength(0);
   });

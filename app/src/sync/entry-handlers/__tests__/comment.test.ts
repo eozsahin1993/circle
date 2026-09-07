@@ -100,7 +100,7 @@ describe('apply', () => {
     const otherKey = bytesToHex(other.publicKey);
     const payload = payloadFor(postId, { body: 'From another device' });
 
-    await commentHandler.apply(circleId, envelope(otherKey, payload));
+    await commentHandler.apply(circleId, envelope(otherKey, payload), 1);
 
     const [comment] = await getPostComments(circleId, postId);
     expect(comment).toMatchObject({ body: 'From another device', authorPublicKey: otherKey, createdAt: 7000 });
@@ -109,7 +109,7 @@ describe('apply', () => {
   test('resolves the author name live from the roster rather than storing it', async () => {
     const { circleId, postId, author } = await circleWithPost();
 
-    await commentHandler.apply(circleId, envelope(bytesToHex(author.publicKey), payloadFor(postId)));
+    await commentHandler.apply(circleId, envelope(bytesToHex(author.publicKey), payloadFor(postId)), 1);
 
     const [comment] = await getPostComments(circleId, postId);
     // The founder's roster row carries the name; nothing was denormalized
@@ -122,7 +122,7 @@ describe('apply', () => {
     const { circleId, postId } = await circleWithPost();
     const unknown = generateIdentity();
 
-    await commentHandler.apply(circleId, envelope(bytesToHex(unknown.publicKey), payloadFor(postId)));
+    await commentHandler.apply(circleId, envelope(bytesToHex(unknown.publicKey), payloadFor(postId)), 1);
 
     const [comment] = await getPostComments(circleId, postId);
     expect(comment.authorName).toBeNull();
@@ -132,8 +132,8 @@ describe('apply', () => {
     const { circleId, postId, author } = await circleWithPost();
     const entry = envelope(bytesToHex(author.publicKey), payloadFor(postId));
 
-    await commentHandler.apply(circleId, entry);
-    await commentHandler.apply(circleId, entry);
+    await commentHandler.apply(circleId, entry, 1);
+    await commentHandler.apply(circleId, entry, 1);
 
     expect(await getPostComments(circleId, postId)).toHaveLength(1);
   });
@@ -141,7 +141,7 @@ describe('apply', () => {
   test('a malformed payload is a no-op rather than a crash', async () => {
     const { circleId, postId } = await circleWithPost();
 
-    await expect(commentHandler.apply(circleId, envelope('aa', { nonsense: true }))).resolves.toBeUndefined();
+    await expect(commentHandler.apply(circleId, envelope('aa', { nonsense: true }), 1)).resolves.toBeUndefined();
 
     expect(await getPostComments(circleId, postId)).toHaveLength(0);
   });

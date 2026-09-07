@@ -9,6 +9,7 @@ export * from '@/data/db/attachments';
 export * from '@/data/db/circles';
 export * from '@/data/db/comments';
 export * from '@/data/db/invites';
+export * from '@/data/db/member-events';
 export * from '@/data/db/members';
 export * from '@/data/db/outbox';
 export * from '@/data/db/pending-join-requests';

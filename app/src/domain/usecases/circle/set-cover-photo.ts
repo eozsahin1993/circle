@@ -1,6 +1,6 @@
 import { deriveAuthorityKeypair, deriveCoverPhotoUploadMessage, deriveWriteToken, encrypt, generateUUID, hashBytes, sign } from '@/services/crypto';
 import { getCircle, updateCirclePicture } from '@/data/db';
-import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
 import { getCircleIdentity, getCurrentContentKey, getMasterSeed } from '@/services/keystore';
 import { writeCoverFile } from '@/services/photo-cache';
@@ -36,7 +36,7 @@ export async function setCoverPhoto(circleId: string, photo: Uint8Array): Promis
   const target = await getCoverPhotoUploadTarget(circle.syncId, writeToken, authorityKeypair.publicKey, signature);
   await uploadBlob(target, encrypt(photo, current.key));
 
-  const entry = buildAndEncryptLogEntry('cover_photo_set', { photoHash: hashBytes(photo), keyVersion: current.version }, identity, current.key);
+  const entry = buildAndEncryptLogEntry(EntryTypes.COVER_PHOTO_SET, { photoHash: hashBytes(photo), keyVersion: current.version }, identity, current.key);
   await appendEntry(circle.syncId, 'meta', generateUUID(), entry, current.version, writeToken);
 
   await updateCirclePicture(circleId, photo);

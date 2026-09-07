@@ -18,6 +18,7 @@ export const EntryTypes = {
   MEMBER_REMOVED: 'member_removed',
   ROLE_CHANGE: 'role_change',
   KEY_ROTATION: 'key_rotation',
+  COVER_PHOTO_SET: 'cover_photo_set',
 } as const;
 
 export type EntryType = (typeof EntryTypes)[keyof typeof EntryTypes];

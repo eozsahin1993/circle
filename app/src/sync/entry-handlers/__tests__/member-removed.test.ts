@@ -94,7 +94,7 @@ describe('apply', () => {
     const targetKey = bytesToHex(target.publicKey);
     await addPlainMember(circleId, targetKey);
 
-    await memberRemovedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), { identityPublicKey: targetKey }));
+    await memberRemovedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), { identityPublicKey: targetKey }), 1);
 
     expect((await getCircleMembers(circleId)).find((m) => m.identityPublicKey === targetKey)).toBeUndefined();
   });
@@ -111,7 +111,8 @@ describe('apply', () => {
 
     await memberRemovedHandler.apply(
       circleId,
-      envelope(bytesToHex(founder.publicKey), { identityPublicKey: targetKey, createdAt: removedLongAgo })
+      envelope(bytesToHex(founder.publicKey), { identityPublicKey: targetKey, createdAt: removedLongAgo }),
+      1
     );
 
     expect(await getMemberByPublicKey(circleId, targetKey)).toMatchObject({ removedAt: removedLongAgo });
@@ -121,7 +122,7 @@ describe('apply', () => {
     const { id: circleId } = await createCircle({ name: 'Family Circle' });
     const before = await getCircleMembers(circleId);
 
-    await expect(memberRemovedHandler.apply(circleId, envelope('aa', { nonsense: true }))).resolves.toBeUndefined();
+    await expect(memberRemovedHandler.apply(circleId, envelope('aa', { nonsense: true }), 1)).resolves.toBeUndefined();
 
     expect(await getCircleMembers(circleId)).toEqual(before);
   });
@@ -136,7 +137,7 @@ describe('apply', () => {
     // unrelated call so the assertion below is about this apply() only.
     jest.clearAllMocks();
 
-    await memberRemovedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), { identityPublicKey: targetKey }));
+    await memberRemovedHandler.apply(circleId, envelope(bytesToHex(founder.publicKey), { identityPublicKey: targetKey }), 1);
 
     expect((await getCircle(circleId))?.leftAt).toBeNull();
     expect(await getCircleIdentity(circleId)).not.toBeNull();
@@ -162,7 +163,7 @@ describe('apply', () => {
     // unrelated call so the count below is about this apply() only.
     jest.clearAllMocks();
 
-    await memberRemovedHandler.apply(circleId, envelope(bytesToHex(remover.publicKey), { identityPublicKey: founderKey }));
+    await memberRemovedHandler.apply(circleId, envelope(bytesToHex(remover.publicKey), { identityPublicKey: founderKey }), 1);
 
     expect((await getCircle(circleId))?.leftAt).not.toBeNull();
     expect(await getCircleIdentity(circleId)).toBeNull();

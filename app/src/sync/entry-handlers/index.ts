@@ -1,5 +1,6 @@
 import { EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { commentHandler } from '@/sync/entry-handlers/comment';
+import { coverPhotoSetHandler } from '@/sync/entry-handlers/cover-photo-set';
 import { keyRotationHandler } from '@/sync/entry-handlers/key-rotation';
 import { memberAddedHandler } from '@/sync/entry-handlers/member-added';
 import { memberRemovedHandler } from '@/sync/entry-handlers/member-removed';
@@ -19,7 +20,8 @@ export type { EntryHandler } from '@/sync/entry-handlers/types';
  * later build that understands the type rebuilds it by replaying from
  * epoch 0.
  *
- * Not yet here, because nothing writes it yet: `circle_renamed`.
+ * Not yet here, because nothing writes it yet: `circle_renamed`. The
+ * registry test enforces that everything which *is* written has an entry.
  */
 export const metaHandlers: Record<string, EntryHandler> = {
   [EntryTypes.MEMBER_ADDED]: memberAddedHandler,
@@ -27,6 +29,7 @@ export const metaHandlers: Record<string, EntryHandler> = {
   [EntryTypes.MEMBER_REMOVED]: memberRemovedHandler,
   [EntryTypes.ROLE_CHANGE]: roleChangeHandler,
   [EntryTypes.KEY_ROTATION]: keyRotationHandler,
+  [EntryTypes.COVER_PHOTO_SET]: coverPhotoSetHandler,
 };
 
 /** Content entry types this build understands. `delete` will join these when tombstones are built. */

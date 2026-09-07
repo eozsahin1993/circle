@@ -53,7 +53,7 @@ async function pull(circleId: string, namespace: Namespace, handlers: Record<str
         console.warn(`Skipping ${namespace} entry ${entry.epoch}: ${envelope.type} rejected by its predicate`);
       } else {
         try {
-          await handler.apply(circleId, envelope);
+          await handler.apply(circleId, envelope, entry.epoch);
         } catch (err) {
           // A constraint violation can never succeed on retry — the entry
           // refers to something this device will never have, usually

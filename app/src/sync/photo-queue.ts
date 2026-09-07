@@ -1,12 +1,14 @@
 import {
+  AttachmentKinds,
   getFetchableAttachments,
   markAttachmentFailed,
   markAttachmentFetched,
+  updateCirclePicture,
   type FetchableAttachment,
 } from '@/data/db';
 import { decrypt, hashBytes } from '@/services/crypto';
 import { getCircleKeyMap } from '@/services/keystore';
-import { writePhotoFile } from '@/services/photo-cache';
+import { writeCoverFile, writePhotoFile } from '@/services/photo-cache';
 import { getBlob } from '@/services/relay';
 import { timed, timedSync } from '@/services/timing';
 
@@ -55,7 +57,14 @@ async function fetchOne(attachment: FetchableAttachment): Promise<void> {
     await markAttachmentFetched(circleId, entryId, bytes);
     // Written now, off the render path, so a feed load is only ever a
     // path string — see services/photo-cache.ts.
-    writePhotoFile(circleId, entryId, bytes);
+    if (attachment.kind === AttachmentKinds.CIRCLE_COVER) {
+      // A cover also lands on the circle row, which is what the circle
+      // list and header read; nothing there consults attachments.
+      await updateCirclePicture(circleId, bytes);
+      writeCoverFile(circleId, bytes);
+    } else {
+      writePhotoFile(circleId, entryId, bytes);
+    }
   } catch (err) {
     const attempts = fetchAttempts + 1;
     console.error(`Failed to fetch attachment ${entryId} (attempt ${attempts})`, err);

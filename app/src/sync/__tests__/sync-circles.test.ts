@@ -4,8 +4,17 @@ jest.mock('@/services/mailbox-relay');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { getAllCircles, getCircleFeed, getCircleMembers, getPostComments, initDatabase } from '@/data/db';
+import {
+  getAllCircles,
+  getCircleFeed,
+  getCircleMemberEvents,
+  getCircleMembers,
+  getPostComments,
+  initDatabase,
+  saveProfile,
+} from '@/data/db';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
+import { setMemberRole } from '@/domain/usecases/circle/change-member-role';
 import { approveJoinRequest, getOrCreateInvite } from '@/domain/usecases/circle/invite-to-circle';
 import type { JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
 import { buildAndEncryptLogEntry, verifyLogEntry } from '@/domain/usecases/circle/log-entry';
@@ -189,6 +198,72 @@ test('a post this device just pushed comes straight back on the same pass withou
   expect(feed[0].photoStatus).toBe('fetched');
 });
 
+/**
+ * The half of `member_events` that no local writer can do. A roster
+ * change made on this device updates `circle_members` immediately but
+ * writes no history: the entry is still in the outbox with no epoch, and
+ * epoch is what an event row is keyed on (see data/db/member-events.ts).
+ * The row only exists once the entry has been appended, given an epoch,
+ * and pulled back — including when this device is the author, which works
+ * only because pull-log has no "skip what I wrote" filter.
+ */
+test('a role change made here writes no history until its own entry echoes back', async () => {
+  await saveProfile({ name: 'Nadia', picture: null, createdAt: 1, updatedAt: 1 });
+  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const founder = (await getCircleIdentity(circleId))!;
+  const contentKey = (await getCurrentContentKey(circleId))!.key;
+
+  const other = generateIdentity();
+  const otherKey = bytesToHex(other.publicKey);
+  const memberAdded = {
+    epoch: 1,
+    keyVersion: 1,
+    receivedAt: Date.now(),
+    encryptedMeta: buildAndEncryptLogEntry(
+      'member_added',
+      { identityPublicKey: otherKey, encPublicKey: 'cc', name: 'Marcus', role: 'member', createdAt: 1_000 },
+      founder,
+      contentKey
+    ),
+  };
+  relayServes({ meta: [memberAdded] });
+  await syncCircle(circleId);
+
+  // createCircle appended the founder's own member_added, so clear first
+  // — otherwise the entry picked up below is that one, not the promotion.
+  (appendEntry as jest.Mock).mockClear();
+  await setMemberRole(circleId, otherKey, 'admin');
+  // setMemberRole drains fire-and-forget; settle it so the append below
+  // is in hand before anything is asserted about it.
+  await drainOutbox(circleId).catch(() => {});
+
+  // The roster already reflects the promotion, optimistically...
+  expect((await getCircleMembers(circleId)).find((member) => member.identityPublicKey === otherKey)?.role).toBe(
+    'admin'
+  );
+  // ...but the feed has nothing to show for it yet.
+  expect((await getCircleMemberEvents(circleId)).map((event) => event.kind)).toEqual(['added']);
+
+  // Serve back the very bytes this device pushed, rather than a
+  // reconstruction — that's the whole point of the round trip.
+  const pushed = (appendEntry as jest.Mock).mock.calls.find((call) => call[1] === 'meta')![3];
+  relayServes({ meta: [memberAdded, { epoch: 2, keyVersion: 1, receivedAt: Date.now(), encryptedMeta: pushed }] });
+
+  await syncCircle(circleId);
+
+  const [newest] = await getCircleMemberEvents(circleId);
+  expect(newest).toMatchObject({
+    kind: 'role_changed',
+    role: 'admin',
+    subjectName: 'Marcus',
+    actorName: 'Nadia',
+    selfInflicted: false,
+  });
+  // Replaying the same entry can't double it — the (circle, epoch) key holds.
+  await syncCircle(circleId);
+  expect((await getCircleMemberEvents(circleId)).filter((event) => event.kind === 'role_changed')).toHaveLength(1);
+});
+
 test('approving a join makes the new member visible to everyone, not just to the approver', async () => {
   // The gap this closes: previously the joiner announced itself, and every
   // other device discarded that entry because nobody had vouched for the
@@ -271,6 +346,7 @@ test('a comment written here is pushed, and one from another device arrives', as
       authorPubkey: bytesToHex(founder.publicKey),
       signature: 'unused',
     },
+    1
   );
   relayServes({
     content: [
@@ -320,7 +396,7 @@ test('a reaction toggled here is pushed, and one from another device arrives', a
     payload: { identityPublicKey: bytesToHex(other.publicKey), encPublicKey: 'cc', name: 'Marcus', role: 'member' },
     authorPubkey: bytesToHex(founder.publicKey),
     signature: 'unused',
-  });
+  }, 1);
   relayServes({
     content: [
       {
@@ -378,7 +454,7 @@ describe('syncStaleCircles', () => {
       payload: { identityPublicKey: bytesToHex(other.publicKey), encPublicKey: 'cc', name: 'Marcus', role: 'member' },
       authorPubkey: bytesToHex(founder.publicKey),
       signature: 'unused',
-    });
+    }, 1);
 
     await syncStaleCircles();
 

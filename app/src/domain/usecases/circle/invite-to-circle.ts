@@ -19,7 +19,7 @@ import {
   getMemberByPublicKey,
   getProfile,
   insertInvite,
-  insertMemberIfAbsent,
+  recordMemberAddedLocally,
   insertOutboxEntry,
   MemberRoles,
   OutboxStatuses,
@@ -283,16 +283,17 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   // Applied locally too, so the approver's own roster updates immediately
   // instead of only when its next pass walks this entry back. Idempotent
   // against that later echo.
-  await insertMemberIfAbsent({
+  await recordMemberAddedLocally({
     circleId,
-    identityPublicKey,
-    encPublicKey,
-    memberId: generateUUID(),
-    role: MemberRoles.member,
-    name: selfReportedName,
-    picture: picture ?? null,
+    subjectPublicKey: identityPublicKey,
     joinedAt,
-    removedAt: null,
+    profile: {
+      encPublicKey,
+      memberId: generateUUID(),
+      role: MemberRoles.member,
+      name: selfReportedName,
+      picture: picture ?? null,
+    },
   });
 
   drainOutbox(circleId).catch((err) => console.error('Failed to push member_added', err));

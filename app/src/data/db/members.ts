@@ -24,37 +24,14 @@ function normalizeMember(member: Member): Member {
  * joining member (via `generateUUID()`), never computed here — that's
  * what lets every device replay the join event and agree on the same ID
  * with zero coordination.
+ *
+ * A raw insert, so it throws on an identity already on the roster. The
+ * app never calls it: every roster change goes through member-events.ts,
+ * which upserts and writes the matching history row. Kept for test
+ * fixtures that want a roster without a log behind it.
  */
 export async function insertMember(member: Member): Promise<void> {
   await db.insert(circleMembers).values(member);
-}
-
-/**
- * Inserts a member only if that identity isn't already on the roster —
- * how the sync engine applies a `member_added` entry, which it may see
- * more than once (a crash between applying an entry and advancing the
- * cursor replays it, and a joiner walking meta from 0 reaches its own
- * self-announced entry). See server/SYNC_DESIGN.md invariant 8.
- */
-export async function insertMemberIfAbsent(member: Member): Promise<void> {
-  await db.insert(circleMembers).values(member).onConflictDoNothing();
-}
-
-/**
- * Corrects an existing member's join time to the one the `member_added`
- * entry carries. `completeJoin` writes the joiner's own row optimistically
- * with that device's clock, well before the approver's entry arrives —
- * `insertMemberIfAbsent` then leaves that row alone, so without this the
- * joiner's device would be the only one dating the join differently from
- * everyone else's. Only ever touches `joinedAt`: the local row's name and
- * picture are the full-resolution originals, better than the thumbnail on
- * the entry.
- */
-export async function reconcileMemberJoinedAt(circleId: string, identityPublicKey: string, joinedAt: number): Promise<void> {
-  await db
-    .update(circleMembers)
-    .set({ joinedAt })
-    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey)));
 }
 
 /** Looks up a member by their identity (Ed25519 signing) public key — used to verify a post's signature. */
@@ -94,81 +71,6 @@ export async function updateMemberProfile(
     .update(circleMembers)
     .set(profile)
     .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey)));
-}
-
-/**
- * Changes a member's role — how `role-change.ts`'s handler applies a
- * `role_change` entry. A no-op against a removed or nonexistent member,
- * same idempotent shape as `markMemberRemoved`.
- */
-export async function updateMemberRole(circleId: string, identityPublicKey: string, role: MemberRole): Promise<void> {
-  await db
-    .update(circleMembers)
-    .set({ role })
-    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey), isNull(circleMembers.removedAt)));
-}
-
-/**
- * Removes a member from a circle's roster — a soft removal, not a delete
- * (see `removedAt` on the schema): the row stays so this member's past
- * posts/comments/reactions keep passing `authoredByMember`. Idempotent —
- * removing an already-removed (or never-existing) row is a no-op.
- *
- * `removedAt` is the removing admin's clock, carried on the entry, not
- * this device's receipt time — otherwise a device replaying history from
- * epoch 0 would date every past removal "now" and sort it to the top of
- * the feed. Defaults to now for the local writer, which is the author.
- */
-export async function markMemberRemoved(circleId: string, identityPublicKey: string, removedAt = Date.now()): Promise<void> {
-  await db
-    .update(circleMembers)
-    .set({ removedAt })
-    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey), isNull(circleMembers.removedAt)));
-}
-
-/** One thing that happened to the roster, for the feed timeline — see `getCircleMembershipEvents`. */
-export type MembershipEvent = {
-  /** Stable and unique across both kinds, so the feed's keyExtractor can use it directly. */
-  id: string;
-  kind: 'joined' | 'removed';
-  name: string;
-  picture: Uint8Array | null;
-  at: number;
-};
-
-/**
- * Every join and removal this circle has seen, newest first — derived
- * from the roster rather than a separate event log, since `joinedAt` and
- * `removedAt` already record exactly these two moments and removed rows
- * are kept (see `markMemberRemoved`). A member who joined and later left
- * produces both events.
- *
- * Deliberately its own query rather than something the feed's post query
- * unions in: `feedPostQuery` can't select a column whose source name
- * collides across its joined tables (see posts.ts), and the feed already
- * merges independently-fetched pieces in JS.
- */
-export async function getCircleMembershipEvents(circleId: string): Promise<MembershipEvent[]> {
-  const rows = await db
-    .select({
-      identityPublicKey: circleMembers.identityPublicKey,
-      name: circleMembers.name,
-      picture: circleMembers.picture,
-      joinedAt: circleMembers.joinedAt,
-      removedAt: circleMembers.removedAt,
-    })
-    .from(circleMembers)
-    .where(eq(circleMembers.circleId, circleId));
-
-  const events: MembershipEvent[] = [];
-  for (const row of rows) {
-    const picture = normalizeBlob(row.picture);
-    events.push({ id: `${row.identityPublicKey}:joined`, kind: 'joined', name: row.name, picture, at: row.joinedAt });
-    if (row.removedAt !== null) {
-      events.push({ id: `${row.identityPublicKey}:removed`, kind: 'removed', name: row.name, picture, at: row.removedAt });
-    }
-  }
-  return events.sort((a, b) => b.at - a.at);
 }
 
 /** Just the count of *current* members — the circle list shows "N people" and never needs the rows. */

@@ -8,15 +8,26 @@ import { getPendingOutboxEntries, markOutboxEntrySynced, type OutboxEntry } from
 import { getAttachment } from '@/data/db/attachments';
 
 /**
- * Which relay namespace a locally-queued entry type belongs in — see
- * server/SYNC_DESIGN.md's "meta"/"content" split. Only entry types the
- * outbox actually queues belong here — `member_removed`/`key_rotation`
- * go straight to the relay from remove-member.ts instead (rotateLog's
- * write-token swap doesn't fit the generic outbox/appendEntry path).
+ * Which relay namespace an entry type belongs in — see
+ * server/SYNC_DESIGN.md's "meta"/"content" split. Must agree with which
+ * handler map in sync/entry-handlers reads it; a mismatch means the
+ * entry is fetched by the wrong pull and silently discarded as an
+ * unknown type, on every device including the author's. See the registry
+ * test that enforces the agreement.
  */
-const META_ENTRY_TYPES: OutboxEntry['entryType'][] = [EntryTypes.MEMBER_ADDED, EntryTypes.ROLE_CHANGE];
+const META_ENTRY_TYPES: OutboxEntry['entryType'][] = [
+  EntryTypes.MEMBER_ADDED,
+  EntryTypes.MEMBER_REMOVED,
+  EntryTypes.PROFILE_UPDATE,
+  EntryTypes.ROLE_CHANGE,
+  EntryTypes.COVER_PHOTO_SET,
+  // Never actually queued — rotateLog's atomic write-token swap doesn't
+  // fit the generic append path (see remove-member.ts) — but listed so
+  // the mapping is right if it ever is.
+  EntryTypes.KEY_ROTATION,
+];
 
-function namespaceFor(entryType: OutboxEntry['entryType']): Namespace {
+export function namespaceFor(entryType: OutboxEntry['entryType']): Namespace {
   return META_ENTRY_TYPES.includes(entryType) ? 'meta' : 'content';
 }
 
