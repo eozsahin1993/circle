@@ -130,6 +130,7 @@ describe('apply', () => {
       name: 'Untouched',
       picture: null,
       joinedAt: Date.now(),
+      removedAt: null,
     });
     const founder = (await getCircleIdentity(circleId))!;
 
