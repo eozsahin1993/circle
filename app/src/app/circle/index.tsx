@@ -164,7 +164,7 @@ export default function CircleListScreen() {
               photoUri={item.photoUri}
               newCount={item.newCount}
               latestActivity={item.latestActivity}
-              onPress={() => router.push({ pathname: '/feed', params: { circleId: item.id } })}
+              onPress={() => router.push({ pathname: '/circle/feed', params: { circleId: item.id } })}
             />
           )}
           // Only once the first read has resolved — otherwise the empty

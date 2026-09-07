@@ -38,7 +38,7 @@ export default function JoinPendingScreen() {
       checkPendingJoinRequest(requestId)
         .then((result) => {
           if (result.joined) {
-            router.replace({ pathname: '/feed', params: { circleId: result.circleId, justJoined: '1' } });
+            router.replace({ pathname: '/circle/feed', params: { circleId: result.circleId, justJoined: '1' } });
           }
         })
         .catch((err) => console.error('Failed to check pending join request', err));

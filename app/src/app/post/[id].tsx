@@ -32,30 +32,10 @@ import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/reac
 import { useTheme } from '@/hooks/use-theme';
 import { bytesToDataUri } from '@/services/image';
 import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
-
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
+import { formatRelative, formatTimestamp } from '@/utils/time';
 
 /** Names shown before the rest become "& N others" — enough to recognise who, not a roster dump. */
-const PREVIEW_NAMES = 2;
-
-/** Short and relative beside a comment's author — the post's own byline carries the absolute date. */
-function formatRelative(ms: number): string {
-  const elapsed = Date.now() - ms;
-  if (elapsed < MINUTE) return 'now';
-  if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)}m`;
-  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h`;
-  if (elapsed < 7 * DAY) return `${Math.floor(elapsed / DAY)}d`;
-  return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-function formatTimestamp(ms: number): string {
-  const date = new Date(ms);
-  const day = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  return `${day}, ${time}`;
-}
+const PREVIEW_NAMES = 3;
 
 export default function PostDetailsScreen() {
   const theme = useTheme();
