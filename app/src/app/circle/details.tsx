@@ -7,12 +7,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet, type ActionSheetOption } from '@/components/action-sheet';
 import { Avatar } from '@/components/avatar';
-import { BackButton } from '@/components/back-button';
 import { PrimaryButton } from '@/components/primary-button';
+import { ScreenHeader } from '@/components/screen-header';
 import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Tints } from '@/constants/theme';
+import { Colors, Icons, Radius, Spacing, Tints } from '@/constants/theme';
 import { getCircleSummary, getCircleMembers, MemberRoles, type CircleListRow, type Member, type MemberRole } from '@/data/db';
 import { setMemberRole } from '@/domain/usecases/circle/change-member-role';
 import { buildDebugKeysetFlags } from '@/domain/usecases/circle/debug-keyset';
@@ -113,9 +113,9 @@ export default function CircleDetailsScreen() {
   const memberMenuOptions: ActionSheetOption[] = memberMenu
     ? [
         memberMenu.role === MemberRoles.admin
-          ? { label: 'Remove as admin', icon: 'shield-off', onPress: () => handleSetRole(memberMenu, MemberRoles.member) }
-          : { label: 'Make admin', icon: 'shield', onPress: () => handleSetRole(memberMenu, MemberRoles.admin) },
-        { label: 'Remove from circle', icon: 'user-x', destructive: true, onPress: () => handleRemoveMember(memberMenu) },
+          ? { label: 'Remove as admin', icon: Icons.demote, onPress: () => handleSetRole(memberMenu, MemberRoles.member) }
+          : { label: 'Make admin', icon: Icons.promote, onPress: () => handleSetRole(memberMenu, MemberRoles.admin) },
+        { label: 'Remove from circle', icon: Icons.removeMember, destructive: true, onPress: () => handleRemoveMember(memberMenu) },
       ]
     : [];
 
@@ -188,9 +188,7 @@ export default function CircleDetailsScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.back}>
-          <BackButton label="Circle details" />
-        </View>
+        <ScreenHeader label="Circle details" />
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
           <ThemedText type="screenTitle">{circle?.name ?? ''}</ThemedText>
@@ -246,7 +244,7 @@ export default function CircleDetailsScreen() {
               </View>
               {admin && member.identityPublicKey !== ownPublicKey ? (
                 <Pressable hitSlop={12} style={styles.memberMenuButton} onPress={() => setMemberMenu(member)}>
-                  <Feather name="more-vertical" size={20} color={theme.muted} />
+                  <Feather name={Icons.more} size={20} color={theme.muted} />
                 </Pressable>
               ) : null}
             </View>
@@ -305,11 +303,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
     paddingTop: Spacing.topPadUnderStatusBar,
-  },
-  back: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    marginBottom: Spacing.cardListGap,
   },
   memberCount: {
     marginTop: 4,

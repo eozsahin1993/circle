@@ -4,9 +4,9 @@ import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
 
-import { BackButton } from '@/components/back-button';
 import { PendingJoinRequestCard } from '@/components/pending-join-request-card';
 import { PrimaryButton } from '@/components/primary-button';
+import { ScreenHeader } from '@/components/screen-header';
 import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -119,9 +119,7 @@ export default function CircleInviteScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.back}>
-          <BackButton label="Invite" />
-        </View>
+        <ScreenHeader label="Invite" />
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
           <ThemedText type="screenTitle">Invite to {circleName}</ThemedText>
@@ -204,11 +202,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
     paddingTop: Spacing.topPadUnderStatusBar,
-  },
-  back: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    marginBottom: Spacing.cardListGap,
   },
   scroll: {
     flex: 1,

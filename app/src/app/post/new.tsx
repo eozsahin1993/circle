@@ -1,4 +1,3 @@
-import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -8,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
 import { PrimaryButton } from '@/components/primary-button';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Fonts, PhotoAspect, Radius, Spacing, Tints } from '@/constants/theme';
@@ -57,11 +57,7 @@ export default function NewPostScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.back}>
-          <Pressable hitSlop={12} onPress={() => router.back()}>
-            <Feather name="x" size={22} color={theme.secondary} />
-          </Pressable>
-        </View>
+        <ScreenHeader variant="close" />
 
         <ThemedText type="screenTitle">Create a post</ThemedText>
 
@@ -138,11 +134,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
     paddingTop: Spacing.topPadUnderStatusBar,
-  },
-  back: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    marginBottom: Spacing.cardListGap,
   },
   postingToRow: {
     flexDirection: 'row',

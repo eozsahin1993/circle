@@ -12,7 +12,7 @@ import { type CommentItem } from '@/components/post-comments';
 import { PostCard, type Post } from '@/components/post-card';
 import { PrivacyInfoModal } from '@/components/privacy-info-modal';
 import { PrivacyNotice } from '@/components/privacy-notice';
-import { Radius, Spacing } from '@/constants/theme';
+import { Icons, Radius, Spacing } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
@@ -413,7 +413,7 @@ export default function FeedScreen() {
           viewabilityConfig={viewabilityConfig}
         />
         <FabButton
-          icon="plus"
+          icon={Icons.add}
           onPress={() => router.push({ pathname: '/post/new', params: { circleId } })}
           style={styles.fab}
         />

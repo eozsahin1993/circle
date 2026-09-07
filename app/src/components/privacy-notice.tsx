@@ -2,7 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import { Pressable, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Icons, Spacing } from '@/constants/theme';
 
 export type PrivacyNoticeProps = {
   /** Opens the privacy explainer sheet — what end-to-end encrypted means here. */
@@ -13,7 +13,7 @@ export type PrivacyNoticeProps = {
 export function PrivacyNotice({ onPress }: PrivacyNoticeProps) {
   return (
     <Pressable style={styles.row} onPress={onPress}>
-      <Feather name="lock" size={12} color={Colors.dark.accent} />
+      <Feather name={Icons.locked} size={12} color={Colors.dark.accent} />
       <ThemedText type="meta" style={styles.text}>
         <ThemedText type="meta" themeColor="muted">
           End-to-end encrypted.{' '}

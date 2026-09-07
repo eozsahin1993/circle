@@ -3,6 +3,7 @@
  * The dim warm ground exists so photographs are the only bright thing on screen.
  */
 
+import { Feather } from '@expo/vector-icons';
 import { Platform } from 'react-native';
 
 export const Colors = {
@@ -98,6 +99,27 @@ export const Type = {
     textTransform: 'uppercase',
   },
 } as const;
+
+/**
+ * Named by what the icon means, not which glyph draws it — so the same
+ * affordance can't end up drawn two different ways in two places, and
+ * changing one is a single edit here. `satisfies` keeps a typo a compile
+ * error instead of a silently missing icon.
+ */
+export const Icons = {
+  back: 'arrow-left',
+  close: 'x',
+  /** Opens a menu of options for the thing it sits on. */
+  more: 'more-horizontal',
+  /** Trailing affordance on a row that navigates somewhere. */
+  disclosure: 'chevron-right',
+  add: 'plus',
+  send: 'arrow-up',
+  locked: 'lock',
+  promote: 'shield',
+  demote: 'shield-off',
+  removeMember: 'user-x',
+} as const satisfies Record<string, keyof typeof Feather.glyphMap>;
 
 export const Radius = {
   pill: 999,

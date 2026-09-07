@@ -13,7 +13,7 @@ import { ReactionChip } from '@/components/reaction-chip';
 import { ReactionPicker } from '@/components/reaction-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { PhotoAspect, Spacing } from '@/constants/theme';
+import { Icons, PhotoAspect, Spacing } from '@/constants/theme';
 import {
   getAttachment,
   getCircleMemberCount,
@@ -187,7 +187,7 @@ export default function PostDetailsScreen() {
               style={[styles.composerInput, { color: theme.text, borderColor: theme.faint }]}
             />
             <FabButton
-              icon="arrow-up"
+              icon={Icons.send}
               size={44}
               disabled={!commentText.trim()}
               onPress={handleSubmitComment}
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: 8,
+    paddingTop: Spacing.topPadUnderStatusBar,
     paddingBottom: Spacing.cardListGap,
   },
   headerText: {

@@ -10,7 +10,7 @@ import { EmptyCirclesIcon } from '@/components/empty-circles-icon';
 import { FabButton } from '@/components/fab-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Icons, Spacing } from '@/constants/theme';
 import {
   getAllPendingJoinRequests,
   getCircleCoverBytes,
@@ -186,7 +186,7 @@ export default function CircleListScreen() {
         />
 
         <FabButton
-          icon="plus"
+          icon={Icons.add}
           onPress={() => router.push('/circle/new')}
           style={styles.fab}
         />
