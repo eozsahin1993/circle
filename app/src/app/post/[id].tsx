@@ -1,10 +1,11 @@
 import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
+import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { BackButton } from '@/components/back-button';
 import { FabButton } from '@/components/fab-button';
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
@@ -119,8 +120,8 @@ export default function PostDetailsScreen() {
           </ThemedText>
         </View>
 
-        <KeyboardAvoidingView style={styles.body} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView contentContainerStyle={styles.scrollContent}>
+        <KeyboardAvoider style={styles.body}>
+          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
             {photoUri ? (
               <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />
             ) : (
@@ -193,7 +194,7 @@ export default function PostDetailsScreen() {
               style={!commentText.trim() ? styles.composerSendDisabled : undefined}
             />
           </View>
-        </KeyboardAvoidingView>
+        </KeyboardAvoider>
       </SafeAreaView>
     </ThemedView>
   );
