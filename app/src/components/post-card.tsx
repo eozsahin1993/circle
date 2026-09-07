@@ -1,3 +1,4 @@
+import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -10,6 +11,7 @@ import { EmojiPicker } from '@/components/emoji-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export type Reaction = {
   emoji: string;
@@ -71,6 +73,7 @@ export function PostCard({
   selfPhotoUri,
   onToggleAlbum,
 }: PostCardProps) {
+  const theme = useTheme();
   const [showPicker, setShowPicker] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
 
@@ -107,9 +110,24 @@ export function PostCard({
         <Avatar uri={post.authorPhotoUri} />
         <View style={styles.byline}>
           <ThemedText type="postAuthor">{post.authorName}</ThemedText>
-          <ThemedText type="meta" themeColor="muted">
-            {post.timestamp}
-          </ThemedText>
+          {/* Everyone can see that a photo is kept; only its author or an
+              admin gets the chip below that changes it. */}
+          <View style={styles.timestampRow}>
+            <ThemedText type="meta" themeColor="muted">
+              {post.timestamp}
+            </ThemedText>
+            {post.inAlbum ? (
+              <>
+                <ThemedText type="meta" themeColor="muted">
+                  ·
+                </ThemedText>
+                <Feather name={Icons.inAlbum} size={12} color={theme.secondary} />
+                <ThemedText type="meta" themeColor="secondary">
+                  In the album
+                </ThemedText>
+              </>
+            ) : null}
+          </View>
         </View>
       </View>
 
@@ -208,6 +226,11 @@ const styles = StyleSheet.create({
   },
   byline: {
     flex: 1,
+  },
+  timestampRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   photoWrap: {
     justifyContent: 'flex-end',

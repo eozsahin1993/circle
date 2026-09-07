@@ -180,13 +180,25 @@ export default function PostDetailsScreen() {
                   </ThemedText>
                 ) : null}
                 {/* Without a caption the byline takes its place under the
-                    photo, rather than sitting tight against it. */}
-                <ThemedText
-                  type="meta"
-                  themeColor="muted"
-                  style={[styles.byline, post.caption ? null : styles.bylineAlone]}>
-                  {post.authorName || profileName || 'Unknown member'} · {formatTimestamp(post.createdAt)}
-                </ThemedText>
+                    photo, rather than sitting tight against it. The album
+                    marker shows for everyone; only the author or an admin
+                    gets the control above that changes it. */}
+                <View style={[styles.byline, post.caption ? null : styles.bylineAlone]}>
+                  <ThemedText type="meta" themeColor="muted">
+                    {post.authorName || profileName || 'Unknown member'} · {formatTimestamp(post.createdAt)}
+                  </ThemedText>
+                  {post.inAlbum ? (
+                    <>
+                      <ThemedText type="meta" themeColor="muted">
+                        ·
+                      </ThemedText>
+                      <Feather name={Icons.inAlbum} size={12} color={theme.secondary} />
+                      <ThemedText type="meta" themeColor="secondary">
+                        In the album
+                      </ThemedText>
+                    </>
+                  ) : null}
+                </View>
               </>
             ) : null}
 
@@ -321,6 +333,10 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.cardListGap,
   },
   byline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 5,
     paddingHorizontal: Spacing.screenPadding,
     paddingTop: 6,
   },
