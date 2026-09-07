@@ -56,7 +56,27 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
 
   // Every kind produces `FeedRow[]` from the slice it is handed, so the
   // mapping below is a flat concatenation and nothing else.
-  const requests = usePendingRequestRows(circleId);
+  /**
+   * Holds whatever the row kinds currently are, so `reload` can fan out to
+   * them without depending on them. `sources` changes identity on every
+   * load — a row kind's memo depends on the slice it was handed, and a
+   * fresh `loadCircleFeed` hands it a fresh array — so a dependency here
+   * would change `reload`'s identity after every load, re-fire the
+   * screen's focus effect (which depends on `reload`), and load again: a
+   * loop that never settles. It also lets `reload` be defined before the
+   * kinds that need to call it.
+   */
+  const sourcesRef = useRef<FeedRows[]>([]);
+
+  const reload = useCallback(async () => {
+    if (!circleId) return;
+    setFeed(await loadCircleFeed(circleId));
+    // Whichever kinds own state the feed's read doesn't cover refresh it
+    // themselves — this doesn't need to know which those are.
+    sourcesRef.current.forEach((source) => source.reload?.());
+  }, [circleId]);
+
+  const requests = usePendingRequestRows({ circleId, onRosterChanged: reload });
   const privacy = usePrivacyRows(options.onPressPrivacy);
   const justJoined = useJustJoinedRows({ justJoined: options.justJoined ?? false, postCount: feed?.posts.length ?? 0 });
   const posts = usePostRows({ circleId, patchPost, posts: feed?.posts ?? [], profile: feed?.profile ?? null });
@@ -71,25 +91,9 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     () => [requests, privacy, justJoined, posts, rosterChanges],
     [requests, privacy, justJoined, posts, rosterChanges],
   );
-
-  /**
-   * Read through a ref, not a dependency. `sources` changes identity on
-   * every load — a row kind's memo depends on the slice it was handed,
-   * and a fresh `loadCircleFeed` hands it a fresh array. Depending on it
-   * here would change `reload`'s identity after every load, re-fire the
-   * screen's focus effect (which depends on `reload`), and load again:
-   * a loop that never settles.
-   */
-  const sourcesRef = useRef(sources);
   sourcesRef.current = sources;
 
-  const reload = useCallback(async () => {
-    if (!circleId) return;
-    setFeed(await loadCircleFeed(circleId));
-    // Whichever kinds own state the feed's read doesn't cover refresh it
-    // themselves — this doesn't need to know which those are.
-    sourcesRef.current.forEach((source) => source.reload?.());
-  }, [circleId]);
+  const rows = useMemo(() => buildFeedRows(sources.flatMap((source) => source.rows)), [sources]);
 
   /**
    * Sync this circle, then re-read. Only the log pass is awaited: photos
@@ -112,8 +116,6 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
       setRefreshing(false);
     }
   }, [circleId, reload]);
-
-  const rows = useMemo(() => buildFeedRows(sources.flatMap((source) => source.rows)), [sources]);
 
   return {
     rows,

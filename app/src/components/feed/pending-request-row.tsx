@@ -32,7 +32,19 @@ type RequestRowActions = {
  * actual creator (see `discoverPendingRequests`'s creator-only gate) —
  * silently nothing for anyone else.
  */
-export function usePendingRequestRows(circleId: string): FeedRows {
+export type PendingRequestRowsInput = {
+  circleId: string;
+  /**
+   * Approving admits a member, which changes the roster — and the feed's
+   * snapshot of it was taken before that. `approveJoinRequest` writes
+   * SQLite correctly, so this only exists to tell the holder of that
+   * snapshot to re-read; without it the member count in the header stays
+   * behind until the screen is left and returned to.
+   */
+  onRosterChanged: () => void;
+};
+
+export function usePendingRequestRows({ circleId, onRosterChanged }: PendingRequestRowsInput): FeedRows {
   const [requests, setRequests] = useState<PendingRequest[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -43,23 +55,28 @@ export function usePendingRequestRows(circleId: string): FeedRows {
       .catch(() => setRequests([]));
   }, [circleId]);
 
-  const answer = useCallback(async (requesterId: string, act: () => Promise<void>, failure: string) => {
-    setBusyId(requesterId);
-    try {
-      await act();
-      setRequests((current) => current.filter((request) => request.requesterId !== requesterId));
-    } catch (err) {
-      console.error(failure, err);
-    } finally {
-      setBusyId(null);
-    }
-  }, []);
+  const answer = useCallback(
+    async (requesterId: string, act: () => Promise<void>, failure: string, changedRoster = false) => {
+      setBusyId(requesterId);
+      try {
+        await act();
+        setRequests((current) => current.filter((request) => request.requesterId !== requesterId));
+        if (changedRoster) onRosterChanged();
+      } catch (err) {
+        console.error(failure, err);
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [onRosterChanged],
+  );
 
   const actions = useMemo<RequestRowActions>(
     () => ({
       busy: busyId !== null,
       onApprove: (requesterId) =>
-        answer(requesterId, () => approveJoinRequest(circleId, requesterId), 'Failed to approve join request'),
+        answer(requesterId, () => approveJoinRequest(circleId, requesterId), 'Failed to approve join request', true),
+      // Denying changes nothing outside this list.
       onDeny: (requesterId) =>
         answer(requesterId, () => denyJoinRequest(circleId, requesterId), 'Failed to dismiss join request'),
     }),
