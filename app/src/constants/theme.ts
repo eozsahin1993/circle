@@ -121,7 +121,9 @@ export const Icons = {
   demote: 'shield-off',
   removeMember: 'user-x',
   /** The circle's album — every photo it holds, not just what's in the feed. */
-  album: 'image',
+  album: 'grid',
+  /** Whether one post is kept in that album — the album seen from a single photo. */
+  inAlbum: 'bookmark',
 } as const satisfies Record<string, keyof typeof Feather.glyphMap>;
 
 export const Radius = {

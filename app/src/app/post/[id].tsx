@@ -1,7 +1,8 @@
+import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
@@ -13,7 +14,7 @@ import { ReactionChip } from '@/components/reaction-chip';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Icons, PhotoAspect, Spacing } from '@/constants/theme';
+import { Icons, PhotoAspect, Radius, Spacing, Tints } from '@/constants/theme';
 import {
   getAttachment,
   getCircleMemberCount,
@@ -115,7 +116,7 @@ export default function PostDetailsScreen() {
     const next = !post.inAlbum;
     // Optimistic: the write is local-first and the entry is queued, so
     // the only thing left to wait on is a network push that must never
-    // hold the chip up.
+    // hold the button up.
     setPost({ ...post, inAlbum: next });
     try {
       await setAlbumVisibility(circleId, postId, next);
@@ -141,6 +142,19 @@ export default function PostDetailsScreen() {
           <ThemedText type="postAuthor" style={styles.headerText} numberOfLines={1}>
             {circleName} · visible to {memberCount} {memberCount === 1 ? 'person' : 'people'}
           </ThemedText>
+          {/* Filing a photo is about the post as a whole, so it sits with
+              the post rather than among the reaction chips, which are each
+              about one emoji. Anyone in the circle can re-file — the album
+              is the circle's shared archive, not the author's own. */}
+          {post ? (
+            <Pressable style={styles.albumButton} onPress={handleToggleAlbum} hitSlop={8}>
+              <Feather
+                name={Icons.inAlbum}
+                size={18}
+                color={post.inAlbum ? theme.accentBright : theme.secondary}
+              />
+            </Pressable>
+          ) : null}
         </View>
 
         <KeyboardAvoider style={styles.body}>
@@ -173,15 +187,6 @@ export default function PostDetailsScreen() {
                 />
               ))}
               <ReactionChip label="+" onPress={() => setShowPicker((v) => !v)} />
-              {/* Anyone in the circle can re-file a photo — the album is
-                  the circle's shared archive, not the author's own. */}
-              {post ? (
-                <ReactionChip
-                  label={post.inAlbum ? 'In album' : 'Add to album'}
-                  reacted={post.inAlbum}
-                  onPress={handleToggleAlbum}
-                />
-              ) : null}
             </View>
 
             {showPicker ? (
@@ -277,6 +282,15 @@ const styles = StyleSheet.create({
   },
   headerText: {
     flex: 1,
+  },
+  albumButton: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Tints.secondaryButtonBorder,
   },
   body: {
     flex: 1,

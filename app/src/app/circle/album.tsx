@@ -7,63 +7,54 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { getAlbumPhotos, getAttachment, getCircleSummary, type AlbumPhoto } from '@/data/db';
 import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
 
-/** Photos per row. Three reads as a photo library; more turns faces into thumbnails too small to recognise. */
-const COLUMNS = 3;
+/** Photos per row. Four fits a month on a screen without shrinking faces past recognising. */
+const COLUMNS = 4;
 
 type AlbumItem = AlbumPhoto & { uri: string };
 
 /**
- * A week header, then that week's photos in rows of `COLUMNS`.
+ * A month header, then that month's photos in rows of `COLUMNS`.
  *
  * A flat list of both kinds rather than `numColumns`, which can only lay
  * out uniform cells and so has nowhere to put a full-width header — same
  * discriminated-union shape the feed's own rows use.
  */
 type AlbumRow =
-  | { kind: 'week'; key: string; label: string }
+  | { kind: 'month'; key: string; label: string }
   | { kind: 'photos'; key: string; photos: AlbumItem[] };
 
-/** Midnight on the Sunday that starts this timestamp's week — the grouping key. */
-function weekStart(ms: number): Date {
+/** Midnight on the 1st of this timestamp's month — the grouping key. */
+function monthStart(ms: number): Date {
   const date = new Date(ms);
   date.setHours(0, 0, 0, 0);
-  date.setDate(date.getDate() - date.getDay());
+  date.setDate(1);
   return date;
 }
 
 /**
- * "Sep 1 – 7", spelling the month on both ends when the week straddles one
- * ("Aug 31 – Sep 6"), and adding the year for any week outside this one.
+ * "September 2027". The year is always spelled out, even for the current
+ * one — an album is read years later, where a bare month is ambiguous, and
+ * a label that grows a year only once January passes would reorder the
+ * headers under the reader mid-scroll.
  */
-function weekLabel(start: Date): string {
-  const end = new Date(start);
-  end.setDate(end.getDate() + 6);
-
-  const sameMonth = start.getMonth() === end.getMonth();
-  const thisYear = start.getFullYear() === new Date().getFullYear();
-  const left = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  const right = end.toLocaleDateString(undefined, {
-    ...(sameMonth ? {} : { month: 'short' }),
-    day: 'numeric',
-    ...(thisYear ? {} : { year: 'numeric' }),
-  });
-  return `${left} – ${right}`;
+function monthLabel(start: Date): string {
+  return start.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 }
 
-/** Groups newest-first photos into week sections, each chunked into rows. */
+/** Groups newest-first photos into month sections, each chunked into rows. */
 function buildRows(photos: AlbumItem[]): AlbumRow[] {
   const rows: AlbumRow[] = [];
-  let openWeek: number | null = null;
+  let openMonth: number | null = null;
 
   for (const photo of photos) {
-    const start = weekStart(photo.createdAt);
-    if (start.getTime() !== openWeek) {
-      openWeek = start.getTime();
-      rows.push({ kind: 'week', key: `week-${openWeek}`, label: weekLabel(start) });
+    const start = monthStart(photo.createdAt);
+    if (start.getTime() !== openMonth) {
+      openMonth = start.getTime();
+      rows.push({ kind: 'month', key: `month-${openMonth}`, label: monthLabel(start) });
     }
 
     const last = rows[rows.length - 1];
@@ -124,15 +115,19 @@ export default function AlbumScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader label={circleName ? `${circleName} album` : 'Album'} />
+        {/* The header keeps the screen's usual inset; the grid below runs
+            edge to edge, so nothing competes with the photos. */}
+        <View style={styles.headerInset}>
+          <ScreenHeader label={circleName ? `${circleName} album` : 'Album'} />
+        </View>
 
         <FlatList
           data={loaded ? rows : []}
           keyExtractor={(row) => row.key}
           contentContainerStyle={styles.list}
           renderItem={({ item }) =>
-            item.kind === 'week' ? (
-              <ThemedText type="eyebrow" themeColor="muted" style={styles.weekLabel}>
+            item.kind === 'month' ? (
+              <ThemedText type="eyebrow" themeColor="muted" style={styles.monthLabel}>
                 {item.label}
               </ThemedText>
             ) : (
@@ -170,7 +165,7 @@ export default function AlbumScreen() {
   );
 }
 
-const GAP = 3;
+const GAP = 2;
 
 const styles = StyleSheet.create({
   screen: {
@@ -178,14 +173,17 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.screenPadding,
     paddingTop: Spacing.topPadUnderStatusBar,
+  },
+  headerInset: {
+    paddingHorizontal: Spacing.screenPadding,
   },
   list: {
     flexGrow: 1,
     paddingBottom: Spacing.cardListGap,
   },
-  weekLabel: {
+  monthLabel: {
+    paddingHorizontal: Spacing.screenPadding,
     paddingTop: Spacing.cardListGap,
     paddingBottom: 8,
   },
@@ -201,7 +199,6 @@ const styles = StyleSheet.create({
   photo: {
     width: '100%',
     height: '100%',
-    borderRadius: Radius.notice,
   },
   empty: {
     flex: 1,
