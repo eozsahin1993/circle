@@ -79,7 +79,14 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
   const requests = usePendingRequestRows({ circleId, onRosterChanged: reload });
   const privacy = usePrivacyRows(options.onPressPrivacy);
   const justJoined = useJustJoinedRows({ justJoined: options.justJoined ?? false, postCount: feed?.posts.length ?? 0 });
-  const posts = usePostRows({ circleId, patchPost, posts: feed?.posts ?? [], profile: feed?.profile ?? null });
+  const posts = usePostRows({
+    circleId,
+    patchPost,
+    posts: feed?.posts ?? [],
+    profile: feed?.profile ?? null,
+    ownPublicKey: feed?.ownPublicKey ?? null,
+    ownIsAdmin: feed?.ownIsAdmin ?? false,
+  });
   const rosterChanges = useRosterChangeRows({ events: feed?.events ?? [], ownPublicKey: feed?.ownPublicKey ?? null });
 
   /**

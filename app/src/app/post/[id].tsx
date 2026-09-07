@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import { bytesToHex } from '@noble/curves/utils.js';
 import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
@@ -28,11 +29,13 @@ import {
   type FeedPost,
   type ReactionSummary,
 } from '@/data/db';
+import { isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
 import { addComment } from '@/domain/usecases/post/comment-on-post';
 import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
 import { setAlbumVisibility } from '@/domain/usecases/post/set-album-visibility';
 import { useTheme } from '@/hooks/use-theme';
 import { bytesToDataUri } from '@/services/image';
+import { getCircleIdentity } from '@/services/keystore';
 import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
 import { formatRelative, formatTimestamp } from '@/utils/time';
 
@@ -54,19 +57,24 @@ export default function PostDetailsScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [showAllReactors, setShowAllReactors] = useState(false);
   const [commentText, setCommentText] = useState('');
+  /** The author or an admin, and nobody else — see set-album-visibility.ts. */
+  const [canEditAlbum, setCanEditAlbum] = useState(false);
 
   const load = useCallback(async () => {
     if (!circleId || !postId) return;
 
-    const [circle, count, feedPost, profile, reactionSummary, details, postComments] = await Promise.all([
-      getCircleSummary(circleId),
-      getCircleMemberCount(circleId),
-      getFeedPost(circleId, postId),
-      getProfile(),
-      getReactionsForPost(circleId, postId),
-      getPostReactors(circleId, postId),
-      getPostComments(circleId, postId),
-    ]);
+    const [circle, count, feedPost, profile, reactionSummary, details, postComments, identity, isAdmin] =
+      await Promise.all([
+        getCircleSummary(circleId),
+        getCircleMemberCount(circleId),
+        getFeedPost(circleId, postId),
+        getProfile(),
+        getReactionsForPost(circleId, postId),
+        getPostReactors(circleId, postId),
+        getPostComments(circleId, postId),
+        getCircleIdentity(circleId),
+        isCircleAdmin(circleId),
+      ]);
 
     setCircleName(circle?.name ?? '');
     setMemberCount(count);
@@ -75,6 +83,7 @@ export default function PostDetailsScreen() {
     setReactions(reactionSummary);
     setReactors(details);
     setComments(postComments);
+    setCanEditAlbum(isAdmin || (identity != null && bytesToHex(identity.publicKey) === feedPost?.authorPublicKey));
 
     if (feedPost?.hasPhoto) {
       let uri = ensurePhotoUri(circleId, postId, () => null);
@@ -144,15 +153,13 @@ export default function PostDetailsScreen() {
           </ThemedText>
           {/* Filing a photo is about the post as a whole, so it sits with
               the post rather than among the reaction chips, which are each
-              about one emoji. Anyone in the circle can re-file — the album
-              is the circle's shared archive, not the author's own. */}
-          {post ? (
+              about one emoji. Shown only to whoever may actually change it. */}
+          {post && canEditAlbum ? (
             <Pressable style={styles.albumButton} onPress={handleToggleAlbum} hitSlop={8}>
-              <Feather
-                name={Icons.inAlbum}
-                size={18}
-                color={post.inAlbum ? theme.accentBright : theme.secondary}
-              />
+              <Feather name={Icons.inAlbum} size={16} color={post.inAlbum ? theme.accentBright : theme.secondary} />
+              <ThemedText type="meta" themeColor={post.inAlbum ? 'accentBright' : 'secondary'}>
+                {post.inAlbum ? 'In album' : 'Add to album'}
+              </ThemedText>
             </Pressable>
           ) : null}
         </View>
@@ -284,11 +291,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   albumButton: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.pill,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: Radius.pill,
     borderWidth: 1,
     borderColor: Tints.secondaryButtonBorder,
   },

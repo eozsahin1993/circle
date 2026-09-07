@@ -15,6 +15,7 @@ import {
   type Profile,
   type ReactionSummary,
 } from '@/data/db';
+import { isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
 import { getReactionsForPost } from '@/domain/usecases/post/react-to-post';
 import { getCircleIdentity } from '@/services/keystore';
 import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
@@ -34,6 +35,8 @@ export type CircleFeed = {
   profile: Profile | null;
   /** This device's identity in the circle. Null in the gap between joining and that join completing. */
   ownPublicKey: string | null;
+  /** Whether the reader is an admin — with authorship, decides who may re-file a photo. */
+  ownIsAdmin: boolean;
   posts: FeedPostView[];
   events: MemberEvent[];
 };
@@ -52,13 +55,14 @@ export type CircleFeed = {
  * tested without a renderer.
  */
 export async function loadCircleFeed(circleId: string): Promise<CircleFeed> {
-  const [circle, memberCount, posts, profile, identity, events] = await Promise.all([
+  const [circle, memberCount, posts, profile, identity, events, ownIsAdmin] = await Promise.all([
     getCircleSummary(circleId),
     getCircleMemberCount(circleId),
     getCircleFeed(circleId),
     getProfile(),
     getCircleIdentity(circleId),
     getCircleMemberEvents(circleId),
+    isCircleAdmin(circleId),
   ]);
 
   const ownPublicKey = identity ? bytesToHex(identity.publicKey) : null;
@@ -81,6 +85,7 @@ export async function loadCircleFeed(circleId: string): Promise<CircleFeed> {
     memberCount,
     profile,
     ownPublicKey,
+    ownIsAdmin,
     events,
     posts: posts.map((post, index) => ({
       post,

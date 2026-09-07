@@ -3,7 +3,15 @@ jest.mock('@/domain/usecases/account/account-manifest');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { AttachmentKinds, AttachmentStatuses, getPost, initDatabase, insertPost } from '@/data/db';
+import {
+  AttachmentKinds,
+  AttachmentStatuses,
+  getPost,
+  initDatabase,
+  insertPost,
+  MemberRoles,
+  recordMemberAddedLocally,
+} from '@/data/db';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import type { LogEntryEnvelope } from '@/domain/usecases/circle/log-entry';
 import { generateIdentity, generateUUID } from '@/services/crypto';
@@ -39,8 +47,20 @@ async function circleWithPost(inAlbum: boolean) {
   return { circleId, postId, author };
 }
 
+/** Adds someone to the roster who did not write the post. */
+async function otherMember(circleId: string, role = MemberRoles.member) {
+  const key = bytesToHex(generateIdentity().publicKey);
+  await recordMemberAddedLocally({
+    circleId,
+    subjectPublicKey: key,
+    joinedAt: 1_000,
+    profile: { encPublicKey: 'cc', memberId: generateUUID(), role, name: 'Marcus', picture: null },
+  });
+  return key;
+}
+
 describe('predicate', () => {
-  test('accepts a change from someone on the roster', async () => {
+  test('accepts a change from the photo’s own author', async () => {
     const { circleId, postId, author } = await circleWithPost(true);
 
     await expect(
@@ -49,6 +69,43 @@ describe('predicate', () => {
         envelope(bytesToHex(author.publicKey), { postId, inAlbum: false, createdAt: 2000 })
       )
     ).resolves.toBe(true);
+  });
+
+  test('accepts a change from an admin who did not write the post', async () => {
+    const { circleId, postId } = await circleWithPost(true);
+    const admin = await otherMember(circleId, MemberRoles.admin);
+
+    await expect(
+      albumVisibilityHandler.predicate(circleId, envelope(admin, { postId, inAlbum: false, createdAt: 2000 }))
+    ).resolves.toBe(true);
+  });
+
+  /** The rule's whole point: re-filing someone else's photo needs a reason to. */
+  test('rejects a change from a plain member who did not write the post', async () => {
+    const { circleId, postId } = await circleWithPost(true);
+    const member = await otherMember(circleId);
+
+    await expect(
+      albumVisibilityHandler.predicate(circleId, envelope(member, { postId, inAlbum: false, createdAt: 2000 }))
+    ).resolves.toBe(false);
+  });
+
+  /**
+   * Authorship comes from the post's row, so a member who isn't an admin
+   * can't pass on a post this device never applied — there's nothing to
+   * match them against. (An admin still can; `apply` then updates nothing,
+   * which the no-op test below covers.)
+   */
+  test('rejects a plain member’s change naming a post this device never applied', async () => {
+    const { circleId } = await circleWithPost(true);
+    const member = await otherMember(circleId);
+
+    await expect(
+      albumVisibilityHandler.predicate(
+        circleId,
+        envelope(member, { postId: generateUUID(), inAlbum: false, createdAt: 2000 })
+      )
+    ).resolves.toBe(false);
   });
 
   test('rejects a change from someone this device has never seen join', async () => {

@@ -26,6 +26,9 @@ export type PostRowsInput = {
   posts: FeedPostView[];
   /** This device's own profile — the fallback for a post whose author has no roster row yet. */
   profile: Profile | null;
+  /** Who the reader is, and whether they may re-file any photo — see set-album-visibility.ts. */
+  ownPublicKey: string | null;
+  ownIsAdmin: boolean;
 };
 
 /** Only callbacks. Anything derivable from `feed` is derived below rather than passed in. */
@@ -45,7 +48,14 @@ type PostRowActions = {
  * reaction shouldn't cost a full reload, and a reload would also drop the
  * open composer on every other card.
  */
-export function usePostRows({ circleId, patchPost, posts, profile }: PostRowsInput): FeedRows {
+export function usePostRows({
+  circleId,
+  patchPost,
+  posts,
+  profile,
+  ownPublicKey,
+  ownIsAdmin,
+}: PostRowsInput): FeedRows {
   const actions = useMemo<PostRowActions>(
     () => ({
       onToggleReaction: async (postId, emoji) => {
@@ -87,10 +97,17 @@ export function usePostRows({ circleId, patchPost, posts, profile }: PostRowsInp
     [circleId, patchPost],
   );
 
-  return useMemo(() => ({ rows: posts.map((view) => postRow(view, profile, actions)) }), [posts, profile, actions]);
+  return useMemo(
+    () => ({
+      rows: posts.map((view) =>
+        postRow(view, profile, actions, ownIsAdmin || view.post.authorPublicKey === ownPublicKey),
+      ),
+    }),
+    [posts, profile, actions, ownPublicKey, ownIsAdmin],
+  );
 }
 
-function postRow(view: FeedPostView, profile: Profile | null, actions: PostRowActions): FeedRow {
+function postRow(view: FeedPostView, profile: Profile | null, actions: PostRowActions, canEditAlbum: boolean): FeedRow {
   const post = toPostCard(view, profile);
 
   return {
@@ -107,7 +124,7 @@ function postRow(view: FeedPostView, profile: Profile | null, actions: PostRowAc
         onPressPhoto={() => actions.onOpenPost(post.id)}
         onPressComments={() => actions.onOpenPost(post.id)}
         onExpandComments={() => actions.onExpandComments(post.id)}
-        onToggleAlbum={() => actions.onToggleAlbum(view)}
+        onToggleAlbum={canEditAlbum ? () => actions.onToggleAlbum(view) : undefined}
       />
     ),
   };

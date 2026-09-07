@@ -94,9 +94,9 @@ export default function NewPostScreen() {
 
             <View style={styles.albumRow}>
               <View style={styles.albumText}>
-                <ThemedText type="postAuthor">Add to an album</ThemedText>
+                <ThemedText type="postAuthor">Add to the album</ThemedText>
                 <ThemedText type="meta" themeColor="muted">
-                  Kitchen drawer scans · anyone in the circle can add
+                  Kept with the circle&rsquo;s photos · you or an admin can change this later
                 </ThemedText>
               </View>
               <Switch

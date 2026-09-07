@@ -1,8 +1,12 @@
+import { bytesToHex } from '@noble/curves/utils.js';
+
 import {
+  getPost,
   OutboxStatuses,
   setPostInAlbumAndEnqueue,
   type NewOutboxEntry,
 } from '@/data/db';
+import { isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { generateUUID } from '@/services/crypto';
@@ -16,9 +20,11 @@ import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
  * change, which costs an entry of its own, so it exists for "I meant to
  * add that" rather than as something to flip idly.
  *
- * Anyone in the circle can re-file a photo, not just its author: an album
- * is the circle's shared archive, and the entry is signed either way, so
- * every device can see who changed what.
+ * The photo's author or an admin, and nobody else — the same rule
+ * `album-visibility.ts`'s predicate enforces on the way back in. Refusing
+ * here as well keeps this device from queueing an entry every other device
+ * would reject, which would leave the change showing locally and nowhere
+ * else.
  *
  * Both directions append, because the log is append-only — album
  * membership can't be retracted, only superseded. Replaying content in
@@ -34,6 +40,12 @@ export async function setAlbumVisibility(circleId: string, postId: string, inAlb
   if (!identity) throw new Error('No identity for this circle on this device.');
   const current = await getCurrentContentKey(circleId);
   if (!current) throw new Error('No content key on this device.');
+
+  const post = await getPost(postId);
+  if (!post) throw new Error('No such post on this device.');
+  if (post.authorPublicKey !== bytesToHex(identity.publicKey) && !(await isCircleAdmin(circleId))) {
+    throw new Error('Only the photo’s author or an admin can change the album.');
+  }
 
   const createdAt = Date.now();
   const outboxEntry: NewOutboxEntry = {
