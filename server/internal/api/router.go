@@ -107,7 +107,7 @@ func newV1Mux(
 	// once this is actually polled on its intended ~30s cadence.
 	epochsMux := http.NewServeMux()
 	getepochs.Register(epochsMux, &getepochs.Service{LogStore: logStore}, readLimit)
-	mux.Handle("/epochs", auth.RequireSession(authStore, epochsMux))
+	mux.Handle("/epochs/", auth.RequireSession(authStore, epochsMux))
 
 	google.Register(mux, &google.Service{AuthStore: authStore, Verifier: googleVerifier})
 	apple.Register(mux, &apple.Service{AuthStore: authStore, Verifier: appleVerifier})

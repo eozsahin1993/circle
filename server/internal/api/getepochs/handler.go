@@ -1,6 +1,7 @@
 package getepochs
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"circle-relay/internal/api/circleerrors"
@@ -11,6 +12,18 @@ import (
 // within it never needs chunking into multiple BatchGetItem calls (only
 // the UnprocessedKeys retry loop, needed regardless of count).
 const maxSyncIDs = 100
+
+// request carries the syncIds in the body rather than as repeated query
+// params — a query string commonly ends up in access logs by default
+// (most combined/common log formats include the full request line), and
+// this is the one call that names a device's *entire* circle set at once,
+// so logging it would hand a reader the whole membership list in a single
+// line. Same reasoning as getuploadtarget/appendlog already putting their
+// sensitive fields in the body. POST rather than GET for the same reason:
+// a body on a GET is legal but widely mishandled by proxies and caches.
+type request struct {
+	SyncIDs []string `json:"syncIds"`
+}
 
 type circleEpochs struct {
 	SyncID       string `json:"syncId"`
@@ -27,7 +40,13 @@ type Handler struct {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	syncIDs := r.URL.Query()["syncId"]
+	var req request
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	syncIDs := req.SyncIDs
 	if len(syncIDs) == 0 {
 		httputil.WriteError(w, http.StatusBadRequest, "at least one syncId is required")
 		return

@@ -234,14 +234,23 @@ export type CircleEpochs = {
 };
 
 /**
- * Cheap "has anything changed" check across many circles in one call — GET
- * /v1/epochs?syncId=&syncId=..., meant to be polled far more often than
+ * Cheap "has anything changed" check across many circles in one call —
+ * POST /v1/epochs/peek, meant to be polled far more often than
  * fetchEntries itself. A circle with no server-side state yet (never
  * bootstrapped) is simply absent from the result, not an error.
+ *
+ * POST despite mutating nothing, and the syncIds go in the body rather
+ * than a query string: this one call names *every* circle this device
+ * belongs to, and query strings routinely land in access logs (see
+ * getUploadTarget for the same reasoning applied to write tokens), which
+ * would put the whole membership list in a log line.
  */
 export async function fetchEpochs(syncIds: string[]): Promise<CircleEpochs[]> {
-  const query = syncIds.map((id) => `syncId=${encodeURIComponent(id)}`).join('&');
-  const response = await authorizedFetch(`/v1/epochs?${query}`);
+  const response = await authorizedFetch('/v1/epochs/peek', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ syncIds }),
+  });
   if (response.status === 429) {
     throw new RateLimitedError();
   }

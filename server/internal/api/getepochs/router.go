@@ -10,5 +10,5 @@ func Register(mux *http.ServeMux, service *Service, wrap func(http.Handler) http
 	if wrap != nil {
 		h = wrap(h)
 	}
-	mux.Handle("GET /epochs", h)
+	mux.Handle("POST /epochs/peek", h)
 }

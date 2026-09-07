@@ -1,6 +1,6 @@
-// End-to-end tests for GET /epochs, against the fully assembled router —
-// see router_test.go's top comment for why this is separate from the
-// per-package unit tests.
+// End-to-end tests for POST /epochs/peek, against the fully assembled
+// router — see router_test.go's top comment for why this is separate from
+// the per-package unit tests.
 package api_test
 
 import (
@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"circle-relay/internal/testsupport"
@@ -42,7 +43,8 @@ func TestEndToEnd_Epochs_ReportsCurrentEpochsAndOmitsAnUnknownCircle(t *testing.
 		t.Fatalf("expected 200 from append, got %d", appendResp.StatusCode)
 	}
 
-	epochsResp := authedRequest(t, http.MethodGet, server.URL+"/v1/epochs?syncId="+syncID+"&syncId="+unknownSyncID, authToken, "")
+	peekBody := `{"syncIds":["` + syncID + `","` + unknownSyncID + `"]}`
+	epochsResp := authedRequest(t, http.MethodPost, server.URL+"/v1/epochs/peek", authToken, peekBody)
 	defer epochsResp.Body.Close()
 	if epochsResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 from epochs, got %d", epochsResp.StatusCode)
@@ -80,10 +82,26 @@ func TestEndToEnd_Epochs_RequiresAtLeastOneSyncID(t *testing.T) {
 	claims["iss"] = google.Issuer
 	authToken := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
 
-	resp := authedRequest(t, http.MethodGet, server.URL+"/v1/epochs", authToken, "")
+	resp := authedRequest(t, http.MethodPost, server.URL+"/v1/epochs/peek", authToken, `{"syncIds":[]}`)
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 with no syncId, got %d", resp.StatusCode)
+	}
+}
+
+func TestEndToEnd_Epochs_RejectsAMalformedBody(t *testing.T) {
+	mux, google, _ := testsupport.NewRouterWithAuth(t)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	claims := validClaims(t, testsupport.UniqueEmail(t), testsupport.TestGoogleClientID)
+	claims["iss"] = google.Issuer
+	authToken := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
+
+	resp := authedRequest(t, http.MethodPost, server.URL+"/v1/epochs/peek", authToken, "not json")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for a malformed body, got %d", resp.StatusCode)
 	}
 }
 
@@ -92,7 +110,8 @@ func TestEndToEnd_Epochs_RequiresAuth(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/v1/epochs?syncId=" + testsupport.UniqueSyncID(t))
+	body := `{"syncIds":["` + testsupport.UniqueSyncID(t) + `"]}`
+	resp, err := http.Post(server.URL+"/v1/epochs/peek", "application/json", strings.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
