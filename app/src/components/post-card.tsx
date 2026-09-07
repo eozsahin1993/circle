@@ -10,7 +10,7 @@ import { ReactionChip } from '@/components/reaction-chip';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
+import { Colors, Icons, PhotoAspect, Radius, Spacing, Tints } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type Reaction = {
@@ -114,15 +114,13 @@ export function PostCard({
             {post.timestamp}
           </ThemedText>
         </View>
-        {/* Bare rather than a bordered pill, unlike the post's own screen:
-            the chips below already carry borders, and a second bordered
-            circle up here would read as one of them. */}
         {onToggleAlbum ? (
           <Pressable
+            style={styles.albumButton}
             onPress={onToggleAlbum}
-            hitSlop={10}
+            hitSlop={8}
             accessibilityLabel={post.inAlbum ? 'Remove from album' : 'Add to album'}>
-            <Feather name={Icons.inAlbum} size={18} color={post.inAlbum ? theme.accentBright : theme.faint} />
+            <Feather name={Icons.inAlbum} size={18} color={post.inAlbum ? theme.accentBright : theme.secondary} />
           </Pressable>
         ) : null}
       </View>
@@ -142,12 +140,16 @@ export function PostCard({
 
       {/* Two lines in the feed; the post's own screen carries the rest.
           Tappable as well as the photo, since the ellipsis is what
-          promises there's more to read. */}
-      <Pressable onPress={onPressPhoto} disabled={!onPressPhoto}>
-        <ThemedText type="captionFeed" style={styles.caption} numberOfLines={2}>
-          {post.caption}
-        </ThemedText>
-      </Pressable>
+          promises there's more to read. Dropped entirely when there's no
+          caption, so the chips close the gap instead of an empty line
+          holding it open. */}
+      {post.caption ? (
+        <Pressable onPress={onPressPhoto} disabled={!onPressPhoto}>
+          <ThemedText type="captionFeed" style={styles.caption} numberOfLines={2}>
+            {post.caption}
+          </ThemedText>
+        </Pressable>
+      ) : null}
 
       {/* One pill for every reaction, not one per emoji: the feed shows
           the three most-used and the total, and the post's own screen
@@ -204,6 +206,16 @@ const styles = StyleSheet.create({
   },
   byline: {
     flex: 1,
+  },
+  /** The circle every other icon button in the app sits in — see circle-header.tsx. */
+  albumButton: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Tints.secondaryButtonBorder,
   },
   photoWrap: {
     justifyContent: 'flex-end',

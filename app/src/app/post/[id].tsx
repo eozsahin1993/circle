@@ -174,10 +174,17 @@ export default function PostDetailsScreen() {
 
             {post ? (
               <>
-                <ThemedText type="captionDetail" style={styles.caption}>
-                  {post.caption}
-                </ThemedText>
-                <ThemedText type="meta" themeColor="muted" style={styles.byline}>
+                {post.caption ? (
+                  <ThemedText type="captionDetail" style={styles.caption}>
+                    {post.caption}
+                  </ThemedText>
+                ) : null}
+                {/* Without a caption the byline takes its place under the
+                    photo, rather than sitting tight against it. */}
+                <ThemedText
+                  type="meta"
+                  themeColor="muted"
+                  style={[styles.byline, post.caption ? null : styles.bylineAlone]}>
                   {post.authorName || profileName || 'Unknown member'} · {formatTimestamp(post.createdAt)}
                 </ThemedText>
               </>
@@ -316,6 +323,9 @@ const styles = StyleSheet.create({
   byline: {
     paddingHorizontal: Spacing.screenPadding,
     paddingTop: 6,
+  },
+  bylineAlone: {
+    paddingTop: Spacing.cardListGap,
   },
   reactions: {
     flexDirection: 'row',
