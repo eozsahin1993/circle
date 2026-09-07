@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
+import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { BackButton } from '@/components/back-button';
 import { PrimaryButton } from '@/components/primary-button';
 import { ThemedText } from '@/components/themed-text';
@@ -80,7 +81,7 @@ export default function ProfileSetupScreen() {
           <BackButton />
         </View>
 
-        <KeyboardAvoidingView style={styles.form} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoider style={styles.form}>
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
             <ThemedText type="onboardingHeadline">Who are you, to the people in your circles?</ThemedText>
             <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
@@ -122,7 +123,7 @@ export default function ProfileSetupScreen() {
             onPress={handleContinue}
             style={styles.continueButton}
           />
-        </KeyboardAvoidingView>
+        </KeyboardAvoider>
       </SafeAreaView>
     </ThemedView>
   );

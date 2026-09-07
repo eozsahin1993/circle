@@ -1,10 +1,11 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/components/back-button';
+import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
 import { PrimaryButton } from '@/components/primary-button';
 import { ThemedText } from '@/components/themed-text';
@@ -46,9 +47,7 @@ export default function NewCircleScreen() {
           <BackButton />
         </View>
 
-        <KeyboardAvoidingView
-          style={styles.form}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoider style={styles.form}>
           <ThemedText type="screenTitle">Name your circle</ThemedText>
 
           <TextInput
@@ -102,7 +101,7 @@ export default function NewCircleScreen() {
             Who can invite, and what happens to the photos over time, is in the circle&apos;s
             settings later.
           </ThemedText>
-        </KeyboardAvoidingView>
+        </KeyboardAvoider>
       </SafeAreaView>
     </ThemedView>
   );

@@ -399,6 +399,10 @@ export default function FeedScreen() {
             </ThemedView>
           }
           stickyHeaderIndices={[0]}
+          // Without this the first tap on "Post" (next to an expanded
+          // post's comment input) only dismisses the keyboard, so the
+          // comment needs tapping twice to send.
+          keyboardShouldPersistTaps="handled"
           ItemSeparatorComponent={({ leadingItem }: { leadingItem?: FeedRow }) => (
             <ThemedView
               style={{ height: (leadingItem && gapAfterRow.get(rowKey(leadingItem))) ?? Spacing.gapBetweenPosts }}
