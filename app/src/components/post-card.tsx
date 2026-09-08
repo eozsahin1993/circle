@@ -30,7 +30,10 @@ export type Post = {
   photoLabel?: string;
   caption: string;
   reactions: Reaction[];
-  comments: CommentItem[];
+  /** The single comment a card shows — the newest. Absent on a post nobody has replied to. */
+  latestComment?: CommentItem;
+  /** How many there are in all, for the "Show all N" link. */
+  commentCount: number;
   /** A comment landed on this post since it was last scrolled into view or opened — shown as a small dot on the comments chip. */
   hasUnseenComments?: boolean;
   /** Whether this photo is kept in the circle's album — lights the bookmark. */
@@ -123,7 +126,7 @@ export function PostCard({
                 </ThemedText>
                 <Feather name={Icons.inAlbum} size={12} color={theme.accent} />
                 <ThemedText type="meta" themeColor="accent">
-                  In the album
+                  Album
                 </ThemedText>
               </>
             ) : null}
@@ -201,7 +204,8 @@ export function PostCard({
 
       <View style={styles.comments}>
         <PostComments
-          comments={post.comments}
+          latest={post.latestComment}
+          total={post.commentCount}
           onSubmit={(body) => onAddComment?.(body)}
           composerOpen={composerOpen}
           onPressShowAll={handleShowAll}

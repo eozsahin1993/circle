@@ -196,7 +196,7 @@ export default function CircleDetailsScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader label="Circle details" />
+        <ScreenHeader title="Circle details" />
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
           <ThemedText type="screenTitle">{circle?.name ?? ''}</ThemedText>
@@ -310,7 +310,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: Spacing.topPadUnderStatusBar,
   },
   memberCount: {
     marginTop: 4,

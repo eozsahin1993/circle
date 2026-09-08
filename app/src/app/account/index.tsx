@@ -92,7 +92,7 @@ export default function AccountScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader label="Your account" />
+        <ScreenHeader title="Your account" />
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.profileRow}>
@@ -290,7 +290,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: Spacing.topPadUnderStatusBar,
   },
   content: {
     paddingBottom: Spacing.cardListGap * 2,

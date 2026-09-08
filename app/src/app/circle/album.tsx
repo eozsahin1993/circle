@@ -118,7 +118,7 @@ export default function AlbumScreen() {
         {/* The header keeps the screen's usual inset; the grid below runs
             edge to edge, so nothing competes with the photos. */}
         <View style={styles.headerInset}>
-          <ScreenHeader label={circleName ? `${circleName} album` : 'Album'} />
+          <ScreenHeader title="Album" subtitle={circleName} />
         </View>
 
         <FlatList
@@ -173,7 +173,6 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingTop: Spacing.topPadUnderStatusBar,
   },
   headerInset: {
     paddingHorizontal: Spacing.screenPadding,

@@ -18,7 +18,10 @@ export type CommentItem = {
 };
 
 export type PostCommentsProps = {
-  comments: CommentItem[];
+  /** The newest comment, the only one a card shows. */
+  latest?: CommentItem;
+  /** How many there are in all — the "Show all" link appears past one. */
+  total: number;
   /** Revealed by the card's Comment button — a quiet post shows the chip row and nothing more. */
   composerOpen: boolean;
   onSubmit: (body: string) => void;
@@ -48,11 +51,9 @@ const COMPOSER_HEIGHT = 42;
  * own screen, which is also the only place it can scroll independently of
  * the feed. The summary line is that tap.
  */
-export function PostComments({ comments, composerOpen, onSubmit, onPressShowAll, selfPhotoUri }: PostCommentsProps) {
+export function PostComments({ latest, total, composerOpen, onSubmit, onPressShowAll, selfPhotoUri }: PostCommentsProps) {
   const theme = useTheme();
   const [text, setText] = useState('');
-
-  const latest = comments[comments.length - 1];
 
   function handleSubmit() {
     if (!text.trim()) return;
@@ -78,10 +79,10 @@ export function PostComments({ comments, composerOpen, onSubmit, onPressShowAll,
         </View>
       ) : null}
 
-      {comments.length > 1 ? (
+      {total > 1 ? (
         <Pressable style={styles.showAll} onPress={onPressShowAll} disabled={!onPressShowAll} hitSlop={6}>
           <ThemedText type="comment" themeColor="secondary">
-            Show all {comments.length} comments
+            Show all {total} comments
           </ThemedText>
         </Pressable>
       ) : null}

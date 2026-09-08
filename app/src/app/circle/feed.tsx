@@ -108,7 +108,9 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: Spacing.feedTextPadding,
-    paddingTop: 6,
+    // The same gap under the safe area an inner screen's `ScreenHeader`
+    // takes, so the two don't sit at different heights.
+    paddingTop: Spacing.topPadUnderSafeArea,
     paddingBottom: Spacing.gapBetweenPosts,
   },
   list: {

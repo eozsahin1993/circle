@@ -43,7 +43,7 @@ export default function NewCircleScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader label="New circle" />
+        <ScreenHeader title="New circle" />
 
         <KeyboardAvoider style={styles.form}>
           <ThemedText type="screenTitle">Name your circle</ThemedText>
@@ -112,7 +112,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: Spacing.topPadUnderStatusBar,
   },
   form: {
     flex: 1,

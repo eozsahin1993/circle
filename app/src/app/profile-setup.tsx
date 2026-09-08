@@ -77,7 +77,7 @@ export default function ProfileSetupScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader label="Your profile" />
+        <ScreenHeader title="Your profile" />
 
         <KeyboardAvoider style={styles.form}>
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
@@ -134,7 +134,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: Spacing.topPadUnderStatusBar,
   },
   form: {
     flex: 1,

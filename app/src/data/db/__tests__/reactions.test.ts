@@ -7,6 +7,7 @@ import {
   AttachmentKinds,
   AttachmentStatuses,
   addReaction,
+  getPostReactionSummaries,
   getPostReactionSummary,
   getPostReactors,
   initDatabase,
@@ -136,4 +137,44 @@ test('the chip summary is ordered by when each emoji was first used', async () =
   const summary = await getPostReactionSummary(postId, a);
 
   expect(summary.map((row) => row.emoji)).toEqual(['❤️', '😭', '🙏']);
+});
+
+describe('getPostReactionSummaries', () => {
+  /**
+   * The batch exists only to save a query per post — if it ever disagreed
+   * with the single-post version, the feed and the post screen would show
+   * different chips for the same post.
+   */
+  test('matches the per-post summary, ordering included', async () => {
+    const { circleId, postId } = await circleWithPost();
+    const me = bytesToHex((await getCircleIdentity(circleId))!.publicKey);
+    const other = bytesToHex(generateIdentity().publicKey);
+    await addReaction({ postId, authorPublicKey: other, emoji: '🙏', createdAt: 1_000 });
+    await addReaction({ postId, authorPublicKey: me, emoji: '❤️', createdAt: 2_000 });
+    await addReaction({ postId, authorPublicKey: other, emoji: '❤️', createdAt: 3_000 });
+
+    const batched = (await getPostReactionSummaries([postId], me)).get(postId);
+
+    expect(batched).toEqual(await getPostReactionSummary(postId, me));
+    expect(batched).toEqual([
+      { emoji: '🙏', count: 1, reactedByMe: false },
+      { emoji: '❤️', count: 2, reactedByMe: true },
+    ]);
+  });
+
+  test('keeps each post to its own reactions, and omits one with none', async () => {
+    const { circleId, postId } = await circleWithPost();
+    const { postId: quiet } = await circleWithPost();
+    const me = bytesToHex((await getCircleIdentity(circleId))!.publicKey);
+    await addReaction({ postId, authorPublicKey: me, emoji: '❤️', createdAt: 1_000 });
+
+    const summaries = await getPostReactionSummaries([postId, quiet], me);
+
+    expect(summaries.get(postId)).toHaveLength(1);
+    expect(summaries.get(quiet)).toBeUndefined();
+  });
+
+  test('an empty page costs no query at all', async () => {
+    expect((await getPostReactionSummaries([], 'aa')).size).toBe(0);
+  });
 });

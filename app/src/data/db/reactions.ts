@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 
 import { db } from '@/data/db/connection';
 import { circleMembers, outbox, postReactions } from '@/data/db/schema';
@@ -53,6 +53,40 @@ export async function getPostReactionSummary(postId: string, ownPublicKey: strin
     .orderBy(asc(sql`min(${postReactions.createdAt})`));
 
   return rows.map((row) => ({ emoji: row.emoji, count: row.count, reactedByMe: row.reactedByMe === 1 }));
+}
+
+/**
+ * The above for a whole page of posts, in one query rather than one per
+ * post — same grouping and same ordering, just not repeated N times.
+ * Posts with no reactions are absent from the map rather than holding an
+ * empty array.
+ */
+export async function getPostReactionSummaries(
+  postIds: string[],
+  ownPublicKey: string
+): Promise<Map<string, ReactionSummary[]>> {
+  const byPost = new Map<string, ReactionSummary[]>();
+  if (postIds.length === 0) return byPost;
+
+  const rows = await db
+    .select({
+      postId: postReactions.postId,
+      emoji: postReactions.emoji,
+      count: sql<number>`count(*)`,
+      reactedByMe: sql<number>`max(case when ${postReactions.authorPublicKey} = ${ownPublicKey} then 1 else 0 end)`,
+    })
+    .from(postReactions)
+    .where(inArray(postReactions.postId, postIds))
+    .groupBy(postReactions.postId, postReactions.emoji)
+    .orderBy(asc(sql`min(${postReactions.createdAt})`));
+
+  for (const row of rows) {
+    const summaries = byPost.get(row.postId) ?? [];
+    summaries.push({ emoji: row.emoji, count: row.count, reactedByMe: row.reactedByMe === 1 });
+    byPost.set(row.postId, summaries);
+  }
+
+  return byPost;
 }
 
 /**

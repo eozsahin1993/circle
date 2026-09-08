@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: Spacing.topPadUnderStatusBar,
+    paddingTop: Spacing.topPadUnderSafeArea,
     gap: Spacing.cardListGap,
   },
   header: {

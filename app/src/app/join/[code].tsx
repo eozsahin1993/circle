@@ -67,7 +67,7 @@ export default function JoinInviteScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader label="Join invite" />
+        <ScreenHeader title="Join invite" />
 
         {phase === 'checking' ? null : phase === 'error' ? (
           <View style={styles.content}>
@@ -105,7 +105,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: Spacing.topPadUnderStatusBar,
   },
   content: {
     flex: 1,

@@ -119,7 +119,7 @@ export default function CircleInviteScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader label="Invite" />
+        <ScreenHeader title="Invite" />
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
           <ThemedText type="screenTitle">Invite to {circleName}</ThemedText>
@@ -201,7 +201,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: Spacing.topPadUnderStatusBar,
   },
   scroll: {
     flex: 1,

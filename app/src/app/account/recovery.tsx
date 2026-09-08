@@ -25,7 +25,7 @@ export default function RecoveryPhraseScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader label="Recovery phrase" />
+        <ScreenHeader title="Recovery phrase" />
 
         <View style={styles.content}>
           <ThemedText type="captionFeed" themeColor="secondary">
@@ -76,7 +76,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: Spacing.topPadUnderStatusBar,
   },
   content: {
     flex: 1,

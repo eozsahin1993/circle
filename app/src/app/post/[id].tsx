@@ -3,22 +3,22 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
 import { KeyboardAvoider } from '@/components/keyboard-avoider';
-import { BackButton } from '@/components/back-button';
 import { FabButton } from '@/components/fab-button';
+import { HeaderIconButton } from '@/components/header-icon-button';
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
 import { ReactionChip } from '@/components/reaction-chip';
 import { EmojiPicker } from '@/components/emoji-picker';
+import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Icons, PhotoAspect, Radius, Spacing, Tints } from '@/constants/theme';
+import { Icons, PhotoAspect, Spacing } from '@/constants/theme';
 import {
   getAttachment,
-  getCircleMemberCount,
   getCircleSummary,
   getFeedPost,
   getPostComments,
@@ -42,12 +42,19 @@ import { formatRelative, formatTimestamp } from '@/utils/time';
 /** Names shown before the rest become "& N others" — enough to recognise who, not a roster dump. */
 const PREVIEW_NAMES = 3;
 
+/** "Aunt Ro, Dad, Emre & 5 others" — or every name, once expanded. */
+function listReactors(names: string[], expanded: boolean): string {
+  const shown = expanded ? names : names.slice(0, PREVIEW_NAMES);
+  const hidden = names.length - shown.length;
+
+  return hidden > 0 ? `${shown.join(', ')} & ${hidden} other${hidden === 1 ? '' : 's'}` : shown.join(', ');
+}
+
 export default function PostDetailsScreen() {
   const theme = useTheme();
   const { id: postId, circleId } = useLocalSearchParams<{ id: string; circleId: string }>();
 
   const [circleName, setCircleName] = useState('');
-  const [memberCount, setMemberCount] = useState(0);
   const [post, setPost] = useState<FeedPost | null>(null);
   const [photoUri, setPhotoUri] = useState<string | undefined>();
   const [profileName, setProfileName] = useState<string | undefined>();
@@ -63,21 +70,18 @@ export default function PostDetailsScreen() {
   const load = useCallback(async () => {
     if (!circleId || !postId) return;
 
-    const [circle, count, feedPost, profile, reactionSummary, details, postComments, identity, isAdmin] =
-      await Promise.all([
-        getCircleSummary(circleId),
-        getCircleMemberCount(circleId),
-        getFeedPost(circleId, postId),
-        getProfile(),
-        getReactionsForPost(circleId, postId),
-        getPostReactors(circleId, postId),
-        getPostComments(circleId, postId),
-        getCircleIdentity(circleId),
-        isCircleAdmin(circleId),
-      ]);
+    const [circle, feedPost, profile, reactionSummary, details, postComments, identity, isAdmin] = await Promise.all([
+      getCircleSummary(circleId),
+      getFeedPost(circleId, postId),
+      getProfile(),
+      getReactionsForPost(circleId, postId),
+      getPostReactors(circleId, postId),
+      getPostComments(circleId, postId),
+      getCircleIdentity(circleId),
+      isCircleAdmin(circleId),
+    ]);
 
     setCircleName(circle?.name ?? '');
-    setMemberCount(count);
     setPost(feedPost);
     setProfileName(profile?.name);
     setReactions(reactionSummary);
@@ -146,22 +150,23 @@ export default function PostDetailsScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <BackButton />
-          <ThemedText type="postAuthor" style={styles.headerText} numberOfLines={1}>
-            {circleName} · visible to {memberCount} {memberCount === 1 ? 'person' : 'people'}
-          </ThemedText>
-          {/* Filing a photo is about the post as a whole, so it sits with
-              the post rather than among the reaction chips, which are each
-              about one emoji. Shown only to whoever may actually change it. */}
-          {post && canEditAlbum ? (
-            <Pressable style={styles.albumButton} onPress={handleToggleAlbum} hitSlop={8}>
-              <Feather name={Icons.inAlbum} size={16} color={post.inAlbum ? theme.accentBright : theme.secondary} />
-              <ThemedText type="meta" themeColor={post.inAlbum ? 'accentBright' : 'secondary'}>
-                {post.inAlbum ? 'In album' : 'Add to album'}
-              </ThemedText>
-            </Pressable>
-          ) : null}
+        <View style={styles.headerInset}>
+          <ScreenHeader
+            title={circleName}
+            actions={
+              // Filing a photo is about the post as a whole, so it sits in
+              // the header rather than among the chips, which are each
+              // about one emoji. Only whoever may change it sees it.
+              post && canEditAlbum ? (
+                <HeaderIconButton
+                  icon={Icons.inAlbum}
+                  active={post.inAlbum}
+                  accessibilityLabel={post.inAlbum ? 'Remove from album' : 'Add to album'}
+                  onPress={handleToggleAlbum}
+                />
+              ) : null
+            }
+          />
         </View>
 
         <KeyboardAvoider style={styles.body}>
@@ -182,7 +187,7 @@ export default function PostDetailsScreen() {
                 {/* Without a caption the byline takes its place under the
                     photo, rather than sitting tight against it. The album
                     marker shows for everyone; only the author or an admin
-                    gets the control above that changes it. */}
+                    gets the bookmark in the header that changes it. */}
                 <View style={[styles.byline, post.caption ? null : styles.bylineAlone]}>
                   <ThemedText type="meta" themeColor="muted">
                     {post.authorName || profileName || 'Unknown member'} · {formatTimestamp(post.createdAt)}
@@ -194,7 +199,7 @@ export default function PostDetailsScreen() {
                       </ThemedText>
                       <Feather name={Icons.inAlbum} size={12} color={theme.accent} />
                       <ThemedText type="meta" themeColor="accent">
-                        In the album
+                        Album
                       </ThemedText>
                     </>
                   ) : null}
@@ -202,6 +207,9 @@ export default function PostDetailsScreen() {
               </>
             ) : null}
 
+            {/* One chip per emoji here, unlike the feed's single pill — this
+                is the screen that carries the breakdown. The bare "+" only
+                works next to them; with nothing to add to, it names itself. */}
             <View style={styles.reactions}>
               {reactions.map((reaction) => (
                 <ReactionChip
@@ -212,7 +220,11 @@ export default function PostDetailsScreen() {
                   onPress={() => handleSelectReaction(reaction.emoji)}
                 />
               ))}
-              <ReactionChip label="+" onPress={() => setShowPicker((v) => !v)} />
+              {reactions.length > 0 ? (
+                <ReactionChip label="+" accessibilityLabel="Add a reaction" onPress={() => setShowPicker((v) => !v)} />
+              ) : (
+                <ReactionChip icon={Icons.add} label="React" onPress={() => setShowPicker((v) => !v)} />
+              )}
             </View>
 
             {showPicker ? (
@@ -225,13 +237,10 @@ export default function PostDetailsScreen() {
                 above already carry which emoji and how many. */}
             {reactors.length > 0 ? (
               <ThemedText type="comment" themeColor="secondary" style={styles.reactors}>
-                {(showAllReactors ? reactors : reactors.slice(0, PREVIEW_NAMES)).join(', ')}
-                {!showAllReactors && reactors.length > PREVIEW_NAMES
-                  ? ` & ${reactors.length - PREVIEW_NAMES} other${reactors.length - PREVIEW_NAMES === 1 ? '' : 's'}`
-                  : null}
+                {`${listReactors(reactors, showAllReactors)} reacted.`}
                 {reactors.length > PREVIEW_NAMES ? (
                   <>
-                    {'. '}
+                    {' '}
                     {/* Nested so it flows with the names instead of being
                         pinned somewhere a long list can't wrap to. */}
                     <ThemedText type="comment" themeColor="accentBright" onPress={() => setShowAllReactors((v) => !v)}>
@@ -298,26 +307,10 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  // The header keeps the screen's usual inset; the photo below runs edge
+  // to edge, same as the album grid.
+  headerInset: {
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: Spacing.topPadUnderStatusBar,
-    paddingBottom: Spacing.cardListGap,
-  },
-  headerText: {
-    flex: 1,
-  },
-  albumButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    height: 32,
-    paddingHorizontal: 12,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    borderColor: Tints.secondaryButtonBorder,
   },
   body: {
     flex: 1,

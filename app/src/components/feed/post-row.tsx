@@ -5,9 +5,9 @@ import type { FeedRow, FeedRows } from '@/components/feed/rows';
 import { type CommentItem } from '@/components/post-comments';
 import { PostCard, type Post } from '@/components/post-card';
 import { Spacing } from '@/constants/theme';
-import type { CommentWithAuthor, Profile } from '@/data/db';
+import type { CommentSummary, CommentWithAuthor, Profile } from '@/data/db';
 import type { FeedPostView } from '@/domain/usecases/feed/circle-feed';
-import { markPostViewed, getPostComments } from '@/data/db';
+import { getCommentSummaries, markPostViewed } from '@/data/db';
 import { addComment } from '@/domain/usecases/post/comment-on-post';
 import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
 import { setAlbumVisibility } from '@/domain/usecases/post/set-album-visibility';
@@ -64,7 +64,8 @@ export function usePostRows({
       },
       onAddComment: async (postId, body) => {
         await addComment(circleId, postId, body);
-        patchPost(postId, { comments: await getPostComments(circleId, postId) });
+        const summaries = await getCommentSummaries(circleId, [postId]);
+        patchPost(postId, { comments: summaries.get(postId) ?? { latest: null, total: 0 } });
       },
       /**
        * Optimistic, like the post's own screen: the write is local-first
@@ -168,7 +169,8 @@ function toPostCard(view: FeedPostView, profile: Profile | null): Post {
     photoUri: view.photoUri,
     caption: post.caption,
     reactions: view.reactions,
-    comments: toCommentItems(view.comments, profile?.name),
+    latestComment: view.comments.latest ? toCommentItem(view.comments.latest, profile?.name) : undefined,
+    commentCount: view.comments.total,
     hasUnseenComments: view.hasUnseenComments,
     inAlbum: post.inAlbum,
   };
@@ -180,12 +182,12 @@ function toPostCard(view: FeedPostView, profile: Profile | null): Post {
  * device's own profile for a comment written before its author's roster
  * row arrived — which is the local author's own comments, pre-sync.
  */
-function toCommentItems(comments: CommentWithAuthor[], ownName?: string): CommentItem[] {
-  return comments.map((comment) => ({
+function toCommentItem(comment: CommentWithAuthor, ownName?: string): CommentItem {
+  return {
     id: comment.id,
     authorName: comment.authorName || ownName || 'Unknown member',
     authorPhotoUri: pictureUri(comment.authorPicture),
     body: comment.body,
     timestamp: formatRelative(comment.createdAt),
-  }));
+  };
 }

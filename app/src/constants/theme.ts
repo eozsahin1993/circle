@@ -145,7 +145,19 @@ export const Spacing = {
    * meant for a form.
    */
   feedTextPadding: 18,
-  topPadUnderStatusBar: 58,
+  /**
+   * The gap above a screen's header row — `ScreenHeader` applies it, so
+   * only the two screens with their own header (`circle/index.tsx`,
+   * `circle/feed.tsx`) name it directly.
+   *
+   * Small because it sits *under* the safe-area inset rather than instead
+   * of it: `SafeAreaView`'s edges are `additive` by default, so its
+   * padding stacks on the inset. That also makes this the whole gap the
+   * eye sees on both platforms — Android's status bar inset is around
+   * 24dp against an iPhone's ~59pt, and anything relying on the inset for
+   * breathing room reads as cramped there.
+   */
+  topPadUnderSafeArea: 16,
   gapBetweenPosts: 34,
   /**
    * Above and below a roster-change row. Tighter than `gapBetweenPosts`

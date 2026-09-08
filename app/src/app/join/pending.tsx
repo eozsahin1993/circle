@@ -48,7 +48,7 @@ export default function JoinPendingScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader label="Join request" />
+        <ScreenHeader title="Join request" />
 
         <View style={styles.content}>
           {gone ? (
@@ -81,7 +81,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: Spacing.topPadUnderStatusBar,
   },
   content: {
     flex: 1,

@@ -1,4 +1,4 @@
-import { and, asc, count, eq } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 
 import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
@@ -39,6 +39,80 @@ export async function insertCommentAndEnqueue(comment: Comment, outboxEntry: New
     tx.insert(postComments).values(comment).run();
     tx.insert(outbox).values(outboxEntry).run();
   });
+}
+
+/**
+ * What a feed card draws under a post: its most recent comment and how
+ * many there are in total. Nothing else — the card shows one line and a
+ * "Show all N" link, and the whole thread is one tap away on the post's
+ * own screen.
+ *
+ * Deliberately not `getPostComments` per post. That pulls every comment
+ * on every post in the feed, with each author's avatar bytes joined on,
+ * to render one row and a number — and it grew with the circle's whole
+ * history, forever.
+ */
+export type CommentSummary = {
+  latest: CommentWithAuthor | null;
+  total: number;
+};
+
+/**
+ * The above for a whole page of posts, in two queries rather than two per
+ * post. The `latest` join uses a per-post max of `createdAt`, which can
+ * match two rows if a post has comments sharing a millisecond; `id`
+ * breaks that tie so every device picks the same one.
+ */
+export async function getCommentSummaries(
+  circleId: string,
+  postIds: string[]
+): Promise<Map<string, CommentSummary>> {
+  const summaries = new Map<string, CommentSummary>();
+  if (postIds.length === 0) return summaries;
+
+  const newest = db
+    .select({ postId: postComments.postId, createdAt: sql<number>`max(${postComments.createdAt})`.as('newest_at') })
+    .from(postComments)
+    .where(inArray(postComments.postId, postIds))
+    .groupBy(postComments.postId)
+    .as('newest');
+
+  const [totals, latest] = await Promise.all([
+    db
+      .select({ postId: postComments.postId, total: count() })
+      .from(postComments)
+      .where(inArray(postComments.postId, postIds))
+      .groupBy(postComments.postId),
+    db
+      .select({
+        id: postComments.id,
+        postId: postComments.postId,
+        authorPublicKey: postComments.authorPublicKey,
+        body: postComments.body,
+        createdAt: postComments.createdAt,
+        authorName: circleMembers.name,
+        authorPicture: circleMembers.picture,
+      })
+      .from(postComments)
+      .innerJoin(newest, and(eq(newest.postId, postComments.postId), eq(newest.createdAt, postComments.createdAt)))
+      .leftJoin(
+        circleMembers,
+        and(
+          eq(circleMembers.circleId, circleId),
+          eq(circleMembers.identityPublicKey, postComments.authorPublicKey)
+        )
+      )
+      .orderBy(asc(postComments.id)),
+  ]);
+
+  for (const row of totals) summaries.set(row.postId, { latest: null, total: row.total });
+  for (const row of latest) {
+    const summary = summaries.get(row.postId);
+    // Ascending id, so on a tie the last write here — the greatest id — stands.
+    if (summary) summary.latest = { ...row, authorPicture: normalizeBlob(row.authorPicture) };
+  }
+
+  return summaries;
 }
 
 /**

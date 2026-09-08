@@ -6,17 +6,17 @@ import {
   getCircleMemberCount,
   getCircleMemberEvents,
   getCircleSummary,
-  getPostComments,
+  getCommentSummaries,
   getProfile,
   getUnseenCommentPostIds,
-  type CommentWithAuthor,
+  type CommentSummary,
   type FeedPost,
   type MemberEvent,
   type Profile,
   type ReactionSummary,
 } from '@/data/db';
 import { isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
-import { getReactionsForPost } from '@/domain/usecases/post/react-to-post';
+import { getPostReactionSummaries } from '@/data/db';
 import { getCircleIdentity } from '@/services/keystore';
 import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
 
@@ -25,7 +25,8 @@ export type FeedPostView = {
   post: FeedPost;
   photoUri?: string;
   reactions: ReactionSummary[];
-  comments: CommentWithAuthor[];
+  /** The one comment a card shows, and the count behind its "Show all" link. */
+  comments: CommentSummary;
   hasUnseenComments: boolean;
 };
 
@@ -75,9 +76,12 @@ export async function loadCircleFeed(circleId: string): Promise<CircleFeed> {
 
   const photoUris = await resolvePhotoUris(circleId, posts);
 
+  // Two queries for the whole page, not two per post — see
+  // getCommentSummaries on what the per-post version cost.
+  const postIds = posts.map((post) => post.id);
   const [reactionsByPost, commentsByPost] = await Promise.all([
-    Promise.all(posts.map((post) => getReactionsForPost(circleId, post.id))),
-    Promise.all(posts.map((post) => getPostComments(circleId, post.id))),
+    ownPublicKey ? getPostReactionSummaries(postIds, ownPublicKey) : new Map<string, ReactionSummary[]>(),
+    getCommentSummaries(circleId, postIds),
   ]);
 
   return {
@@ -87,11 +91,11 @@ export async function loadCircleFeed(circleId: string): Promise<CircleFeed> {
     ownPublicKey,
     ownIsAdmin,
     events,
-    posts: posts.map((post, index) => ({
+    posts: posts.map((post) => ({
       post,
       photoUri: photoUris.get(post.id),
-      reactions: reactionsByPost[index],
-      comments: commentsByPost[index],
+      reactions: reactionsByPost.get(post.id) ?? [],
+      comments: commentsByPost.get(post.id) ?? { latest: null, total: 0 },
       hasUnseenComments: unseenCommentPostIds.has(post.id),
     })),
   };
