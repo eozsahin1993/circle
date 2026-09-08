@@ -6,6 +6,7 @@ import { keyRotationHandler } from '@/sync/entry-handlers/key-rotation';
 import { memberAddedHandler } from '@/sync/entry-handlers/member-added';
 import { memberRemovedHandler } from '@/sync/entry-handlers/member-removed';
 import { postHandler } from '@/sync/entry-handlers/post';
+import { postDeleteHandler } from '@/sync/entry-handlers/post-delete';
 import { profileUpdateHandler } from '@/sync/entry-handlers/profile-update';
 import { reactionHandler } from '@/sync/entry-handlers/reaction';
 import { roleChangeHandler } from '@/sync/entry-handlers/role-change';
@@ -33,10 +34,11 @@ export const metaHandlers: Record<string, EntryHandler> = {
   [EntryTypes.COVER_PHOTO_SET]: coverPhotoSetHandler,
 };
 
-/** Content entry types this build understands. `delete` will join these when tombstones are built. */
+/** Content entry types this build understands. */
 export const contentHandlers: Record<string, EntryHandler> = {
   [EntryTypes.POST]: postHandler,
   [EntryTypes.COMMENT]: commentHandler,
   [EntryTypes.REACTION]: reactionHandler,
   [EntryTypes.ALBUM_VISIBILITY]: albumVisibilityHandler,
+  [EntryTypes.POST_DELETE]: postDeleteHandler,
 };

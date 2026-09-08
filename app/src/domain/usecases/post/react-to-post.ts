@@ -51,6 +51,7 @@ export async function toggleReaction(circleId: string, postId: string, emoji: st
     entryId: generateUUID(),
     status: OutboxStatuses.pending,
     epoch: null,
+    blobEntryId: null,
     encryptedMeta: buildAndEncryptLogEntry(
       EntryTypes.REACTION,
       { postId, emoji, reacted, createdAt },

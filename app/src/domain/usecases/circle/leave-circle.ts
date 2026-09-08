@@ -73,6 +73,7 @@ export async function leaveCircle(circleId: string): Promise<void> {
     entryId: generateUUID(),
     status: OutboxStatuses.pending,
     epoch: null,
+    blobEntryId: null,
     encryptedMeta: entry,
   });
 

@@ -277,6 +277,7 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
     entryId: generateUUID(),
     status: OutboxStatuses.pending,
     epoch: null,
+    blobEntryId: null,
     encryptedMeta: memberAddedEntry,
   });
 

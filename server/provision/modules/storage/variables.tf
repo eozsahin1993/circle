@@ -4,7 +4,7 @@ variable "name_prefix" {
 }
 
 variable "blob_glacier_transition_days" {
-  description = "Age at which S3 transitions a blob to Glacier Instant Retrieval (see s3.tf) — blobs are never deleted, only tiered. Defaults to Glacier IR's own 90-day minimum billable duration."
+  description = "Age at which S3 transitions a blob to Glacier Instant Retrieval (see s3.tf) — nothing expires on a timer, it is only tiered — a blob goes when its post is deleted (see internal/api/deleteblob). Defaults to Glacier IR's own 90-day minimum billable duration."
   type        = number
   default     = 90
 }

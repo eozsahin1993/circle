@@ -23,6 +23,10 @@ type UploadTarget struct {
 // See GetUploadTarget's doc comment for why.
 var ErrBlobAlreadyExists = errors.New("blobstore: a blob already exists for this entry")
 
+// ErrBlobNotFound: nothing is stored at this key. Only Uploader reports
+// it — Delete treats a missing object as already deleted.
+var ErrBlobNotFound = errors.New("blobstore: no blob for this entry")
+
 // Store is storage for the (large, encrypted) blob behind one log entry.
 // GetDownloadURL always succeeds and costs nothing to hand out — pure
 // local signing — so callers never check "does this entry have a blob"
@@ -42,7 +46,10 @@ type Store interface {
 	// entryID they didn't create and overwrite it with a replacement that
 	// still decrypts successfully — a write token proves "a current
 	// member," never "the original author," so it can't close this alone.
-	GetUploadTarget(ctx context.Context, syncID, entryID string) (UploadTarget, error)
+	// uploaderAccountID is recorded on the object for Delete to gate on
+	// later — the closest the relay can get to the clients' author rule,
+	// since the author's circle identity key is inside the ciphertext.
+	GetUploadTarget(ctx context.Context, syncID, entryID, uploaderAccountID string) (UploadTarget, error)
 
 	// GetCoverPhotoUploadTarget returns a short-lived presigned POST for a
 	// circle's cover photo — always the same key (entryID "cover"; see
@@ -60,4 +67,15 @@ type Store interface {
 	// ciphertext bytes from. It 404s on use if nothing was ever uploaded
 	// there — that's expected, not an error here.
 	GetDownloadURL(ctx context.Context, syncID, entryID string) (string, error)
+
+	// UploaderAccountID returns the account GetUploadTarget recorded, or
+	// ErrBlobNotFound if nothing is stored. Empty for a blob predating
+	// uploader recording: unknown, never a match.
+	UploaderAccountID(ctx context.Context, syncID, entryID string) (string, error)
+
+	// Delete removes a blob's bytes — the one thing the relay ever
+	// removes. Idempotent, so the client can retry it. The entries naming
+	// the blob stay, immutable (SYNC_DESIGN.md invariant 1); only the
+	// ciphertext goes.
+	Delete(ctx context.Context, syncID, entryID string) error
 }

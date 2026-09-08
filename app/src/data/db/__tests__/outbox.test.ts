@@ -33,7 +33,7 @@ function makeAttachment(post: { id: string; circleId: string; createdAt: number 
 }
 
 function makeOutboxEntry(circleId: string, entryId: string): NewOutboxEntry {
-  return { circleId, entryType: 'post', entryId, status: 'pending', epoch: null, encryptedMeta: new Uint8Array([9, 9, 9]) };
+  return { circleId, entryType: 'post', entryId, status: 'pending', epoch: null, blobEntryId: null, encryptedMeta: new Uint8Array([9, 9, 9]) };
 }
 
 describe('outbox', () => {

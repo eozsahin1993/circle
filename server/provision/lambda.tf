@@ -46,7 +46,12 @@ data "aws_iam_policy_document" "lambda_storage_access" {
     sid = "S3Access"
     actions = [
       "s3:PutObject",
+      # HeadObject as well as reads: the upload path checks for an existing
+      # object, and deleteblob reads back the uploader recorded on it.
       "s3:GetObject",
+      # The one thing the relay ever removes, and only a post's ciphertext
+      # — never a log entry (see internal/api/deleteblob).
+      "s3:DeleteObject",
     ]
     resources = ["${module.storage.bucket_arn}/*"]
   }

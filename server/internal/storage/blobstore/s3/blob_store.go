@@ -35,6 +35,12 @@ const (
 	// object as e.g. text/html, which would matter if a download URL
 	// were ever opened directly in a browser.
 	blobContentType = "application/octet-stream"
+
+	// Two spellings of one thing: S3 owns the `x-amz-meta-` prefix and
+	// strips it on the way back out, so writing and reading differ. Holds
+	// the relay account, not the circle identity that authored the post.
+	uploaderMetadataKey = "uploader-account-id"
+	uploaderField       = "x-amz-meta-" + uploaderMetadataKey
 )
 
 type Store struct {
@@ -55,7 +61,7 @@ var _ blobstore.Store = (*Store)(nil)
 
 // GetUploadTarget checks for an existing object first (see the interface
 // doc for why), then hands off to presignUpload.
-func (s *Store) GetUploadTarget(ctx context.Context, syncID, entryID string) (blobstore.UploadTarget, error) {
+func (s *Store) GetUploadTarget(ctx context.Context, syncID, entryID, uploaderAccountID string) (blobstore.UploadTarget, error) {
 	key := blobKey(syncID, entryID)
 	_, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(s.bucketName), Key: aws.String(key)})
 	if err == nil {
@@ -65,7 +71,7 @@ func (s *Store) GetUploadTarget(ctx context.Context, syncID, entryID string) (bl
 	if !errors.As(err, &notFound) {
 		return blobstore.UploadTarget{}, err
 	}
-	return s.presignUpload(ctx, key)
+	return s.presignUpload(ctx, key, uploaderAccountID)
 }
 
 // coverPhotoEntryID is the fixed "entryID" a circle's cover photo always
@@ -78,30 +84,68 @@ const coverPhotoEntryID = "cover"
 // see the interface doc for why that's safe here specifically — and
 // signs at the fixed key every device will look for a circle's cover
 // photo at.
+// Records no uploader: a cover is admin-gated on the way in and has no
+// delete path.
 func (s *Store) GetCoverPhotoUploadTarget(ctx context.Context, syncID string) (blobstore.UploadTarget, error) {
-	return s.presignUpload(ctx, blobKey(syncID, coverPhotoEntryID))
+	return s.presignUpload(ctx, blobKey(syncID, coverPhotoEntryID), "")
 }
 
 // presignUpload signs a POST policy with a content-length-range condition
 // and a pinned Content-Type, so S3 itself rejects an oversized or
 // mistyped upload. Unlike Key, ContentType on PutObjectInput isn't picked
 // up by PresignPostObject on its own — both need adding explicitly.
-func (s *Store) presignUpload(ctx context.Context, key string) (blobstore.UploadTarget, error) {
+// The uploader rides in under a *signed* policy condition, so the client
+// must send back exactly the account the relay put there.
+func (s *Store) presignUpload(ctx context.Context, key, uploaderAccountID string) (blobstore.UploadTarget, error) {
+	conditions := []any{
+		[]any{"content-length-range", 1, s.maxBlobSize},
+		map[string]any{"Content-Type": blobContentType},
+	}
+	if uploaderAccountID != "" {
+		conditions = append(conditions, map[string]any{uploaderField: uploaderAccountID})
+	}
+
 	req, err := s.presignClient.PresignPostObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucketName),
 		Key:    aws.String(key),
 	}, func(o *s3.PresignPostOptions) {
 		o.Expires = uploadURLTTL
-		o.Conditions = []any{
-			[]any{"content-length-range", 1, s.maxBlobSize},
-			map[string]any{"Content-Type": blobContentType},
-		}
+		o.Conditions = conditions
 	})
 	if err != nil {
 		return blobstore.UploadTarget{}, err
 	}
 	req.Values["Content-Type"] = blobContentType
+	if uploaderAccountID != "" {
+		req.Values[uploaderField] = uploaderAccountID
+	}
 	return blobstore.UploadTarget{URL: req.URL, Fields: req.Values}, nil
+}
+
+// UploaderAccountID reads back what presignUpload recorded.
+func (s *Store) UploaderAccountID(ctx context.Context, syncID, entryID string) (string, error) {
+	head, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucketName),
+		Key:    aws.String(blobKey(syncID, entryID)),
+	})
+	if err != nil {
+		var notFound *s3types.NotFound
+		if errors.As(err, &notFound) {
+			return "", blobstore.ErrBlobNotFound
+		}
+		return "", err
+	}
+	return head.Metadata[uploaderMetadataKey], nil
+}
+
+// DeleteObject reports success whether or not the key was there, which
+// is the idempotency the interface promises.
+func (s *Store) Delete(ctx context.Context, syncID, entryID string) error {
+	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(s.bucketName),
+		Key:    aws.String(blobKey(syncID, entryID)),
+	})
+	return err
 }
 
 func (s *Store) GetDownloadURL(ctx context.Context, syncID, entryID string) (string, error) {

@@ -191,3 +191,11 @@ func RotateMessage(syncID, entryID, newWriteTokenHash string) []byte {
 func CoverPhotoUploadMessage(syncID string) []byte {
 	return []byte("circle-relay/cover-photo-upload/v1\x00" + syncID)
 }
+
+// DeleteBlobMessage is the exact byte sequence an authority signature
+// must cover to delete a blob the admin did not upload themselves. Same
+// construction as the two above, bound to the entry so one signature
+// destroys one object rather than any blob in the circle.
+func DeleteBlobMessage(syncID, entryID string) []byte {
+	return []byte("circle-relay/delete-blob/v1\x00" + syncID + "\x00" + entryID)
+}

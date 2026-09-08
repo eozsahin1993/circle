@@ -8,9 +8,13 @@
 package testsupport
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
 	"sync"
 	"testing"
 	"time"
@@ -390,4 +394,49 @@ func createBucket(client *awss3.Client) error {
 		return err
 	}
 	return nil
+}
+
+// UploadBlob puts payload at a presigned POST target, the way a client
+// does. Fields must be written before the "file" part: S3 requires that
+// order and ignores anything after it.
+//
+// Lives here rather than in one package's _test.go because two packages
+// now need a blob that genuinely exists — one to read back the uploader
+// recorded on it, one to delete it.
+func UploadBlob(t testing.TB, target blobstore.UploadTarget, payload []byte) {
+	t.Helper()
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	for key, value := range target.Fields {
+		if err := writer.WriteField(key, value); err != nil {
+			t.Fatalf("WriteField(%s): %v", key, err)
+		}
+	}
+	part, err := writer.CreateFormFile("file", "blob")
+	if err != nil {
+		t.Fatalf("CreateFormFile: %v", err)
+	}
+	if _, err := part.Write(payload); err != nil {
+		t.Fatalf("write file part: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, target.URL, &body)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST upload: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		responseBody, _ := io.ReadAll(resp.Body)
+		t.Fatalf("upload failed: %d %s", resp.StatusCode, responseBody)
+	}
 }

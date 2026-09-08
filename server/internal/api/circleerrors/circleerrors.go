@@ -5,6 +5,7 @@ package circleerrors
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
 	"circle-relay/internal/storage/blobstore"
@@ -42,6 +43,10 @@ func Status(err error) (int, string) {
 		// blobstore.Store.GetUploadTarget's doc comment.
 		return http.StatusConflict, "a blob already exists for this entry"
 	default:
+		// The response can't carry the reason (it may name internals), and
+		// the request log only records the status — so an unmapped error is
+		// otherwise a 500 with no way to find out what happened.
+		log.Printf("unmapped error, returning 500: %v", err)
 		return http.StatusInternalServerError, "internal error"
 	}
 }

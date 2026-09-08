@@ -19,9 +19,11 @@ type Service struct {
 	LogStore  logstore.Store
 }
 
-func (s *Service) UploadTarget(ctx context.Context, syncID, entryID, writeToken string) (blobstore.UploadTarget, error) {
+// accountID rides onto the object so deleteblob can tell the uploader
+// from any other member — see blobstore.Store.GetUploadTarget.
+func (s *Service) UploadTarget(ctx context.Context, syncID, entryID, writeToken, accountID string) (blobstore.UploadTarget, error) {
 	if err := s.LogStore.VerifyWriteToken(ctx, syncID, writeToken); err != nil {
 		return blobstore.UploadTarget{}, err
 	}
-	return s.BlobStore.GetUploadTarget(ctx, syncID, entryID)
+	return s.BlobStore.GetUploadTarget(ctx, syncID, entryID, accountID)
 }

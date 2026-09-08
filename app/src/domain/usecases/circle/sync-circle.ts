@@ -1,9 +1,17 @@
 import { getCircle } from '@/data/db';
 import { EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { timed, timedSync } from '@/services/timing';
-import { getCurrentContentKey } from '@/services/keystore';
-import { deriveWriteToken, encrypt } from '@/services/crypto';
-import { appendEntry, BlobAlreadyExistsError, getUploadTarget, uploadBlob, type Namespace } from '@/services/relay';
+import { getCurrentContentKey, getMasterSeed } from '@/services/keystore';
+import { deriveAuthorityKeypair, deriveDeleteBlobMessage, deriveWriteToken, encrypt, sign } from '@/services/crypto';
+import {
+  appendEntry,
+  BlobAlreadyExistsError,
+  BlobDeleteRefusedError,
+  deleteBlob,
+  getUploadTarget,
+  uploadBlob,
+  type Namespace,
+} from '@/services/relay';
 import { getPendingOutboxEntries, markOutboxEntrySynced, type OutboxEntry } from '@/data/db';
 import { getAttachment } from '@/data/db/attachments';
 
@@ -89,6 +97,39 @@ export function drainOutbox(circleId: string): Promise<void> {
   return drain;
 }
 
+/**
+ * Deletes a blob whose entry has just landed, signing as an authority
+ * when this device has that key — the relay lets the uploading account
+ * through without one, and needs one from anybody else (see
+ * `deleteBlob`). Signing unconditionally costs nothing and saves knowing,
+ * at drain time, whether this device wrote the photo: the post's row is
+ * already gone by then.
+ *
+ * A refusal is logged and passed over rather than thrown. The bytes are
+ * cleanup; the entry is the truth, and it has already landed. Throwing
+ * would leave the row pending forever and block everything queued behind
+ * it, which is a much worse outcome than one blob outliving its post.
+ */
+async function deleteBlobFor(circleId: string, syncId: string, blobEntryId: string, writeToken: Uint8Array): Promise<void> {
+  const masterSeed = await getMasterSeed();
+  const authority = masterSeed
+    ? (() => {
+        const keypair = deriveAuthorityKeypair(masterSeed, circleId);
+        return {
+          publicKey: keypair.publicKey,
+          signature: sign(deriveDeleteBlobMessage(syncId, blobEntryId), keypair.secretKey),
+        };
+      })()
+    : undefined;
+
+  try {
+    await deleteBlob(syncId, blobEntryId, writeToken, authority);
+  } catch (err) {
+    if (!(err instanceof BlobDeleteRefusedError)) throw err;
+    console.error(`The relay refused to delete blob ${blobEntryId}`, err);
+  }
+}
+
 async function pushPendingEntries(circleId: string): Promise<void> {
   const circle = await getCircle(circleId);
   if (!circle) throw new Error('No local circle row for this id.');
@@ -123,6 +164,15 @@ async function pushPendingEntries(circleId: string): Promise<void> {
     }
 
     const { epoch } = await appendEntry(circle.syncId, namespace, entry.entryId, entry.encryptedMeta, current.version, writeToken);
+
+    // After the append, never before: the entry is what every device
+    // converges on, and bytes removed ahead of it would leave the photo
+    // missing with nothing in the log yet saying why. Idempotent on both
+    // sides, so a failure here just retries the whole row.
+    if (entry.blobEntryId) {
+      await deleteBlobFor(circleId, circle.syncId, entry.blobEntryId, writeToken);
+    }
+
     await markOutboxEntrySynced(entry.sequenceNum, epoch);
   }
 }

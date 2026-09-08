@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 
-import { db } from '@/data/db/connection';
+import { db, reopenDatabase } from '@/data/db/connection';
 import migrationsData from '@/data/db/migrations/migrations';
 
 /**
@@ -9,14 +9,21 @@ import migrationsData from '@/data/db/migrations/migrations';
  * invoking a mount effect twice in development. Only protects against two
  * calls within the same running JS instance; see the transaction below for
  * what actually protects the data itself.
+ *
+ * On `globalThis` for the same reason the connection is (see
+ * connection.ts): Fast Refresh re-evaluating this module would otherwise
+ * reset the memo and let a second batch start while the first is still
+ * inside `BEGIN IMMEDIATE` — exactly the case where a schema change is
+ * being reloaded into a running app.
  */
-let migrationsPromise: Promise<void> | null = null;
+declare global {
+  // eslint-disable-next-line no-var
+  var __hearthMigrations: Promise<void> | undefined;
+}
 
 export function runMigrations(): Promise<void> {
-  if (!migrationsPromise) {
-    migrationsPromise = runMigrationsOnce();
-  }
-  return migrationsPromise;
+  globalThis.__hearthMigrations ??= runMigrationsOnce();
+  return globalThis.__hearthMigrations;
 }
 
 // Not `__drizzle_migrations` — its schema and lookup logic are entirely
@@ -63,7 +70,18 @@ async function runMigrationsOnce(): Promise<void> {
   // database (e.g. an overlapping app instance from a Fast Refresh reload
   // or relaunch racing this one) fails immediately with "database is
   // locked" instead of waiting for this transaction to finish.
-  await db.run(sql`PRAGMA busy_timeout = 5000;`);
+  //
+  // Doubles as the liveness probe for the handle: a reload can destroy the
+  // native database under a JS runtime that survives it, and every
+  // statement then fails on a null native object. Reopening here is what
+  // makes that recoverable without relaunching the app.
+  try {
+    await db.run(sql`PRAGMA busy_timeout = 5000;`);
+  } catch (err) {
+    console.warn('Reopening the database — the handle did not survive a reload', err);
+    reopenDatabase();
+    await db.run(sql`PRAGMA busy_timeout = 5000;`);
+  }
   await db.run(sql`PRAGMA foreign_keys = ON;`);
   await db.run(sql`
     CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE} (

@@ -342,6 +342,7 @@ export const outbox = sqliteTable(
         'key_rotation',
         'cover_photo_set',
         'album_visibility',
+        'post_delete',
       ],
     }).notNull(),
     /**
@@ -377,6 +378,19 @@ export const outbox = sqliteTable(
      */
     status: text('status', { enum: ['pending', 'synced'] }).notNull(),
     epoch: integer('epoch'),
+    /**
+     * A blob this entry's push should delete once the entry itself has
+     * landed — the deleted post's id, for a `post_delete`. Null for
+     * everything else, which is nearly every row.
+     *
+     * Not `entryId`: a deletion is its own entry with its own id (the
+     * post's is already taken at the relay, where entryId is the
+     * idempotency key), so the blob's address has nowhere else to ride.
+     * Sitting on the outbox row is what makes the deletion retriable —
+     * it happens whenever the queue drains, which is what lets a photo
+     * be deleted offline.
+     */
+    blobEntryId: text('blob_entry_id'),
   },
   (t) => [index('outbox_circle_id').on(t.circleId)]
 );

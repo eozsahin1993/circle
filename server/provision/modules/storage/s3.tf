@@ -31,12 +31,16 @@ resource "aws_s3_bucket_cors_configuration" "circle_blobs" {
   }
 }
 
-# Blobs are never deleted — permanent retention, same as the log entries
-# that point to them (server/SYNC_DESIGN.md invariant 1). Affordable via
-# tiering, not eviction: after blob_glacier_transition_days, objects move
-# to Glacier Instant Retrieval — same millisecond-latency access as
-# Standard, ~6x cheaper per GB. Defaults to Glacier IR's own 90-day
-# minimum billable duration.
+# Blobs never expire on a timer — permanent retention, same as the log
+# entries that point to them (server/SYNC_DESIGN.md invariant 1).
+# Affordable via tiering, not eviction: after blob_glacier_transition_days,
+# objects move to Glacier Instant Retrieval — same millisecond-latency
+# access as Standard, ~6x cheaper per GB. Defaults to Glacier IR's own
+# 90-day minimum billable duration.
+#
+# They are deletable on request, which is a different thing from expiry:
+# deleting a photo removes its object then and there (see
+# internal/api/deleteblob), so nothing outlives the post it belonged to.
 resource "aws_s3_bucket_lifecycle_configuration" "circle_blobs" {
   bucket = aws_s3_bucket.circle_blobs.id
 

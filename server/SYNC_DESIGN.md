@@ -27,7 +27,14 @@ the architecture is wrong for it — not a signal to bend the rule.
    |---|---|
    | data plane (log entries) | **append-only, immutable** |
    | control plane (`#control`) | mutable current state |
-   | blob store | mutable in place (overwrite avatars/cover); never deleted |
+   | blob store | mutable in place (overwrite avatars/cover); deletable |
+
+   A blob is the one thing the relay will remove, and only on request
+   from the account that uploaded it or an admin who signs for it (see
+   internal/api/deleteblob). That does not soften the row above it: the
+   entries naming a deleted blob stay, immutable, so replay still
+   converges. Bytes are the part that carries storage cost and any
+   obligation to actually destroy content.
 
 3. **The relay enforces possession, never identity.** It is blind; it can
    check "you hold the current capability," never "you are an admin."

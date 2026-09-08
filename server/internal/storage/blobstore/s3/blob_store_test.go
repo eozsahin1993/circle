@@ -22,7 +22,7 @@ func TestGetUploadTarget_RefusesOnceABlobExists(t *testing.T) {
 	ctx := t.Context()
 	syncID := testsupport.UniqueSyncID(t)
 
-	retryTarget, err := store.GetUploadTarget(ctx, syncID, "entry-1")
+	retryTarget, err := store.GetUploadTarget(ctx, syncID, "entry-1", "google:uploader")
 	if err != nil {
 		t.Fatalf("expected a retry before any upload has succeeded to still work: %v", err)
 	}
@@ -30,7 +30,7 @@ func TestGetUploadTarget_RefusesOnceABlobExists(t *testing.T) {
 		t.Fatalf("upload failed: %d %s", status, body)
 	}
 
-	if _, err := store.GetUploadTarget(ctx, syncID, "entry-1"); !errors.Is(err, blobstore.ErrBlobAlreadyExists) {
+	if _, err := store.GetUploadTarget(ctx, syncID, "entry-1", "google:uploader"); !errors.Is(err, blobstore.ErrBlobAlreadyExists) {
 		t.Fatalf("expected ErrBlobAlreadyExists once a blob has actually landed, got %v", err)
 	}
 }
@@ -49,7 +49,7 @@ func TestGetUploadTarget_RoundTrip(t *testing.T) {
 	store := testsupport.NewBlobStore(t)
 	ctx := t.Context()
 
-	target, err := store.GetUploadTarget(ctx, testsupport.UniqueSyncID(t), "entry-1")
+	target, err := store.GetUploadTarget(ctx, testsupport.UniqueSyncID(t), "entry-1", "google:uploader")
 	if err != nil {
 		t.Fatalf("GetUploadTarget: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestGetUploadTarget_RejectsOversizedBlob(t *testing.T) {
 	store := testsupport.NewBlobStore(t)
 	ctx := t.Context()
 
-	target, err := store.GetUploadTarget(ctx, testsupport.UniqueSyncID(t), "entry-1")
+	target, err := store.GetUploadTarget(ctx, testsupport.UniqueSyncID(t), "entry-1", "google:uploader")
 	if err != nil {
 		t.Fatalf("GetUploadTarget: %v", err)
 	}

@@ -95,6 +95,7 @@ export async function createPost(input: CreatePostInput): Promise<void> {
     entryId: postId,
     status: OutboxStatuses.pending,
     epoch: null,
+    blobEntryId: null,
     encryptedMeta,
   };
 

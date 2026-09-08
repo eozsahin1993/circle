@@ -192,8 +192,8 @@ describe('getAlbumPhotos', () => {
     await insertPost(newer, makeAttachment(newer));
 
     await expect(getAlbumPhotos(circle.id)).resolves.toEqual([
-      { id: newer.id, createdAt: 2000 },
-      { id: older.id, createdAt: 1000 },
+      { id: newer.id, createdAt: 2000, photoStatus: 'fetched' },
+      { id: older.id, createdAt: 1000, photoStatus: 'fetched' },
     ]);
   });
 
@@ -208,12 +208,20 @@ describe('getAlbumPhotos', () => {
     expect(photos.map((photo) => photo.id)).toEqual([kept.id]);
   });
 
-  test('leaves out a photo still downloading — there is nothing to show yet', async () => {
+  /**
+   * Deliberately kept, not filtered: the grid holds its place with a
+   * placeholder. Dropping it made a partly-synced album look shorter than
+   * the circle's, which is indistinguishable from one that really has
+   * fewer photos.
+   */
+  test('keeps a photo still downloading, carrying its status', async () => {
     const circle = await makeCircle();
     const pending = makePost(circle.id);
     await insertPost(pending, { ...makeAttachment(pending), bytes: null, status: AttachmentStatuses.PENDING });
 
-    await expect(getAlbumPhotos(circle.id)).resolves.toEqual([]);
+    await expect(getAlbumPhotos(circle.id)).resolves.toEqual([
+      { id: pending.id, createdAt: pending.createdAt, photoStatus: 'pending' },
+    ]);
   });
 
   test("leaves out another circle's photos", async () => {

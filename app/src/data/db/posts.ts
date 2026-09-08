@@ -3,7 +3,7 @@ import { and, desc, eq, gt, isNull, ne, or } from 'drizzle-orm';
 import { type Attachment, type NewAttachment } from '@/data/db/attachments';
 import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
-import { attachments, circleMembers, outbox, postComments, posts } from '@/data/db/schema';
+import { attachments, circleMembers, outbox, postComments, postReactions, posts } from '@/data/db/schema';
 import type { NewOutboxEntry } from '@/data/db/outbox';
 
 export type Post = typeof posts.$inferSelect;
@@ -162,10 +162,11 @@ export async function markPostViewed(id: string): Promise<void> {
   await db.update(posts).set({ lastViewedAt: Date.now() }).where(eq(posts.id, id));
 }
 
-/** One photo in the album grid — id and date only; the pixels come from the photo cache by id. */
+/** One photo in the album grid — id, date and download state; the pixels come from the photo cache by id. */
 export type AlbumPhoto = {
   id: string;
   createdAt: number;
+  photoStatus: Attachment['status'];
 };
 
 /**
@@ -175,15 +176,17 @@ export type AlbumPhoto = {
  * doc comment on what pulling blobs through this driver costs. The grid
  * resolves each one through the photo cache instead, same as the feed.
  *
- * Inner-joined on a `fetched` attachment because a photo still downloading
- * has nothing to show yet; it appears once its bytes land.
+ * Includes photos whose bytes haven't landed, carrying the attachment's
+ * status so the grid can hold their place — filtering them out here made a
+ * partly-synced album quietly shorter than the circle's, with no way to
+ * tell that from an album that really has fewer photos in it.
  */
 export async function getAlbumPhotos(circleId: string): Promise<AlbumPhoto[]> {
   return db
-    .select({ id: posts.id, createdAt: posts.createdAt })
+    .select({ id: posts.id, createdAt: posts.createdAt, photoStatus: attachments.status })
     .from(posts)
     .innerJoin(attachments, and(eq(attachments.circleId, posts.circleId), eq(attachments.entryId, posts.id)))
-    .where(and(eq(posts.circleId, circleId), eq(posts.inAlbum, true), eq(attachments.status, 'fetched')))
+    .where(and(eq(posts.circleId, circleId), eq(posts.inAlbum, true)))
     .orderBy(desc(posts.createdAt));
 }
 
@@ -208,6 +211,54 @@ export async function setPostInAlbumAndEnqueue(
 /** Adds or removes a post from the album locally — the sync path's half of the above. */
 export async function setPostInAlbum(id: string, inAlbum: boolean): Promise<void> {
   await db.update(posts).set({ inAlbum }).where(eq(posts.id, id));
+}
+
+/**
+ * Removes a post and everything derived from it.
+ *
+ * Children go explicitly, child-first, rather than by foreign-key cascade
+ * — same choice `resetAllLocalData` makes. `PRAGMA foreign_keys` is a
+ * per-connection setting SQLite defaults to *off*, so cascade only fires
+ * where something has turned it on for that exact connection; a path that
+ * reaches this before `runMigrations` has, or a future second connection,
+ * would silently orphan every comment and reaction instead of failing.
+ * Two extra statements inside the transaction cost nothing and don't
+ * depend on runtime state.
+ *
+ * The attachment has no foreign key at all — it's addressed by (circleId,
+ * entryId) so a blob can exist before its post — and its row must go or
+ * the download queue keeps chasing bytes for a post that isn't there.
+ *
+ * Removes nothing at the relay: the log is append-only, so a deletion is
+ * an entry every device applies (see post-delete.ts). The blob is a
+ * separate, explicit call — see `deletePost`.
+ */
+export async function deletePostLocally(circleId: string, id: string): Promise<void> {
+  db.transaction((tx) => {
+    tx.delete(postComments).where(eq(postComments.postId, id)).run();
+    tx.delete(postReactions).where(eq(postReactions.postId, id)).run();
+    tx.delete(attachments)
+      .where(and(eq(attachments.circleId, circleId), eq(attachments.entryId, id)))
+      .run();
+    tx.delete(posts).where(eq(posts.id, id)).run();
+  });
+}
+
+/** Deletes a post here and queues the deletion for every other device, atomically — same reasoning as `setPostInAlbumAndEnqueue`. */
+export async function deletePostAndEnqueue(
+  circleId: string,
+  id: string,
+  outboxEntry: NewOutboxEntry
+): Promise<void> {
+  db.transaction((tx) => {
+    tx.delete(postComments).where(eq(postComments.postId, id)).run();
+    tx.delete(postReactions).where(eq(postReactions.postId, id)).run();
+    tx.delete(attachments)
+      .where(and(eq(attachments.circleId, circleId), eq(attachments.entryId, id)))
+      .run();
+    tx.delete(posts).where(eq(posts.id, id)).run();
+    tx.insert(outbox).values(outboxEntry).run();
+  });
 }
 
 /**

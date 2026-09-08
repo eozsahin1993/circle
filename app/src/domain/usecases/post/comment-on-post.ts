@@ -52,6 +52,7 @@ export async function addComment(circleId: string, postId: string, body: string)
     entryId: commentId,
     status: OutboxStatuses.pending,
     epoch: null,
+    blobEntryId: null,
     encryptedMeta,
   };
 

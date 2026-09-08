@@ -1,7 +1,8 @@
 import { Buffer } from 'buffer';
+import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { File, Paths, UploadType } from 'expo-file-system';
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { generateUUID } from '@/services/crypto';
@@ -49,6 +50,19 @@ export class BlobAlreadyExistsError extends Error {
   }
 }
 
+/**
+ * Thrown when the relay refuses to delete a blob (403): this device
+ * neither uploaded it nor holds an admin key the circle recognises. A
+ * permanent refusal, not a transient one — see `deleteBlobFor`, which
+ * gives up on the bytes rather than blocking the queue behind it.
+ */
+export class BlobDeleteRefusedError extends Error {
+  constructor(detail: string) {
+    super(detail);
+    this.name = 'BlobDeleteRefusedError';
+  }
+}
+
 /** Thrown on HTTP 429 (see server/internal/api/ratelimit) — not handled specially, just identifiable in logs. Callers already retry any thrown error later (outbox, pullMeta, photo-queue.ts), and the budget is sized to make this rare. */
 export class RateLimitedError extends Error {
   constructor() {
@@ -57,21 +71,51 @@ export class RateLimitedError extends Error {
   }
 }
 
+const DEV_RELAY_PORT = process.env.EXPO_PUBLIC_RELAY_PORT ?? '8090';
+
+/**
+ * The dev machine's address, from whichever dev-only source reports it:
+ * `hostUri` is the documented one but is undefined on some dev clients,
+ * and `scriptURL` is where the bundle itself came from. Reading
+ * `SourceCode` throws where the module isn't registered. Null in a
+ * release build, which has no dev server to ask.
+ */
+function devHost(): string | null {
+  try {
+    const scriptUrl = NativeModules.SourceCode?.getConstants?.()?.scriptURL as string | undefined;
+    return Constants.expoConfig?.hostUri?.split(':')[0] ?? scriptUrl?.match(/^https?:\/\/([^/:]+)/)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Logged once per address: "could not connect" is unreadable without knowing what was dialled. */
+let announced: string | null = null;
+
+/**
+ * The dev machine on `EXPO_PUBLIC_RELAY_PORT` while a packager is
+ * serving, else `EXPO_PUBLIC_RELAY_URL`. Inferring the address is what
+ * keeps a new DHCP lease from silently breaking every request — the port
+ * is configuration, the address isn't.
+ *
+ * The Android emulator can't reach the host as `localhost` (that resolves
+ * to the emulator); 10.0.2.2 is its alias for the host's loopback. Never
+ * applied on a real phone, where 10.0.2.2 is unroutable and every call
+ * would hang ~20s before the kernel gave up.
+ */
 function baseUrl(): string {
-  const url = process.env.EXPO_PUBLIC_RELAY_URL;
-  if (!url) throw new Error('EXPO_PUBLIC_RELAY_URL is not set.');
-  // The Android emulator can't reach the host machine via `localhost` — that
-  // resolves to the emulator itself, not the Mac running the relay. 10.0.2.2
-  // is the emulator's alias for the host's loopback interface.
-  //
-  // Gated on `!Device.isDevice` because that alias means nothing on a real
-  // phone: 10.0.2.2 is simply unroutable on a LAN, so the rewrite turns
-  // every relay call into a TCP connect that hangs for ~20s before the
-  // kernel gives up, rather than failing fast. A physical device needs the
-  // host's real LAN IP in EXPO_PUBLIC_RELAY_URL, so leave the URL alone and
-  // let a wrong one fail immediately and visibly.
-  if (Platform.OS === 'android' && !Device.isDevice) {
-    return url.replace('//localhost', '//10.0.2.2').replace('//127.0.0.1', '//10.0.2.2');
+  const host = __DEV__ ? devHost() : null;
+  const configured = host ? `http://${host}:${DEV_RELAY_PORT}` : process.env.EXPO_PUBLIC_RELAY_URL;
+  if (!configured) throw new Error('EXPO_PUBLIC_RELAY_URL is not set.');
+
+  const url =
+    Platform.OS === 'android' && !Device.isDevice
+      ? configured.replace('//localhost', '//10.0.2.2').replace('//127.0.0.1', '//10.0.2.2')
+      : configured;
+
+  if (__DEV__ && url !== announced) {
+    announced = url;
+    console.log(`Relay: ${url}`);
   }
   return url;
 }
@@ -320,6 +364,49 @@ export async function getCoverPhotoUploadTarget(
     throw new Error(await describeError(response, 'Failed to get cover-photo upload target'));
   }
   return response.json();
+}
+
+/**
+ * Deletes one entry's ciphertext — POST
+ * /v1/circles/{syncId}/entries/{entryId}/delete-blob. The only relay call
+ * that removes anything, and it removes bytes only: the entries naming
+ * this blob stay in the log, immutable, so replay still converges.
+ *
+ * Gated on being the account that uploaded it, which the relay recorded
+ * at upload time. An admin deleting someone else's photo isn't that
+ * account, so they pass `authorityPublicKey` + a signature over
+ * `deriveDeleteBlobMessage(syncId, entryId)` instead — the relay can't
+ * check the clients' author-or-admin rule itself, since the author's key
+ * is inside the ciphertext.
+ *
+ * Idempotent: deleting what's already gone succeeds, which is what makes
+ * the outbox safe to retry this from.
+ */
+export async function deleteBlob(
+  syncId: string,
+  entryId: string,
+  writeToken: Uint8Array,
+  authority?: { publicKey: Uint8Array; signature: Uint8Array }
+): Promise<void> {
+  const response = await authorizedFetch(`/v1/circles/${syncId}/entries/${entryId}/delete-blob`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      writeToken: bytesToHex(writeToken),
+      ...(authority
+        ? {
+            authorityPublicKey: bytesToHex(authority.publicKey),
+            signature: bytesToHex(authority.signature),
+          }
+        : {}),
+    }),
+  });
+  if (response.status === 403) {
+    throw new BlobDeleteRefusedError(await describeError(response, 'The relay refused to delete this blob'));
+  }
+  if (!response.ok) {
+    throw new Error(await describeError(response, 'Failed to delete blob'));
+  }
 }
 
 /**

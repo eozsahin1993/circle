@@ -11,11 +11,14 @@ jest.mock('expo-file-system', () => ({
   UploadType: { MULTIPART: 1, BINARY_CONTENT: 0 },
 }));
 
+jest.mock('expo-constants', () => ({ __esModule: true, default: { expoConfig: {} } }));
+
 const mockGetAuthToken = jest.fn();
 jest.mock('@/services/keystore', () => ({
   getAuthToken: () => mockGetAuthToken(),
 }));
 
+import Constants from 'expo-constants';
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import {
@@ -44,6 +47,36 @@ beforeEach(() => {
   global.fetch = jest.fn();
   jest.clearAllMocks();
   mockGetAuthToken.mockResolvedValue(AUTH_TOKEN);
+});
+
+/**
+ * The address is inferred, not configured: a dev machine's LAN IP changes
+ * with its DHCP lease, and every request would otherwise go to whatever
+ * address was last written into .env.
+ */
+describe('the relay address in development', () => {
+  afterEach(() => {
+    delete (Constants.expoConfig as { hostUri?: string }).hostUri;
+    delete process.env.EXPO_PUBLIC_RELAY_PORT;
+  });
+
+  test('follows the dev server, keeping the configured relay port', async () => {
+    (Constants.expoConfig as { hostUri?: string }).hostUri = '192.168.0.126:8081';
+    process.env.EXPO_PUBLIC_RELAY_PORT = '8090';
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}));
+
+    await getManifest();
+
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe('http://192.168.0.126:8090/v1/account/manifest');
+  });
+
+  test('falls back to the configured URL when there is no dev server to ask', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}));
+
+    await getManifest();
+
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe(`${RELAY_URL}/v1/account/manifest`);
+  });
 });
 
 function jsonResponse(body: unknown, ok = true, status = 200) {

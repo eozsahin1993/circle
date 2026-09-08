@@ -1,0 +1,1 @@
+ALTER TABLE `outbox` ADD `blob_entry_id` text;

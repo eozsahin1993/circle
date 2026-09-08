@@ -37,6 +37,12 @@ export function writePhotoFile(circleId: string, entryId: string, bytes: Uint8Ar
   return file.uri;
 }
 
+/** Drops a cached photo. Safe to call for one that was never written — the cache is derived, so a miss is not an error. */
+export function deletePhotoFile(circleId: string, entryId: string): void {
+  const file = photoFile(circleId, entryId);
+  if (file.exists) file.delete();
+}
+
 /**
  * A circle's cover, which is cached exactly like a post photo — it sits at
  * the fixed `COVER_ENTRY_ID` the relay reserves for it, so it can't

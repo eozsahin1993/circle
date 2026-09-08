@@ -36,6 +36,7 @@ export async function setMemberRole(circleId: string, identityPublicKey: string,
     entryId: generateUUID(),
     status: OutboxStatuses.pending,
     epoch: null,
+    blobEntryId: null,
     encryptedMeta: entry,
   });
 

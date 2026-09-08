@@ -5,12 +5,21 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { decrypt, generateUUID, hashBytes } from '@/services/crypto';
 import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
 import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
-import { appendEntry, BlobAlreadyExistsError, bootstrapCircle, getUploadTarget, uploadBlob } from '@/services/relay';
+import {
+  appendEntry,
+  BlobAlreadyExistsError,
+  BlobDeleteRefusedError,
+  bootstrapCircle,
+  deleteBlob,
+  getUploadTarget,
+  uploadBlob,
+} from '@/services/relay';
 import {
   AttachmentKinds,
   AttachmentStatuses,
   getPendingOutboxEntries,
   initDatabase,
+  insertOutboxEntry,
   insertPostAndEnqueue,
   OutboxStatuses,
   type Post,
@@ -59,6 +68,7 @@ async function enqueuePost(circleId: string, photo: Uint8Array): Promise<Post> {
       entryId: postId,
       status: OutboxStatuses.pending,
       epoch: null,
+      blobEntryId: null,
       encryptedMeta,
     }
   );
@@ -218,4 +228,82 @@ test('an entry queued while a drain is running still gets pushed by it', async (
 
   expect((appendEntry as jest.Mock).mock.calls).toHaveLength(2);
   expect(await getPendingOutboxEntries(circleId)).toHaveLength(0);
+});
+
+describe('an entry that carries a blob to delete', () => {
+  /**
+   * `post_delete` names the photo whose bytes should go, and the drain is
+   * what actually removes them — which is what lets a photo be deleted
+   * offline and cleaned up whenever the queue next runs.
+   */
+  async function enqueueDeletion(circleId: string, postId: string) {
+    const identity = (await getCircleIdentity(circleId))!;
+    const current = (await getCurrentContentKey(circleId))!;
+    await insertOutboxEntry({
+      circleId,
+      entryType: 'post_delete',
+      entryId: generateUUID(),
+      status: OutboxStatuses.pending,
+      epoch: null,
+      blobEntryId: postId,
+      encryptedMeta: buildAndEncryptLogEntry(
+        'post_delete',
+        { postId, createdAt: Date.now() },
+        identity,
+        current.key
+      ),
+    });
+  }
+
+  test('deletes the blob after the entry lands, then marks it synced', async () => {
+    const { circleId } = await makeCircle();
+    const postId = generateUUID();
+    await enqueueDeletion(circleId, postId);
+    (deleteBlob as jest.Mock).mockResolvedValue(undefined);
+
+    await drainOutbox(circleId);
+
+    expect(appendEntry as jest.Mock).toHaveBeenCalled();
+    expect((deleteBlob as jest.Mock).mock.calls[0][1]).toBe(postId);
+    expect(
+      (appendEntry as jest.Mock).mock.invocationCallOrder[0]
+    ).toBeLessThan((deleteBlob as jest.Mock).mock.invocationCallOrder[0]);
+    expect(await getPendingOutboxEntries(circleId)).toHaveLength(0);
+  });
+
+  /** A transient failure must not lose the deletion — the row stays queued and the whole push retries. */
+  test('a failed delete leaves the entry pending', async () => {
+    const { circleId } = await makeCircle();
+    await enqueueDeletion(circleId, generateUUID());
+    (deleteBlob as jest.Mock).mockRejectedValue(new Error('offline'));
+
+    await expect(drainOutbox(circleId)).rejects.toThrow('offline');
+
+    expect(await getPendingOutboxEntries(circleId)).toHaveLength(1);
+  });
+
+  /**
+   * A refusal is permanent, so retrying forever would wedge everything
+   * queued behind it — the entry is the truth and has already landed.
+   */
+  test('a refused delete is passed over rather than blocking the queue', async () => {
+    const { circleId } = await makeCircle();
+    await enqueueDeletion(circleId, generateUUID());
+    (deleteBlob as jest.Mock).mockRejectedValue(new BlobDeleteRefusedError('not the uploader'));
+
+    await drainOutbox(circleId);
+
+    expect(await getPendingOutboxEntries(circleId)).toHaveLength(0);
+  });
+
+  test('an ordinary post deletes nothing', async () => {
+    const { circleId } = await makeCircle();
+    await enqueuePost(circleId, new Uint8Array([1, 1, 1]));
+    (getUploadTarget as jest.Mock).mockResolvedValue({ url: 'https://s3', fields: {} });
+    (uploadBlob as jest.Mock).mockResolvedValue(undefined);
+
+    await drainOutbox(circleId);
+
+    expect(deleteBlob as jest.Mock).not.toHaveBeenCalled();
+  });
 });

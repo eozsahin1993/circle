@@ -46,6 +46,7 @@ export async function broadcastProfileUpdate(name: string, picture: Uint8Array |
         entryId: generateUUID(),
         status: OutboxStatuses.pending,
         epoch: null,
+        blobEntryId: null,
         encryptedMeta: entry,
       });
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"circle-relay/internal/api/auth"
 	"circle-relay/internal/api/circleerrors"
 	"circle-relay/internal/httputil"
 )
@@ -45,7 +46,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	target, err := h.Service.UploadTarget(r.Context(), syncID, entryID, req.WriteToken)
+	target, err := h.Service.UploadTarget(r.Context(), syncID, entryID, req.WriteToken, auth.AccountID(r.Context()))
 	if err != nil {
 		status, message := circleerrors.Status(err) // covers both a logstore write-token rejection and blobstore.ErrBlobAlreadyExists
 		httputil.WriteError(w, status, message)

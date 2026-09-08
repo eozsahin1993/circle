@@ -57,6 +57,7 @@ export async function setAlbumVisibility(circleId: string, postId: string, inAlb
     entryId: generateUUID(),
     status: OutboxStatuses.pending,
     epoch: null,
+    blobEntryId: null,
     encryptedMeta: buildAndEncryptLogEntry(
       EntryTypes.ALBUM_VISIBILITY,
       { postId, inAlbum, createdAt },

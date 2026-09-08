@@ -1,22 +1,23 @@
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { bytesToHex } from '@noble/curves/utils.js';
 import { Image } from 'expo-image';
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ActionSheet } from '@/components/action-sheet';
 import { Avatar } from '@/components/avatar';
 import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { FabButton } from '@/components/fab-button';
 import { HeaderIconButton } from '@/components/header-icon-button';
-import { PhotoPlaceholder } from '@/components/photo-placeholder';
+import { missingPhotoFor, PhotoPlaceholder } from '@/components/photo-placeholder';
 import { ReactionChip } from '@/components/reaction-chip';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Icons, PhotoAspect, Spacing } from '@/constants/theme';
+import { FilledIcons, Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
 import {
   getAttachment,
   getCircleSummary,
@@ -31,13 +32,14 @@ import {
 } from '@/data/db';
 import { isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
 import { addComment } from '@/domain/usecases/post/comment-on-post';
+import { deletePost } from '@/domain/usecases/post/delete-post';
 import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
 import { setAlbumVisibility } from '@/domain/usecases/post/set-album-visibility';
 import { useTheme } from '@/hooks/use-theme';
 import { bytesToDataUri } from '@/services/image';
 import { getCircleIdentity } from '@/services/keystore';
 import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
-import { formatRelative, formatTimestamp } from '@/utils/time';
+import { formatDay, formatRelative, formatTimestamp } from '@/utils/time';
 
 /** Names shown before the rest become "& N others" — enough to recognise who, not a roster dump. */
 const PREVIEW_NAMES = 3;
@@ -64,8 +66,11 @@ export default function PostDetailsScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [showAllReactors, setShowAllReactors] = useState(false);
   const [commentText, setCommentText] = useState('');
-  /** The author or an admin, and nobody else — see set-album-visibility.ts. */
-  const [canEditAlbum, setCanEditAlbum] = useState(false);
+  const [showActions, setShowActions] = useState(false);
+  /** The author or an admin, and nobody else — the rule both `setAlbumVisibility` and `deletePost` enforce. */
+  const [canEditPost, setCanEditPost] = useState(false);
+  /** Which of the two it is, so the sheet can say why deleting is offered. */
+  const [ownPost, setOwnPost] = useState(false);
 
   const load = useCallback(async () => {
     if (!circleId || !postId) return;
@@ -87,7 +92,9 @@ export default function PostDetailsScreen() {
     setReactions(reactionSummary);
     setReactors(details);
     setComments(postComments);
-    setCanEditAlbum(isAdmin || (identity != null && bytesToHex(identity.publicKey) === feedPost?.authorPublicKey));
+    const mine = identity != null && bytesToHex(identity.publicKey) === feedPost?.authorPublicKey;
+    setOwnPost(mine);
+    setCanEditPost(mine || isAdmin);
 
     if (feedPost?.hasPhoto) {
       let uri = ensurePhotoUri(circleId, postId, () => null);
@@ -139,6 +146,31 @@ export default function PostDetailsScreen() {
     }
   }
 
+  /**
+   * Confirms first, because this is for everyone and there is no undo —
+   * the same weight `removeMember` carries on the details screen. Leaves
+   * the screen on success: what it was showing no longer exists.
+   */
+  function handleDelete() {
+    if (!circleId || !postId) return;
+
+    Alert.alert('Delete this photo?', 'It will disappear for everyone in the circle. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          deletePost(circleId, postId)
+            .then(() => router.back())
+            .catch((err) => {
+              console.error('Failed to delete the post', err);
+              Alert.alert('Could not delete', 'The photo is still there. Try again in a moment.');
+            });
+        },
+      },
+    ]);
+  }
+
   async function handleSubmitComment() {
     if (!circleId || !postId || !commentText.trim()) return;
     const body = commentText;
@@ -154,16 +186,25 @@ export default function PostDetailsScreen() {
           <ScreenHeader
             title={circleName}
             actions={
-              // Filing a photo is about the post as a whole, so it sits in
-              // the header rather than among the chips, which are each
-              // about one emoji. Only whoever may change it sees it.
-              post && canEditAlbum ? (
-                <HeaderIconButton
-                  icon={Icons.inAlbum}
-                  active={post.inAlbum}
-                  accessibilityLabel={post.inAlbum ? 'Remove from album' : 'Add to album'}
-                  onPress={handleToggleAlbum}
-                />
+              // Both are about the post as a whole, so they sit in the
+              // header rather than among the chips, which are each about
+              // one emoji. Both carry the same rule — the photo's author
+              // or an admin — so they appear and disappear together.
+              canEditPost && post ? (
+                <>
+                  <HeaderIconButton
+                    icon={Icons.inAlbum}
+                    activeIcon={FilledIcons.inAlbum}
+                    active={post.inAlbum}
+                    accessibilityLabel={post.inAlbum ? 'Remove from album' : 'Add to album'}
+                    onPress={handleToggleAlbum}
+                  />
+                  <HeaderIconButton
+                    icon={Icons.more}
+                    accessibilityLabel="More"
+                    onPress={() => setShowActions(true)}
+                  />
+                </>
               ) : null
             }
           />
@@ -174,7 +215,7 @@ export default function PostDetailsScreen() {
             {photoUri ? (
               <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />
             ) : (
-              <PhotoPlaceholder style={styles.photo} />
+              <PhotoPlaceholder style={styles.photo} missing={missingPhotoFor(post?.photoStatus)} />
             )}
 
             {post ? (
@@ -197,7 +238,7 @@ export default function PostDetailsScreen() {
                       <ThemedText type="meta" themeColor="muted">
                         ·
                       </ThemedText>
-                      <Feather name={Icons.inAlbum} size={12} color={theme.accent} />
+                      <Ionicons name={FilledIcons.inAlbum} size={12} color={theme.accent} />
                       <ThemedText type="meta" themeColor="accent">
                         Album
                       </ThemedText>
@@ -223,7 +264,7 @@ export default function PostDetailsScreen() {
               {reactions.length > 0 ? (
                 <ReactionChip label="+" accessibilityLabel="Add a reaction" onPress={() => setShowPicker((v) => !v)} />
               ) : (
-                <ReactionChip icon={Icons.add} label="React" onPress={() => setShowPicker((v) => !v)} />
+                <ReactionChip icon={Icons.react} label="React" onPress={() => setShowPicker((v) => !v)} />
               )}
             </View>
 
@@ -296,6 +337,27 @@ export default function PostDetailsScreen() {
           </View>
         </KeyboardAvoider>
       </SafeAreaView>
+
+      {/* Says which photo it's about, since it covers the one behind it,
+          and why the reader is allowed to delete it at all — the rule is
+          otherwise invisible. */}
+      <ActionSheet
+        visible={showActions}
+        onClose={() => setShowActions(false)}
+        title={post?.authorName ? `${post.authorName}’s photo` : 'This photo'}
+        subtitle={post ? `${formatDay(post.createdAt)} · ${circleName}` : undefined}
+        avatarUri={photoUri}
+        avatarRadius={Radius.input}
+        options={[
+          {
+            label: 'Delete this photo',
+            description: ownPost ? 'It’s yours to take back.' : 'You are an admin of this circle.',
+            icon: Icons.deletePost,
+            destructive: true,
+            onPress: handleDelete,
+          },
+        ]}
+      />
     </ThemedView>
   );
 }
