@@ -15,6 +15,8 @@ export type ActionSheetOption = {
   onPress: () => void;
   /** Feather icon name shown to the left of the label — see feather.dev for the full set. */
   icon: keyof typeof Feather.glyphMap;
+  /** A line under the label: what the action will actually do, or why it's offered at all. */
+  description?: string;
   /** Renders the icon and label in the danger color — for a destructive action like removing someone. */
   destructive?: boolean;
 };
@@ -24,8 +26,12 @@ export type ActionSheetProps = {
   onClose: () => void;
   /** Shown above the option rows — the row this sheet was opened from, e.g. a member's name. */
   title?: string;
+  /** A second line under `title`, naming which one: a date and a circle, say. */
+  subtitle?: string;
   /** Shown next to `title`, e.g. the member's avatar — omit for a plain text-only header. */
   avatarUri?: string;
+  /** Squares off that image, for a sheet about a photograph rather than a person. */
+  avatarRadius?: number;
   options: ActionSheetOption[];
 };
 
@@ -43,7 +49,15 @@ const SLIDE_DISTANCE = Dimensions.get('window').height;
  * cards); Cancel is a separate, ordinary `SecondaryButton` below it,
  * rather than folded into the list as one more row.
  */
-export function ActionSheet({ visible, onClose, title, avatarUri, options }: ActionSheetProps) {
+export function ActionSheet({
+  visible,
+  onClose,
+  title,
+  subtitle,
+  avatarUri,
+  avatarRadius,
+  options,
+}: ActionSheetProps) {
   const theme = useTheme();
   // Same not-yet-visible-but-still-mounted trick as PrivacyInfoModal —
   // needed so the closing slide-down animation has something to animate.
@@ -85,10 +99,17 @@ export function ActionSheet({ visible, onClose, title, avatarUri, options }: Act
 
             {title ? (
               <View style={styles.header}>
-                <Avatar size={36} uri={avatarUri} />
-                <ThemedText type="postAuthor" numberOfLines={1} style={styles.headerTitle}>
-                  {title}
-                </ThemedText>
+                <Avatar size={44} uri={avatarUri} radius={avatarRadius} />
+                <View style={styles.headerTitle}>
+                  <ThemedText type="cardTitle" numberOfLines={1}>
+                    {title}
+                  </ThemedText>
+                  {subtitle ? (
+                    <ThemedText type="meta" themeColor="muted" numberOfLines={1}>
+                      {subtitle}
+                    </ThemedText>
+                  ) : null}
+                </View>
               </View>
             ) : null}
 
@@ -102,10 +123,23 @@ export function ActionSheet({ visible, onClose, title, avatarUri, options }: Act
                     pressed && styles.rowPressed,
                   ]}
                   onPress={() => select(option.onPress)}>
-                  <Feather name={option.icon} size={19} color={option.destructive ? theme.danger : theme.accentBright} />
-                  <ThemedText type="postAuthor" themeColor={option.destructive ? 'danger' : 'text'}>
-                    {option.label}
-                  </ThemedText>
+                  <View style={[styles.rowIcon, option.destructive ? styles.rowIconDestructive : null]}>
+                    <Feather
+                      name={option.icon}
+                      size={18}
+                      color={option.destructive ? theme.danger : theme.accentBright}
+                    />
+                  </View>
+                  <View style={styles.rowText}>
+                    <ThemedText type="postAuthor" themeColor={option.destructive ? 'danger' : 'text'}>
+                      {option.label}
+                    </ThemedText>
+                    {option.description ? (
+                      <ThemedText type="meta" themeColor="muted">
+                        {option.description}
+                      </ThemedText>
+                    ) : null}
+                  </View>
                 </Pressable>
               ))}
             </ThemedView>
@@ -179,6 +213,21 @@ const styles = StyleSheet.create({
   },
   rowPressed: {
     backgroundColor: Tints.chipIdleBg,
+  },
+  rowIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Tints.chipIdleBg,
+  },
+  rowIconDestructive: {
+    backgroundColor: Tints.dangerWashBg,
+  },
+  rowText: {
+    flex: 1,
+    gap: 2,
   },
   cancelButton: {
     alignSelf: 'stretch',

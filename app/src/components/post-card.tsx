@@ -1,16 +1,16 @@
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { type CommentItem, PostComments } from '@/components/post-comments';
-import { PhotoPlaceholder } from '@/components/photo-placeholder';
+import { PhotoPlaceholder, type MissingPhoto } from '@/components/photo-placeholder';
 import { ReactionChip } from '@/components/reaction-chip';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
+import { Colors, FilledIcons, Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type Reaction = {
@@ -27,6 +27,8 @@ export type Post = {
   timestamp: string;
   /** Data URI of the actual photo, when it's known — otherwise the hatch placeholder shows. */
   photoUri?: string;
+  /** Why there's no photo yet, when there isn't one — see `PhotoPlaceholder`. */
+  missingPhoto?: MissingPhoto;
   photoLabel?: string;
   caption: string;
   reactions: Reaction[];
@@ -124,7 +126,7 @@ export function PostCard({
                 <ThemedText type="meta" themeColor="muted">
                   ·
                 </ThemedText>
-                <Feather name={Icons.inAlbum} size={12} color={theme.accent} />
+                <Ionicons name={FilledIcons.inAlbum} size={12} color={theme.accent} />
                 <ThemedText type="meta" themeColor="accent">
                   Album
                 </ThemedText>
@@ -138,7 +140,7 @@ export function PostCard({
         {post.photoUri ? (
           <Image source={{ uri: post.photoUri }} style={styles.photo} contentFit="cover" />
         ) : (
-          <PhotoPlaceholder style={styles.photo} />
+          <PhotoPlaceholder style={styles.photo} missing={post.missingPhoto} />
         )}
         {post.photoLabel ? (
           <ThemedText type="eyebrow" style={styles.photoLabel}>
@@ -177,7 +179,7 @@ export function PostCard({
             onPress={() => setShowPicker((v) => !v)}
           />
         ) : (
-          <ReactionChip icon={Icons.add} label="React" onPress={() => setShowPicker((v) => !v)} />
+          <ReactionChip icon={Icons.react} label="React" onPress={() => setShowPicker((v) => !v)} />
         )}
 
         <View style={styles.commentsChipWrap}>

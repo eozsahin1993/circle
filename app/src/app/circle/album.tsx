@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { missingPhotoFor, PhotoPlaceholder } from '@/components/photo-placeholder';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -14,7 +15,7 @@ import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
 /** Photos per row. Four fits a month on a screen without shrinking faces past recognising. */
 const COLUMNS = 4;
 
-type AlbumItem = AlbumPhoto & { uri: string };
+type AlbumItem = AlbumPhoto & { uri: string | null };
 
 /**
  * A month header, then that month's photos in rows of `COLUMNS`.
@@ -69,10 +70,14 @@ function buildRows(photos: AlbumItem[]): AlbumRow[] {
 }
 
 /**
- * Resolves each photo to a cached `file://` path, dropping any whose bytes
- * have since gone missing. Only a photo whose file isn't cached costs a
- * read of its bytes — the cache is derived, so a cleared cache directory
- * costs one rewrite rather than losing the photo (see photo-cache.ts).
+ * Resolves each photo to a cached `file://` path, keeping the ones whose
+ * bytes haven't arrived as a null uri rather than dropping them. Dropping
+ * them made a partly-synced album silently shorter than the circle's, with
+ * nothing to say a photo was missing at all.
+ *
+ * Only a photo whose file isn't cached costs a read of its bytes — the
+ * cache is derived, so a cleared cache directory costs one rewrite rather
+ * than losing the photo (see photo-cache.ts).
  */
 async function resolvePhotos(circleId: string, photos: AlbumPhoto[]): Promise<AlbumItem[]> {
   const resolved: AlbumItem[] = [];
@@ -83,7 +88,7 @@ async function resolvePhotos(circleId: string, photos: AlbumPhoto[]): Promise<Al
       const attachment = await getAttachment(circleId, photo.id);
       if (attachment?.bytes) uri = writePhotoFile(circleId, photo.id, attachment.bytes);
     }
-    if (uri) resolved.push({ ...photo, uri });
+    resolved.push({ ...photo, uri: uri ?? null });
   }
 
   return resolved;
@@ -137,7 +142,13 @@ export default function AlbumScreen() {
                     key={photo.id}
                     style={styles.cell}
                     onPress={() => router.push({ pathname: '/post/[id]', params: { id: photo.id, circleId } })}>
-                    <Image source={{ uri: photo.uri }} style={styles.photo} contentFit="cover" />
+                    {photo.uri ? (
+                      <Image source={{ uri: photo.uri }} style={styles.photo} contentFit="cover" />
+                    ) : (
+                      // Icon only: a cell this size has no room for the
+                      // label the feed's placeholder carries.
+                      <PhotoPlaceholder style={styles.photo} missing={missingPhotoFor(photo.photoStatus)} compact />
+                    )}
                   </Pressable>
                 ))}
                 {/* Keeps a short last row left-aligned rather than stretching its photos. */}

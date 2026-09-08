@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 
 import type { FeedRow, FeedRows } from '@/components/feed/rows';
 import { type CommentItem } from '@/components/post-comments';
+import { missingPhotoFor } from '@/components/photo-placeholder';
 import { PostCard, type Post } from '@/components/post-card';
 import { Spacing } from '@/constants/theme';
 import type { CommentSummary, CommentWithAuthor, Profile } from '@/data/db';
@@ -167,6 +168,7 @@ function toPostCard(view: FeedPostView, profile: Profile | null): Post {
     authorPhotoUri: pictureUri(picture),
     timestamp: formatTimestamp(post.createdAt),
     photoUri: view.photoUri,
+    missingPhoto: view.photoUri ? undefined : missingPhotoFor(post.photoStatus),
     caption: post.caption,
     reactions: view.reactions,
     latestComment: view.comments.latest ? toCommentItem(view.comments.latest, profile?.name) : undefined,

@@ -10,10 +10,12 @@ export type AvatarProps = {
   ringColor?: string;
   /** A real picture to show instead of the hatch placeholder — e.g. a freshly-picked profile photo. */
   uri?: string;
+  /** Corner radius, defaulting to a circle. Square it off for a thumbnail of a photograph, which isn't a face. */
+  radius?: number;
 };
 
 /** Shows `uri` if given, otherwise the diagonal-hatch placeholder — both clipped to a circle. */
-export function Avatar({ size = 44, ringColor, uri }: AvatarProps) {
+export function Avatar({ size = 44, ringColor, uri, radius }: AvatarProps) {
   const stripe = Math.max(6, Math.round(size / 4));
 
   return (
@@ -23,7 +25,7 @@ export function Avatar({ size = 44, ringColor, uri }: AvatarProps) {
         {
           width: size,
           height: size,
-          borderRadius: size / 2,
+          borderRadius: radius ?? size / 2,
           borderWidth: ringColor ? 2 : 0,
           borderColor: ringColor,
         },

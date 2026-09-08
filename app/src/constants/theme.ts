@@ -3,7 +3,7 @@
  * The dim warm ground exists so photographs are the only bright thing on screen.
  */
 
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
 
 export const Colors = {
@@ -59,6 +59,7 @@ export const Tints = {
   privacyWashBg: 'rgba(192,138,46,0.09)',
   privacyWashBorder: 'rgba(192,138,46,0.22)',
   dangerWashBorder: 'rgba(217,122,110,0.35)',
+  dangerWashBg: 'rgba(217,122,110,0.12)',
   secondaryButtonBorder: 'rgba(245,239,230,0.2)',
 } as const;
 
@@ -114,17 +115,34 @@ export const Icons = {
   /** Trailing affordance on a row that navigates somewhere. */
   disclosure: 'chevron-right',
   add: 'plus',
+  /** Opens the emoji picker on a post nobody has reacted to yet — outline, since it's an invitation rather than a reaction you left. */
+  react: 'heart',
   comment: 'message-circle',
   send: 'arrow-up',
   locked: 'lock',
   promote: 'shield',
   demote: 'shield-off',
   removeMember: 'user-x',
+  /** Deletes a photo from the circle for everyone — not "remove me from it". */
+  deletePost: 'trash-2',
+  /** A photo whose entry has landed but whose bytes haven't yet. */
+  photoArriving: 'download-cloud',
+  /** A photo whose download has failed enough times to stop looking temporary. */
+  photoUnavailable: 'alert-circle',
   /** The circle's album — every photo it holds, not just what's in the feed. */
   album: 'grid',
   /** Whether one post is kept in that album — the album seen from a single photo. */
   inAlbum: 'bookmark',
 } as const satisfies Record<string, keyof typeof Feather.glyphMap>;
+
+/**
+ * Solid counterparts for the icons that have an on state, which Feather
+ * doesn't draw — every glyph in it is a 2px outline. Ionicons is the only
+ * other family the app uses, and only for these.
+ */
+export const FilledIcons = {
+  inAlbum: 'bookmark',
+} as const satisfies Record<string, keyof typeof Ionicons.glyphMap>;
 
 export const Radius = {
   pill: 999,
