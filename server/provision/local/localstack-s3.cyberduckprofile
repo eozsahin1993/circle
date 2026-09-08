@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Cyberduck connection profile for the LocalStack S3 this directory's
+  terraform creates. Double-click to install, then make a bookmark with
+  it — access key and secret are both `test` (LocalStack accepts any).
+
+  Three things have to be right at once, and the stock "Amazon S3" profile
+  gets all three wrong: plain HTTP, a custom host and port, and path-style
+  addressing. Without the last one Cyberduck dials
+  `<bucket>.localhost:4566`, which doesn't resolve, and the failure reads
+  as LocalStack being down.
+-->
+<plist version="1.0">
+    <dict>
+        <key>Protocol</key>
+        <string>s3</string>
+        <key>Vendor</key>
+        <string>localstack-s3</string>
+        <key>Scheme</key>
+        <string>http</string>
+        <key>Description</key>
+        <string>LocalStack S3 (circle dev)</string>
+        <key>Default Hostname</key>
+        <string>localhost</string>
+        <key>Default Port</key>
+        <string>4566</string>
+        <key>Default Path</key>
+        <string>/circle-local-circle-blobs</string>
+        <key>Hostname Configurable</key>
+        <true/>
+        <key>Port Configurable</key>
+        <true/>
+        <key>Username Configurable</key>
+        <true/>
+        <key>Properties</key>
+        <dict>
+            <key>s3.bucket.virtualhost.disable</key>
+            <true/>
+        </dict>
+    </dict>
+</plist>
