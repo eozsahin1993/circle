@@ -1,17 +1,18 @@
-import { Feather } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import * as Device from 'expo-device';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
+import { Icon } from '@/components/icon';
 import { PrivacyInfoModal } from '@/components/privacy-info-modal';
 import { ReactionChip } from '@/components/reaction-chip';
 import { ScreenHeader } from '@/components/screen-header';
+import { SettingsGroups, type SettingsGroup } from '@/components/settings-group';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Icons, Radius, Spacing, Tints } from '@/constants/theme';
+import { Icons, Radius, Spacing, Tints } from '@/constants/theme';
 import { getProfile, type Profile } from '@/data/db';
 import { resetLocalDataForTesting } from '@/domain/usecases/dev-reset';
 import { signOut } from '@/domain/usecases/account/sign-in';
@@ -47,6 +48,70 @@ export default function AccountScreen() {
       getProfile().then(setProfile);
     }, []),
   );
+
+  /** Same shape the circle screen uses — one list, one row component, one set of spacings. */
+  const settingsGroups: SettingsGroup[] = [
+    {
+      title: 'Notify me about',
+      footnote: 'Notifications are generated on your phone. No push server is told what happened.',
+      rows: [
+        {
+          label: 'New photos in a circle',
+          control: {
+            kind: 'switch',
+            value: settings.notifyNewPhotos,
+            onValueChange: (value) => updateSettings({ notifyNewPhotos: value }),
+          },
+        },
+        {
+          label: 'Comments and reactions',
+          control: {
+            kind: 'switch',
+            value: settings.notifyCommentsReactions,
+            onValueChange: (value) => updateSettings({ notifyCommentsReactions: value }),
+          },
+        },
+        {
+          label: 'Someone joins a circle',
+          control: {
+            kind: 'switch',
+            value: settings.notifyMemberJoined,
+            onValueChange: (value) => updateSettings({ notifyMemberJoined: value }),
+          },
+        },
+      ],
+    },
+    {
+      title: 'Account recovery',
+      rows: [
+        {
+          label: 'Recovery phrase',
+          description: '12 words that restore your circles on a new phone',
+          control: { kind: 'navigate' },
+          onPress: () => router.push('/account/recovery'),
+        },
+        {
+          label: 'How the privacy works',
+          description: 'What end-to-end encrypted means here',
+          control: { kind: 'navigate' },
+          onPress: () => setPrivacyVisible(true),
+        },
+      ],
+    },
+    {
+      title: 'Developer',
+      rows: [
+        __DEV__ && {
+          label: resettingDevData ? 'Resetting…' : 'Reset all local data',
+          description:
+            '__DEV__ only. Wipes circles, keys, and the master seed so you can test sign-in fresh without reinstalling.',
+          destructive: true,
+          disabled: resettingDevData,
+          onPress: handleDevReset,
+        },
+      ],
+    },
+  ];
 
   function handleDevReset() {
     Alert.alert('Reset all local data? (dev only)', 'Wipes every circle, key, and the master seed on this device. No undo.', [
@@ -145,7 +210,7 @@ export default function AccountScreen() {
                 <ThemedText type="postAuthor" themeColor="accentBright">
                   Add another device
                 </ThemedText>
-                <Feather name={Icons.disclosure} size={18} color={theme.accentBright} />
+                <Icon icon={Icons.disclosure} size={18} color={theme.accentBright} />
               </Pressable>
             </ThemedView>
 
@@ -154,34 +219,6 @@ export default function AccountScreen() {
             </ThemedText>
           </View>
 
-          <View style={styles.section}>
-            <ThemedText type="eyebrow" themeColor="muted" style={styles.sectionLabel}>
-              Notify me about
-            </ThemedText>
-
-            <ThemedView type="surface" style={styles.card}>
-              <ToggleRow
-                label="New photos in a circle"
-                value={settings.notifyNewPhotos}
-                onValueChange={(value) => updateSettings({ notifyNewPhotos: value })}
-              />
-              <ToggleRow
-                label="Comments and reactions"
-                value={settings.notifyCommentsReactions}
-                onValueChange={(value) => updateSettings({ notifyCommentsReactions: value })}
-              />
-              <ToggleRow
-                label="Someone joins a circle"
-                value={settings.notifyMemberJoined}
-                onValueChange={(value) => updateSettings({ notifyMemberJoined: value })}
-                last
-              />
-            </ThemedView>
-
-            <ThemedText type="meta" themeColor="faint" style={styles.explainer}>
-              Notifications are generated on your phone. No push server is told what happened.
-            </ThemedText>
-          </View>
 
           <View style={styles.section}>
             <ThemedText type="eyebrow" themeColor="muted" style={styles.sectionLabel}>
@@ -201,33 +238,7 @@ export default function AccountScreen() {
             </View>
           </View>
 
-          <View style={styles.section}>
-            <ThemedText type="eyebrow" themeColor="muted" style={styles.sectionLabel}>
-              Account recovery
-            </ThemedText>
-
-            <ThemedView type="surface" style={styles.card}>
-              <Pressable style={styles.linkRow} onPress={() => router.push('/account/recovery')}>
-                <View style={styles.linkText}>
-                  <ThemedText type="postAuthor">Recovery phrase</ThemedText>
-                  <ThemedText type="meta" themeColor="muted">
-                    12 words that restore your circles on a new phone
-                  </ThemedText>
-                </View>
-                <Feather name={Icons.disclosure} size={18} color={theme.muted} />
-              </Pressable>
-
-              <Pressable style={styles.linkRowLast} onPress={() => setPrivacyVisible(true)}>
-                <View style={styles.linkText}>
-                  <ThemedText type="postAuthor">How the privacy works</ThemedText>
-                  <ThemedText type="meta" themeColor="muted">
-                    What end-to-end encrypted means here
-                  </ThemedText>
-                </View>
-                <Feather name={Icons.disclosure} size={18} color={theme.muted} />
-              </Pressable>
-            </ThemedView>
-          </View>
+          <SettingsGroups groups={settingsGroups} />
 
           <Pressable style={styles.signOutRow} onPress={handleSignOut} disabled={signingOut}>
             <ThemedText type="postAuthor" themeColor="accent">
@@ -235,51 +246,11 @@ export default function AccountScreen() {
             </ThemedText>
           </Pressable>
 
-          {__DEV__ ? (
-            <View style={styles.section}>
-              <ThemedText type="eyebrow" themeColor="muted" style={styles.sectionLabel}>
-                Developer
-              </ThemedText>
-              <ThemedView type="surface" style={[styles.card, styles.devCard]}>
-                <Pressable style={styles.devResetRow} onPress={handleDevReset} disabled={resettingDevData}>
-                  <ThemedText type="postAuthor" themeColor="accent">
-                    {resettingDevData ? 'Resetting…' : 'Reset all local data'}
-                  </ThemedText>
-                  <ThemedText type="meta" themeColor="muted">
-                    __DEV__ only — wipes circles, keys, and the master seed so you can test sign-in fresh
-                    without reinstalling.
-                  </ThemedText>
-                </Pressable>
-              </ThemedView>
-            </View>
-          ) : null}
         </ScrollView>
       </SafeAreaView>
 
       <PrivacyInfoModal visible={privacyVisible} onClose={() => setPrivacyVisible(false)} />
     </ThemedView>
-  );
-}
-
-type ToggleRowProps = {
-  label: string;
-  value: boolean;
-  onValueChange: (value: boolean) => void;
-  last?: boolean;
-};
-
-function ToggleRow({ label, value, onValueChange, last }: ToggleRowProps) {
-  return (
-    <View style={last ? styles.toggleRowLast : styles.toggleRow}>
-      <ThemedText type="postAuthor" style={styles.toggleLabel}>
-        {label}
-      </ThemedText>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: Tints.chipIdleBorder, true: Colors.dark.accent }}
-      />
-    </View>
   );
 }
 
@@ -354,24 +325,6 @@ const styles = StyleSheet.create({
   explainer: {
     paddingHorizontal: 4,
   },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Tints.chipIdleBorder,
-  },
-  toggleRowLast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-  },
-  toggleLabel: {
-    flex: 1,
-    marginRight: 12,
-  },
   appearanceRow: {
     flexDirection: 'row',
     gap: 10,
@@ -380,34 +333,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Tints.chipIdleBorder,
-  },
-  linkRowLast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-  },
-  linkText: {
-    flex: 1,
-    gap: 2,
-    marginRight: 12,
-  },
   signOutRow: {
     alignItems: 'center',
-    paddingVertical: 14,
-  },
-  devCard: {
-    borderColor: Colors.dark.accent,
-  },
-  devResetRow: {
-    gap: 2,
     paddingVertical: 14,
   },
 });

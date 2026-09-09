@@ -27,9 +27,8 @@ export type PendingJoinRequestCardProps = {
 };
 
 /**
- * One pending join request, with its own approve/deny actions — shared
- * between `circle/details.tsx` and `circle/invite.tsx`, which both show
- * the same underlying `discoverPendingRequests` data. Only ever rendered
+ * One pending join request, with its own approve/deny actions, rendered
+ * as a feed row (see `feed/pending-request-row.tsx`). Only ever rendered
  * for the invite's actual creator (see that function's creator-only
  * gate) — "Tapped your link" is never anyone else's, per
  * server/DESIGN.md's "Invites" section (approval is always the specific

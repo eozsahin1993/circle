@@ -3,8 +3,30 @@
  * The dim warm ground exists so photographs are the only bright thing on screen.
  */
 
-import { Feather, Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
+
+import ArrowLeft from 'lucide-react-native/icons/arrow-left';
+import ArrowUp from 'lucide-react-native/icons/arrow-up';
+import Bookmark from 'lucide-react-native/icons/bookmark';
+import ChevronRight from 'lucide-react-native/icons/chevron-right';
+import CircleAlert from 'lucide-react-native/icons/circle-alert';
+import CloudDownload from 'lucide-react-native/icons/cloud-download';
+import Ellipsis from 'lucide-react-native/icons/ellipsis';
+import Heart from 'lucide-react-native/icons/heart';
+import Images from 'lucide-react-native/icons/images';
+import Link from 'lucide-react-native/icons/link';
+import Lock from 'lucide-react-native/icons/lock';
+import MessageCircle from 'lucide-react-native/icons/message-circle';
+import Plus from 'lucide-react-native/icons/plus';
+import QrCode from 'lucide-react-native/icons/qr-code';
+import RefreshCw from 'lucide-react-native/icons/refresh-cw';
+import ShieldCheck from 'lucide-react-native/icons/shield-check';
+import ShieldOff from 'lucide-react-native/icons/shield-off';
+import Trash from 'lucide-react-native/icons/trash';
+import UserX from 'lucide-react-native/icons/user-x';
+import X from 'lucide-react-native/icons/x';
+
+import type { IconGlyph } from '@/components/icon';
 
 export const Colors = {
   dark: {
@@ -106,43 +128,43 @@ export const Type = {
  * affordance can't end up drawn two different ways in two places, and
  * changing one is a single edit here. `satisfies` keeps a typo a compile
  * error instead of a silently missing icon.
+ *
+ * Imported one deep path at a time rather than from lucide's barrel; see
+ * `IconGlyph` for why that matters.
  */
 export const Icons = {
-  back: 'arrow-left',
-  close: 'x',
+  back: ArrowLeft,
+  close: X,
   /** Opens a menu of options for the thing it sits on. */
-  more: 'more-horizontal',
+  more: Ellipsis,
   /** Trailing affordance on a row that navigates somewhere. */
-  disclosure: 'chevron-right',
-  add: 'plus',
+  disclosure: ChevronRight,
+  add: Plus,
   /** Opens the emoji picker on a post nobody has reacted to yet — outline, since it's an invitation rather than a reaction you left. */
-  react: 'heart',
-  comment: 'message-circle',
-  send: 'arrow-up',
-  locked: 'lock',
-  promote: 'shield',
-  demote: 'shield-off',
-  removeMember: 'user-x',
+  react: Heart,
+  comment: MessageCircle,
+  send: ArrowUp,
+  locked: Lock,
+  promote: ShieldCheck,
+  demote: ShieldOff,
+  removeMember: UserX,
   /** Deletes a photo from the circle for everyone — not "remove me from it". */
-  deletePost: 'trash-2',
+  deletePost: Trash,
   /** A photo whose entry has landed but whose bytes haven't yet. */
-  photoArriving: 'download-cloud',
+  photoArriving: CloudDownload,
   /** A photo whose download has failed enough times to stop looking temporary. */
-  photoUnavailable: 'alert-circle',
+  photoUnavailable: CircleAlert,
   /** The circle's album — every photo it holds, not just what's in the feed. */
-  album: 'grid',
-  /** Whether one post is kept in that album — the album seen from a single photo. */
-  inAlbum: 'bookmark',
-} as const satisfies Record<string, keyof typeof Feather.glyphMap>;
-
-/**
- * Solid counterparts for the icons that have an on state, which Feather
- * doesn't draw — every glyph in it is a 2px outline. Ionicons is the only
- * other family the app uses, and only for these.
- */
-export const FilledIcons = {
-  inAlbum: 'bookmark',
-} as const satisfies Record<string, keyof typeof Ionicons.glyphMap>;
+  album: Images,
+  /** Whether one post is kept in that album — the album seen from a single photo. Solid when it is; see `Icon`'s `filled`. */
+  inAlbum: Bookmark,
+  /** Sends a circle's key to someone who isn't in the room. */
+  inviteLink: Link,
+  /** Shows that key as a code to scan, for someone who is. */
+  inviteCode: QrCode,
+  /** Retires the key in circulation and mints a fresh one. */
+  replaceKey: RefreshCw,
+} as const satisfies Record<string, IconGlyph>;
 
 export const Radius = {
   pill: 999,

@@ -1,7 +1,7 @@
-import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Icons } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -29,7 +29,7 @@ export function BackButton({ variant = 'back' }: BackButtonProps) {
 
   return (
     <Pressable hitSlop={12} onPress={goBack}>
-      <Feather name={variant === 'close' ? Icons.close : Icons.back} size={22} color={theme.secondary} />
+      <Icon icon={variant === 'close' ? Icons.close : Icons.back} size={22} color={theme.secondary} />
     </Pressable>
   );
 }

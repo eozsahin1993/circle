@@ -1,6 +1,6 @@
-import { Feather } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
+import { Icon, type IconGlyph } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { Radius, Tints } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -14,7 +14,7 @@ export type ReactionChipProps = Omit<PressableProps, 'style'> & {
    */
   emoji?: string;
   /** Leading glyph, for a chip that names an action rather than a reaction. */
-  icon?: keyof typeof Feather.glyphMap;
+  icon?: IconGlyph;
   label?: string;
   reacted?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -29,7 +29,7 @@ export function ReactionChip({ emoji, icon, label, reacted, style, ...rest }: Re
     <Pressable
       style={[styles.chip, reacted ? styles.reacted : styles.idle, style]}
       {...rest}>
-      {icon ? <Feather name={icon} size={15} color={theme[contentColor]} /> : null}
+      {icon ? <Icon icon={icon} size={15} color={theme[contentColor]} /> : null}
       {emoji ? <Text style={styles.emoji}>{emoji}</Text> : null}
       {label ? (
         // One line, ellipsized. A translated "React"/"Comment" can be far

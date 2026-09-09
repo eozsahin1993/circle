@@ -19,6 +19,7 @@ export const EntryTypes = {
   ROLE_CHANGE: 'role_change',
   KEY_ROTATION: 'key_rotation',
   COVER_PHOTO_SET: 'cover_photo_set',
+  CIRCLE_RENAMED: 'circle_renamed',
   ALBUM_VISIBILITY: 'album_visibility',
   POST_DELETE: 'post_delete',
 } as const;

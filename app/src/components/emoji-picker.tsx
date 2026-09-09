@@ -1,6 +1,6 @@
-import { Feather } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Icons, Radius, Tints } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -51,7 +51,7 @@ export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
 
       {onClose ? (
         <Pressable style={styles.slot} onPress={onClose} accessibilityLabel="Close">
-          <Feather name={Icons.close} size={17} color={theme.faint} />
+          <Icon icon={Icons.close} size={17} color={theme.faint} />
         </Pressable>
       ) : null}
     </View>

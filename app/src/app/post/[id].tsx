@@ -1,4 +1,3 @@
-import { Feather, Ionicons } from '@expo/vector-icons';
 import { bytesToHex } from '@noble/curves/utils.js';
 import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -8,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/action-sheet';
 import { Avatar } from '@/components/avatar';
+import { Icon } from '@/components/icon';
 import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { FabButton } from '@/components/fab-button';
 import { HeaderIconButton } from '@/components/header-icon-button';
@@ -17,7 +17,7 @@ import { EmojiPicker } from '@/components/emoji-picker';
 import { ScreenHeader } from '@/components/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { FilledIcons, Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
+import { Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
 import {
   getAttachment,
   getCircleSummary,
@@ -194,7 +194,6 @@ export default function PostDetailsScreen() {
                 <>
                   <HeaderIconButton
                     icon={Icons.inAlbum}
-                    activeIcon={FilledIcons.inAlbum}
                     active={post.inAlbum}
                     accessibilityLabel={post.inAlbum ? 'Remove from album' : 'Add to album'}
                     onPress={handleToggleAlbum}
@@ -238,7 +237,7 @@ export default function PostDetailsScreen() {
                       <ThemedText type="meta" themeColor="muted">
                         ·
                       </ThemedText>
-                      <Ionicons name={FilledIcons.inAlbum} size={12} color={theme.accent} />
+                      <Icon icon={Icons.inAlbum} size={12} color={theme.accent} filled />
                       <ThemedText type="meta" themeColor="accent">
                         Album
                       </ThemedText>

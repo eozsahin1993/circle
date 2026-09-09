@@ -1,7 +1,7 @@
-import { Feather } from '@expo/vector-icons';
 import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
 import { StyleSheet, View, type ViewProps } from 'react-native';
 
+import { Icon, type IconGlyph } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Icons } from '@/constants/theme';
 
@@ -19,7 +19,7 @@ export function missingPhotoFor(status: string | null | undefined): MissingPhoto
   return status === 'failed' ? 'unavailable' : 'arriving';
 }
 
-const NOTES: Record<MissingPhoto, { icon: keyof typeof Feather.glyphMap; label: string }> = {
+const NOTES: Record<MissingPhoto, { icon: IconGlyph; label: string }> = {
   arriving: { icon: Icons.photoArriving, label: 'Photo on its way' },
   unavailable: { icon: Icons.photoUnavailable, label: 'Photo unavailable' },
 };
@@ -65,7 +65,7 @@ export function PhotoPlaceholder({ style, children, missing, compact, ...rest }:
       </View>
       {missing ? (
         <View style={styles.note} pointerEvents="none">
-          <Feather name={NOTES[missing].icon} size={compact ? 15 : 18} color={Colors.dark.muted} />
+          <Icon icon={NOTES[missing].icon} size={compact ? 15 : 18} color={Colors.dark.muted} />
           {compact ? null : (
             <ThemedText type="meta" themeColor="muted">
               {NOTES[missing].label}

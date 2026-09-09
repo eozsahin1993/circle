@@ -1,4 +1,3 @@
-import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -7,45 +6,69 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet, type ActionSheetOption } from '@/components/action-sheet';
 import { Avatar } from '@/components/avatar';
-import { PrimaryButton } from '@/components/primary-button';
+import { Icon } from '@/components/icon';
+import { InviteSheet } from '@/components/invite-sheet';
+import { PromptSheet } from '@/components/prompt-sheet';
 import { ScreenHeader } from '@/components/screen-header';
 import { SecondaryButton } from '@/components/secondary-button';
+import { SettingsGroups, type SettingsGroup } from '@/components/settings-group';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Icons, Radius, Spacing, Tints } from '@/constants/theme';
-import { getCircleSummary, getCircleMembers, MemberRoles, type CircleListRow, type Member, type MemberRole } from '@/data/db';
+import { MemberRoles, type Member, type MemberRole } from '@/data/db';
 import { setMemberRole } from '@/domain/usecases/circle/change-member-role';
+import { resolveCircleCoverUri } from '@/domain/usecases/circle/circle-cover';
+import { loadCircleDetails, type CircleDetails } from '@/domain/usecases/circle/circle-details';
 import { buildDebugKeysetFlags } from '@/domain/usecases/circle/debug-keyset';
-import { getOrCreateInvite, isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
+import { getOrCreateInvite, replaceInvite } from '@/domain/usecases/circle/invite-to-circle';
 import { deleteCircleForEveryone, leaveCircle } from '@/domain/usecases/circle/leave-circle';
 import { removeMember } from '@/domain/usecases/circle/remove-member';
+import { renameCircle } from '@/domain/usecases/circle/rename-circle';
+import { setCoverPhoto } from '@/domain/usecases/circle/set-cover-photo';
 import { useTheme } from '@/hooks/use-theme';
-import { getCircleIdentity } from '@/services/keystore';
-import { bytesToDataUri } from '@/services/image';
-import { bytesToHex } from '@noble/curves/utils.js';
+import { bytesToDataUri, pickAndCompressImage } from '@/services/image';
 
 function inviteLink(code: string): string {
   return `circle://join/${code}`;
 }
 
 function formatJoined(joinedAt: number): string {
-  return new Date(joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  return new Date(joinedAt).toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  });
 }
+
+function formatExpiry(expiresAt: number): string {
+  const days = Math.ceil((expiresAt - Date.now()) / (24 * 60 * 60 * 1000));
+  if (days <= 0) return 'expired';
+  return days === 1 ? 'expires in 1 day' : `expires in ${days} days`;
+}
+
+/** Stable identity, so `avatarUris`' memo doesn't bust on every render. */
+const NO_MEMBERS: Member[] = [];
 
 export default function CircleDetailsScreen() {
   const theme = useTheme();
   const { circleId } = useLocalSearchParams<{ circleId: string }>();
-  const [circle, setCircle] = useState<CircleListRow | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [admin, setAdmin] = useState(false);
-  const [ownPublicKey, setOwnPublicKey] = useState<string | null>(null);
+  const [details, setDetails] = useState<CircleDetails | null>(null);
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [memberMenu, setMemberMenu] = useState<Member | null>(null);
+  const [inviteSheet, setInviteSheet] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [coverUri, setCoverUri] = useState<string | undefined>();
 
-  const loadMembers = useCallback(async () => {
+  const circle = details?.circle ?? null;
+  const members = details?.members ?? NO_MEMBERS;
+  const admin = details?.ownIsAdmin ?? false;
+  const ownPublicKey = details?.ownPublicKey ?? null;
+  const invite = details?.invite ?? null;
+
+  const reload = useCallback(async () => {
     if (!circleId) return;
-    setMembers(await getCircleMembers(circleId));
+    setDetails(await loadCircleDetails(circleId));
+    setCoverUri(await resolveCircleCoverUri(circleId));
   }, [circleId]);
 
   // Encoded once per roster change rather than on every render. Member
@@ -63,16 +86,8 @@ export default function CircleDetailsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (!circleId) return;
-      Promise.all([getCircleSummary(circleId), getCircleMembers(circleId), isCircleAdmin(circleId), getCircleIdentity(circleId)]).then(
-        ([circleRow, memberRows, isAdmin, identity]) => {
-          setCircle(circleRow);
-          setMembers(memberRows);
-          setAdmin(isAdmin);
-          setOwnPublicKey(identity ? bytesToHex(identity.publicKey) : null);
-        },
-      );
-    }, [circleId]),
+      reload().catch((err) => console.error('Failed to load circle details', err));
+    }, [reload]),
   );
 
   function handleRemoveMember(member: Member) {
@@ -88,7 +103,7 @@ export default function CircleDetailsScreen() {
           onPress: async () => {
             try {
               await removeMember(circleId, member.identityPublicKey);
-              await loadMembers();
+              await reload();
             } catch (err) {
               console.error('Failed to remove member', err);
               setError("Couldn't remove that member — try again.");
@@ -103,7 +118,7 @@ export default function CircleDetailsScreen() {
     if (!circleId) return;
     try {
       await setMemberRole(circleId, member.identityPublicKey, role);
-      await loadMembers();
+      await reload();
     } catch (err) {
       console.error('Failed to change member role', err);
       setError("Couldn't change that member's role — try again.");
@@ -113,9 +128,22 @@ export default function CircleDetailsScreen() {
   const memberMenuOptions: ActionSheetOption[] = memberMenu
     ? [
         memberMenu.role === MemberRoles.admin
-          ? { label: 'Remove as admin', icon: Icons.demote, onPress: () => handleSetRole(memberMenu, MemberRoles.member) }
-          : { label: 'Make admin', icon: Icons.promote, onPress: () => handleSetRole(memberMenu, MemberRoles.admin) },
-        { label: 'Remove from circle', icon: Icons.removeMember, destructive: true, onPress: () => handleRemoveMember(memberMenu) },
+          ? {
+              label: 'Remove as admin',
+              icon: Icons.demote,
+              onPress: () => handleSetRole(memberMenu, MemberRoles.member),
+            }
+          : {
+              label: 'Make admin',
+              icon: Icons.promote,
+              onPress: () => handleSetRole(memberMenu, MemberRoles.admin),
+            },
+        {
+          label: 'Remove from circle',
+          icon: Icons.removeMember,
+          destructive: true,
+          onPress: () => handleRemoveMember(memberMenu),
+        },
       ]
     : [];
 
@@ -125,7 +153,9 @@ export default function CircleDetailsScreen() {
     setError(null);
     try {
       const invite = await getOrCreateInvite(circleId);
-      await Share.share({ message: `Join ${circle?.name ?? 'my circle'} on Circle: ${inviteLink(invite.code)}` });
+      await Share.share({
+        message: `Join ${circle?.name ?? 'my circle'} on Circle: ${inviteLink(invite.code)}`,
+      });
     } catch (err) {
       console.error('Failed to share invite', err);
       setError("Couldn't create an invite — try again.");
@@ -134,27 +164,102 @@ export default function CircleDetailsScreen() {
     }
   }
 
+  /** Mints the key before opening, so the sheet never renders an empty code. */
+  async function handleShowCode() {
+    if (!circleId) return;
+    setError(null);
+    try {
+      await getOrCreateInvite(circleId);
+      await reload();
+      setInviteSheet(true);
+    } catch (err) {
+      console.error('Failed to create an invite', err);
+      setError("Couldn't create an invite — try again.");
+    }
+  }
+
+  /** Asks first: this retires every invite already handed out. */
+  function handleReplaceKey() {
+    if (!circleId) return;
+    Alert.alert(
+      'Replace the key?',
+      'The old link and code stop working, so anyone still holding one can no longer ask to join. Everyone already in the circle stays in.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Replace',
+          style: 'destructive',
+          onPress: async () => {
+            setSharing(true);
+            setError(null);
+            try {
+              await replaceInvite(circleId);
+              await reload();
+            } catch (err) {
+              console.error('Failed to replace the invite key', err);
+              setError("Couldn't replace the key — try again.");
+            } finally {
+              setSharing(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
   function handleLeave() {
     if (!circleId) return;
-    Alert.alert(`Leave ${circle?.name ?? 'this circle'}?`, 'You keep the photos already downloaded. You will need a new key to come back.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Leave',
-        style: 'destructive',
-        onPress: async () => {
-          // All local: the entry announcing the departure is queued, not
-          // pushed, so this works offline and can't fail on a connection.
-          try {
-            await leaveCircle(circleId);
-          } catch (err) {
-            console.error('Failed to leave circle', err);
-            Alert.alert("Couldn't leave", String(err));
-            return;
-          }
-          router.dismissTo('/circle');
+    Alert.alert(
+      `Leave ${circle?.name ?? 'this circle'}?`,
+      'The circle disappears from this phone, and you will need a new key to come back.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            // All local: the entry announcing the departure is queued, not
+            // pushed, so this works offline and can't fail on a connection.
+            try {
+              await leaveCircle(circleId);
+            } catch (err) {
+              console.error('Failed to leave circle', err);
+              Alert.alert("Couldn't leave", String(err));
+              return;
+            }
+            router.dismissTo('/circle');
+          },
         },
-      },
-    ]);
+      ],
+    );
+  }
+
+  async function handleSetCoverPhoto() {
+    if (!circleId) return;
+    setError(null);
+    try {
+      const picked = await pickAndCompressImage();
+      if (!picked) return;
+      await setCoverPhoto(circleId, picked.bytes);
+      await reload();
+    } catch (err) {
+      console.error('Failed to set the cover photo', err);
+      setError("Couldn't set the cover photo — try again.");
+    }
+  }
+
+  async function handleRename(name: string) {
+    if (!circleId) return;
+    setError(null);
+    try {
+      await renameCircle(circleId, name);
+      setRenaming(false);
+      await reload();
+    } catch (err) {
+      console.error('Failed to rename the circle', err);
+      setError("Couldn't rename the circle — try again.");
+      setRenaming(false);
+    }
   }
 
   async function handleCopyDebugKeyset() {
@@ -162,7 +267,7 @@ export default function CircleDetailsScreen() {
     try {
       const flags = await buildDebugKeysetFlags(circleId);
       await Clipboard.setStringAsync(flags);
-      Alert.alert('Copied', "Paste after `go run ./cmd/decryptlog --table <table>` on your machine.");
+      Alert.alert('Copied', 'Paste after `go run ./cmd/decryptlog --table <table>` on your machine.');
     } catch (err) {
       console.error('Failed to build debug keyset', err);
       Alert.alert("Couldn't copy the keyset", String(err));
@@ -173,7 +278,7 @@ export default function CircleDetailsScreen() {
     if (!circleId) return;
     Alert.alert(
       'Delete for everyone?',
-      'Every phone in the circle erases its copy the next time it connects. This cannot be undone.',
+      "This erases the circle from this phone, and can't be undone here. Other members keep their copy until the relay can carry a deletion.",
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -193,6 +298,151 @@ export default function CircleDetailsScreen() {
     );
   }
 
+  /**
+   * The three things you can do with a circle's key. Its own group rather
+   * than a member of `settingsGroups` because it belongs above the roster,
+   * where you look when the reason you opened this screen is to add
+   * someone.
+   */
+  const inviteGroup: SettingsGroup = {
+    title: 'Invite members',
+    rows: [
+      {
+        label: 'Share invite link',
+        description: 'Sends the key however you like',
+        icon: Icons.inviteLink,
+        // No chevron: this hands off to the OS share sheet rather than
+        // opening a view of ours to come back from.
+        disabled: sharing,
+        onPress: handleShareLink,
+      },
+      {
+        label: 'Show a QR code',
+        description: 'For someone standing next to you',
+        icon: Icons.inviteCode,
+        control: { kind: 'navigate' },
+        disabled: sharing,
+        onPress: handleShowCode,
+      },
+      {
+        label: 'Replace the key',
+        description: 'The old link and code stop working',
+        icon: Icons.replaceKey,
+        // The code sits on the row that retires it, so what "the old code"
+        // means is the thing you're looking at.
+        control: invite ? { kind: 'value', text: invite.code } : undefined,
+        disabled: sharing,
+        onPress: handleReplaceKey,
+      },
+    ],
+    footnote: `The key only lets someone ask. You approve each person yourself before they see anything.${
+      invite ? ` This one ${formatExpiry(invite.expiresAt)}.` : ''
+    }`,
+  };
+
+  /**
+   * Every setting on this screen, as data. Adding one is an entry here —
+   * a row gated on `admin` can say so inline, and a group whose rows all
+   * drop out renders nothing.
+   */
+  const settingsGroups: SettingsGroup[] = [
+    {
+      title: 'This circle',
+      rows: [
+        admin && {
+          label: 'Cover photo',
+          description: 'What everyone sees on the circles list',
+          // Resolved the same way the list resolves it, newest-post
+          // fallback included, so the row can't show a circle a different
+          // face from the one you just tapped.
+          control: { kind: 'image', uri: coverUri },
+          onPress: handleSetCoverPhoto,
+        },
+        admin && {
+          label: 'Rename this circle',
+          description: 'Everyone sees the new name once their phone syncs',
+          control: { kind: 'navigate' },
+          onPress: () => setRenaming(true),
+        },
+        // TODO: "Silence this circle" waits on notifications existing at
+        // all; a toggle now would store a preference nothing reads.
+      ],
+    },
+    {
+      title: 'Careful',
+      destructive: true,
+      rows: [
+        {
+          label: `Leave ${circle?.name ?? 'this circle'}`,
+          // Not "you keep the photos": `markCircleLeft` is a soft delete and
+          // the bytes do survive, but every list filters left circles out,
+          // so there is no screen that can still show them.
+          description: 'The circle disappears from this phone. You will need a new key to come back.',
+          destructive: true,
+          onPress: handleLeave,
+        },
+        admin && {
+          label: 'Delete for everyone',
+          // Deliberately not "every phone erases its copy":
+          // `deleteCircleForEveryone` only clears this device, and
+          // propagating a deletion is relay work that doesn't exist yet.
+          description:
+            "Admins only. Erases this phone's copy. Other members keep theirs until the relay can carry a deletion.",
+          destructive: true,
+          onPress: handleDeleteForEveryone,
+        },
+      ],
+    },
+  ];
+
+  function renderMemberList() {
+    return (
+      <>
+        <View style={styles.sectionHeader}>
+          <ThemedText type="eyebrow" themeColor="muted">
+            Members
+          </ThemedText>
+          <ThemedText type="meta" themeColor="muted">
+            {members.length} in the circle
+          </ThemedText>
+        </View>
+
+        {members.map(renderMember)}
+      </>
+    );
+  }
+
+  /** One roster row. The menu is offered on everyone but the reader — nobody demotes or removes themselves here. */
+  function renderMember(member: Member) {
+    return (
+      <View key={member.identityPublicKey} style={styles.memberRow}>
+        <Avatar size={44} uri={avatarUris.get(member.identityPublicKey)} />
+
+        <View style={styles.memberInfo}>
+          <View style={styles.memberNameRow}>
+            <ThemedText type="postAuthor">{member.name || 'Unnamed member'}</ThemedText>
+            {member.role === MemberRoles.admin ? (
+              <View style={styles.adminBadge}>
+                <ThemedText type="meta" themeColor="accentLabel" style={styles.adminBadgeText}>
+                  Admin
+                </ThemedText>
+              </View>
+            ) : null}
+          </View>
+          <ThemedText type="meta" themeColor="muted">
+            Joined {formatJoined(member.joinedAt)}
+          </ThemedText>
+        </View>
+
+        {admin && member.identityPublicKey !== ownPublicKey ? (
+          <Pressable hitSlop={12} style={styles.memberMenuButton} onPress={() => setMemberMenu(member)}>
+            <Icon icon={Icons.more} size={20} color={theme.muted} />
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  }
+
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
@@ -204,59 +454,17 @@ export default function CircleDetailsScreen() {
             {members.length} {members.length === 1 ? 'person' : 'people'}
           </ThemedText>
 
-          {admin ? (
-            <View style={styles.inviteActions}>
-              <PrimaryButton label="Share invite link" disabled={sharing} onPress={handleShareLink} />
-              <SecondaryButton
-                label="Show a QR code"
-                onPress={() => router.push({ pathname: '/circle/invite', params: { circleId } })}
-              />
-              {error ? (
-                <ThemedText type="captionFeed" themeColor="accent" style={styles.error}>
-                  {error}
-                </ThemedText>
-              ) : null}
-              <ThemedText type="meta" themeColor="faint" style={styles.explainer}>
-                Sharing the key is the only way in — there is no directory. Anyone who has it can
-                request to join, but you still have to approve them.
-              </ThemedText>
-            </View>
+          {admin ? <SettingsGroups groups={[inviteGroup]} /> : null}
+
+          {error ? (
+            <ThemedText type="meta" themeColor="accent" style={styles.error}>
+              {error}
+            </ThemedText>
           ) : null}
 
-          <View style={styles.sectionHeader}>
-            <ThemedText type="eyebrow" themeColor="muted">
-              Members
-            </ThemedText>
-            <ThemedText type="meta" themeColor="muted">
-              {members.length} in the circle
-            </ThemedText>
-          </View>
+          {renderMemberList()}
 
-          {members.map((member) => (
-            <View key={member.identityPublicKey} style={styles.memberRow}>
-              <Avatar size={44} uri={avatarUris.get(member.identityPublicKey)} />
-              <View style={styles.memberInfo}>
-                <View style={styles.memberNameRow}>
-                  <ThemedText type="postAuthor">{member.name || 'Unnamed member'}</ThemedText>
-                  {member.role === MemberRoles.admin ? (
-                    <View style={styles.adminBadge}>
-                      <ThemedText type="meta" themeColor="accentLabel" style={styles.adminBadgeText}>
-                        Admin
-                      </ThemedText>
-                    </View>
-                  ) : null}
-                </View>
-                <ThemedText type="meta" themeColor="muted">
-                  Joined {formatJoined(member.joinedAt)}
-                </ThemedText>
-              </View>
-              {admin && member.identityPublicKey !== ownPublicKey ? (
-                <Pressable hitSlop={12} style={styles.memberMenuButton} onPress={() => setMemberMenu(member)}>
-                  <Feather name={Icons.more} size={20} color={theme.muted} />
-                </Pressable>
-              ) : null}
-            </View>
-          ))}
+          <SettingsGroups groups={settingsGroups} />
 
           {__DEV__ ? (
             <View style={styles.debugZone}>
@@ -266,31 +474,27 @@ export default function CircleDetailsScreen() {
               <SecondaryButton label="Copy keyset for decryptlog" onPress={handleCopyDebugKeyset} />
             </View>
           ) : null}
-
-          <View style={styles.dangerZone}>
-            <Pressable style={styles.dangerRow} onPress={handleLeave}>
-              <ThemedText type="postAuthor" themeColor="danger">
-                Leave {circle?.name ?? 'this circle'}
-              </ThemedText>
-              <ThemedText type="meta" themeColor="muted">
-                You keep the photos already downloaded. You will need a new key to come back.
-              </ThemedText>
-            </Pressable>
-
-            {admin ? (
-              <Pressable style={styles.dangerRowLast} onPress={handleDeleteForEveryone}>
-                <ThemedText type="postAuthor" themeColor="danger">
-                  Delete for everyone
-                </ThemedText>
-                <ThemedText type="meta" themeColor="muted">
-                  Admins only. Every phone in the circle erases its copy the next time it connects.
-                  This cannot be undone.
-                </ThemedText>
-              </Pressable>
-            ) : null}
-          </View>
         </ScrollView>
       </SafeAreaView>
+
+      <PromptSheet
+        visible={renaming}
+        title="Rename this circle"
+        description="Everyone sees the new name once their phone syncs."
+        initialValue={circle?.name ?? ''}
+        placeholder="Circle name"
+        confirmLabel="Rename"
+        onCancel={() => setRenaming(false)}
+        onConfirm={handleRename}
+      />
+
+      <InviteSheet
+        visible={inviteSheet}
+        onClose={() => setInviteSheet(false)}
+        link={invite ? inviteLink(invite.code) : ''}
+        code={invite?.code ?? ''}
+        expiry={invite ? formatExpiry(invite.expiresAt) : undefined}
+      />
 
       <ActionSheet
         visible={memberMenu !== null}
@@ -313,7 +517,6 @@ const styles = StyleSheet.create({
   },
   memberCount: {
     marginTop: 4,
-    marginBottom: Spacing.cardListGap,
   },
   scroll: {
     flex: 1,
@@ -321,20 +524,14 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: Spacing.cardListGap,
   },
-  inviteActions: {
-    gap: 12,
-    marginBottom: Spacing.cardListGap,
-  },
   error: {
-    textAlign: 'center',
-  },
-  explainer: {
-    textAlign: 'center',
+    marginTop: 10,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: Spacing.cardListGap,
     marginBottom: 4,
   },
   memberRow: {
@@ -370,22 +567,5 @@ const styles = StyleSheet.create({
   debugZone: {
     marginTop: Spacing.cardListGap,
     gap: 8,
-  },
-  dangerZone: {
-    marginTop: Spacing.cardListGap,
-    borderColor: Tints.dangerWashBorder,
-    borderWidth: 1,
-    borderRadius: Radius.notice,
-    paddingHorizontal: Spacing.screenPadding,
-  },
-  dangerRow: {
-    gap: 2,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Tints.dangerWashBorder,
-  },
-  dangerRowLast: {
-    gap: 2,
-    paddingVertical: 14,
   },
 });

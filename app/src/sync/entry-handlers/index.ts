@@ -1,6 +1,7 @@
 import { EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { albumVisibilityHandler } from '@/sync/entry-handlers/album-visibility';
 import { commentHandler } from '@/sync/entry-handlers/comment';
+import { circleRenamedHandler } from '@/sync/entry-handlers/circle-renamed';
 import { coverPhotoSetHandler } from '@/sync/entry-handlers/cover-photo-set';
 import { keyRotationHandler } from '@/sync/entry-handlers/key-rotation';
 import { memberAddedHandler } from '@/sync/entry-handlers/member-added';
@@ -32,6 +33,7 @@ export const metaHandlers: Record<string, EntryHandler> = {
   [EntryTypes.ROLE_CHANGE]: roleChangeHandler,
   [EntryTypes.KEY_ROTATION]: keyRotationHandler,
   [EntryTypes.COVER_PHOTO_SET]: coverPhotoSetHandler,
+  [EntryTypes.CIRCLE_RENAMED]: circleRenamedHandler,
 };
 
 /** Content entry types this build understands. */

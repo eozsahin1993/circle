@@ -51,6 +51,15 @@ npx jest --ci --forceExit --runInBand --no-cache
 
 Everyday runs (no migration changes) don't need it.
 
+## Icons in tests are mapped to lucide's CommonJS build
+
+`jest.moduleNameMapper` sends `lucide-react-native/icons/*` at the package's
+`dist/cjs` copy. Jest resolves that subpath to the ESM `.mjs` otherwise, and
+the preset's transform only matches `.[jt]sx?` — so the icon never gets
+compiled and every test that touches `constants/theme.ts` dies with a
+misleading `Cannot use import statement outside a module`. Metro is
+unaffected and takes the ESM build as normal.
+
 ## Always add a new migration — never edit an existing one
 
 `migrations/run.ts` tracks applied migrations by **index**, so editing a

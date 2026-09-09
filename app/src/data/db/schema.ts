@@ -341,6 +341,7 @@ export const outbox = sqliteTable(
         'role_change',
         'key_rotation',
         'cover_photo_set',
+        'circle_renamed',
         'album_visibility',
         'post_delete',
       ],

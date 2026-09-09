@@ -1,9 +1,9 @@
-import { Feather } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Animated, Dimensions, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
+import { Icon, type IconGlyph } from '@/components/icon';
 import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -13,8 +13,8 @@ import { useTheme } from '@/hooks/use-theme';
 export type ActionSheetOption = {
   label: string;
   onPress: () => void;
-  /** Feather icon name shown to the left of the label — see feather.dev for the full set. */
-  icon: keyof typeof Feather.glyphMap;
+  /** Shown to the left of the label — see `Icons`, which names these by what they mean. */
+  icon: IconGlyph;
   /** A line under the label: what the action will actually do, or why it's offered at all. */
   description?: string;
   /** Renders the icon and label in the danger color — for a destructive action like removing someone. */
@@ -124,8 +124,8 @@ export function ActionSheet({
                   ]}
                   onPress={() => select(option.onPress)}>
                   <View style={[styles.rowIcon, option.destructive ? styles.rowIconDestructive : null]}>
-                    <Feather
-                      name={option.icon}
+                    <Icon
+                      icon={option.icon}
                       size={18}
                       color={option.destructive ? theme.danger : theme.accentBright}
                     />

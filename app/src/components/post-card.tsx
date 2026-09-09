@@ -1,16 +1,16 @@
-import { Feather, Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
+import { Icon } from '@/components/icon';
 import { type CommentItem, PostComments } from '@/components/post-comments';
 import { PhotoPlaceholder, type MissingPhoto } from '@/components/photo-placeholder';
 import { ReactionChip } from '@/components/reaction-chip';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, FilledIcons, Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
+import { Colors, Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type Reaction = {
@@ -126,7 +126,7 @@ export function PostCard({
                 <ThemedText type="meta" themeColor="muted">
                   ·
                 </ThemedText>
-                <Ionicons name={FilledIcons.inAlbum} size={12} color={theme.accent} />
+                <Icon icon={Icons.inAlbum} size={12} color={theme.accent} filled />
                 <ThemedText type="meta" themeColor="accent">
                   Album
                 </ThemedText>

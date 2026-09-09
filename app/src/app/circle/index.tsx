@@ -13,19 +13,17 @@ import { ThemedView } from '@/components/themed-view';
 import { Icons, Spacing } from '@/constants/theme';
 import {
   getAllPendingJoinRequests,
-  getCircleCoverBytes,
   getCircleMemberCount,
-  getNewestFetchedPostId,
   getNewestPostCreatedAt,
   getProfile,
   getUnreadCount,
   listCircles,
   type CircleListRow,
 } from '@/data/db';
+import { resolveCircleCoverUri } from '@/domain/usecases/circle/circle-cover';
 import { checkPendingJoinRequest } from '@/domain/usecases/circle/join-circle';
 import { getCircleIdentity } from '@/services/keystore';
 import { bytesToDataUri } from '@/services/image';
-import { cachedCoverUri, ensurePhotoUri, writeCoverFile } from '@/services/photo-cache';
 import { formatRelativeTime } from '@/services/relative-time';
 import { nudgePhotoQueue } from '@/sync/photo-queue';
 import { syncAllCircles } from '@/sync/sync-circles';
@@ -55,28 +53,6 @@ async function resolveLatestActivity(circleId: string): Promise<string | undefin
   return newestPostCreatedAt === null ? undefined : `Last added ${formatRelativeTime(newestPostCreatedAt)}`;
 }
 
-/**
- * The circle's cover as a cached `file://` path. Only a circle whose file
- * is missing costs a read of its bytes; everything after is an existence
- * check — which is what keeps re-entering this screen cheap. Handing
- * `expo-image` a base64 data URI instead meant serialising ~260KB of
- * string into the native tree on every focus.
- */
-async function resolveCoverUri(circleId: string): Promise<string | undefined> {
-  const cached = cachedCoverUri(circleId);
-  if (cached) return cached;
-
-  const bytes = await getCircleCoverBytes(circleId);
-  if (bytes) return writeCoverFile(circleId, bytes);
-
-  // No cover of its own: fall back to the newest post's photo, reusing the
-  // file the photo queue already wrote rather than reading those bytes
-  // back out of SQLite. Deliberately not cached under COVER_ENTRY_ID — the
-  // fallback should follow the newest post, not freeze on today's.
-  const newestPostId = await getNewestFetchedPostId(circleId);
-  return newestPostId ? (ensurePhotoUri(circleId, newestPostId, () => null) ?? undefined) : undefined;
-}
-
 export default function CircleListScreen() {
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
   const [circles, setCircles] = useState<CircleListItem[]>([]);
@@ -96,7 +72,7 @@ export default function CircleListScreen() {
       allCircles.map(async (circle) => {
         const [memberCount, photoUri, newCount, latestActivity] = await Promise.all([
           getCircleMemberCount(circle.id),
-          resolveCoverUri(circle.id),
+          resolveCircleCoverUri(circle.id),
           resolveUnreadCount(circle),
           resolveLatestActivity(circle.id),
         ]);

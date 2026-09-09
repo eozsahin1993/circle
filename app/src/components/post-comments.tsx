@@ -1,8 +1,8 @@
-import { Feather } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
+import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { Icons, Radius, Tints, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -109,7 +109,7 @@ export function PostComments({ latest, total, composerOpen, onSubmit, onPressSho
               composer is just the field. */}
           {text.trim() ? (
             <Pressable onPress={handleSubmit} style={[styles.send, { backgroundColor: theme.accent }]}>
-              <Feather name={Icons.send} size={17} color={theme.accentLabel} />
+              <Icon icon={Icons.send} size={17} color={theme.accentLabel} />
             </Pressable>
           ) : null}
         </View>

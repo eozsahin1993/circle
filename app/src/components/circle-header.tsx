@@ -1,7 +1,7 @@
-import { Feather } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { BackButton } from '@/components/back-button';
+import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { Icons, Radius, Tints } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -32,11 +32,11 @@ export function CircleHeader({ name, memberCount, onPressDetails, onPressAlbum }
       </Pressable>
 
       <Pressable style={styles.circleButton} onPress={onPressAlbum} hitSlop={8}>
-        <Feather name={Icons.album} size={18} color={theme.secondary} />
+        <Icon icon={Icons.album} size={18} color={theme.secondary} />
       </Pressable>
 
       <Pressable style={styles.circleButton} onPress={onPressDetails} hitSlop={8}>
-        <Feather name={Icons.more} size={18} color={theme.secondary} />
+        <Icon icon={Icons.more} size={18} color={theme.secondary} />
       </Pressable>
     </View>
   );
