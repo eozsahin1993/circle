@@ -2,10 +2,11 @@ import { entropyToMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Share, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PrimaryButton } from '@/components/primary-button';
+import { SecondaryButton } from '@/components/secondary-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -22,6 +23,20 @@ export default function RecoveryPhraseScreen() {
     });
   }, []);
 
+  /**
+   * Hands the words to the OS share sheet so they can land in a mailbox
+   * or notes app, which people keep and can search years later, unlike the
+   * paper this screen otherwise implies. Deliberately the device's own
+   * share sheet rather than anything the relay sends: a phrase the server
+   * transmits is a phrase the server saw.
+   */
+  async function handleSendToSelf() {
+    if (!words) return;
+    await Share.share({
+      message: `Circle recovery phrase\n\n${words.join(' ')}\n\nThese 12 words restore your circles on a new phone. Anyone who has them can too.`,
+    });
+  }
+
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
@@ -29,8 +44,8 @@ export default function RecoveryPhraseScreen() {
 
         <View style={styles.content}>
           <ThemedText type="captionFeed" themeColor="secondary">
-            These 12 words can rebuild your circle keys on a new phone. Anyone who has them can too
-            — keep them as offline as the photos themselves.
+            These 12 words can rebuild your circle keys on a new phone. Anyone who has them can too,
+            so keep them somewhere only you can get to.
           </ThemedText>
 
           <ThemedView type="surface" style={styles.card}>
@@ -57,6 +72,8 @@ export default function RecoveryPhraseScreen() {
           </ThemedView>
 
           <View style={styles.spacer} />
+
+          {revealed ? <SecondaryButton label="Save them somewhere" onPress={handleSendToSelf} /> : null}
 
           <PrimaryButton
             label={revealed ? 'Done' : 'Reveal words'}
