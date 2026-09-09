@@ -32,7 +32,16 @@ export async function broadcastProfileUpdate(name: string, picture: Uint8Array |
     try {
       const identity = await getCircleIdentity(circle.id);
       const current = await getCurrentContentKey(circle.id);
-      if (!identity || !current) continue;
+      // Worth a line even though there's nothing to do about it: unlike a
+      // failed push, nothing is queued, so no later sync retries this and
+      // the circle simply never learns. Silence made that indistinguishable
+      // from success.
+      if (!identity || !current) {
+        console.error(
+          `Skipped the profile update for circle ${circle.id}: this device has no ${identity ? 'content key' : 'circle identity'} for it.`,
+        );
+        continue;
+      }
 
       const entry = buildAndEncryptLogEntry(
         EntryTypes.PROFILE_UPDATE,
