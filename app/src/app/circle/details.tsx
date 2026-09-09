@@ -65,6 +65,14 @@ export default function CircleDetailsScreen() {
   const ownPublicKey = details?.ownPublicKey ?? null;
   const invite = details?.invite ?? null;
 
+  /**
+   * Only an admin may write `member_added` or change a role, so a circle
+   * whose one admin loses their device can never add or remove anyone
+   * again, including re-adding that person. No entry repairs it after the
+   * fact, so promoting a second admin first is the only fix there is.
+   */
+  const soleAdmin = admin && members.filter((member) => member.role === MemberRoles.admin).length === 1;
+
   const reload = useCallback(async () => {
     if (!circleId) return;
     setDetails(await loadCircleDetails(circleId));
@@ -403,6 +411,13 @@ export default function CircleDetailsScreen() {
         </View>
 
         {members.map(renderMember)}
+
+        {soleAdmin && members.length > 1 ? (
+          <ThemedText type="meta" themeColor="faint" style={styles.adminNotice}>
+            You are the only admin. If you lose this phone, nobody can be added or removed again. Tap
+            someone above to make them an admin too.
+          </ThemedText>
+        ) : null}
       </>
     );
   }
@@ -549,6 +564,9 @@ const styles = StyleSheet.create({
   adminBadgeText: {
     fontSize: 10.5,
     fontWeight: '600',
+  },
+  adminNotice: {
+    marginTop: 10,
   },
   debugZone: {
     marginTop: Spacing.cardListGap,
