@@ -299,6 +299,27 @@ export function deriveJoinRequestKey(inviteCode: string): Uint8Array {
   return hkdf(sha256, new TextEncoder().encode(inviteCode), undefined, JOIN_REQUEST_KEY_DOMAIN, 32);
 }
 
+const DEVICE_TRANSFER_TAG_DOMAIN = new TextEncoder().encode('device-transfer-tag');
+const DEVICE_TRANSFER_REQUEST_KEY_DOMAIN = new TextEncoder().encode('device-transfer-request');
+
+/**
+ * Derives the relay-visible tag for a device transfer's mailbox row —
+ * same shape as `deriveInviteTag`, a different domain string so a
+ * transfer code can never address an invite's row or vice versa.
+ */
+export function deriveDeviceTransferTag(transferCode: string): string {
+  return bytesToHex(sha256(concatBytes(DEVICE_TRANSFER_TAG_DOMAIN, new TextEncoder().encode(transferCode))));
+}
+
+/**
+ * `HKDF(transfer_code, "device-transfer-request")` — encrypts the waiting
+ * device's row, so the relay doesn't learn a device model name it has no
+ * other way to see. Only the phone that scanned the QR holds the code.
+ */
+export function deriveDeviceTransferRequestKey(transferCode: string): Uint8Array {
+  return hkdf(sha256, new TextEncoder().encode(transferCode), undefined, DEVICE_TRANSFER_REQUEST_KEY_DOMAIN, 32);
+}
+
 /**
  * Generates a fresh one-time X25519 keypair for a single handshake message
  * — never reused, never persisted beyond that one exchange. Used for the

@@ -121,6 +121,17 @@ export default function ProfileSetupScreen() {
             onPress={handleContinue}
             style={styles.continueButton}
           />
+
+          {/* Only reachable once signed in — the transfer handshake goes
+              through the relay's mailbox, which needs a session. */}
+          <Pressable
+            style={styles.alreadyHaveAccount}
+            disabled={saving}
+            onPress={() => router.push('/account/transfer')}>
+            <ThemedText type="buttonLabel" themeColor="accentBright">
+              I already have an account
+            </ThemedText>
+          </Pressable>
         </KeyboardAvoider>
       </SafeAreaView>
     </ThemedView>
@@ -133,6 +144,12 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+    paddingHorizontal: Spacing.screenPadding,
+  },
+  alreadyHaveAccount: {
+    alignSelf: 'center',
+    marginTop: Spacing.cardListGap,
+    paddingVertical: 14,
     paddingHorizontal: Spacing.screenPadding,
   },
   form: {

@@ -1,24 +1,20 @@
 import { router, useFocusEffect } from 'expo-router';
-import * as Device from 'expo-device';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
-import { Icon } from '@/components/icon';
 import { PrivacyInfoModal } from '@/components/privacy-info-modal';
 import { ReactionChip } from '@/components/reaction-chip';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { SettingsGroups, type SettingsGroup } from '@/components/settings-group';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Icons, Radius, Spacing, Tints } from '@/constants/theme';
-import { getProfile, type Profile } from '@/data/db';
+import { Radius, Spacing, Tints } from '@/constants/theme';
+import { getProfile, listCircles, type Profile } from '@/data/db';
 import { resetLocalDataForTesting } from '@/domain/usecases/dev-reset';
 import { signOut } from '@/domain/usecases/account/sign-in';
 import { useAppSettings } from '@/hooks/use-app-settings';
-import { useTheme } from '@/hooks/use-theme';
-import { showError, showMessage } from '@/services/messages';
 import { bytesToDataUri } from '@/services/image';
 import type { ThemePreference } from '@/services/settings';
 
@@ -28,25 +24,20 @@ const APPEARANCE_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'dark', label: 'Dark' },
 ];
 
-// Stated as a plan, not an enforced limit — there's no device-linking flow
-// to add a second device yet, so nothing actually counts toward this today.
-const DEVICE_CAP = 3;
-
-function formatAdded(ms: number): string {
-  return new Date(ms).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-}
-
 export default function AccountScreen() {
-  const theme = useTheme();
   const { settings, updateSettings } = useAppSettings();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [resettingDevData, setResettingDevData] = useState(false);
+  // Gates the "bring over" direction: adopting another account's seed
+  // would strand any circle this device already joined under its own.
+  const [hasCircles, setHasCircles] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
       getProfile().then(setProfile);
+      listCircles().then((circles) => setHasCircles(circles.length > 0));
     }, []),
   );
 
@@ -79,6 +70,28 @@ export default function AccountScreen() {
             value: settings.notifyMemberJoined,
             onValueChange: (value) => updateSettings({ notifyMemberJoined: value }),
           },
+        },
+      ],
+    },
+    {
+      title: 'Devices',
+      // No list and no count: nothing tracks which devices hold your keys,
+      // and nothing could revoke one if it did — every device with the
+      // seed derives the same identity, so the log can't tell them apart.
+      // A list you can't act on reads as control you don't have.
+      footnote: 'A device you add holds the same keys as this one. There is no way to take them back.',
+      rows: [
+        {
+          label: 'Add another device',
+          description: 'Scan the code on your other phone',
+          control: { kind: 'navigate' },
+          onPress: () => router.push('/account/scan-device'),
+        },
+        !hasCircles && {
+          label: 'Bring over an existing account',
+          description: 'Show a code for your old phone to scan',
+          control: { kind: 'navigate' },
+          onPress: () => router.push('/account/transfer'),
         },
       ],
     },
@@ -176,47 +189,6 @@ export default function AccountScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <ThemedText type="eyebrow" themeColor="muted">
-                Devices holding your keys
-              </ThemedText>
-              <ThemedText type="meta" themeColor="muted">
-                1 of {DEVICE_CAP} allowed
-              </ThemedText>
-            </View>
-
-            <ThemedView type="surface" style={styles.card}>
-              <View style={styles.deviceRow}>
-                <View style={[styles.statusDot, { backgroundColor: theme.accent }]} />
-                <View style={styles.deviceInfo}>
-                  <ThemedText type="postAuthor">{Device.modelName ?? 'This device'} · this phone</ThemedText>
-                  <ThemedText type="meta" themeColor="muted">
-                    {profile ? `Added ${formatAdded(profile.createdAt)} · ` : ''}in use now
-                  </ThemedText>
-                </View>
-                <ThemedText type="meta" themeColor="muted">
-                  This one
-                </ThemedText>
-              </View>
-
-              <Pressable
-                style={styles.addDeviceRow}
-                onPress={() =>
-                  showError('Linking a second device isn’t built yet')
-                }>
-                <ThemedText type="postAuthor" themeColor="accentBright">
-                  Add another device
-                </ThemedText>
-                <Icon icon={Icons.disclosure} size={18} color={theme.accentBright} />
-              </Pressable>
-            </ThemedView>
-
-            <ThemedText type="meta" themeColor="faint" style={styles.explainer}>
-              Revoking a device removes its copy of your keys. Photos already on it stay on it.
-            </ThemedText>
-          </View>
-
 
           <View style={styles.section}>
             <ThemedText type="eyebrow" themeColor="muted" style={styles.sectionLabel}>
@@ -283,45 +255,8 @@ const styles = StyleSheet.create({
   section: {
     gap: 10,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   sectionLabel: {
     marginBottom: 0,
-  },
-  card: {
-    borderColor: Tints.chipIdleBorder,
-    borderWidth: 1,
-    borderRadius: Radius.notice,
-    paddingHorizontal: Spacing.screenPadding,
-  },
-  deviceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Tints.chipIdleBorder,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  deviceInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  addDeviceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-  },
-  explainer: {
-    paddingHorizontal: 4,
   },
   appearanceRow: {
     flexDirection: 'row',

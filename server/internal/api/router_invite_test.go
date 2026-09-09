@@ -173,3 +173,83 @@ func TestEndToEnd_Invite_ApproveUnknownRequestReturns404(t *testing.T) {
 		t.Fatalf("expected 404 approving a join request that was never made, got %d", resp.StatusCode)
 	}
 }
+
+// TestEndToEnd_DeviceTransfer_NoPreviewRow walks the device-transfer
+// handshake, which reuses these same routes with the parties swapped (see
+// app/src/domain/usecases/account/device-transfer-payloads.ts).
+//
+// The one thing it exists to prove: a transfer never writes an invite
+// preview row, because there is no circle to preview. Every step below
+// therefore runs against a tag whose partition holds nothing but the one
+// request row. If a future change made a request or an approval depend on
+// its invite existing, this is what would catch it — the client would
+// otherwise fail at the point where a master seed was being handed over.
+func TestEndToEnd_DeviceTransfer_NoPreviewRow(t *testing.T) {
+	mux, google, _ := testsupport.NewRouterWithAuth(t)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	claims := validClaims(t, testsupport.UniqueEmail(t), testsupport.TestGoogleClientID)
+	claims["iss"] = google.Issuer
+	token := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
+
+	transferTag := testsupport.UniqueInviteTag(t)
+	requesterID := "transfer-requester"
+
+	// The waiting device publishes its one-time public key. No preview.
+	request := base64.StdEncoding.EncodeToString([]byte("pretend-encrypted-device-name"))
+	putRequestResp := authedRequest(t, http.MethodPut, server.URL+"/v1/invites/"+transferTag+"/requests/"+requesterID, token, `{"encryptedRequest":"`+request+`"}`)
+	defer putRequestResp.Body.Close()
+	if putRequestResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 putting a request under a tag with no invite row, got %d", putRequestResp.StatusCode)
+	}
+
+	// The established device reads it back to name what it's about to trust.
+	listResp := authedRequest(t, http.MethodGet, server.URL+"/v1/invites/"+transferTag+"/requests", token, "")
+	defer listResp.Body.Close()
+	var listBody struct {
+		Requests []struct {
+			RequesterID      string `json:"requesterId"`
+			EncryptedRequest string `json:"encryptedRequest"`
+		} `json:"requests"`
+	}
+	if err := json.NewDecoder(listResp.Body).Decode(&listBody); err != nil {
+		t.Fatal(err)
+	}
+	if len(listBody.Requests) != 1 || listBody.Requests[0].EncryptedRequest != request {
+		t.Fatalf("expected the one request row back, got %+v", listBody.Requests)
+	}
+
+	// ...then seals the account to it.
+	approval := base64.StdEncoding.EncodeToString([]byte("pretend-sealed-master-seed"))
+	putApprovalResp := authedRequest(t, http.MethodPut, server.URL+"/v1/invites/"+transferTag+"/requests/"+requesterID+"/approval", token, `{"encryptedApproval":"`+approval+`"}`)
+	defer putApprovalResp.Body.Close()
+	if putApprovalResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 approving under a tag with no invite row, got %d", putApprovalResp.StatusCode)
+	}
+
+	getResp := authedRequest(t, http.MethodGet, server.URL+"/v1/invites/"+transferTag+"/requests/"+requesterID, token, "")
+	defer getResp.Body.Close()
+	var getBody struct {
+		EncryptedApproval *string `json:"encryptedApproval"`
+	}
+	if err := json.NewDecoder(getResp.Body).Decode(&getBody); err != nil {
+		t.Fatal(err)
+	}
+	if getBody.EncryptedApproval == nil || *getBody.EncryptedApproval != approval {
+		t.Fatalf("expected the sealed payload back, got %v", getBody.EncryptedApproval)
+	}
+
+	// The waiting device clears the row once it has consumed the payload.
+	deleteResp := authedRequest(t, http.MethodDelete, server.URL+"/v1/invites/"+transferTag+"/requests/"+requesterID, token, "")
+	defer deleteResp.Body.Close()
+	if deleteResp.StatusCode != http.StatusOK && deleteResp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected the transfer row to be deletable, got %d", deleteResp.StatusCode)
+	}
+
+	afterResp := authedRequest(t, http.MethodGet, server.URL+"/v1/invites/"+transferTag+"/requests/"+requesterID, token, "")
+	defer afterResp.Body.Close()
+	if afterResp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404 once the sealed payload was cleared, got %d", afterResp.StatusCode)
+	}
+}
