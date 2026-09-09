@@ -26,6 +26,7 @@ import { getCircleIdentity } from '@/services/keystore';
 import { bytesToDataUri } from '@/services/image';
 import { formatRelativeTime } from '@/services/relative-time';
 import { nudgePhotoQueue } from '@/sync/photo-queue';
+import { showError } from '@/services/messages';
 import { syncAllCircles } from '@/sync/sync-circles';
 
 type CircleListItem = CircleListRow & {
@@ -104,8 +105,9 @@ export default function CircleListScreen() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await syncAllCircles();
+      const failed = await syncAllCircles();
       nudgePhotoQueue();
+      if (failed > 0) showError('Could not refresh your circles');
     } finally {
       await loadFromDatabase().catch((err) => console.error('Failed to reload circles', err));
       setRefreshing(false);

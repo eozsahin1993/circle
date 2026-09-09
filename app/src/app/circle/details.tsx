@@ -26,6 +26,7 @@ import { removeMember } from '@/domain/usecases/circle/remove-member';
 import { renameCircle } from '@/domain/usecases/circle/rename-circle';
 import { setCoverPhoto } from '@/domain/usecases/circle/set-cover-photo';
 import { useTheme } from '@/hooks/use-theme';
+import { showDone, showError } from '@/services/messages';
 import { bytesToDataUri, pickAndCompressImage } from '@/services/image';
 
 function inviteLink(code: string): string {
@@ -53,7 +54,6 @@ export default function CircleDetailsScreen() {
   const { circleId } = useLocalSearchParams<{ circleId: string }>();
   const [details, setDetails] = useState<CircleDetails | null>(null);
   const [sharing, setSharing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [memberMenu, setMemberMenu] = useState<Member | null>(null);
   const [inviteSheet, setInviteSheet] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -106,7 +106,7 @@ export default function CircleDetailsScreen() {
               await reload();
             } catch (err) {
               console.error('Failed to remove member', err);
-              setError("Couldn't remove that member — try again.");
+              showError('Could not remove that member');
             }
           },
         },
@@ -121,7 +121,7 @@ export default function CircleDetailsScreen() {
       await reload();
     } catch (err) {
       console.error('Failed to change member role', err);
-      setError("Couldn't change that member's role — try again.");
+      showError('Could not change their role');
     }
   }
 
@@ -150,7 +150,6 @@ export default function CircleDetailsScreen() {
   async function handleShareLink() {
     if (!circleId) return;
     setSharing(true);
-    setError(null);
     try {
       const invite = await getOrCreateInvite(circleId);
       await Share.share({
@@ -158,7 +157,7 @@ export default function CircleDetailsScreen() {
       });
     } catch (err) {
       console.error('Failed to share invite', err);
-      setError("Couldn't create an invite — try again.");
+      showError('Could not create an invite');
     } finally {
       setSharing(false);
     }
@@ -167,14 +166,13 @@ export default function CircleDetailsScreen() {
   /** Mints the key before opening, so the sheet never renders an empty code. */
   async function handleShowCode() {
     if (!circleId) return;
-    setError(null);
     try {
       await getOrCreateInvite(circleId);
       await reload();
       setInviteSheet(true);
     } catch (err) {
       console.error('Failed to create an invite', err);
-      setError("Couldn't create an invite — try again.");
+      showError('Could not create an invite');
     }
   }
 
@@ -191,13 +189,12 @@ export default function CircleDetailsScreen() {
           style: 'destructive',
           onPress: async () => {
             setSharing(true);
-            setError(null);
             try {
               await replaceInvite(circleId);
               await reload();
             } catch (err) {
               console.error('Failed to replace the invite key', err);
-              setError("Couldn't replace the key — try again.");
+              showError('Could not replace the key');
             } finally {
               setSharing(false);
             }
@@ -224,7 +221,7 @@ export default function CircleDetailsScreen() {
               await leaveCircle(circleId);
             } catch (err) {
               console.error('Failed to leave circle', err);
-              Alert.alert("Couldn't leave", String(err));
+              showError('Could not leave the circle');
               return;
             }
             router.dismissTo('/circle');
@@ -236,7 +233,6 @@ export default function CircleDetailsScreen() {
 
   async function handleSetCoverPhoto() {
     if (!circleId) return;
-    setError(null);
     try {
       const picked = await pickAndCompressImage();
       if (!picked) return;
@@ -244,20 +240,19 @@ export default function CircleDetailsScreen() {
       await reload();
     } catch (err) {
       console.error('Failed to set the cover photo', err);
-      setError("Couldn't set the cover photo — try again.");
+      showError('Could not set the cover photo');
     }
   }
 
   async function handleRename(name: string) {
     if (!circleId) return;
-    setError(null);
     try {
       await renameCircle(circleId, name);
       setRenaming(false);
       await reload();
     } catch (err) {
       console.error('Failed to rename the circle', err);
-      setError("Couldn't rename the circle — try again.");
+      showError('Could not rename the circle');
       setRenaming(false);
     }
   }
@@ -267,10 +262,10 @@ export default function CircleDetailsScreen() {
     try {
       const flags = await buildDebugKeysetFlags(circleId);
       await Clipboard.setStringAsync(flags);
-      Alert.alert('Copied', 'Paste after `go run ./cmd/decryptlog --table <table>` on your machine.');
+      showDone('Keyset copied for decryptlog');
     } catch (err) {
       console.error('Failed to build debug keyset', err);
-      Alert.alert("Couldn't copy the keyset", String(err));
+      showError('Could not copy the keyset');
     }
   }
 
@@ -290,7 +285,7 @@ export default function CircleDetailsScreen() {
               router.dismissTo('/circle');
             } catch (err) {
               console.error('Failed to delete circle', err);
-              setError("Couldn't delete the circle — try again.");
+              showError('Could not delete the circle');
             }
           },
         },
@@ -456,12 +451,6 @@ export default function CircleDetailsScreen() {
 
           {admin ? <SettingsGroups groups={[inviteGroup]} /> : null}
 
-          {error ? (
-            <ThemedText type="meta" themeColor="accent" style={styles.error}>
-              {error}
-            </ThemedText>
-          ) : null}
-
           {renderMemberList()}
 
           <SettingsGroups groups={settingsGroups} />
@@ -523,9 +512,6 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: Spacing.cardListGap,
-  },
-  error: {
-    marginTop: 10,
   },
   sectionHeader: {
     flexDirection: 'row',

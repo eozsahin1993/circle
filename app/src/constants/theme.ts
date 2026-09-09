@@ -9,11 +9,13 @@ import Album from 'lucide-react-native/icons/album';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import ArrowUp from 'lucide-react-native/icons/arrow-up';
 import Bookmark from 'lucide-react-native/icons/bookmark';
+import Check from 'lucide-react-native/icons/check';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import CircleAlert from 'lucide-react-native/icons/circle-alert';
 import CloudDownload from 'lucide-react-native/icons/cloud-download';
 import Ellipsis from 'lucide-react-native/icons/ellipsis';
 import Heart from 'lucide-react-native/icons/heart';
+import Info from 'lucide-react-native/icons/info';
 import Link from 'lucide-react-native/icons/link';
 import Lock from 'lucide-react-native/icons/lock';
 import MessageCircle from 'lucide-react-native/icons/message-circle';
@@ -24,6 +26,7 @@ import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import ShieldOff from 'lucide-react-native/icons/shield-off';
 import SquarePen from 'lucide-react-native/icons/square-pen';
 import Trash from 'lucide-react-native/icons/trash';
+import TriangleAlert from 'lucide-react-native/icons/triangle-alert';
 import UserX from 'lucide-react-native/icons/user-x';
 import X from 'lucide-react-native/icons/x';
 
@@ -33,6 +36,7 @@ export const Colors = {
   dark: {
     background: '#14100C',
     surface: '#1D1712',
+    raised: '#2A231B',
     accent: '#C08A2E',
     accentBright: '#DCA645',
     accentLabel: '#17120C',
@@ -47,6 +51,7 @@ export const Colors = {
   light: {
     background: '#F3EDE2',
     surface: '#FFFFFF',
+    raised: '#E9E0D1',
     accent: '#A6552F',
     accentBright: '#A6552F',
     accentLabel: '#FFFFFF',
@@ -61,6 +66,19 @@ export const Colors = {
 } as const;
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+
+/**
+ * `raised` is for the few things that float over the page rather than
+ * sitting in it — see `SnackbarHost`. `surface` can't do that job: in dark
+ * mode it's nine values off `background`, which is the point for a card
+ * embedded in the page and useless for something meant to look detached.
+ *
+ * It moves *away* from the page in both schemes rather than always
+ * lighter — lighter in dark mode, darker in light — so the separation
+ * doesn't depend on which one you're in. Deliberately not the inverse of
+ * the page, bright-on-dark: a light bar would be the brightest thing on a
+ * dark screen, and this system reserves that for photographs.
+ */
 
 /** Photo placeholder slot background, light mode only — dark mode uses `surface`. */
 export const PhotoSlotLight = '#DED4C4';
@@ -84,6 +102,10 @@ export const Tints = {
   dangerWashBorder: 'rgba(217,122,110,0.35)',
   dangerWashBg: 'rgba(217,122,110,0.12)',
   secondaryButtonBorder: 'rgba(245,239,230,0.2)',
+  /** The three edges a `raised` surface can carry — quiet by default, tinted when the message has an outcome. */
+  raisedBorder: 'rgba(245,239,230,0.08)',
+  raisedAccentBorder: 'rgba(192,138,46,0.30)',
+  raisedDangerBorder: 'rgba(217,122,110,0.30)',
 } as const;
 
 export const Fonts = {
@@ -155,8 +177,14 @@ export const Icons = {
   deletePost: Trash,
   /** A photo whose entry has landed but whose bytes haven't yet. */
   photoArriving: CloudDownload,
-  /** A photo whose download has failed enough times to stop looking temporary. */
+  /** A photo whose download has failed enough times to stop looking temporary. Also what a failed message is marked with — see `SnackbarHost`. */
   photoUnavailable: CircleAlert,
+  /** A message about the app rather than about something that just happened. */
+  notice: Info,
+  /** Something asked for has happened — the message confirming a delete, a copy. */
+  done: Check,
+  /** Something asked for didn't happen, and won't without help. */
+  failed: TriangleAlert,
   /** The circle's album — every photo it holds, not just what's in the feed. */
   album: Album,
   /** Whether one post is kept in that album — the album seen from a single photo. Solid when it is; see `Icon`'s `filled`. */

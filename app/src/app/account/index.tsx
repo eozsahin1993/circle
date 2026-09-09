@@ -18,6 +18,7 @@ import { resetLocalDataForTesting } from '@/domain/usecases/dev-reset';
 import { signOut } from '@/domain/usecases/account/sign-in';
 import { useAppSettings } from '@/hooks/use-app-settings';
 import { useTheme } from '@/hooks/use-theme';
+import { showError, showMessage } from '@/services/messages';
 import { bytesToDataUri } from '@/services/image';
 import type { ThemePreference } from '@/services/settings';
 
@@ -202,10 +203,7 @@ export default function AccountScreen() {
               <Pressable
                 style={styles.addDeviceRow}
                 onPress={() =>
-                  Alert.alert(
-                    'Not available yet',
-                    'Linking a second device isn’t built yet — this phone is the only one that can post to your circles right now.',
-                  )
+                  showError('Linking a second device isn’t built yet')
                 }>
                 <ThemedText type="postAuthor" themeColor="accentBright">
                   Add another device

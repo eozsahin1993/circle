@@ -7,6 +7,7 @@ import { usePrivacyRows } from '@/components/feed/privacy-row';
 import { useRosterChangeRows } from '@/components/feed/roster-change-row';
 import { buildFeedRows, type FeedRow, type FeedRows } from '@/components/feed/rows';
 import { loadCircleFeed, type CircleFeed, type FeedPostView } from '@/domain/usecases/feed/circle-feed';
+import { showError } from '@/services/messages';
 import { nudgePhotoQueue } from '@/sync/photo-queue';
 import { syncCircle } from '@/sync/sync-circles';
 
@@ -115,9 +116,11 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
       await syncCircle(circleId);
       nudgePhotoQueue();
     } catch (err) {
-      // An offline pull still re-reads below, so it shows whatever landed
-      // last rather than an error over stale-but-valid content.
+      // Reported, then re-read below anyway: a pull that couldn't reach
+      // the relay still shows whatever landed last, rather than replacing
+      // stale-but-valid content with a failure.
       console.error('Failed to sync on pull-to-refresh', err);
+      showError('Could not refresh the feed');
     } finally {
       await reload().catch((err) => console.error('Failed to reload the feed', err));
       setRefreshing(false);

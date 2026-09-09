@@ -36,6 +36,7 @@ import { deletePost } from '@/domain/usecases/post/delete-post';
 import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
 import { setAlbumVisibility } from '@/domain/usecases/post/set-album-visibility';
 import { useTheme } from '@/hooks/use-theme';
+import { showError, showMessage } from '@/services/messages';
 import { bytesToDataUri } from '@/services/image';
 import { getCircleIdentity } from '@/services/keystore';
 import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
@@ -143,6 +144,9 @@ export default function PostDetailsScreen() {
     } catch (err) {
       console.error('Failed to change album visibility', err);
       setPost({ ...post, inAlbum: post.inAlbum });
+      // The revert is otherwise indistinguishable from the tap not
+      // registering, or from the app undoing it on a whim.
+      showError(next ? 'Could not add it to the album' : 'Could not remove it from the album');
     }
   }
 
@@ -156,19 +160,23 @@ export default function PostDetailsScreen() {
 
     Alert.alert('Delete this photo?', 'It will disappear for everyone in the circle. This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          deletePost(circleId, postId)
-            .then(() => router.back())
-            .catch((err) => {
-              console.error('Failed to delete the post', err);
-              Alert.alert('Could not delete', 'The photo is still there. Try again in a moment.');
-            });
-        },
-      },
+      { text: 'Delete', style: 'destructive', onPress: runDelete },
     ]);
+  }
+
+  /** The deletion itself, so Retry doesn't ask a question already answered. */
+  function runDelete() {
+    if (!circleId || !postId) return;
+
+    deletePost(circleId, postId)
+      .then(() => {
+        router.back();
+        showMessage('Photo deleted', { icon: Icons.deletePost });
+      })
+      .catch((err) => {
+        console.error('Failed to delete the post', err);
+        showError('Could not delete the photo', { action: { label: 'Retry', onPress: runDelete } });
+      });
   }
 
   async function handleSubmitComment() {

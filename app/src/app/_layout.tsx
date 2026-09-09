@@ -8,9 +8,11 @@ import { useFonts } from 'expo-font';
 import { useEffect, useState } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 
+import { Snackbar } from '@/components/snackbar';
 import { Colors } from '@/constants/theme';
 import { initDatabase } from '@/data/db';
 import { AppSettingsProvider, useAppSettings } from '@/hooks/use-app-settings';
+import { useMessages } from '@/hooks/use-messages';
 import { getAppSettings, type AppSettings } from '@/services/settings';
 import { startJankMonitor } from '@/services/timing';
 import { startSyncScheduler } from '@/sync/scheduler';
@@ -62,10 +64,14 @@ const HearthLightTheme = {
 /** Picks the nav theme off the resolved scheme (system/light/dark preference already applied) rather than the raw OS setting, so the Appearance picker in /account actually changes anything. */
 function AppShell() {
   const { scheme } = useAppSettings();
+  const { message, visible, dismiss, settle } = useMessages();
 
   return (
     <ThemeProvider value={scheme === 'dark' ? HearthDarkTheme : HearthLightTheme}>
       <Stack screenOptions={{ headerShown: false }} />
+      {/* Outside the stack, so a message survives the screen that caused
+          it — including one that navigates away as it reports. */}
+      <Snackbar message={message} visible={visible} dismiss={dismiss} onHidden={settle} />
     </ThemeProvider>
   );
 }

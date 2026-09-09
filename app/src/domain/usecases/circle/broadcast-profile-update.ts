@@ -7,6 +7,7 @@ import { insertOutboxEntry, listCircles, OutboxStatuses, updateMemberProfile } f
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { compressToThumbnail } from '@/services/image';
+import { showError } from '@/services/messages';
 import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
 
 /**
@@ -19,7 +20,9 @@ import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
  * Best-effort per circle, independently: one circle being offline or
  * missing a content key doesn't block the others, and queues through the
  * same outbox every other meta write uses so a temporarily offline device
- * still gets there once connectivity returns. Call this after saving the
+ * still gets there once connectivity returns. What it couldn't queue at
+ * all is said out loud — nothing retries that, so silence would be
+ * indistinguishable from having worked. Call this after saving the
  * new profile locally (see data/db/profile.ts's saveProfile) — it doesn't
  * touch the local profile row itself, only broadcasts what's already
  * there to every circle.
@@ -28,6 +31,9 @@ export async function broadcastProfileUpdate(name: string, picture: Uint8Array |
   const pictureThumbnail = picture ? Buffer.from(await compressToThumbnail(picture)).toString('base64') : undefined;
 
   const circles = await listCircles();
+  /** Circles nothing was queued for, by name — see the message below. */
+  const missed: string[] = [];
+
   for (const circle of circles) {
     try {
       const identity = await getCircleIdentity(circle.id);
@@ -40,6 +46,7 @@ export async function broadcastProfileUpdate(name: string, picture: Uint8Array |
         console.error(
           `Skipped the profile update for circle ${circle.id}: this device has no ${identity ? 'content key' : 'circle identity'} for it.`,
         );
+        missed.push(circle.name);
         continue;
       }
 
@@ -67,6 +74,15 @@ export async function broadcastProfileUpdate(name: string, picture: Uint8Array |
       drainOutbox(circle.id).catch((err) => console.error(`Failed to push profile_update for circle ${circle.id}`, err));
     } catch (err) {
       console.error(`Failed to broadcast profile update to circle ${circle.id}`, err);
+      missed.push(circle.name);
     }
+  }
+
+  if (missed.length > 0) {
+    showError(
+      missed.length === 1
+        ? `Could not update your profile in ${missed[0]}`
+        : 'Could not update your profile everywhere',
+    );
   }
 }

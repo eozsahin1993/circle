@@ -6,6 +6,7 @@ import { type CommentItem } from '@/components/post-comments';
 import { missingPhotoFor } from '@/components/photo-placeholder';
 import { PostCard, type Post } from '@/components/post-card';
 import { Spacing } from '@/constants/theme';
+import { showError } from '@/services/messages';
 import type { CommentSummary, CommentWithAuthor, Profile } from '@/data/db';
 import type { FeedPostView } from '@/domain/usecases/feed/circle-feed';
 import { getCommentSummaries, markPostViewed } from '@/data/db';
@@ -82,6 +83,7 @@ export function usePostRows({
         } catch (err) {
           console.error('Failed to change album visibility', err);
           patchPost(id, { post: view.post });
+          showError(next ? 'Could not add it to the album' : 'Could not remove it from the album');
         }
       },
       onOpenPost: (postId) => router.push({ pathname: '/post/[id]', params: { id: postId, circleId } }),

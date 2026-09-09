@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PrimaryButton } from '@/components/primary-button';
+import { showError } from '@/services/messages';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -59,8 +60,11 @@ export default function JoinInviteScreen() {
       router.replace({ pathname: '/join/pending', params: { requestId } });
     } catch (err) {
       console.error('Failed to request to join', err);
-      setError("Couldn't send your request — try again.");
-      setPhase('error');
+      // Back to 'ready', not 'error': the invite is fine, the send wasn't.
+      // The error phase says "Can't open this invite" and takes the button
+      // away, which makes a dropped connection look like a dead key.
+      setPhase('ready');
+      showError('Could not send your request', { action: { label: 'Retry', onPress: handleRequestToJoin } });
     }
   }
 

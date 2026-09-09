@@ -28,19 +28,28 @@ export async function syncCircle(circleId: string): Promise<void> {
  * family-circle scale there are few enough that sequential is simpler
  * than any concurrency limit. A failure is contained to its own circle so
  * one broken circle can't stop the rest syncing.
+ *
+ * Returns how many circles failed rather than throwing, since throwing on
+ * the first would defeat that containment. The scheduler ignores the
+ * count; pull-to-refresh reports it, because someone is standing there
+ * waiting to see whether it worked.
  */
-export async function syncAllCircles(): Promise<void> {
+export async function syncAllCircles(): Promise<number> {
+  let failed = 0;
+
   for (const circle of await getAllCircles()) {
     try {
       await syncCircle(circle.id);
     } catch (err) {
       console.error(`Failed to sync circle ${circle.id}`, err);
+      failed += 1;
     }
   }
   // Circles this device has left are excluded from getAllCircles, but one
   // with a departure still queued needs a pass of its own until that
   // entry has gone out — see finishDeparture.
   await finishPendingDepartures();
+  return failed;
 }
 
 /**

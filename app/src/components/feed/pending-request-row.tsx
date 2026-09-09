@@ -5,6 +5,7 @@ import type { FeedRow, FeedRows } from '@/components/feed/rows';
 import { PendingJoinRequestCard } from '@/components/pending-join-request-card';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { showError } from '@/services/messages';
 import {
   approveJoinRequest,
   denyJoinRequest,
@@ -56,7 +57,7 @@ export function usePendingRequestRows({ circleId, onRosterChanged }: PendingRequ
   }, [circleId]);
 
   const answer = useCallback(
-    async (requesterId: string, act: () => Promise<void>, failure: string, changedRoster = false) => {
+    async (requesterId: string, act: () => Promise<void>, failure: string, message: string, changedRoster = false) => {
       setBusyId(requesterId);
       try {
         await act();
@@ -64,6 +65,7 @@ export function usePendingRequestRows({ circleId, onRosterChanged }: PendingRequ
         if (changedRoster) onRosterChanged();
       } catch (err) {
         console.error(failure, err);
+        showError(message);
       } finally {
         setBusyId(null);
       }
@@ -75,10 +77,21 @@ export function usePendingRequestRows({ circleId, onRosterChanged }: PendingRequ
     () => ({
       busy: busyId !== null,
       onApprove: (requesterId) =>
-        answer(requesterId, () => approveJoinRequest(circleId, requesterId), 'Failed to approve join request', true),
+        answer(
+          requesterId,
+          () => approveJoinRequest(circleId, requesterId),
+          'Failed to approve join request',
+          'Could not let them in',
+          true,
+        ),
       // Denying changes nothing outside this list.
       onDeny: (requesterId) =>
-        answer(requesterId, () => denyJoinRequest(circleId, requesterId), 'Failed to dismiss join request'),
+        answer(
+          requesterId,
+          () => denyJoinRequest(circleId, requesterId),
+          'Failed to dismiss join request',
+          'Could not dismiss the request',
+        ),
     }),
     [busyId, answer, circleId],
   );
