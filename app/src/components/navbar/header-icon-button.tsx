@@ -9,7 +9,8 @@ export type HeaderIconButtonProps = Omit<PressableProps, 'style'> & {
   active?: boolean;
 };
 
-const SIZE = 21;
+/** The back arrow's size, so nothing in the header row is drawn at a different weight. */
+const SIZE = 22;
 
 /** One control in a `ScreenHeader`'s right-hand slot. Bare glyph, no chrome — the header's own row gives it its height. */
 export function HeaderIconButton({ icon, active, ...rest }: HeaderIconButtonProps) {

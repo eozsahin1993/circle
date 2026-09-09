@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { BackButton, type BackButtonProps } from '@/components/back-button';
+import { BackButton, type BackButtonProps } from '@/components/navbar/back-button';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 
@@ -10,26 +10,32 @@ export type ScreenHeaderProps = BackButtonProps & {
   title?: string;
   /** Which one, when the title alone is ambiguous: the circle an album belongs to, say. */
   subtitle?: string;
+  /**
+   * Makes the two lines a tap target. Only for a title that names
+   * something with more behind it — otherwise tapping where you already
+   * are shouldn't take you anywhere.
+   */
+  onPressTitle?: () => void;
   /** Icon controls pinned right, about the screen as a whole — `HeaderIconButton`s. */
   actions?: ReactNode;
 };
 
 /**
- * The back/close row every screen opens with — the one place its spacing
- * lives, so it can't drift screen to screen. Not used by the two screens
- * whose headers aren't "go back one screen" chrome: `circle/index.tsx`
- * (stack root) and `circle/feed.tsx` (see `CircleHeader`).
+ * The header row every screen opens with — the one place its height,
+ * type and spacing live, so it can't drift screen to screen. Used by the
+ * feed as well, whose back button leaves the circle rather than the
+ * screen; only `circle/index.tsx`, the stack root, has none.
  *
- * Both lines sit outside the button: they name where you are, and tapping
- * where you are shouldn't take you somewhere else.
+ * Both lines sit outside the back button, so returning and opening what
+ * you're looking at stay separate targets.
  */
-export function ScreenHeader({ title, subtitle, actions, ...button }: ScreenHeaderProps) {
+export function ScreenHeader({ title, subtitle, onPressTitle, actions, ...button }: ScreenHeaderProps) {
   return (
     <View style={styles.header}>
       <BackButton {...button} />
       {/* Always present, always flexible: it's what holds the actions
           against the right edge, with or without a title in it. */}
-      <View style={styles.titles}>
+      <Pressable style={styles.titles} onPress={onPressTitle} disabled={!onPressTitle}>
         {title ? (
           <ThemedText type="cardTitle" numberOfLines={1}>
             {title}
@@ -40,7 +46,7 @@ export function ScreenHeader({ title, subtitle, actions, ...button }: ScreenHead
             {subtitle}
           </ThemedText>
         ) : null}
-      </View>
+      </Pressable>
       {actions ? <View style={styles.actions}>{actions}</View> : null}
     </View>
   );

@@ -5,6 +5,7 @@
 
 import { Platform } from 'react-native';
 
+import Album from 'lucide-react-native/icons/album';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import ArrowUp from 'lucide-react-native/icons/arrow-up';
 import Bookmark from 'lucide-react-native/icons/bookmark';
@@ -13,7 +14,6 @@ import CircleAlert from 'lucide-react-native/icons/circle-alert';
 import CloudDownload from 'lucide-react-native/icons/cloud-download';
 import Ellipsis from 'lucide-react-native/icons/ellipsis';
 import Heart from 'lucide-react-native/icons/heart';
-import Images from 'lucide-react-native/icons/images';
 import Link from 'lucide-react-native/icons/link';
 import Lock from 'lucide-react-native/icons/lock';
 import MessageCircle from 'lucide-react-native/icons/message-circle';
@@ -22,6 +22,7 @@ import QrCode from 'lucide-react-native/icons/qr-code';
 import RefreshCw from 'lucide-react-native/icons/refresh-cw';
 import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import ShieldOff from 'lucide-react-native/icons/shield-off';
+import SquarePen from 'lucide-react-native/icons/square-pen';
 import Trash from 'lucide-react-native/icons/trash';
 import UserX from 'lucide-react-native/icons/user-x';
 import X from 'lucide-react-native/icons/x';
@@ -140,6 +141,8 @@ export const Icons = {
   /** Trailing affordance on a row that navigates somewhere. */
   disclosure: ChevronRight,
   add: Plus,
+  /** Starts a new post — writing something into the circle, not adding a row to a list. */
+  composePost: SquarePen,
   /** Opens the emoji picker on a post nobody has reacted to yet — outline, since it's an invitation rather than a reaction you left. */
   react: Heart,
   comment: MessageCircle,
@@ -155,7 +158,7 @@ export const Icons = {
   /** A photo whose download has failed enough times to stop looking temporary. */
   photoUnavailable: CircleAlert,
   /** The circle's album — every photo it holds, not just what's in the feed. */
-  album: Images,
+  album: Album,
   /** Whether one post is kept in that album — the album seen from a single photo. Solid when it is; see `Icon`'s `filled`. */
   inAlbum: Bookmark,
   /** Sends a circle's key to someone who isn't in the room. */
@@ -187,8 +190,8 @@ export const Spacing = {
   feedTextPadding: 18,
   /**
    * The gap above a screen's header row — `ScreenHeader` applies it, so
-   * only the two screens with their own header (`circle/index.tsx`,
-   * `circle/feed.tsx`) name it directly.
+   * only `circle/index.tsx`, the stack root without one, names it
+   * directly.
    *
    * Small because it sits *under* the safe-area inset rather than instead
    * of it: `SafeAreaView`'s edges are `additive` by default, so its

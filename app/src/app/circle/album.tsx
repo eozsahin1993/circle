@@ -5,7 +5,7 @@ import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { missingPhotoFor, PhotoPlaceholder } from '@/components/photo-placeholder';
-import { ScreenHeader } from '@/components/screen-header';
+import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';

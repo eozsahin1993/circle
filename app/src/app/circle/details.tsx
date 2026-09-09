@@ -9,7 +9,7 @@ import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/icon';
 import { InviteSheet } from '@/components/invite-sheet';
 import { PromptSheet } from '@/components/prompt-sheet';
-import { ScreenHeader } from '@/components/screen-header';
+import { ScreenHeader } from '@/components/navbar/screen-header';
 import { SecondaryButton } from '@/components/secondary-button';
 import { SettingsGroups, type SettingsGroup } from '@/components/settings-group';
 import { ThemedText } from '@/components/themed-text';

@@ -57,12 +57,12 @@ export function gapBetween(leading: FeedRow, trailing: FeedRow | undefined): num
 }
 
 /**
- * FlatList counts `ListHeaderComponent` as index 0, so a sticky data row
- * sits one further along than its position in `rows`. Index 0 is always
- * included: the circle header is sticky by definition.
+ * Which rows stay pinned while the timeline scrolls under them, as plain
+ * indices into `rows` — the feed's header sits outside the list, so
+ * there's no `ListHeaderComponent` occupying index 0 to count past.
  */
 export function stickyIndices(rows: FeedRow[]): number[] {
-  return [0, ...rows.flatMap((row, index) => (row.sticky ? [index + 1] : []))];
+  return rows.flatMap((row, index) => (row.sticky ? [index] : []));
 }
 
 /**

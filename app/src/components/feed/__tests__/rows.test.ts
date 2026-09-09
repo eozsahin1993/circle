@@ -98,12 +98,11 @@ describe('stickyIndices', () => {
   const pinned: FeedRow = { key: 'p', spacing: 0, sticky: true, render: () => null! };
   const ordinary: FeedRow = { key: 'o', spacing: 0, render: () => null! };
 
-  /** FlatList counts ListHeaderComponent as index 0, so data rows sit one further along. */
-  test('offsets by the header, which is always sticky', () => {
-    expect(stickyIndices([pinned, pinned, ordinary])).toEqual([0, 1, 2]);
+  test('is the position of each pinned row', () => {
+    expect(stickyIndices([pinned, pinned, ordinary])).toEqual([0, 1]);
   });
 
-  test('is just the header when nothing else sticks', () => {
-    expect(stickyIndices([ordinary])).toEqual([0]);
+  test('is empty when nothing sticks', () => {
+    expect(stickyIndices([ordinary])).toEqual([]);
   });
 });

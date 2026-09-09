@@ -8,7 +8,7 @@ import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/icon';
 import { PrivacyInfoModal } from '@/components/privacy-info-modal';
 import { ReactionChip } from '@/components/reaction-chip';
-import { ScreenHeader } from '@/components/screen-header';
+import { ScreenHeader } from '@/components/navbar/screen-header';
 import { SettingsGroups, type SettingsGroup } from '@/components/settings-group';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';

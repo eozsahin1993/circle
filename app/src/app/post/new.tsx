@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
 import { PrimaryButton } from '@/components/primary-button';
-import { ScreenHeader } from '@/components/screen-header';
+import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Fonts, PhotoAspect, Radius, Spacing, Tints } from '@/constants/theme';

@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingHorizontal: Spacing.screenPadding,
+    paddingHorizontal: Spacing.feedTextPadding,
     paddingVertical: 4,
   },
   text: {

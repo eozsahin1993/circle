@@ -1,12 +1,13 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, type ViewToken } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, View, type ViewToken } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { CircleHeader } from '@/components/circle-header';
 import { FabButton } from '@/components/fab-button';
 import { gapBetween, stickyIndices, type FeedRow } from '@/components/feed/rows';
+import { HeaderIconButton } from '@/components/navbar/header-icon-button';
 import { PrivacyInfoModal } from '@/components/privacy-info-modal';
+import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedView } from '@/components/themed-view';
 import { Icons, Spacing } from '@/constants/theme';
 import { markCircleViewed } from '@/data/db';
@@ -22,6 +23,10 @@ export default function FeedScreen() {
   const { circleId, justJoined } = useLocalSearchParams<{ circleId: string; justJoined?: string }>();
   const [showPrivacyInfo, setShowPrivacyInfo] = useState(false);
   const onPressPrivacy = useCallback(() => setShowPrivacyInfo(true), []);
+  const openDetails = useCallback(
+    () => router.push({ pathname: '/circle/details', params: { circleId } }),
+    [circleId],
+  );
   const { rows, circleName, memberCount, refreshing, reload, refresh } = useCircleFeed(circleId, {
     justJoined: justJoined === '1',
     onPressPrivacy,
@@ -58,21 +63,32 @@ export default function FeedScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
+        {/* Outside the list, like every other screen's header — so it
+            stays put rather than scrolling, and the refresh spinner comes
+            down from under it instead of over it. */}
+        <View style={styles.headerInset}>
+          <ScreenHeader
+            title={circleName}
+            subtitle={`${memberCount} people. Tap for details`}
+            onPressTitle={openDetails}
+            actions={
+              <>
+                <HeaderIconButton
+                  icon={Icons.album}
+                  accessibilityLabel="Album"
+                  onPress={() => router.push({ pathname: '/circle/album', params: { circleId } })}
+                />
+                <HeaderIconButton icon={Icons.more} accessibilityLabel="Circle details" onPress={openDetails} />
+              </>
+            }
+          />
+        </View>
+
         <FlatList
           data={rows}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
           keyExtractor={(row) => row.key}
           renderItem={({ item }) => item.render()}
-          ListHeaderComponent={
-            <ThemedView style={styles.header}>
-              <CircleHeader
-                name={circleName}
-                memberCount={memberCount}
-                onPressDetails={() => router.push({ pathname: '/circle/details', params: { circleId } })}
-                onPressAlbum={() => router.push({ pathname: '/circle/album', params: { circleId } })}
-              />
-            </ThemedView>
-          }
           stickyHeaderIndices={stickyIndices(rows)}
           // Without this the first tap on send (next to an expanded post's
           // comment input) only dismisses the keyboard, so the comment
@@ -88,7 +104,7 @@ export default function FeedScreen() {
           viewabilityConfig={viewabilityConfig}
         />
         <FabButton
-          icon={Icons.add}
+          icon={Icons.composePost}
           onPress={() => router.push({ pathname: '/post/new', params: { circleId } })}
           style={styles.fab}
         />
@@ -106,14 +122,13 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  header: {
+  headerInset: {
     paddingHorizontal: Spacing.feedTextPadding,
-    // The same gap under the safe area an inner screen's `ScreenHeader`
-    // takes, so the two don't sit at different heights.
-    paddingTop: Spacing.topPadUnderSafeArea,
-    paddingBottom: Spacing.gapBetweenPosts,
   },
   list: {
+    // On top of the header's own bottom margin: the first row is feed
+    // content arriving under fixed chrome, not the next line of it.
+    paddingTop: Spacing.cardListGap,
     paddingBottom: 100,
   },
   fab: {
