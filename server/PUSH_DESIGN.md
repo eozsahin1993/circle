@@ -169,24 +169,28 @@ attacker-supplied. That is fine for its purpose: a random routing ID
 reaches nobody, and to actually spam someone you must use their real one,
 which is exactly the key — so it cannot be varied while still reaching
 them. But it means an attacker cycling random IDs gets a fresh budget every
-request, so it does nothing to protect the *relay*. Hence four layers,
-since there is no session to budget against:
+request, so it does nothing to protect the *relay*. Since there is no
+session to budget against, that half is pushed out to the edge:
 
 - **Per recipient `routingId`.** The one that matters: it bounds how much
   any individual can be pushed regardless of who is sending.
 - **Cap the `routingIds[]` length per request.** A circle's membership is
   bounded, so a request targeting thousands is not a real one.
-- **Per IP**, for raw flood protection, generously — families share a
-  home network and would otherwise collide with each other.
-- **Penalize verification failures.** A caller submitting routing IDs
-  whose hash does not match is probing, not sending.
+- **Raw flood protection belongs at the edge**, not here. API Gateway
+  throttling or a WAF rate rule, as configuration. Doing it in the
+  application would mean keying on IP, which means writing IPs into our
+  own table — directly against the no-logging stance below, and only
+  approximately true anyway: carrier CGNAT puts thousands of users behind
+  one address, families share a home network, and IPv6 needs /64 bucketing
+  rather than per-address. Any limit loose enough to be safe is too loose
+  to be useful.
 
 **Order matters: verify before consuming any budget.** Cheapest and most
-selective first — per-IP, then the length cap (no I/O at all), then read
-and verify each routing ID, and only then consume that recipient's budget
-for the ones that passed. Budgeting first means an attacker cycling random
-routing IDs makes the relay *write* a budget row per nonexistent target,
-turning the rate limiter into the amplification.
+selective first — the length cap (no I/O at all), then read and verify each
+routing ID, and only then consume that recipient's budget for the ones that
+passed. Budgeting first means an attacker cycling random routing IDs makes
+the relay *write* a budget row per nonexistent target, turning the rate
+limiter into the amplification.
 
 Verification and the per-recipient budget are not redundant, because they
 stop different people. Verification stops an outsider: no token, no
