@@ -95,6 +95,14 @@ mitigates the equivalent), not worth blocking on for v1.
 
 ## 2. Push notifications: rich, but the relay never knows why
 
+> **Superseded by [PUSH_DESIGN.md](PUSH_DESIGN.md)** — build from that.
+> This section reached the same broad shape but left the decisive question
+> (whether the fanout call is authenticated) unspecified, and its
+> `routingId → pushToken` table contradicts its own "one row per device".
+> It also overstates what the indirection buys: the relay can infer
+> relationships in flight regardless. Kept for the reasoning, not the
+> mechanism.
+
 Superseded an earlier thin/data-only design (push carries nothing, device
 just wakes and syncs). Decided against: a silent-only push can't show
 "Sarah posted in Family Circle" the way competitors do, and push
