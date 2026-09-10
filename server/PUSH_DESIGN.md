@@ -181,6 +181,18 @@ since there is no session to budget against:
 - **Penalize verification failures.** A caller submitting routing IDs
   whose hash does not match is probing, not sending.
 
+**Order matters: verify before consuming any budget.** Cheapest and most
+selective first — per-IP, then the length cap (no I/O at all), then read
+and verify each routing ID, and only then consume that recipient's budget
+for the ones that passed. Budgeting first means an attacker cycling random
+routing IDs makes the relay *write* a budget row per nonexistent target,
+turning the rate limiter into the amplification.
+
+Verification and the per-recipient budget are not redundant, because they
+stop different people. Verification stops an outsider: no token, no
+delivery. The budget stops an insider, who has a valid token and passes
+verification every time — nothing else bounds them.
+
 ## Notification content
 
 The device composes the real text. The payload also carries a fixed,
