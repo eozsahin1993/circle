@@ -2,6 +2,7 @@ package dynamodb_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -88,5 +89,42 @@ func TestRateLimitStore_Allow_DoesNotShareACounterAcrossKeyPrefixes(t *testing.T
 	// have been exhausted by the write store's calls above.
 	if allowed, err := readStore.Allow(ctx, sharedKey); err != nil || !allowed {
 		t.Fatalf("expected the read store's first request for the same account to be allowed, got allowed=%v err=%v", allowed, err)
+	}
+}
+
+// Callers sharing a window boundary must not deny each other. Both fail the
+// first increment on the stale window; one resets it, and the rest have to
+// notice that rather than concluding they are over budget.
+func TestConcurrentCallersAtAWindowBoundaryAreAllAllowed(t *testing.T) {
+	store := testsupport.NewRateLimitStore(t, testsupport.UniqueAccountID(t), 100, time.Millisecond)
+	key := testsupport.UniqueAccountID(t)
+
+	// Open a window, then let it expire so every caller below starts by
+	// failing on staleness.
+	if allowed, err := store.Allow(context.Background(), key); err != nil || !allowed {
+		t.Fatalf("first call should open the window: %v %v", allowed, err)
+	}
+	time.Sleep(5 * time.Millisecond)
+
+	const callers = 8
+	var wg sync.WaitGroup
+	denied := make([]bool, callers)
+	for i := range callers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			allowed, err := store.Allow(context.Background(), key)
+			if err != nil {
+				t.Errorf("caller %d errored: %v", i, err)
+			}
+			denied[i] = !allowed
+		}()
+	}
+	wg.Wait()
+
+	for i, wasDenied := range denied {
+		if wasDenied {
+			t.Fatalf("caller %d was denied with a limit of 100 and %d callers", i, callers)
+		}
 	}
 }
