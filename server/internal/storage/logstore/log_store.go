@@ -79,6 +79,10 @@ var (
 	ErrWouldEmptyAuthoritySet = errors.New("logstore: removing that key would leave the authority set empty")
 	// ErrInvalidSignature: checked before any storage call, so this never reflects a race, only a bad request.
 	ErrInvalidSignature = errors.New("logstore: signature does not verify")
+	// ErrCircleDeleted: the circle has been deleted, so it takes no
+	// further writes. Reads still work — that's how a device that hasn't
+	// synced yet finds the tombstone saying so.
+	ErrCircleDeleted = errors.New("logstore: circle has been deleted")
 	// ErrConcurrentModification: a Rotate lost its compare-and-swap race
 	// past the retry budget. Expected to be vanishingly rare at
 	// family-circle scale — treat as "retry," not a hard failure.
@@ -153,6 +157,23 @@ func (c AuthorityChange) Message() []byte {
 	return []byte("circle-relay/authority-change/v1\x00" + string(c.Action) + "\x00" + c.SyncID + "\x00" + c.EntryID + "\x00" + c.TargetAuthorityPublicKey)
 }
 
+// CircleDeletion is one circle being deleted — the tombstone entry
+// recording it, and the capabilities it's checked against.
+type CircleDeletion struct {
+	SyncID           string
+	EntryID          string
+	EncryptedPayload []byte
+	KeyVersion       int64
+	WriteToken       string
+
+	SignerAuthorityPublicKey string
+	Signature                []byte
+}
+
+func (d CircleDeletion) Message() []byte {
+	return []byte("circle-relay/delete-circle/v1\x00" + d.SyncID + "\x00" + d.EntryID)
+}
+
 // Store is storage for the append-only per-circle log, plus the small
 // piece of relay-visible control state (see server/SYNC_DESIGN.md's
 // "#control") that authorizes writes to it. Bootstrap, Append, Rotate and
@@ -212,6 +233,22 @@ type Store interface {
 	// DynamoDB drops a string set attribute once its last element goes,
 	// leaving nothing to add a key back to.
 	ChangeAuthority(ctx context.Context, change AuthorityChange) (CommitResult, error)
+
+	// DeleteCircle ends a circle: appends the tombstone and stamps
+	// deletedAt on control state in one transaction, then deletes every
+	// content-namespace entry.
+	//
+	// Meta survives, tombstone included. Handlers resolve an entry's author
+	// against the roster, and the roster is built from meta — sweep it and
+	// a device syncing from epoch 0 has nothing to verify the tombstone
+	// against, skips it, and keeps a circle that no longer exists.
+	//
+	// Only the tombstone-and-stamp is atomic; the sweep behind it is
+	// resumable instead, since it can delete far more items than one
+	// transaction holds. The ordering is the point: a tombstone with
+	// entries still under it is a retry, entries with no tombstone are
+	// silent data loss.
+	DeleteCircle(ctx context.Context, deletion CircleDeletion) (CommitResult, error)
 
 	// Read never deletes or evicts — retention is permanent (invariant 1).
 	Read(ctx context.Context, syncID string, ns Namespace, since int64) (FetchResult, error)

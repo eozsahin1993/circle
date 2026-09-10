@@ -8,8 +8,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"testing"
+	"time"
+
+	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"circle-relay/internal/storage/logstore"
 	"circle-relay/internal/testsupport"
@@ -814,5 +818,290 @@ func TestLogStore_ChangeAuthority_RetryWithTheSameEntryIDIsIdempotent(t *testing
 	}
 	if len(metaRead.Entries) != 1 {
 		t.Fatalf("expected the retry to append nothing, got %d meta entries", len(metaRead.Entries))
+	}
+}
+
+// circleDeletion builds a fully-populated, correctly-signed
+// CircleDeletion — same convention as authorityChange.
+func circleDeletion(signer authorityKey, syncID, entryID, token string) logstore.CircleDeletion {
+	deletion := logstore.CircleDeletion{
+		SyncID:                   syncID,
+		EntryID:                  entryID,
+		EncryptedPayload:         []byte("circle_deleted payload"),
+		KeyVersion:               1,
+		WriteToken:               token,
+		SignerAuthorityPublicKey: signer.publicKeyHex,
+	}
+	deletion.Signature = ed25519.Sign(signer.private, deletion.Message())
+	return deletion
+}
+
+func TestLogStore_DeleteCircle_SweepsContentButKeepsMetaAndTheTombstone(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceMeta, "member-1", []byte("member_added"), 1, token); err != nil {
+		t.Fatal(err)
+	}
+	for _, entryID := range []string{"post-1", "post-2", "post-3"} {
+		if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, entryID, []byte("post"), 1, token); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	commit, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token))
+	if err != nil {
+		t.Fatalf("deleting the circle failed: %v", err)
+	}
+	if commit.Epoch != 2 {
+		t.Fatalf("expected the tombstone at meta epoch 2, behind member-1, got %d", commit.Epoch)
+	}
+
+	// Meta survives whole, or a device syncing from epoch 0 would have no
+	// roster to verify the tombstone's author against.
+	metaRead, err := store.Read(ctx, syncID, logstore.NamespaceMeta, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(metaRead.Entries) != 2 {
+		t.Fatalf("expected meta to keep both its entries, got %d", len(metaRead.Entries))
+	}
+	if string(metaRead.Entries[1].EncryptedMeta) != "circle_deleted payload" {
+		t.Fatalf("expected the tombstone last in meta, got %q", metaRead.Entries[1].EncryptedMeta)
+	}
+
+	contentRead, err := store.Read(ctx, syncID, logstore.NamespaceContent, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(contentRead.Entries) != 0 {
+		t.Fatalf("expected every content entry swept, got %d", len(contentRead.Entries))
+	}
+}
+
+func TestLogStore_DeleteCircle_RefusesEveryLaterWrite(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	promoted := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, "post-after", []byte("post"), 1, token); !errors.Is(err, logstore.ErrCircleDeleted) {
+		t.Fatalf("expected a content append to be refused, got %v", err)
+	}
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceMeta, "meta-after", []byte("meta"), 1, token); !errors.Is(err, logstore.ErrCircleDeleted) {
+		t.Fatalf("expected a meta append to be refused, got %v", err)
+	}
+
+	newHash := hashToken(t, newToken(t))
+	if _, err := store.Rotate(ctx, syncID, "rotate-after", []byte("k"), 1, token, newHash, founder.publicKeyHex, founder.sign(syncID, "rotate-after", newHash)); !errors.Is(err, logstore.ErrCircleDeleted) {
+		t.Fatalf("expected a rotation to be refused, got %v", err)
+	}
+	if _, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-after", logstore.AuthorityAdd, promoted.publicKeyHex, token)); !errors.Is(err, logstore.ErrCircleDeleted) {
+		t.Fatalf("expected an authority change to be refused, got %v", err)
+	}
+	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-2", token)); !errors.Is(err, logstore.ErrCircleDeleted) {
+		t.Fatalf("expected a second deletion to be refused, got %v", err)
+	}
+}
+
+func TestLogStore_DeleteCircle_KeepsServingReads(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+		t.Fatal(err)
+	}
+
+	// A device that hasn't synced since finds the tombstone only if reads
+	// still work — refusing them would leave it holding the circle forever.
+	read, err := store.Read(ctx, syncID, logstore.NamespaceMeta, 0)
+	if err != nil {
+		t.Fatalf("reads must survive deletion: %v", err)
+	}
+	if len(read.Entries) != 1 {
+		t.Fatalf("expected the tombstone readable, got %d entries", len(read.Entries))
+	}
+	epochs, err := store.Peek(ctx, []string{syncID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if epochs[syncID].Meta != 1 {
+		t.Fatalf("expected Peek to report the tombstone's epoch, got %+v", epochs[syncID])
+	}
+}
+
+func TestLogStore_DeleteCircle_RejectsASignerOutsideTheSet(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	outsider := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	if _, err := store.DeleteCircle(ctx, circleDeletion(outsider, syncID, "tombstone-1", token)); !errors.Is(err, logstore.ErrAuthorityNotRecognized) {
+		t.Fatalf("expected a non-authority to be refused, got %v", err)
+	}
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, "post-1", []byte("post"), 1, token); err != nil {
+		t.Fatalf("a refused deletion must leave the circle writable: %v", err)
+	}
+}
+
+func TestLogStore_DeleteCircle_SignatureDoesNotCarryAcrossCircles(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	target := testsupport.UniqueSyncID(t)
+	other := testsupport.UniqueSyncID(t)
+	bootstrap(t, store, target, founder, token)
+	bootstrap(t, store, other, founder, token)
+
+	deletion := circleDeletion(founder, other, "tombstone-1", token)
+	deletion.SyncID = target
+	if _, err := store.DeleteCircle(ctx, deletion); !errors.Is(err, logstore.ErrInvalidSignature) {
+		t.Fatalf("expected a signature for another circle to be refused, got %v", err)
+	}
+}
+
+func TestLogStore_DeleteCircle_RetryWithTheSameEntryIDIsIdempotent(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	first, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The same entryID is a retry of a call whose response was lost, not a
+	// second deletion — it re-runs the sweep and returns the original commit.
+	second, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token))
+	if err != nil {
+		t.Fatalf("a retry must converge rather than fail: %v", err)
+	}
+	if first != second {
+		t.Fatalf("expected the retry to return the original commit, got %+v then %+v", first, second)
+	}
+}
+
+// More entries than one BatchWriteItem can carry (25), so the sweep has to
+// chunk — the boundary a single-batch test would never reach.
+func TestLogStore_DeleteCircle_SweepsPastOneBatch(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	const entries = 30
+	for i := range entries {
+		if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, fmt.Sprintf("post-%d", i), []byte("post"), 1, token); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+		t.Fatal(err)
+	}
+
+	read, err := store.Read(ctx, syncID, logstore.NamespaceContent, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Entries) != 0 {
+		t.Fatalf("expected all %d content entries swept across batches, got %d left", entries, len(read.Entries))
+	}
+}
+
+// Meta is stamped for expiry rather than deleted: still readable now, so a
+// device syncing from epoch 0 can rebuild a roster and verify the
+// tombstone, but no longer stored forever.
+func TestLogStore_DeleteCircle_StampsMetaForExpiryWithoutDeletingIt(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceMeta, "member-1", []byte("member_added"), 1, token); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+		t.Fatal(err)
+	}
+
+	read, err := store.Read(ctx, syncID, logstore.NamespaceMeta, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Entries) != 2 {
+		t.Fatalf("expected meta still readable, got %d entries", len(read.Entries))
+	}
+
+	// Every meta row, tombstone included, carries a future expiry.
+	for _, epoch := range []int64{1, 2} {
+		// Built here rather than reached for: entrySK is unexported, and
+		// this asserts on the physical row the store wrote.
+		out, err := testsupport.RawItem(t, syncID, fmt.Sprintf("meta#%012d", epoch))
+		if err != nil {
+			t.Fatal(err)
+		}
+		attr, ok := out["expiresAt"].(*ddbtypes.AttributeValueMemberN)
+		if !ok {
+			t.Fatalf("expected meta epoch %d stamped with expiresAt, got %+v", epoch, out)
+		}
+		expiresAt, err := strconv.ParseInt(attr.Value, 10, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if expiresAt <= time.Now().Unix() {
+			t.Fatalf("expected meta epoch %d to expire in the future, got %d", epoch, expiresAt)
+		}
+	}
+}
+
+// A circle nobody ever posted to still deletes cleanly — and without
+// querying a namespace the counter already says is empty.
+func TestLogStore_DeleteCircle_WithNoContentAtAll(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+		t.Fatalf("deleting an empty circle failed: %v", err)
+	}
+
+	read, err := store.Read(ctx, syncID, logstore.NamespaceMeta, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Entries) != 1 {
+		t.Fatalf("expected just the tombstone, got %d entries", len(read.Entries))
+	}
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, "post-1", []byte("post"), 1, token); !errors.Is(err, logstore.ErrCircleDeleted) {
+		t.Fatalf("expected the circle closed to writes, got %v", err)
 	}
 }

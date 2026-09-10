@@ -18,6 +18,7 @@ import (
 	"circle-relay/internal/api/changeauthority"
 	"circle-relay/internal/api/createlog"
 	"circle-relay/internal/api/deleteblob"
+	"circle-relay/internal/api/deletecircle"
 	"circle-relay/internal/api/getblob"
 	"circle-relay/internal/api/getcoverphotouploadtarget"
 	"circle-relay/internal/api/getepochs"
@@ -96,6 +97,7 @@ func newV1Mux(
 	appendlog.Register(circleMux, &appendlog.Service{LogStore: logStore}, writeLimit)
 	rotatelog.Register(circleMux, &rotatelog.Service{LogStore: logStore}, writeLimit)
 	changeauthority.Register(circleMux, &changeauthority.Service{LogStore: logStore}, writeLimit)
+	deletecircle.Register(circleMux, &deletecircle.Service{LogStore: logStore, BlobStore: blobStore}, writeLimit)
 	getlog.Register(circleMux, &getlog.Service{LogStore: logStore}, readLimit)
 	getblob.Register(circleMux, &getblob.Service{BlobStore: blobStore}, readLimit)
 	getuploadtarget.Register(circleMux, &getuploadtarget.Service{BlobStore: blobStore, LogStore: logStore}, writeLimit)

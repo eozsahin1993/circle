@@ -297,6 +297,46 @@ export async function changeAuthority(change: {
   return { epoch: body.epoch, receivedAt: body.receivedAt };
 }
 
+/**
+ * Ends a circle — POST /v1/circles/{syncId}/delete. Appends the tombstone
+ * every other device tears itself down on, then sweeps the content
+ * namespace and every blob the circle owned. Meta survives, so a device
+ * syncing from scratch can still verify the tombstone it finds.
+ *
+ * Gone (410) means someone already deleted it, which is the outcome this
+ * was asking for.
+ */
+export async function deleteCircleOnRelay(deletion: {
+  syncId: string;
+  entryId: string;
+  encryptedMeta: Uint8Array;
+  keyVersion: number;
+  writeToken: Uint8Array;
+  signerAuthorityPublicKey: Uint8Array;
+  signature: Uint8Array;
+}): Promise<AppendResult> {
+  const response = await authorizedFetch(`/v1/circles/${deletion.syncId}/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      entryId: deletion.entryId,
+      encryptedMeta: Buffer.from(deletion.encryptedMeta).toString('base64'),
+      keyVersion: deletion.keyVersion,
+      writeToken: bytesToHex(deletion.writeToken),
+      signerAuthorityPublicKey: bytesToHex(deletion.signerAuthorityPublicKey),
+      signature: bytesToHex(deletion.signature),
+    }),
+  });
+  if (response.status === 429) {
+    throw new RateLimitedError();
+  }
+  if (!response.ok) {
+    throw new Error(await describeError(response, 'Failed to delete circle'));
+  }
+  const body = await response.json();
+  return { epoch: body.epoch, receivedAt: body.receivedAt };
+}
+
 /** Fetches every entry in `namespace` after `since` — GET /v1/circles/{syncId}/entries?namespace=&since=. */
 export async function fetchEntries(syncId: string, namespace: Namespace, since: number): Promise<FetchEntriesResult> {
   const response = await authorizedFetch(`/v1/circles/${syncId}/entries?namespace=${namespace}&since=${since}`);

@@ -253,6 +253,16 @@ export function deriveDeleteBlobMessage(syncId: string, entryId: string): Uint8A
 }
 
 /**
+ * The exact byte sequence an authority signature must cover to delete a
+ * circle — must match the relay's own `logstore.CircleDeletion.Message()`
+ * byte-for-byte. Bound to the tombstone's entry id, so one signature ends
+ * one circle rather than authorizing a deletion the caller can replay.
+ */
+export function deriveDeleteCircleMessage(syncId: string, entryId: string): Uint8Array {
+  return new TextEncoder().encode(`circle-relay/delete-circle/v1\x00${syncId}\x00${entryId}`);
+}
+
+/**
  * Encrypts `plaintext` under the circle's shared secret using
  * XChaCha20-Poly1305 (AEAD — tampering makes decrypt fail, it doesn't
  * silently return corrupted data). A fresh random nonce is generated per

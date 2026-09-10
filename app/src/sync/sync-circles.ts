@@ -1,4 +1,4 @@
-import { getAllCircles, getPendingOutboxEntries } from '@/data/db';
+import { getAllCircles, getCircle, getPendingOutboxEntries } from '@/data/db';
 import { finishPendingDepartures } from '@/domain/usecases/circle/leave-circle';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { fetchEpochs } from '@/services/relay';
@@ -19,6 +19,11 @@ import { pullContent, pullMeta } from '@/sync/pull-log';
  */
 export async function syncCircle(circleId: string): Promise<void> {
   await timed('sync.meta', () => pullMeta(circleId));
+  // The meta pass may have torn the circle down — a deletion tombstone, or
+  // this device's own removal. Both leave nothing for the rest of the pass
+  // to push to or pull from.
+  if (!(await getCircle(circleId))) return;
+
   await timed('sync.push', () => drainOutbox(circleId));
   await timed('sync.content', () => pullContent(circleId));
 }

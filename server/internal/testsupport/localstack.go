@@ -494,3 +494,25 @@ func UploadBlob(t testing.TB, target blobstore.UploadTarget, payload []byte) {
 		t.Fatalf("upload failed: %d %s", resp.StatusCode, responseBody)
 	}
 }
+
+// RawItem reads one item straight out of the log table, bypassing the
+// store — for asserting on attributes the Store interface deliberately
+// doesn't expose, like the TTL stamp a deleted circle's meta carries.
+func RawItem(t testing.TB, pk, sk string) (map[string]ddbtypes.AttributeValue, error) {
+	t.Helper()
+	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
+		o.BaseEndpoint = aws.String(localstackEndpoint)
+	})
+	out, err := client.GetItem(context.Background(), &awsdynamodb.GetItemInput{
+		TableName: aws.String(tableName),
+		Key: map[string]ddbtypes.AttributeValue{
+			"pk": &ddbtypes.AttributeValueMemberS{Value: pk},
+			"sk": &ddbtypes.AttributeValueMemberS{Value: sk},
+		},
+		ConsistentRead: aws.Bool(true),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out.Item, nil
+}

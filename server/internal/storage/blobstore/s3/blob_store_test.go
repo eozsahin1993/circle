@@ -114,3 +114,63 @@ func postUpload(t *testing.T, target blobstore.UploadTarget, payload []byte) (in
 	respBody, _ := io.ReadAll(resp.Body)
 	return resp.StatusCode, string(respBody)
 }
+
+// DeleteCircle takes every object under the circle's prefix — post blobs
+// and the cover photo alike — and leaves a neighbouring circle's alone.
+// The neighbour's syncID deliberately extends the target's, which is what
+// a prefix without its trailing slash would wrongly match.
+func TestDeleteCircle_RemovesEveryBlobUnderThePrefixAndNothingElse(t *testing.T) {
+	store := testsupport.NewBlobStore(t)
+	ctx := t.Context()
+	syncID := testsupport.UniqueSyncID(t)
+	neighbour := syncID + "-extended"
+
+	for _, blob := range []struct{ sync, entry string }{
+		{syncID, "entry-1"},
+		{syncID, "entry-2"},
+		{neighbour, "entry-1"},
+	} {
+		target, err := store.GetUploadTarget(ctx, blob.sync, blob.entry, "google:uploader")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if status, body := postUpload(t, target, []byte("ciphertext")); status < 200 || status >= 300 {
+			t.Fatalf("upload failed: %d %s", status, body)
+		}
+	}
+	coverTarget, err := store.GetCoverPhotoUploadTarget(ctx, syncID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, body := postUpload(t, coverTarget, []byte("cover")); status < 200 || status >= 300 {
+		t.Fatalf("cover upload failed: %d %s", status, body)
+	}
+
+	if err := store.DeleteCircle(ctx, syncID); err != nil {
+		t.Fatalf("sweeping the circle's blobs failed: %v", err)
+	}
+
+	for _, entryID := range []string{"entry-1", "entry-2", "cover"} {
+		if _, err := store.UploaderAccountID(ctx, syncID, entryID); !errors.Is(err, blobstore.ErrBlobNotFound) {
+			t.Fatalf("expected %s swept, got %v", entryID, err)
+		}
+	}
+	if _, err := store.UploaderAccountID(ctx, neighbour, "entry-1"); err != nil {
+		t.Fatalf("a circle whose syncID merely extends the deleted one must be untouched: %v", err)
+	}
+}
+
+// Idempotent, so the caller can retry a sweep that died partway — and
+// safe on a circle that never had a blob at all.
+func TestDeleteCircle_IsIdempotent(t *testing.T) {
+	store := testsupport.NewBlobStore(t)
+	ctx := t.Context()
+	syncID := testsupport.UniqueSyncID(t)
+
+	if err := store.DeleteCircle(ctx, syncID); err != nil {
+		t.Fatalf("sweeping a circle with no blobs must succeed: %v", err)
+	}
+	if err := store.DeleteCircle(ctx, syncID); err != nil {
+		t.Fatalf("a second sweep must succeed: %v", err)
+	}
+}

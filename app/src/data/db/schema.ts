@@ -369,6 +369,7 @@ export const outbox = sqliteTable(
         'album_visibility',
         'post_delete',
         'push_enabled',
+        'circle_deleted',
       ],
     }).notNull(),
     /**

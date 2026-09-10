@@ -148,6 +148,48 @@ func (s *Store) Delete(ctx context.Context, syncID, entryID string) error {
 	return err
 }
 
+// DeleteCircle lists and deletes a page at a time rather than collecting
+// every key first. The trailing slash matters: without it the prefix
+// would also match a circle whose syncID merely starts with this one.
+//
+// The bucket is unversioned, so these deletes destroy the bytes rather
+// than laying down delete markers over recoverable versions — turning
+// versioning on would silently stop this deleting anything.
+func (s *Store) DeleteCircle(ctx context.Context, syncID string) error {
+	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
+		Bucket: aws.String(s.bucketName),
+		Prefix: aws.String(syncID + "/"),
+	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return err
+		}
+		if len(page.Contents) == 0 {
+			continue
+		}
+
+		objects := make([]s3types.ObjectIdentifier, 0, len(page.Contents))
+		for _, object := range page.Contents {
+			objects = append(objects, s3types.ObjectIdentifier{Key: object.Key})
+		}
+		out, err := s.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(s.bucketName),
+			Delete: &s3types.Delete{Objects: objects, Quiet: aws.Bool(true)},
+		})
+		if err != nil {
+			return err
+		}
+		// DeleteObjects reports per-object failures in the response rather
+		// than as an error, so a partial failure would otherwise look like
+		// a clean sweep.
+		if len(out.Errors) > 0 {
+			return fmt.Errorf("deleting blobs for %s: %d of %d objects failed, first: %s", syncID, len(out.Errors), len(objects), aws.ToString(out.Errors[0].Message))
+		}
+	}
+	return nil
+}
+
 func (s *Store) GetDownloadURL(ctx context.Context, syncID, entryID string) (string, error) {
 	req, err := s.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucketName),

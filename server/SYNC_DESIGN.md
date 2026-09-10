@@ -21,6 +21,16 @@ the architecture is wrong for it — not a signal to bend the rule.
    entry as one syncing today), and immutability is what makes "once you
    have entry E you have it correctly forever" true — no invalidation, no
    re-fetch, no staleness.
+
+   **The one exception is deleting a circle**, which ends the log rather
+   than editing it. A `circle_deleted` tombstone is appended at the head of
+   meta, then every content entry beneath it is swept and the circle takes
+   no further writes. No entry is ever rewritten, and no surviving entry
+   changes — a device that synced yesterday and one syncing today still
+   agree on every entry either of them holds. Meta is kept whole on
+   purpose: handlers resolve an author against the roster, the roster is
+   built from meta, and a device syncing from epoch 0 into a swept meta
+   would have nothing to verify the tombstone against.
 2. **Mutability is exactly three-tiered**, and it follows the plane split:
 
    | | mutability |
@@ -134,6 +144,7 @@ them. It keys off **which operation the client invokes**:
 | **append** (any entry, either namespace) | write token *(counter bump rides along)* |
 | **rotate** (append + token swap, atomic) | write token **+ authority signature** |
 | **authority change** (append + set change, atomic) | write token **+ authority signature** |
+| **delete circle** (append + stamp + sweep) | write token **+ authority signature** |
 
 - **Write token** = *"may I append?"*
 - **Authority signature** = *"may I change the rules?"* — and the rules are
@@ -147,12 +158,21 @@ them. It keys off **which operation the client invokes**:
   — so the write token rides alongside the signature, exactly as rotate
   does.
 
-**The relay has no destructive operations.** It appends, and it mutates
-those two control fields. It never deletes an entry or a blob. This keeps
-the append-only premise whole rather than carving an exception into it, and
-removes a class of risk entirely: no admin can destroy shared content
-server-side, so there's no orphaned-blob cleanup, no "which namespaces are
-deletable" flag, and no way to brick a circle by removing key material.
+**The relay's destructive operations are few, named, and never
+automatic.** It appends and it mutates those two control fields. Beyond
+that it deletes only when explicitly asked: one blob (`deleteblob`), or a
+whole circle (`deletecircle`). Nothing expires on a timer, nothing is
+swept as a side effect of anything else, and there is no "which namespaces
+are deletable" flag — a circle deletion is the one operation that removes
+entries, and it removes exactly the content namespace.
+
+Both are authority-gated, which bounds the risk rather than eliminating
+it: an admin can destroy shared content server-side, and always could —
+`deleteblob` covers any blob in the circle, not only their own. Deleting a
+circle is the same power exercised at once, and it costs the entries too.
+What no operation can do is remove key material and brick a circle that
+still exists: the authority set can never be emptied, and a deleted circle
+takes no further writes at all.
 
 **Lying about the operation gains nothing.** Append a rotation-shaped entry
 via plain `append` to dodge the authority check → the entry lands but **no

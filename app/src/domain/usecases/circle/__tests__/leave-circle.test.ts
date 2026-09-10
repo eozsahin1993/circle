@@ -22,7 +22,7 @@ import { finishDeparture, finishPendingDepartures, leaveCircle } from '@/domain/
 import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
 import { deriveAuthorityKeyProofMessage, generateIdentity, generateUUID, sign } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
-import { appendEntry, bootstrapCircle, changeAuthority, fetchEntries } from '@/services/relay';
+import { appendEntry, bootstrapCircle, changeAuthority, deleteCircleOnRelay, fetchEntries } from '@/services/relay';
 
 beforeAll(async () => {
   await initDatabase();
@@ -37,11 +37,21 @@ beforeEach(() => {
   (fetchEntries as jest.Mock).mockResolvedValue({ entries: [], currentEpoch: 0 });
 });
 
-/** A circle founded here, with the founder's own append already accounted for. */
+/**
+ * A circle founded here, with the founder's own append already accounted
+ * for — plus a second member, since a circle down to its last member is
+ * deleted rather than departed from.
+ */
 async function foundedCircle() {
   const { id: circleId } = await createCircle({ name: 'Family Circle' });
   const identity = (await getCircleIdentity(circleId))!;
   const contentKey = (await getCurrentContentKey(circleId))!.key;
+  await recordMemberAddedLocally({
+    circleId,
+    subjectPublicKey: bytesToHex(generateIdentity().publicKey),
+    joinedAt: 1_000,
+    profile: { encPublicKey: 'bb', memberId: generateUUID(), role: MemberRoles.member, name: 'Rosa', picture: null },
+  });
   jest.clearAllMocks();
   (appendEntry as jest.Mock).mockResolvedValue({ epoch: 2, receivedAt: Date.now() });
   (changeAuthority as jest.Mock).mockResolvedValue({ epoch: 3, receivedAt: Date.now() });
@@ -313,4 +323,53 @@ test('a failed meta pull still leaves, using the roster this device already has'
     .filter((change) => change.action === 'add');
   expect(bytesToHex(promotion.targetAuthorityPublicKey)).toBe((await getMemberByPublicKey(circleId, oldest))!.authorityPublicKey);
   expect((await getCircle(circleId))?.leftAt).not.toBeNull();
+});
+
+// The last member out ends the circle rather than announcing a departure
+// nobody is left to hear. Everything they hold goes with it.
+test('the last member leaving deletes the circle instead of departing', async () => {
+  const { id: circleId } = await createCircle({ name: 'Just Me' });
+  jest.clearAllMocks();
+  (deleteCircleOnRelay as jest.Mock).mockResolvedValue({ epoch: 2, receivedAt: Date.now() });
+  (fetchEntries as jest.Mock).mockResolvedValue({ entries: [], currentEpoch: 0 });
+
+  await leaveCircle(circleId);
+  await finishDeparture(circleId);
+
+  expect(deleteCircleOnRelay).toHaveBeenCalledTimes(1);
+  expect(appendEntry).not.toHaveBeenCalled();
+  // Not merely left — gone, along with the keys that could read it.
+  expect(await getCircle(circleId)).toBeNull();
+  expect(await getCircleIdentity(circleId)).toBeNull();
+});
+
+// The check is "nobody else is here", and offline that can just mean this
+// device never saw the last person join. Deleting on it would take the
+// circle away from members it doesn't know about.
+test('a solo roster this device could not confirm departs rather than deletes', async () => {
+  const { id: circleId } = await createCircle({ name: 'Just Me' });
+  jest.clearAllMocks();
+  (fetchEntries as jest.Mock).mockRejectedValue(new Error('offline'));
+  (appendEntry as jest.Mock).mockResolvedValue({ epoch: 2, receivedAt: Date.now() });
+
+  await leaveCircle(circleId);
+
+  expect(deleteCircleOnRelay).not.toHaveBeenCalled();
+  expect((await getCircle(circleId))?.leftAt).not.toBeNull();
+});
+
+// A deletion that hasn't reached the relay leaves everything in place, so
+// the next pass can retry it — the same rule a queued departure follows.
+test('a deletion that fails to push keeps the circle and its keys', async () => {
+  const { id: circleId } = await createCircle({ name: 'Just Me' });
+  jest.clearAllMocks();
+  (fetchEntries as jest.Mock).mockResolvedValue({ entries: [], currentEpoch: 0 });
+  (deleteCircleOnRelay as jest.Mock).mockRejectedValue(new Error('offline'));
+
+  await leaveCircle(circleId);
+  await finishDeparture(circleId).catch(() => {});
+
+  expect(await getPendingOutboxEntries(circleId)).toHaveLength(1);
+  expect(await getCircle(circleId)).not.toBeNull();
+  expect(await getCircleIdentity(circleId)).not.toBeNull();
 });

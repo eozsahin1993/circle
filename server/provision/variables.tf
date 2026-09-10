@@ -15,7 +15,7 @@ locals {
 }
 
 variable "blob_glacier_transition_days" {
-  description = "Age at which a circle's blobs (photos, avatars, cover images) transition to Glacier Instant Retrieval — see provision/modules/storage/s3.tf and server/SYNC_DESIGN.md. Nothing is ever deleted (the log and its blobs are permanent by design); this only controls when storage gets cheaper. Exposed here rather than hardcoded so it can be changed without a rebuild."
+  description = "Age at which a circle's blobs (post photos and cover images — member avatars are thumbnails carried inside the log entries themselves, not objects here) transition to Glacier Instant Retrieval. Nothing expires on a timer; blobs go only when something deletes them, either one at a time or with the circle they belong to. Exposed here rather than hardcoded so it can be changed without a rebuild."
   type        = number
   default     = 90
 }

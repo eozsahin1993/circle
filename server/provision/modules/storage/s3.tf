@@ -40,7 +40,13 @@ resource "aws_s3_bucket_cors_configuration" "circle_blobs" {
 #
 # They are deletable on request, which is a different thing from expiry:
 # deleting a photo removes its object then and there (see
-# internal/api/deleteblob), so nothing outlives the post it belonged to.
+# internal/api/deleteblob), so nothing outlives the post it belonged to,
+# and deleting a circle takes everything under its prefix (see
+# internal/api/deletecircle).
+#
+# Versioning is deliberately off. With it on, those deletes would lay down
+# delete markers over recoverable versions and quietly stop destroying
+# anything.
 resource "aws_s3_bucket_lifecycle_configuration" "circle_blobs" {
   bucket = aws_s3_bucket.circle_blobs.id
 

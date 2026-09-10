@@ -44,6 +44,23 @@ export function deletePhotoFile(circleId: string, entryId: string): void {
 }
 
 /**
+ * Drops every cached photo belonging to a circle, cover included. Unlike
+ * the rest of this module, this one isn't housekeeping a derived cache —
+ * it runs when a circle is deleted, and these files are the last decrypted
+ * copies of its photos on the device once the rows behind them are gone.
+ *
+ * Matched by the `circleId-` filename prefix rather than tracked
+ * separately, so it can't drift from what `photoFile` actually writes.
+ */
+export function deleteCirclePhotoFiles(circleId: string): void {
+  const directory = new Directory(Paths.cache, PHOTO_DIRECTORY);
+  if (!directory.exists) return;
+  for (const entry of directory.list()) {
+    if (entry instanceof File && entry.name.startsWith(`${circleId}-`)) entry.delete();
+  }
+}
+
+/**
  * A circle's cover, which is cached exactly like a post photo — it sits at
  * the fixed `COVER_ENTRY_ID` the relay reserves for it, so it can't
  * collide with a post. These two wrappers exist so that key stays the

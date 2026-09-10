@@ -1,8 +1,10 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import {
+  deleteCircle,
   discardPendingOutboxEntries,
   getCircle,
+  getCircleMembers,
   getLeftCircles,
   getPendingOutboxEntries,
   insertOutboxEntry,
@@ -11,6 +13,7 @@ import {
   recordMemberRemovedLocally,
 } from '@/data/db';
 import { removeCircleNotificationChannel } from '@/services/push/channels';
+import { deleteCirclePhotoFiles } from '@/services/photo-cache';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { queueDepartingHandover } from '@/domain/usecases/circle/authority';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
@@ -60,12 +63,26 @@ export async function leaveCircle(circleId: string): Promise<void> {
 
   // A stale roster hands the circle to someone who already left, and the
   // relay reads no rosters. Best-effort: leaving can't need a connection.
-  await pullMeta(circleId).catch((err) => console.error(`Leaving circle ${circleId} without catching up on meta first`, err));
+  const caughtUp = await pullMeta(circleId).then(
+    () => true,
+    (err) => {
+      console.error(`Leaving circle ${circleId} without catching up on meta first`, err);
+      return false;
+    }
+  );
 
   // The pull may have carried this device's own removal, which already
   // tore the circle down — the departure it was about to announce.
   const current = await getCurrentContentKey(circleId);
   if (!current) return;
+
+  // Only on a roster known to be current: offline, "nobody else is here"
+  // may just mean this device never saw the last person join, and deleting
+  // on that would take the circle from members it doesn't know about.
+  if (caughtUp && (await getCircleMembers(circleId)).length === 1) {
+    await deleteCircleForEveryone(circleId);
+    return;
+  }
 
   // The outbox drains in order, so the handover has to be queued ahead of
   // the departure to reach the relay while this device can still sign it.
@@ -129,13 +146,55 @@ export async function finishDeparture(circleId: string): Promise<void> {
     return;
   }
 
+  // Read before the drain: a clean outbox afterwards is exactly what
+  // removes the evidence of which kind of exit this was.
+  const deleting = (await getPendingOutboxEntries(circleId)).some((entry) => entry.entryType === EntryTypes.CIRCLE_DELETED);
+
   await drainOutbox(circleId);
 
   // Still queued means the push failed — leave the keys alone and let the
   // next pass retry. Only a clean outbox proves the circle has heard.
   if ((await getPendingOutboxEntries(circleId)).length > 0) return;
 
+  if (deleting) {
+    // The teardown every other device runs on replaying the tombstone.
+    await deleteCircle(circleId);
+    deleteCirclePhotoFiles(circleId);
+  }
   await deleteCircleKeys(circleId);
+}
+
+/**
+ * Ends a circle for everyone — the last member's exit, not an admin's
+ * decision about anyone else's copy. What makes it safe is that there is
+ * nobody left whose photos it destroys but their own.
+ *
+ * Queued like a departure, so it works offline and the local teardown
+ * waits on the relay: `finishDeparture` tears this device down once the
+ * tombstone lands, and every other device does the same on replaying it.
+ */
+export async function deleteCircleForEveryone(circleId: string): Promise<void> {
+  const identity = await getCircleIdentity(circleId);
+  if (!identity) throw new Error('No circle identity on this device.');
+  const current = await getCurrentContentKey(circleId);
+  if (!current) throw new Error('No content key on this device.');
+
+  const entry = buildAndEncryptLogEntry(EntryTypes.CIRCLE_DELETED, { createdAt: Date.now() }, identity, current.key);
+  await insertOutboxEntry({
+    circleId,
+    entryType: EntryTypes.CIRCLE_DELETED,
+    entryId: generateUUID(),
+    status: OutboxStatuses.pending,
+    epoch: null,
+    blobEntryId: null,
+    encryptedMeta: entry,
+  });
+
+  await markCircleLeft(circleId);
+  await removeCircleNotificationChannel(circleId);
+  await syncAccountManifestBestEffort();
+
+  finishDeparture(circleId).catch((err) => console.error('Failed to push circle deletion', err));
 }
 
 /**

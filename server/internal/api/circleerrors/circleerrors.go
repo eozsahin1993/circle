@@ -41,6 +41,8 @@ func Status(err error) (int, string) {
 		return http.StatusConflict, "that would leave the circle with no admin the relay recognizes"
 	case errors.Is(err, logstore.ErrInvalidSignature):
 		return http.StatusBadRequest, "signature does not verify"
+	case errors.Is(err, logstore.ErrCircleDeleted):
+		return http.StatusGone, "circle has been deleted"
 	case errors.Is(err, logstore.ErrConcurrentModification):
 		return http.StatusConflict, "circle state changed concurrently, retry"
 	case errors.Is(err, blobstore.ErrBlobAlreadyExists):

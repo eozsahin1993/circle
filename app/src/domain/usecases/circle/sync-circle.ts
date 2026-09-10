@@ -8,6 +8,7 @@ import {
   deriveAuthorityChangeMessage,
   deriveAuthorityKeypair,
   deriveDeleteBlobMessage,
+  deriveDeleteCircleMessage,
   deriveWriteToken,
   encrypt,
   sign,
@@ -17,6 +18,7 @@ import {
   BlobAlreadyExistsError,
   BlobDeleteRefusedError,
   changeAuthority,
+  deleteCircleOnRelay,
   deleteBlob,
   getUploadTarget,
   uploadBlob,
@@ -43,6 +45,7 @@ const META_ENTRY_TYPES: OutboxEntry['entryType'][] = [
   EntryTypes.COVER_PHOTO_SET,
   EntryTypes.CIRCLE_RENAMED,
   EntryTypes.PUSH_ENABLED,
+  EntryTypes.CIRCLE_DELETED,
   // Never actually queued — rotateLog's atomic write-token swap doesn't
   // fit the generic append path (see remove-member.ts) — but listed so
   // the mapping is right if it ever is.
@@ -194,6 +197,34 @@ async function pushAuthorityChange(
   });
 }
 
+/**
+ * Signed at drain time like an authority change, from a key derived here
+ * rather than carried on the queued row — leaving this device's keys the
+ * only thing that can authorize its own circle's deletion, even hours
+ * after the row was written.
+ */
+async function pushCircleDeletion(
+  circleId: string,
+  syncId: string,
+  entry: OutboxEntry,
+  keyVersion: number,
+  writeToken: Uint8Array
+): Promise<AppendResult> {
+  const masterSeed = await getMasterSeed();
+  if (!masterSeed) throw new Error('No master seed on this device.');
+  const keypair = deriveAuthorityKeypair(masterSeed, circleId);
+
+  return deleteCircleOnRelay({
+    syncId,
+    entryId: entry.entryId,
+    encryptedMeta: entry.encryptedMeta,
+    keyVersion,
+    writeToken,
+    signerAuthorityPublicKey: keypair.publicKey,
+    signature: sign(deriveDeleteCircleMessage(syncId, entry.entryId), keypair.secretKey),
+  });
+}
+
 async function pushPendingEntries(circleId: string): Promise<void> {
   const circle = await getCircle(circleId);
   if (!circle) throw new Error('No local circle row for this id.');
@@ -227,12 +258,15 @@ async function pushPendingEntries(circleId: string): Promise<void> {
       }
     }
 
-    // A promotion or demotion can't go down the generic append path: the
-    // relay commits the authority-set change and this entry together or
-    // not at all, so it has an endpoint of its own.
+    // Two entries can't go down the generic append path, because the relay
+    // commits each alongside something else or not at all: an authority
+    // change with its set mutation, a deletion with the sweep behind it.
+    // Both have endpoints of their own.
     const { epoch } = entry.authorityAction
       ? await pushAuthorityChange(circleId, circle.syncId, entry, current.version, writeToken)
-      : await appendEntry(circle.syncId, namespace, entry.entryId, entry.encryptedMeta, current.version, writeToken);
+      : entry.entryType === EntryTypes.CIRCLE_DELETED
+        ? await pushCircleDeletion(circleId, circle.syncId, entry, current.version, writeToken)
+        : await appendEntry(circle.syncId, namespace, entry.entryId, entry.encryptedMeta, current.version, writeToken);
 
     // Notified from here rather than from each usecase: this is the one
     // place that knows an entry actually landed, and it forwards the same

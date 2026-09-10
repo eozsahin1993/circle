@@ -78,4 +78,10 @@ type Store interface {
 	// the blob stay, immutable (SYNC_DESIGN.md invariant 1); only the
 	// ciphertext goes.
 	Delete(ctx context.Context, syncID, entryID string) error
+
+	// DeleteCircle removes every blob a circle owns, cover photo included
+	// — they all share the syncID prefix. Idempotent and resumable: a
+	// caller that fails partway retries the whole thing, and objects
+	// already gone are simply absent from the next listing.
+	DeleteCircle(ctx context.Context, syncID string) error
 }

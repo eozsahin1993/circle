@@ -376,3 +376,114 @@ func TestEndToEnd_PromoteAdminThenHandOverGovernance(t *testing.T) {
 		t.Fatalf("expected promote + rotation + demote on meta, got %d entries", len(fetched.Entries))
 	}
 }
+
+// Deleting a circle end to end: the tombstone lands in meta, the content
+// namespace is swept, reads keep working so a device that hasn't synced
+// still finds the notice, and nothing can be written afterwards.
+func TestEndToEnd_DeleteCircleTombstonesAndSweeps(t *testing.T) {
+	syncID := testsupport.UniqueSyncID(t)
+	mux, google, _ := testsupport.NewRouterWithAuth(t)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	claims := validClaims(t, testsupport.UniqueEmail(t), testsupport.TestGoogleClientID)
+	claims["iss"] = google.Issuer
+	authToken := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
+
+	founderPub, founderPriv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outsiderPub, outsiderPriv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	founderPubHex := hex.EncodeToString(founderPub)
+	writeToken := randomHex(t, 32)
+
+	bootstrapResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID, authToken,
+		`{"founderAuthorityPublicKey":"`+founderPubHex+`","initialWriteTokenHash":"`+hashToken(writeToken)+`"}`)
+	defer bootstrapResp.Body.Close()
+	if bootstrapResp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 from bootstrap, got %d", bootstrapResp.StatusCode)
+	}
+
+	appendEntry := func(entryID, namespace string) *http.Response {
+		return authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/entries", authToken,
+			`{"namespace":"`+namespace+`","entryId":"`+entryID+`","keyVersion":1,"encryptedMeta":"`+
+				base64.StdEncoding.EncodeToString([]byte(namespace+" payload"))+`","writeToken":"`+writeToken+`"}`)
+	}
+	for _, entry := range []struct{ id, ns string }{{"member-1", "meta"}, {"post-1", "content"}, {"post-2", "content"}} {
+		resp := appendEntry(entry.id, entry.ns)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200 appending %s, got %d", entry.id, resp.StatusCode)
+		}
+		resp.Body.Close()
+	}
+
+	deleteBody := func(entryID, signer string, priv ed25519.PrivateKey) string {
+		deletion := logstore.CircleDeletion{SyncID: syncID, EntryID: entryID}
+		sig := ed25519.Sign(priv, deletion.Message())
+		return `{"entryId":"` + entryID + `","keyVersion":1,"encryptedMeta":"` +
+			base64.StdEncoding.EncodeToString([]byte("circle_deleted payload")) +
+			`","writeToken":"` + writeToken +
+			`","signerAuthorityPublicKey":"` + signer +
+			`","signature":"` + hex.EncodeToString(sig) + `"}`
+	}
+	postDelete := func(body string) *http.Response {
+		return authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/delete", authToken, body)
+	}
+
+	// A current member who isn't an admin holds the write token, so that
+	// alone can't be what gates this.
+	outsiderResp := postDelete(deleteBody("tombstone-0", hex.EncodeToString(outsiderPub), outsiderPriv))
+	defer outsiderResp.Body.Close()
+	if outsiderResp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 deleting without authority, got %d", outsiderResp.StatusCode)
+	}
+
+	deleteResp := postDelete(deleteBody("tombstone-1", founderPubHex, founderPriv))
+	defer deleteResp.Body.Close()
+	if deleteResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 from delete, got %d", deleteResp.StatusCode)
+	}
+
+	metaEntries := readEntries(t, server.URL, authToken, syncID, "meta")
+	if len(metaEntries) != 2 {
+		t.Fatalf("expected meta kept whole with the tombstone appended, got %d entries", len(metaEntries))
+	}
+	contentEntries := readEntries(t, server.URL, authToken, syncID, "content")
+	if len(contentEntries) != 0 {
+		t.Fatalf("expected the content namespace swept, got %d entries", len(contentEntries))
+	}
+
+	afterResp := appendEntry("post-3", "content")
+	defer afterResp.Body.Close()
+	if afterResp.StatusCode != http.StatusGone {
+		t.Fatalf("expected 410 appending to a deleted circle, got %d", afterResp.StatusCode)
+	}
+}
+
+// readEntries fetches one namespace's entries over HTTP, so a test can
+// assert on what a syncing device would actually receive.
+func readEntries(t *testing.T, serverURL, authToken, syncID, namespace string) []struct {
+	Epoch         int64  `json:"epoch"`
+	EncryptedMeta string `json:"encryptedMeta"`
+} {
+	t.Helper()
+	resp := authedRequest(t, http.MethodGet, serverURL+"/v1/circles/"+syncID+"/entries?namespace="+namespace+"&since=0", authToken, "")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 reading %s, got %d", namespace, resp.StatusCode)
+	}
+	var body struct {
+		Entries []struct {
+			Epoch         int64  `json:"epoch"`
+			EncryptedMeta string `json:"encryptedMeta"`
+		} `json:"entries"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	return body.Entries
+}
