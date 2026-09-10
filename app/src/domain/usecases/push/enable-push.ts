@@ -44,9 +44,12 @@ export async function enablePushEverywhere(): Promise<void> {
  * opening a feed costs nothing after the first time.
  */
 export async function askForPushOnCircle(circleId: string): Promise<void> {
-  // Granted means launch already registered this circle; denied means the
-  // OS will not ask again.
-  if ((await getPermissionsAsync()).status !== 'undetermined') return;
+  // Not keyed on `status`: iOS reports `undetermined` before the first ask,
+  // Android reports denied-with-canAskAgain, so testing for `undetermined`
+  // meant Android was never asked at all. These two cover both.
+  const existing = await getPermissionsAsync();
+  if (existing.granted) return; // launch already registered this circle
+  if (!existing.canAskAgain) return; // the OS will not ask again
 
   const device = await getDevicePushToken({ ask: true });
   if (!device) return;
