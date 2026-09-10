@@ -300,3 +300,51 @@ describe('apply', () => {
     expect(added?.joinedAt).toBeGreaterThanOrEqual(before);
   });
 });
+
+/**
+ * The routing id has to survive the replay path, not just the local one.
+ * Without it nobody ever learns anybody else's, and notifyCircle finds
+ * nothing to target — push cannot work between two devices at all.
+ */
+test('the routing id on the entry reaches the roster', async () => {
+  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const founder = bytesToHex((await getCircleIdentity(circleId))!.publicKey);
+  const joiner = bytesToHex(generateIdentity().publicKey);
+  const routingId = 'a'.repeat(64);
+
+  await memberAddedHandler.apply(
+    circleId,
+    envelope(founder, {
+      identityPublicKey: joiner,
+      encPublicKey: 'cc',
+      name: 'Marcus',
+      role: MemberRoles.member,
+      pushRoutingId: routingId,
+      createdAt: 1,
+    }),
+    2,
+  );
+
+  const member = (await getCircleMembers(circleId)).find((m) => m.identityPublicKey === joiner);
+  expect(member?.pushRoutingId).toBe(routingId);
+});
+
+/** An entry written before push existed must not blank a known one. */
+test('an entry with no routing id leaves an existing one alone', async () => {
+  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const founder = bytesToHex((await getCircleIdentity(circleId))!.publicKey);
+  const joiner = bytesToHex(generateIdentity().publicKey);
+  const base = {
+    identityPublicKey: joiner,
+    encPublicKey: 'cc',
+    name: 'Marcus',
+    role: MemberRoles.member,
+    createdAt: 1,
+  };
+
+  await memberAddedHandler.apply(circleId, envelope(founder, { ...base, pushRoutingId: 'b'.repeat(64) }), 2);
+  await memberAddedHandler.apply(circleId, envelope(founder, base), 3);
+
+  const member = (await getCircleMembers(circleId)).find((m) => m.identityPublicKey === joiner);
+  expect(member?.pushRoutingId).toBe('b'.repeat(64));
+});

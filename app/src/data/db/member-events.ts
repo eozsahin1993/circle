@@ -95,6 +95,7 @@ export async function recordMemberAdded(event: EventBase & { profile: AddedMembe
       identityPublicKey: event.subjectPublicKey,
       encPublicKey: event.profile.encPublicKey,
       memberId: event.profile.memberId,
+      pushRoutingId: event.profile.pushRoutingId ?? '',
       role: event.profile.role,
       name: event.profile.name,
       picture: event.profile.picture,
@@ -103,7 +104,15 @@ export async function recordMemberAdded(event: EventBase & { profile: AddedMembe
     })
     .onConflictDoUpdate({
       target: [circleMembers.circleId, circleMembers.identityPublicKey],
-      set: { joinedAt: event.occurredAt, removedAt: null },
+      // Carried on the update too: this row usually already exists by the
+      // time the entry replays, so an insert-only field would never reach
+      // anyone. Empty is left alone rather than written, so replaying an
+      // entry from before push existed can't erase a later push_enabled.
+      set: {
+        joinedAt: event.occurredAt,
+        removedAt: null,
+        ...(event.profile.pushRoutingId ? { pushRoutingId: event.profile.pushRoutingId } : {}),
+      },
     });
 }
 
