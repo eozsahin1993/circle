@@ -59,15 +59,19 @@ export function stringField(record: Record<string, unknown>, key: string, { allo
   return value;
 }
 
+const LOWERCASE_HEX = /^[0-9a-f]*$/;
+
 /**
- * A lowercase-hex field of an exact byte length — public keys, routing ids,
- * anything that names a fixed-size value. Null when absent or malformed,
- * so a caller decides whether that rejects the entry or degrades.
+ * A public key, routing id, or anything else carried as lowercase hex of a
+ * known size. `byteLength` is the value it encodes, so the string itself is
+ * twice that. Null when absent or malformed — the caller decides whether
+ * that rejects the entry or degrades to a default.
  */
-export function hexField(record: Record<string, unknown>, key: string, bytes: number): string | null {
+export function hexField(record: Record<string, unknown>, key: string, byteLength: number): string | null {
   const value = record[key];
   if (typeof value !== 'string') return null;
-  return new RegExp(`^[0-9a-f]{${bytes * 2}}$`).test(value) ? value : null;
+  if (value.length !== byteLength * 2) return null;
+  return LOWERCASE_HEX.test(value) ? value : null;
 }
 
 export function numberField(record: Record<string, unknown>, key: string): number | null {

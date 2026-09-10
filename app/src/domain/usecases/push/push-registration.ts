@@ -24,13 +24,14 @@ import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from
  */
 
 /**
- * The notification kinds a category id names. Bit positions in the relay's
- * mask, so these values are permanent — add to the end, never renumber.
+ * Bit positions in the relay's mask, so these values are permanent — add to
+ * the end, never renumber.
  */
 export const PushCategories = {
-  newPhoto: 0,
-  commentOrReaction: 1,
-  memberJoined: 2,
+  newPost: 0,
+  comment: 1,
+  reaction: 2,
+  memberJoined: 3,
 } as const;
 
 export type PushCategory = (typeof PushCategories)[keyof typeof PushCategories];
@@ -43,20 +44,35 @@ export type PushRegistration = {
 };
 
 /**
- * Registers one circle. Re-run after a key rotation: the fanout token
- * follows the current content key, so a stale registration stops
- * verifying and this device quietly goes dark until it re-registers.
+ * Writes this circle's control row: which categories to deliver, and the
+ * hash that authorizes a sender.
+ *
+ * Separate from the device row because it needs no push token — the
+ * preferences UI can work before notification permission is even asked
+ * for. Re-run after a key rotation: the fanout token follows the current
+ * content key, so a stale hash stops verifying and this circle quietly
+ * goes dark.
  */
-export async function registerPushForCircle(circleId: string, registration: PushRegistration): Promise<void> {
+export async function syncCirclePushPrefs(circleId: string, categories: PushCategory[]): Promise<void> {
   const masterSeed = await getMasterSeed();
   const current = await getCurrentContentKey(circleId);
   if (!masterSeed || !current) return;
 
   const pushRoutingId = derivePushRoutingId(masterSeed, circleId);
-  const pushFanoutToken = derivePushFanoutToken(current.key);
-  const deviceId = derivePushDeviceId(await getPushDeviceSecret(), pushRoutingId);
+  const pushFanoutHash = derivePushFanoutHash(derivePushFanoutToken(current.key), pushRoutingId);
 
-  await putPushPrefs(pushRoutingId, derivePushFanoutHash(pushFanoutToken, pushRoutingId), registration.categories, current.version);
+  await putPushPrefs(pushRoutingId, pushFanoutHash, categories, current.version);
+}
+
+/** Turns notifications on for a circle. The only path that writes to the log. */
+export async function registerPushForCircle(circleId: string, registration: PushRegistration): Promise<void> {
+  const masterSeed = await getMasterSeed();
+  if (!masterSeed) return;
+
+  await syncCirclePushPrefs(circleId, registration.categories);
+
+  const pushRoutingId = derivePushRoutingId(masterSeed, circleId);
+  const deviceId = derivePushDeviceId(await getPushDeviceSecret(), pushRoutingId);
   await putPushDevice(pushRoutingId, deviceId, registration.pushToken, registration.platform, true);
   await publishPushRoutingId(circleId, pushRoutingId);
 }

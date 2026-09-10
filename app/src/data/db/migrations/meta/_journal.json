@@ -85,6 +85,20 @@
       "when": 1789057603583,
       "tag": "0011_bright_monster_badoon",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1789058304768,
+      "tag": "0012_wide_starfox",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1789059479831,
+      "tag": "0013_jittery_magik",
+      "breakpoints": true
     }
   ]
 }

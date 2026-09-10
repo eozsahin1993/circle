@@ -19,6 +19,7 @@ import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account
 import { compressToThumbnail } from '@/services/image';
 import { writeCoverFile } from '@/services/photo-cache';
 import { bootstrapCircle, appendEntry } from '@/services/relay';
+import { defaultCircleMask } from '@/domain/usecases/push/push-preferences';
 import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap } from '@/services/keystore';
 
 export type CreateCircleInput = {
@@ -108,6 +109,7 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
     name: input.name,
     picture: input.picture ?? null,
     syncId,
+    pushCategoryMask: await defaultCircleMask(),
     createdAt: now,
     leftAt: null,
     // Deliberately *not* 1, though this device wrote epoch 1 itself. The

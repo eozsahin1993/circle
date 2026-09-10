@@ -36,7 +36,7 @@ import { appendEntry, bootstrapCircle } from '@/services/relay';
 const registration = {
   pushToken: new Uint8Array([1, 2, 3]),
   platform: 'android' as const,
-  categories: [PushCategories.newPhoto, PushCategories.commentOrReaction],
+  categories: [PushCategories.newPost, PushCategories.comment],
 };
 
 beforeAll(async () => {

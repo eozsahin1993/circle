@@ -10,7 +10,7 @@ function normalizeCircle(circle: Circle): Circle {
   return { ...circle, picture: normalizeBlob(circle.picture) };
 }
 
-export async function insertCircle(circle: Circle): Promise<void> {
+export async function insertCircle(circle: typeof circles.$inferInsert): Promise<void> {
   await db.insert(circles).values(circle);
 }
 
@@ -178,4 +178,14 @@ export async function markCircleLeft(id: string): Promise<void> {
  */
 export async function deleteCircle(id: string): Promise<void> {
   await db.delete(circles).where(eq(circles.id, id));
+}
+
+/** Records whether this account has silenced a circle's notifications. */
+export async function setCirclePushSilenced(id: string, pushSilenced: boolean): Promise<void> {
+  await db.update(circles).set({ pushSilenced }).where(eq(circles.id, id));
+}
+
+/** Records which notification categories a circle sends. */
+export async function setCirclePushCategoryMask(id: string, pushCategoryMask: number): Promise<void> {
+  await db.update(circles).set({ pushCategoryMask }).where(eq(circles.id, id));
 }

@@ -8,6 +8,7 @@ import { ActionSheet, type ActionSheetOption } from '@/components/action-sheet';
 import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/icon';
 import { InviteSheet } from '@/components/invite-sheet';
+import { OptionSheet } from '@/components/option-sheet';
 import { PromptSheet } from '@/components/prompt-sheet';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { SecondaryButton } from '@/components/secondary-button';
@@ -25,6 +26,13 @@ import { deleteCircleForEveryone, leaveCircle } from '@/domain/usecases/circle/l
 import { removeMember } from '@/domain/usecases/circle/remove-member';
 import { renameCircle } from '@/domain/usecases/circle/rename-circle';
 import { setCoverPhoto } from '@/domain/usecases/circle/set-cover-photo';
+import {
+  PushLevels,
+  setCircleLevel,
+  setCircleSilenced,
+  type CirclePushPreferences,
+  type PushLevelId,
+} from '@/domain/usecases/push/push-preferences';
 import { useTheme } from '@/hooks/use-theme';
 import { showDone, showError } from '@/services/messages';
 import { bytesToDataUri, pickAndCompressImage } from '@/services/image';
@@ -40,6 +48,10 @@ function formatJoined(joinedAt: number): string {
   });
 }
 
+function pushLevelLabel(level: PushLevelId): string {
+  return PushLevels.find((candidate) => candidate.id === level)?.label ?? '';
+}
+
 function formatExpiry(expiresAt: number): string {
   const days = Math.ceil((expiresAt - Date.now()) / (24 * 60 * 60 * 1000));
   if (days <= 0) return 'expired';
@@ -48,6 +60,8 @@ function formatExpiry(expiresAt: number): string {
 
 /** Stable identity, so `avatarUris`' memo doesn't bust on every render. */
 const NO_MEMBERS: Member[] = [];
+
+const NO_PUSH_PREFERENCES: CirclePushPreferences = { silenced: false, level: 'comments', categories: [] };
 
 export default function CircleDetailsScreen() {
   const theme = useTheme();
@@ -58,12 +72,14 @@ export default function CircleDetailsScreen() {
   const [inviteSheet, setInviteSheet] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [coverUri, setCoverUri] = useState<string | undefined>();
+  const [levelPicker, setLevelPicker] = useState(false);
 
   const circle = details?.circle ?? null;
   const members = details?.members ?? NO_MEMBERS;
   const admin = details?.ownIsAdmin ?? false;
   const ownPublicKey = details?.ownPublicKey ?? null;
   const invite = details?.invite ?? null;
+  const push = details?.push ?? NO_PUSH_PREFERENCES;
 
   /**
    * Only an admin may write `member_added` or change a role, so a circle
@@ -154,6 +170,32 @@ export default function CircleDetailsScreen() {
         },
       ]
     : [];
+
+  async function handleSilenceChange(silenced: boolean) {
+    if (!circleId) return;
+    // Reloaded rather than held in local state: the local flag is written
+    // first and is what this row reads, so a failed relay call still leaves
+    // the toggle showing what was actually stored.
+    try {
+      await setCircleSilenced(circleId, silenced);
+    } catch (err) {
+      console.error('Failed to change notification settings', err);
+      showError("Couldn't reach the relay, but this phone remembers");
+    }
+    await reload();
+  }
+
+  async function handleLevelChange(level: PushLevelId) {
+    if (!circleId) return;
+    setLevelPicker(false);
+    try {
+      await setCircleLevel(circleId, level);
+    } catch (err) {
+      console.error('Failed to change notification settings', err);
+      showError("Couldn't reach the relay, but this phone remembers");
+    }
+    await reload();
+  }
 
   async function handleShareLink() {
     if (!circleId) return;
@@ -350,6 +392,25 @@ export default function CircleDetailsScreen() {
    */
   const settingsGroups: SettingsGroup[] = [
     {
+      title: 'Notifications',
+      footnote: push.silenced
+        ? 'Silenced, so nothing from here reaches you until you switch it back on.'
+        : 'Only this circle. Your other circles keep their own setting.',
+      rows: [
+        {
+          label: 'Silence this circle',
+          description: 'Nothing from here reaches your phone',
+          control: { kind: 'switch', value: push.silenced, onValueChange: handleSilenceChange },
+        },
+        {
+          label: 'Notify me about',
+          control: { kind: 'value', text: pushLevelLabel(push.level) },
+          disabled: push.silenced,
+          onPress: () => setLevelPicker(true),
+        },
+      ],
+    },
+    {
       title: 'This circle',
       rows: [
         admin && {
@@ -367,8 +428,6 @@ export default function CircleDetailsScreen() {
           control: { kind: 'navigate' },
           onPress: () => setRenaming(true),
         },
-        // TODO: "Silence this circle" waits on notifications existing at
-        // all; a toggle now would store a preference nothing reads.
       ],
     },
     {
@@ -498,6 +557,15 @@ export default function CircleDetailsScreen() {
         link={invite ? inviteLink(invite.code) : ''}
         code={invite?.code ?? ''}
         expiry={invite ? formatExpiry(invite.expiresAt) : undefined}
+      />
+
+      <OptionSheet
+        visible={levelPicker}
+        onClose={() => setLevelPicker(false)}
+        title="Notify me about"
+        options={PushLevels}
+        selected={push.level}
+        onSelect={handleLevelChange}
       />
 
       <ActionSheet

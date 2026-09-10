@@ -49,6 +49,7 @@ func (s *Store) PutPrefs(ctx context.Context, pushRoutingID string, prefs pushst
 			"pushFanoutHash":  &types.AttributeValueMemberB{Value: prefs.PushFanoutHash},
 			"categoryMask":    &types.AttributeValueMemberN{Value: strconv.FormatInt(prefs.CategoryMask, 10)},
 			"keyVersion":      &types.AttributeValueMemberN{Value: strconv.FormatInt(prefs.KeyVersion, 10)},
+			"silenced":        &types.AttributeValueMemberBOOL{Value: prefs.Silenced},
 		},
 	})
 	if err != nil {
@@ -91,8 +92,32 @@ func (s *Store) GetPrefs(ctx context.Context, pushRoutingID string) (*pushstore.
 		PushFanoutHash: pushFanoutHash,
 		CategoryMask:   categoryMask,
 		KeyVersion:     keyVersion,
+		Silenced:       dynamoutil.AttrBool(out.Item, "silenced"),
 	}
 	return &prefs, nil
+}
+
+func (s *Store) SetSilenced(ctx context.Context, pushRoutingID string, silenced bool) error {
+	_, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(s.tableName),
+		Key: map[string]types.AttributeValue{
+			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: pushRoutingID},
+			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: prefsSK},
+		},
+		UpdateExpression: aws.String("SET silenced = :silenced"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":silenced": &types.AttributeValueMemberBOOL{Value: silenced},
+		},
+		ConditionExpression: aws.String(fmt.Sprintf("attribute_exists(%s)", dynamoutil.PKAttr)),
+	})
+	if err != nil {
+		var condFailed *types.ConditionalCheckFailedException
+		if errors.As(err, &condFailed) {
+			return pushstore.ErrPushRoutingNotFound
+		}
+		return fmt.Errorf("set push silenced: %w", err)
+	}
+	return nil
 }
 
 func (s *Store) PutDevice(ctx context.Context, pushRoutingID string, device pushstore.Device) error {

@@ -50,12 +50,12 @@ test('targets every member who published a routing id', async () => {
   const marcus = await addMemberWithRouting(circleId, 'marcus');
   const nadia = await addMemberWithRouting(circleId, 'nadia');
 
-  await notifyCircle(circleId, PushCategories.newPhoto, payload);
+  await notifyCircle(circleId, PushCategories.newPost, payload);
 
   const [routingIds, fanoutToken, category, sentPayload] = (sendPush as jest.Mock).mock.calls[0];
   expect([...routingIds].sort()).toEqual([marcus, nadia].sort());
   expect(fanoutToken).toEqual(derivePushFanoutToken((await getCurrentContentKey(circleId))!.key));
-  expect(category).toBe(PushCategories.newPhoto);
+  expect(category).toBe(PushCategories.newPost);
   expect(sentPayload).toBe(payload);
 });
 
@@ -66,7 +66,7 @@ test('never targets the sender', async () => {
   await setMemberPushRoutingId(circleId, bytesToHex(identity.publicKey), derivePushRoutingId((await getMasterSeed())!, circleId));
   const marcus = await addMemberWithRouting(circleId, 'marcus');
 
-  await notifyCircle(circleId, PushCategories.newPhoto, payload);
+  await notifyCircle(circleId, PushCategories.newPost, payload);
 
   expect((sendPush as jest.Mock).mock.calls[0][0]).toEqual([marcus]);
 });
@@ -81,7 +81,7 @@ test('skips members with no routing id', async () => {
     profile: { encPublicKey: 'cc', memberId: generateUUID(), role: MemberRoles.member, name: 'Quiet', picture: null },
   });
 
-  await notifyCircle(circleId, PushCategories.newPhoto, payload);
+  await notifyCircle(circleId, PushCategories.newPost, payload);
 
   expect(sendPush).not.toHaveBeenCalled();
 });
@@ -89,7 +89,7 @@ test('skips members with no routing id', async () => {
 test('a circle with nobody to notify sends nothing', async () => {
   const { id: circleId } = await createCircle({ name: 'Family Circle' });
 
-  await notifyCircle(circleId, PushCategories.commentOrReaction, payload);
+  await notifyCircle(circleId, PushCategories.comment, payload);
 
   expect(sendPush).not.toHaveBeenCalled();
 });

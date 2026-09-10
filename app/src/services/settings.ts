@@ -4,18 +4,18 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 
 export type AppSettings = {
   themePreference: ThemePreference;
-  notifyNewPhotos: boolean;
-  notifyCommentsReactions: boolean;
-  notifyMemberJoined: boolean;
+  /** Which level a newly created or joined circle starts at — see push-preferences.ts. */
+  defaultPushLevel: string;
 };
 
 const STORAGE_KEY = 'app_settings';
 
 const DEFAULT_SETTINGS: AppSettings = {
   themePreference: 'system',
-  notifyNewPhotos: true,
-  notifyCommentsReactions: true,
-  notifyMemberJoined: false,
+  // Reactions are where the volume jumps: one photo can draw five, and
+  // none of them say anything a comment doesn't. Easier to turn up than to
+  // win back someone who switched notifications off entirely.
+  defaultPushLevel: 'comments',
 };
 
 /**

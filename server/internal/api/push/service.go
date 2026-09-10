@@ -33,6 +33,10 @@ func (s *Service) PutPrefs(ctx context.Context, pushRoutingID string, prefs push
 	return s.PushStore.PutPrefs(ctx, pushRoutingID, prefs)
 }
 
+func (s *Service) SetSilenced(ctx context.Context, pushRoutingID string, silenced bool) error {
+	return s.PushStore.SetSilenced(ctx, pushRoutingID, silenced)
+}
+
 func (s *Service) PutDevice(ctx context.Context, pushRoutingID string, device pushstore.Device) error {
 	return s.PushStore.PutDevice(ctx, pushRoutingID, device)
 }
@@ -99,6 +103,9 @@ func (s *Service) resolve(ctx context.Context, pushRoutingID string, pushFanoutT
 	}
 
 	// Constant time, or a caller could test tokens a byte at a time.
+	if prefs.Silenced {
+		return nil, nil
+	}
 	if !hmac.Equal(prefs.PushFanoutHash, PushFanoutHash(pushFanoutToken, pushRoutingID)) {
 		return nil, nil
 	}

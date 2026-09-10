@@ -66,6 +66,7 @@ test('returns an empty shape for a circle this device does not have', async () =
     ownIsAdmin: false,
     ownPublicKey: null,
     invite: null,
+    push: { silenced: false, level: 'posts', categories: [] },
   });
 });
 

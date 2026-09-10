@@ -13,6 +13,16 @@ export const circles = sqliteTable('circles', {
    */
   syncId: text('sync_id').notNull().default(''),
   createdAt: integer('created_at').notNull(),
+  /**
+   * Which notification categories this circle sends, as a bitmask — see
+   * `PushCategories`. Local is the source of truth: the relay holds routing
+   * rows but has no read endpoint, so a screen would otherwise have nothing
+   * to render. Defaults to everything on; a circle is reachable from the
+   * moment you join without anyone opting in.
+   */
+  pushCategoryMask: integer('push_category_mask').notNull().default(11),
+  /** Silenced outright, independent of the mask, so the categories survive being switched back on. */
+  pushSilenced: integer('push_silenced', { mode: 'boolean' }).notNull().default(false),
   /** Set when this device leaves the circle — kept (not deleted) so already-synced posts stay as a local archive. */
   leftAt: integer('left_at'),
   /** How far this device has synced each namespace — see server/SYNC_DESIGN.md's "Read / sync". 0 means never synced. */

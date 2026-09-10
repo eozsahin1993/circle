@@ -1,5 +1,7 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
+import { circlePushPreferences, type CirclePushPreferences } from '@/domain/usecases/push/push-preferences';
+
 import {
   getCircleMembers,
   getCircleSummary,
@@ -23,6 +25,8 @@ export type CircleDetails = {
    * an admin who only came to look at the roster.
    */
   invite: Invite | null;
+  /** Which notifications this circle sends — see push-preferences.ts. */
+  push: CirclePushPreferences;
 };
 
 /**
@@ -44,5 +48,6 @@ export async function loadCircleDetails(circleId: string): Promise<CircleDetails
     ownIsAdmin,
     ownPublicKey: identity ? bytesToHex(identity.publicKey) : null,
     invite,
+    push: await circlePushPreferences(circleId),
   };
 }

@@ -28,6 +28,7 @@ import {
 } from '@/data/db';
 import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
 import { writeCoverFile } from '@/services/photo-cache';
+import { defaultCircleMask } from '@/domain/usecases/push/push-preferences';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { compressToThumbnail } from '@/services/image';
@@ -189,6 +190,7 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
     name: circleName,
     picture,
     syncId,
+    pushCategoryMask: await defaultCircleMask(),
     createdAt: now,
     leftAt: null,
     metaCursor: 0,

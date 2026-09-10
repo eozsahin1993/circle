@@ -30,6 +30,8 @@ func (f *fakeStore) GetPrefs(_ context.Context, pushRoutingID string) (*pushstor
 	return &prefs, nil
 }
 
+func (f *fakeStore) SetSilenced(context.Context, string, bool) error { return nil }
+
 func (f *fakeStore) PutDevice(context.Context, string, pushstore.Device) error { return nil }
 
 func (f *fakeStore) ListDevices(_ context.Context, pushRoutingID string) ([]pushstore.Device, error) {
@@ -122,6 +124,23 @@ func TestFanout_UnregisteredTargetIsSkippedNotFatal(t *testing.T) {
 	}
 	if len(result.Deliveries) != 1 || result.Skipped != 1 {
 		t.Fatalf("expected 1 delivered and 1 skipped, got %d and %d", len(result.Deliveries), result.Skipped)
+	}
+}
+
+// Silencing flips a flag rather than deleting the row, so the send path
+// has to honour it — a stale hash would otherwise still verify.
+func TestFanout_SilencedRoutingGetsNothing(t *testing.T) {
+	service, store := newService(t, &countingLimit{allow: true})
+	prefs := store.prefs["routing-a"]
+	prefs.Silenced = true
+	store.prefs["routing-a"] = prefs
+
+	result, err := service.Fanout(context.Background(), []string{"routing-a"}, []byte(token), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Deliveries) != 0 || result.Skipped != 1 {
+		t.Fatalf("a silenced routing id must get nothing, got %d deliveries", len(result.Deliveries))
 	}
 }
 

@@ -3,6 +3,7 @@ package push
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -130,6 +131,36 @@ func (h *PutDeviceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.Service.PutDevice(r.Context(), pushRoutingID, device); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to store push device")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, okResponse{OK: true})
+}
+
+type setSilencedRequest struct {
+	Silenced bool `json:"silenced"`
+}
+
+// SetSilencedHandler flips the flag without touching the hash or
+// categories, so unsilencing needs no content key and cannot half-fail.
+type SetSilencedHandler struct {
+	Service *Service
+}
+
+func (h *SetSilencedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var req setSilencedRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httputil.WriteError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	err := h.Service.SetSilenced(r.Context(), r.PathValue("pushRoutingId"), req.Silenced)
+	if errors.Is(err, pushstore.ErrPushRoutingNotFound) {
+		httputil.WriteError(w, http.StatusNotFound, "this routing id is not registered")
+		return
+	}
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "failed to change notification settings")
 		return
 	}
 

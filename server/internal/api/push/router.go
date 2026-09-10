@@ -7,6 +7,7 @@ import "net/http"
 func Register(mux *http.ServeMux, service *Service) {
 	mux.Handle("PUT /push/{pushRoutingId}", &PutPrefsHandler{Service: service})
 	mux.Handle("DELETE /push/{pushRoutingId}", &DeleteRoutingHandler{Service: service})
+	mux.Handle("PUT /push/{pushRoutingId}/silenced", &SetSilencedHandler{Service: service})
 
 	mux.Handle("PUT /push/{pushRoutingId}/devices/{deviceId}", &PutDeviceHandler{Service: service})
 	mux.Handle("DELETE /push/{pushRoutingId}/devices/{deviceId}", &DeleteDeviceHandler{Service: service})

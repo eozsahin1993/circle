@@ -204,6 +204,48 @@ func TestDeleteRoutingRemovesPrefsAndDevices(t *testing.T) {
 	}
 }
 
+// Silencing must not disturb the hash or categories, so unsilencing needs
+// no content key.
+func TestSetSilencedLeavesTheRestAlone(t *testing.T) {
+	store := newStore(t)
+	pushRoutingID := testsupport.UniqueInviteTag(t)
+	ctx := context.Background()
+
+	if err := store.PutPrefs(ctx, pushRoutingID, samplePrefs()); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetSilenced(ctx, pushRoutingID, true); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := store.GetPrefs(ctx, pushRoutingID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Silenced {
+		t.Fatal("expected the row silenced")
+	}
+	if string(got.PushFanoutHash) != string(samplePrefs().PushFanoutHash) || got.CategoryMask != 0b101 {
+		t.Fatalf("silencing disturbed the rest of the row: %+v", got)
+	}
+
+	if err := store.SetSilenced(ctx, pushRoutingID, false); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := store.GetPrefs(ctx, pushRoutingID); got.Silenced {
+		t.Fatal("expected the row unsilenced")
+	}
+}
+
+func TestSetSilencedUnregistered(t *testing.T) {
+	store := newStore(t)
+
+	err := store.SetSilenced(context.Background(), testsupport.UniqueInviteTag(t), true)
+	if !errors.Is(err, pushstore.ErrPushRoutingNotFound) {
+		t.Fatalf("expected ErrPushRoutingNotFound, got %v", err)
+	}
+}
+
 // Registering a rotated push token must not restate the account's
 // categories — the two rows are written independently on purpose.
 func TestPutDeviceLeavesPrefsAlone(t *testing.T) {

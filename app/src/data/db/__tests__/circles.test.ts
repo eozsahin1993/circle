@@ -49,6 +49,8 @@ function makeCircle(overrides: Partial<{ id: string; name: string; createdAt: nu
     picture: null,
     syncId: generateUUID(),
     createdAt: Date.now(),
+    pushCategoryMask: 3,
+    pushSilenced: false,
     leftAt: null,
     metaCursor: 0,
     contentCursor: 0,

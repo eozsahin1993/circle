@@ -24,6 +24,11 @@ type Prefs struct {
 	CategoryMask int64
 	// Never compared during a send — the hash is what authorizes.
 	KeyVersion int64
+	// Set while this account has silenced the circle. A flag rather than
+	// deleting the row: silencing is account-wide, so it cannot live on a
+	// device row, and delete-then-recreate would make a failed unsilence
+	// leave someone unreachable with nothing to notice.
+	Silenced bool
 }
 
 // Device is one device's delivery row. PushToken arrives already
@@ -39,6 +44,10 @@ type Device struct {
 // device wanting delivery under it.
 type Store interface {
 	PutPrefs(ctx context.Context, pushRoutingID string, prefs Prefs) error
+	// SetSilenced flips just that flag, leaving the hash and categories
+	// alone — no re-derivation, and unsilencing needs no content key.
+	// Returns ErrPushRoutingNotFound if there is no prefs row.
+	SetSilenced(ctx context.Context, pushRoutingID string, silenced bool) error
 	GetPrefs(ctx context.Context, pushRoutingID string) (*Prefs, error)
 	// Independent of PutPrefs: re-registering a rotated push token must not
 	// restate the account's categories.

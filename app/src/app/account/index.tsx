@@ -4,19 +4,25 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
+import { OptionSheet } from '@/components/option-sheet';
 import { PrivacyInfoModal } from '@/components/privacy-info-modal';
 import { ReactionChip } from '@/components/reaction-chip';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { SettingsGroups, type SettingsGroup } from '@/components/settings-group';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Radius, Spacing, Tints } from '@/constants/theme';
+import { Icons, Radius, Spacing, Tints } from '@/constants/theme';
 import { getProfile, listCircles, type Profile } from '@/data/db';
 import { resetLocalDataForTesting } from '@/domain/usecases/dev-reset';
 import { signOut } from '@/domain/usecases/account/sign-in';
+import { PushLevels, type PushLevelId } from '@/domain/usecases/push/push-preferences';
 import { useAppSettings } from '@/hooks/use-app-settings';
 import { bytesToDataUri } from '@/services/image';
 import type { ThemePreference } from '@/services/settings';
+
+function pushLevelLabel(level: PushLevelId): string {
+  return PushLevels.find((candidate) => candidate.id === level)?.label ?? '';
+}
 
 const APPEARANCE_OPTIONS: { value: ThemePreference; label: string }[] = [
   { value: 'system', label: 'System' },
@@ -30,6 +36,7 @@ export default function AccountScreen() {
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [resettingDevData, setResettingDevData] = useState(false);
+  const [levelPicker, setLevelPicker] = useState(false);
   // Gates the "bring over" direction: adopting another account's seed
   // would strand any circle this device already joined under its own.
   const [hasCircles, setHasCircles] = useState(true);
@@ -44,32 +51,14 @@ export default function AccountScreen() {
   /** Same shape the circle screen uses — one list, one row component, one set of spacings. */
   const settingsGroups: SettingsGroup[] = [
     {
-      title: 'Notify me about',
-      footnote: 'Notifications are generated on your phone. No push server is told what happened.',
+      title: 'New circles start with',
+      footnote:
+        'Each circle keeps its own setting once you are in it. Change those in the circle itself. Notifications are generated on your phone; no push server is told what happened.',
       rows: [
         {
-          label: 'New photos in a circle',
-          control: {
-            kind: 'switch',
-            value: settings.notifyNewPhotos,
-            onValueChange: (value) => updateSettings({ notifyNewPhotos: value }),
-          },
-        },
-        {
-          label: 'Comments and reactions',
-          control: {
-            kind: 'switch',
-            value: settings.notifyCommentsReactions,
-            onValueChange: (value) => updateSettings({ notifyCommentsReactions: value }),
-          },
-        },
-        {
-          label: 'Someone joins a circle',
-          control: {
-            kind: 'switch',
-            value: settings.notifyMemberJoined,
-            onValueChange: (value) => updateSettings({ notifyMemberJoined: value }),
-          },
+          label: 'Notify me about',
+          control: { kind: 'value', text: pushLevelLabel(settings.defaultPushLevel as PushLevelId) },
+          onPress: () => setLevelPicker(true),
         },
       ],
     },
@@ -218,6 +207,18 @@ export default function AccountScreen() {
 
         </ScrollView>
       </SafeAreaView>
+
+      <OptionSheet
+        visible={levelPicker}
+        onClose={() => setLevelPicker(false)}
+        title="Notify me about"
+        options={PushLevels}
+        selected={settings.defaultPushLevel as PushLevelId}
+        onSelect={(level) => {
+          setLevelPicker(false);
+          updateSettings({ defaultPushLevel: level });
+        }}
+      />
 
       <PrivacyInfoModal visible={privacyVisible} onClose={() => setPrivacyVisible(false)} />
     </ThemedView>

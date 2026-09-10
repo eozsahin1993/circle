@@ -1,0 +1,1 @@
+ALTER TABLE `circles` ADD `push_category_mask` integer DEFAULT 11 NOT NULL;
