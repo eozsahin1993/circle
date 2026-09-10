@@ -279,22 +279,26 @@ conversation.
 
 A channel's sound, vibration and importance are frozen once created. Its
 **name and description are not**, so re-calling `createNotificationChannel`
-with the same id is how a renamed circle keeps a correct label. Changing a
-tone means creating a *new* channel and pointing at it; Android remembers
-deleted channel ids, so key them on the settings (`circle-<id>-<soundHash>`)
-rather than reusing one.
+with the same id is how a renamed circle keeps a correct label — which is
+why the id is a plain `circle-<id>`.
+
+Offering a tone picker *in the app* would break that: a new sound needs a
+new channel, so the id would have to carry the sound
+(`circle-<id>-<soundHash>`), and Android remembers deleted channel ids.
+Android's own settings already offer a per-channel sound, so the id stays
+plain until we decide the in-app version is worth that.
 
 Three Android mechanisms, easy to conflate, all keyed `circle-<id>`:
 
 - **Channel** — owns sound, vibration, importance. One per circle.
 - **Channel group** (`createNotificationChannelGroup`) — organises channels
-  in *system settings*. With one channel per circle it only keeps that list
-  tidy, but it leaves room to split into per-category channels later:
-  settings would show the circle as a heading with Photos / Comments /
-  Reactions beneath, finer control than the in-app ladder, with nothing to
-  restructure. Groups can be created and updated freely, unlike channels,
-  and deleting one deletes its channels — which is what leaving a circle
-  should do.
+  in *system settings*. **One shared group**, not one per circle: with a
+  single channel each, a group per circle would render as a heading per
+  circle with one meaningless child under it. Shared, it reads as "Circles"
+  with a row per circle. A group each only earns its place once a circle has
+  several channels — per category, say. Note deleting a group deletes its
+  channels, so leaving a circle drops that circle's *channel*, never the
+  group.
 - **Notification group** (`setGroup` on a posted notification) — bundles a
   circle's notifications in the *shade*, so several photos collapse into one
   stack with a summary rather than five rows.

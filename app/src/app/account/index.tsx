@@ -13,7 +13,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Icons, Radius, Spacing, Tints } from '@/constants/theme';
 import { getProfile, listCircles, type Profile } from '@/data/db';
-import { resetLocalDataForTesting } from '@/domain/usecases/dev-reset';
+import { resetEverythingForTesting } from '@/domain/usecases/dev-reset';
 import { signOut } from '@/domain/usecases/account/sign-in';
 import { PushLevels, type PushLevelId } from '@/domain/usecases/push/push-preferences';
 import { useAppSettings } from '@/hooks/use-app-settings';
@@ -107,7 +107,7 @@ export default function AccountScreen() {
         __DEV__ && {
           label: resettingDevData ? 'Resetting…' : 'Reset all local data',
           description:
-            '__DEV__ only. Wipes circles, keys, and the master seed so you can test sign-in fresh without reinstalling.',
+            '__DEV__ only. Wipes circles, keys, the master seed, and the database schema, so a changed migration actually re-runs.',
           destructive: true,
           disabled: resettingDevData,
           onPress: handleDevReset,
@@ -117,7 +117,7 @@ export default function AccountScreen() {
   ];
 
   function handleDevReset() {
-    Alert.alert('Reset all local data? (dev only)', 'Wipes every circle, key, and the master seed on this device. No undo.', [
+    Alert.alert('Reset all local data? (dev only)', 'Wipes every circle, key, the master seed, and the database itself. No undo.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Reset',
@@ -125,7 +125,7 @@ export default function AccountScreen() {
         onPress: async () => {
           setResettingDevData(true);
           try {
-            await resetLocalDataForTesting();
+            await resetEverythingForTesting();
             router.replace('/');
           } finally {
             setResettingDevData(false);

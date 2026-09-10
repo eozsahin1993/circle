@@ -11,6 +11,7 @@ import {
   OutboxStatuses,
   recordMemberRemovedLocally,
 } from '@/data/db';
+import { removeCircleChannel } from '@/services/notification-channels';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
@@ -79,6 +80,8 @@ export async function leaveCircle(circleId: string): Promise<void> {
 
   await recordMemberRemovedLocally({ circleId, subjectPublicKey: ownPublicKey, removedAt });
   await markCircleLeft(circleId);
+  // Deleting the group takes its channels with it.
+  await removeCircleChannel(circleId);
   await syncAccountManifestBestEffort();
 
   finishDeparture(circleId).catch((err) => console.error('Failed to push departure', err));
@@ -151,5 +154,6 @@ export async function deleteCircleForEveryone(circleId: string): Promise<void> {
 
   await deleteCircle(circleId);
   await deleteCircleKeys(circleId);
+  await removeCircleChannel(circleId);
   await syncAccountManifestBestEffort();
 }

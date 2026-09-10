@@ -1,4 +1,4 @@
-import { getAllCircleIds, resetAllLocalData } from '@/data/db';
+import { getAllCircleIds, resetAllLocalData, resetDatabaseSchema } from '@/data/db';
 import { deleteAuthToken, deleteCircleKeys, deleteMasterSeed } from '@/services/keystore';
 
 /**
@@ -22,4 +22,13 @@ export async function resetLocalDataForTesting(): Promise<void> {
   await deleteMasterSeed();
   await deleteAuthToken();
   await resetAllLocalData();
+}
+
+/**
+ * `resetLocalDataForTesting` plus the schema itself, for the __DEV__ menu
+ * action — the tests call the cheaper one, which keeps the tables.
+ */
+export async function resetEverythingForTesting(): Promise<void> {
+  await resetLocalDataForTesting();
+  await resetDatabaseSchema();
 }

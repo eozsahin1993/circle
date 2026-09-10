@@ -1,4 +1,7 @@
-import { db } from '@/data/db/connection';
+import { sql } from 'drizzle-orm';
+
+import { db, reopenDatabase } from '@/data/db/connection';
+import { runMigrations } from '@/data/db/migrations/run';
 import {
   attachments,
   circleInvites,
@@ -29,6 +32,31 @@ export async function getAllCircleIds(): Promise<string[]> {
  * that's a separate concern, see services/keystore.ts; callers that want a
  * full device reset need both.
  */
+/**
+ * Drops every table and re-runs migrations from scratch — a real reset,
+ * unlike `resetAllLocalData`, which leaves the schema and its recorded
+ * migration index in place.
+ *
+ * That distinction is the whole point: migrations are tracked by index, so
+ * a schema left behind means an edited or renamed migration is skipped
+ * silently and surfaces later as "no such column" (see migrations/run.ts).
+ * Reaching for a reset is exactly when that bites.
+ *
+ * Reads the table list rather than naming it, so a table added later is
+ * dropped too. DEV-only, same as its one caller.
+ */
+export async function resetDatabaseSchema(): Promise<void> {
+  const tables = await db.all<{ name: string }>(
+    sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`,
+  );
+  for (const table of tables) {
+    await db.run(sql.raw(`DROP TABLE IF EXISTS "${table.name}"`));
+  }
+
+  reopenDatabase();
+  await runMigrations();
+}
+
 export async function resetAllLocalData(): Promise<void> {
   await db.delete(postComments);
   await db.delete(postReactions);

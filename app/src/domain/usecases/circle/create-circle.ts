@@ -20,6 +20,7 @@ import { compressToThumbnail } from '@/services/image';
 import { writeCoverFile } from '@/services/photo-cache';
 import { bootstrapCircle, appendEntry } from '@/services/relay';
 import { defaultCircleMask } from '@/domain/usecases/push/push-preferences';
+import { ensureCircleChannel } from '@/services/notification-channels';
 import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap } from '@/services/keystore';
 
 export type CreateCircleInput = {
@@ -134,6 +135,8 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
       picture: profile?.picture ?? null,
     },
   });
+
+  await ensureCircleChannel(circleId, input.name);
 
   await syncAccountManifestBestEffort();
 

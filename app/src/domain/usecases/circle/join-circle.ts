@@ -29,6 +29,7 @@ import {
 import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
 import { writeCoverFile } from '@/services/photo-cache';
 import { defaultCircleMask } from '@/domain/usecases/push/push-preferences';
+import { ensureCircleChannel } from '@/services/notification-channels';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { compressToThumbnail } from '@/services/image';
@@ -214,6 +215,8 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
       picture: profile?.picture ?? null,
     },
   });
+
+  await ensureCircleChannel(circleId, circleName);
 
   await syncAccountManifestBestEffort();
 
