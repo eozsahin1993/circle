@@ -5,6 +5,7 @@ import {
   type NotificationTaskPayload,
 } from 'expo-notifications';
 import { defineTask } from 'expo-task-manager';
+import { Platform } from 'react-native';
 
 import { handlePush } from '@/domain/usecases/push/handle-push';
 import { initDatabase } from '@/data/db';
@@ -77,6 +78,12 @@ export async function startPushHandling(): Promise<void> {
       shouldSetBadge: false,
     }),
   });
+
+  // Android only for now. The relay sends nothing to iOS — those go direct
+  // to APNs, which isn't built — so registering there would fail every
+  // launch on a build without the remote-notification entitlement, for a
+  // task that has nothing to receive. Lift this with the iOS extension.
+  if (Platform.OS !== 'android') return;
 
   await registerTaskAsync(PUSH_TASK);
 }
