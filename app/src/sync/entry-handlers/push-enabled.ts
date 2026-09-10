@@ -1,5 +1,5 @@
 import { setMemberPushRoutingId } from '@/data/db';
-import { authoredByMember, asRecord, stringField, type EntryHandler } from '@/sync/entry-handlers/types';
+import { authoredByMember, asRecord, hexField, type EntryHandler } from '@/sync/entry-handlers/types';
 
 /**
  * What `publishPushRoutingId` puts in a `push_enabled` entry — the author's
@@ -19,9 +19,8 @@ type PushEnabledPayload = { pushRoutingId: string };
 function parse(payload: unknown): PushEnabledPayload | null {
   const record = asRecord(payload);
   if (!record) return null;
-  const pushRoutingId = stringField(record, 'pushRoutingId');
-  if (pushRoutingId === null || !/^[0-9a-f]{64}$/.test(pushRoutingId)) return null;
-  return { pushRoutingId };
+  const pushRoutingId = hexField(record, 'pushRoutingId', 32);
+  return pushRoutingId === null ? null : { pushRoutingId };
 }
 
 export const pushEnabledHandler: EntryHandler = {
