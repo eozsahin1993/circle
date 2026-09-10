@@ -42,3 +42,10 @@ example
 # generated native folders
 /ios
 /android
+
+# Firebase service-account keys — the relay's FCM credential. Never commit:
+# anyone holding one can push arbitrary text to every user's lock screen.
+# google-services.json is fine (it ships inside the APK, and its API key is
+# restricted to this package and signing certificate).
+*firebase-adminsdk*.json
+service-account*.json
