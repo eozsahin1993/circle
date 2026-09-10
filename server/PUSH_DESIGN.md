@@ -176,14 +176,22 @@ session to budget against, that half is pushed out to the edge:
   any individual can be pushed regardless of who is sending.
 - **Cap the `routingIds[]` length per request.** A circle's membership is
   bounded, so a request targeting thousands is not a real one.
-- **Raw flood protection belongs at the edge**, not here. API Gateway
-  throttling or a WAF rate rule, as configuration. Doing it in the
-  application would mean keying on IP, which means writing IPs into our
-  own table — directly against the no-logging stance below, and only
+- **Raw flood protection belongs in front of the app**, not in it. Doing
+  it here would mean keying on IP, which means writing IPs into our own
+  table — directly against the no-logging stance below, and only
   approximately true anyway: carrier CGNAT puts thousands of users behind
   one address, families share a home network, and IPv6 needs /64 bucketing
   rather than per-address. Any limit loose enough to be safe is too loose
   to be useful.
+
+  Note the relay is served by a Lambda Function URL
+  (`provision/lambda_url.tf`), not API Gateway, so there is no gateway
+  throttling to configure and **WAF cannot attach to it**. Two real
+  options: set `reserved_concurrent_executions` on the function, which
+  caps the blast radius and the bill without stopping a flood; or put
+  CloudFront in front via Origin Access Control and attach WAF with a
+  rate-based rule to that. The first is one line and worth doing anyway;
+  the second is what push actually needs before it ships.
 
 **Order matters: verify before consuming any budget.** Cheapest and most
 selective first — the length cap (no I/O at all), then read and verify each
