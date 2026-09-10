@@ -64,7 +64,7 @@ func main() {
 	pushDeps := api.PushDeps{
 		Store:          pushStore,
 		RecipientLimit: ratelimitdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.RateLimitTableName, "push", int(cfg.RateLimitPushMaxRequests), cfg.RateLimitWindow()),
-		Dispatch:       pushDispatcher(awsCfg, cfg.FCMCredentialParameter),
+		Dispatch:       pushDispatcher(awsCfg, cfg.FCMCredentialParameter, cfg.FCMCredentialFile),
 	}
 
 	mux := api.NewRouter(logStore, blobStore, authStore, manifestStore, inviteStore, writeRateLimitStore, readRateLimitStore, googleVerifier, appleVerifier, pushDeps)
@@ -95,8 +95,12 @@ func nonEmpty(values ...string) []string {
 //
 // Fire-and-forget by design: a push is best-effort, and a failed one must
 // not fail the append that triggered it.
-func pushDispatcher(awsCfg aws.Config, parameterName string) func(push.Delivery, int64, []byte) {
-	loader := &pushcredential.Loader{Client: ssm.NewFromConfig(awsCfg), ParameterName: parameterName}
+func pushDispatcher(awsCfg aws.Config, parameterName, filePath string) func(push.Delivery, int64, []byte) {
+	loader := &pushcredential.Loader{
+		Client:        ssm.NewFromConfig(awsCfg),
+		ParameterName: parameterName,
+		FilePath:      filePath,
+	}
 	var (
 		once   sync.Once
 		sender *fcm.Sender

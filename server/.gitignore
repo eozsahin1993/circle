@@ -17,3 +17,8 @@ provision/**/*.tfstate
 provision/**/*.tfstate.*
 provision/**/crash.log
 provision/**/*.tfvars
+
+# The FCM service-account key, for local runs (see FCM_CREDENTIAL_FILE).
+# Anyone holding one can push arbitrary text to every user's lock screen.
+*firebase-adminsdk*.json
+fcm-service-account*.json

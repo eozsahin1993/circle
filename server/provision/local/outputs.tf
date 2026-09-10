@@ -27,3 +27,7 @@ output "rate_limit_table_name" {
   description = "Set as RATE_LIMIT_TABLE_NAME when running cmd/server against LocalStack."
   value       = aws_dynamodb_table.rate_limit.name
 }
+
+output "push_table_name" {
+  value = aws_dynamodb_table.push.name
+}

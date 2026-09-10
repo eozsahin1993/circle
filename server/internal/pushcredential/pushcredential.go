@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -36,6 +37,11 @@ type ServiceAccount struct {
 type Loader struct {
 	Client        *ssm.Client
 	ParameterName string
+	// FilePath, when set, is read instead of SSM — for running the relay
+	// locally against LocalStack, which has no parameter to read. Never set
+	// in Lambda: a key on disk beside the code is the arrangement SSM
+	// exists to avoid.
+	FilePath string
 
 	once sync.Once
 	// Held rather than returned so a failed first load doesn't retry on
@@ -52,26 +58,49 @@ type Loader struct {
 // needs kms:Decrypt even though nothing here imports a KMS client.
 func (l *Loader) Load(ctx context.Context) (*ServiceAccount, error) {
 	l.once.Do(func() {
-		out, err := l.Client.GetParameter(ctx, &ssm.GetParameterInput{
-			Name:           aws.String(l.ParameterName),
-			WithDecryption: aws.Bool(true),
-		})
+		raw, err := l.read(ctx)
 		if err != nil {
-			l.err = fmt.Errorf("read %s: %w", l.ParameterName, err)
+			l.err = err
 			return
 		}
 
 		var account ServiceAccount
-		if err := json.Unmarshal([]byte(aws.ToString(out.Parameter.Value)), &account); err != nil {
-			l.err = errNotAKey(l.ParameterName)
+		if err := json.Unmarshal(raw, &account); err != nil {
+			l.err = errNotAKey(l.source())
 			return
 		}
 		if account.ProjectID == "" || account.ClientEmail == "" || account.PrivateKey == "" {
-			l.err = fmt.Errorf("%s is missing project_id, client_email or private_key", l.ParameterName)
+			l.err = fmt.Errorf("%s is missing project_id, client_email or private_key", l.source())
 			return
 		}
 
 		l.account = &account
 	})
 	return l.account, l.err
+}
+
+func (l *Loader) source() string {
+	if l.FilePath != "" {
+		return l.FilePath
+	}
+	return l.ParameterName
+}
+
+func (l *Loader) read(ctx context.Context) ([]byte, error) {
+	if l.FilePath != "" {
+		raw, err := os.ReadFile(l.FilePath)
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", l.FilePath, err)
+		}
+		return raw, nil
+	}
+
+	out, err := l.Client.GetParameter(ctx, &ssm.GetParameterInput{
+		Name:           aws.String(l.ParameterName),
+		WithDecryption: aws.Bool(true),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", l.ParameterName, err)
+	}
+	return []byte(aws.ToString(out.Parameter.Value)), nil
 }
