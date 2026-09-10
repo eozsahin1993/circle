@@ -7,7 +7,10 @@ import { and, eq } from 'drizzle-orm';
 
 import {
   getCircle,
+  getCircleMemberEvents,
   getCircleMembers,
+  getCircleFeed,
+  insertPost,
   getMemberByPublicKey,
   getPendingOutboxEntries,
   initDatabase,
@@ -56,7 +59,8 @@ async function foundedCircle() {
   (appendEntry as jest.Mock).mockResolvedValue({ epoch: 2, receivedAt: Date.now() });
   (changeAuthority as jest.Mock).mockResolvedValue({ epoch: 3, receivedAt: Date.now() });
   (fetchEntries as jest.Mock).mockResolvedValue({ entries: [], currentEpoch: 0 });
-  return { circleId, identity, ownKey: bytesToHex(identity.publicKey), contentKey };
+  const { syncId } = (await getCircle(circleId))!;
+  return { circleId, syncId, identity, ownKey: bytesToHex(identity.publicKey), contentKey };
 }
 
 test('leaving pushes a self-signed member_removed to the meta namespace', async () => {
@@ -108,21 +112,24 @@ test('a failed push keeps the keys so the next pass can retry', async () => {
   expect(await getCurrentContentKey(circleId)).not.toBeNull();
 });
 
-/** Appends this run has made for one circle — other tests in this file leave their own behind. */
-async function appendsFor(circleId: string) {
-  const { syncId } = (await getCircle(circleId))!;
+/**
+ * Appends this run has made for one circle — other tests in this file
+ * leave their own behind. Takes the syncId rather than looking it up:
+ * a completed departure removes the circle row entirely.
+ */
+function appendsFor(syncId: string) {
   return (appendEntry as jest.Mock).mock.calls.filter((call) => call[0] === syncId);
 }
 
 test('finishPendingDepartures ignores a left circle with nothing queued', async () => {
-  const { circleId } = await foundedCircle();
+  const { circleId, syncId } = await foundedCircle();
   await leaveCircle(circleId);
   await finishDeparture(circleId);
   jest.clearAllMocks();
 
   await finishPendingDepartures();
 
-  expect(await appendsFor(circleId)).toHaveLength(0);
+  expect(appendsFor(syncId)).toHaveLength(0);
 });
 
 /**
@@ -132,7 +139,7 @@ test('finishPendingDepartures ignores a left circle with nothing queued', async 
  * departure can no longer be signed, and no longer needs to be.
  */
 test('a departure is abandoned if an admin got there first', async () => {
-  const { circleId, ownKey, contentKey } = await foundedCircle();
+  const { circleId, syncId, ownKey, contentKey } = await foundedCircle();
   // A second admin, on the roster — the predicate won't accept a removal
   // from someone this device has never seen join.
   const admin = generateIdentity();
@@ -173,7 +180,7 @@ test('a departure is abandoned if an admin got there first', async () => {
   expect(await getPendingOutboxEntries(circleId)).toHaveLength(0);
   // Never pushed: the entry could no longer be signed, and the removal it
   // was announcing had already happened.
-  expect(await appendsFor(circleId)).toHaveLength(0);
+  expect(appendsFor(syncId)).toHaveLength(0);
   expect(await getCurrentContentKey(circleId)).toBeNull();
 });
 
@@ -217,6 +224,9 @@ test('the last admin promotes a successor on the way out, before giving up their
   const oldest = await addMember(circleId, { joinedAt: 1_000 });
   await addMember(circleId, { joinedAt: 2_000 });
 
+  // Read before leaving: a completed departure takes the roster with it.
+  const successorKey = (await getMemberByPublicKey(circleId, oldest))!.authorityPublicKey;
+
   await leaveCircle(circleId);
   await finishDeparture(circleId);
 
@@ -224,9 +234,7 @@ test('the last admin promotes a successor on the way out, before giving up their
   // Order is load-bearing: the relay refuses a removal that would empty
   // the set, so the successor has to land first.
   expect(calls.map((change) => change.action)).toEqual(['add', 'remove']);
-
-  const successor = (await getMemberByPublicKey(circleId, oldest))!;
-  expect(bytesToHex(calls[0].targetAuthorityPublicKey)).toBe(successor.authorityPublicKey);
+  expect(bytesToHex(calls[0].targetAuthorityPublicKey)).toBe(successorKey);
   // ...and the departure goes out behind both.
   expect((changeAuthority as jest.Mock).mock.invocationCallOrder[1]).toBeLessThan(
     (appendEntry as jest.Mock).mock.invocationCallOrder[0]
@@ -372,4 +380,30 @@ test('a deletion that fails to push keeps the circle and its keys', async () => 
   expect(await getPendingOutboxEntries(circleId)).toHaveLength(1);
   expect(await getCircle(circleId)).not.toBeNull();
   expect(await getCircleIdentity(circleId)).not.toBeNull();
+});
+
+// The bug this guards: leaving used to stop at the keys, leaving rows in
+// place. Rejoining the same circle replayed the same log into a new
+// circleId, and every post collided with the row the left circle still
+// held — `posts.id` is unique on its own, not per circle. Photos came
+// back and the posts holding them didn't.
+test('a completed departure leaves nothing of the circle behind', async () => {
+  const { circleId } = await foundedCircle();
+  await insertPost({
+    id: 'post-1',
+    circleId,
+    caption: 'a photo',
+    authorPublicKey: 'aa'.repeat(32),
+    createdAt: 1_000,
+    lastViewedAt: null,
+    inAlbum: true,
+  });
+
+  await leaveCircle(circleId);
+  await finishDeparture(circleId);
+
+  expect(await getCircle(circleId)).toBeNull();
+  expect(await getCircleMembers(circleId)).toHaveLength(0);
+  expect(await getCircleFeed(circleId)).toHaveLength(0);
+  expect(await getCircleMemberEvents(circleId)).toHaveLength(0);
 });

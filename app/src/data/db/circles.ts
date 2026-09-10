@@ -1,8 +1,18 @@
-import { and, asc, count, eq, gt, isNotNull, isNull, ne, or } from 'drizzle-orm';
+import { and, asc, count, eq, gt, inArray, isNotNull, isNull, ne, or } from 'drizzle-orm';
 
 import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
-import { circles, postComments, posts } from '@/data/db/schema';
+import {
+  attachments,
+  circleInvites,
+  circleMembers,
+  circles,
+  memberEvents,
+  outbox,
+  postComments,
+  postReactions,
+  posts,
+} from '@/data/db/schema';
 
 export type Circle = typeof circles.$inferSelect;
 
@@ -169,15 +179,34 @@ export async function markCircleLeft(id: string): Promise<void> {
 }
 
 /**
- * Deletes a circle and, via ON DELETE CASCADE, its entire roster with it —
- * a hard delete, unlike `markCircleLeft`. Only removes this device's own
- * copy; propagating the deletion to every other member's device is a
- * `circle_deleted`-style event on the relay's per-circle log once that
- * exists (see server/DESIGN.md) — not something this function can do on
- * its own today.
+ * Removes a circle and everything derived from it on this device.
+ *
+ * Children go explicitly, child-first, rather than by foreign-key cascade
+ * — same choice `deletePostLocally` and `resetAllLocalData` make, for the
+ * same reason: `PRAGMA foreign_keys` is a per-connection setting SQLite
+ * defaults to *off*, so cascade only fires where something turned it on
+ * for that exact connection. A path reaching this before `runMigrations`
+ * has, or a future second connection, would silently orphan a circle's
+ * entire history instead of failing.
+ *
+ * Orphaned rows aren't merely untidy here. `posts.id` is unique on its own
+ * rather than per circle, so a post left behind by one circle silently
+ * swallows the same post replaying into another — which is what rejoining
+ * a circle you had left used to do.
  */
 export async function deleteCircle(id: string): Promise<void> {
-  await db.delete(circles).where(eq(circles.id, id));
+  const circlePosts = db.select({ id: posts.id }).from(posts).where(eq(posts.circleId, id));
+  db.transaction((tx) => {
+    tx.delete(postComments).where(inArray(postComments.postId, circlePosts)).run();
+    tx.delete(postReactions).where(inArray(postReactions.postId, circlePosts)).run();
+    tx.delete(posts).where(eq(posts.circleId, id)).run();
+    tx.delete(attachments).where(eq(attachments.circleId, id)).run();
+    tx.delete(memberEvents).where(eq(memberEvents.circleId, id)).run();
+    tx.delete(circleMembers).where(eq(circleMembers.circleId, id)).run();
+    tx.delete(circleInvites).where(eq(circleInvites.circleId, id)).run();
+    tx.delete(outbox).where(eq(outbox.circleId, id)).run();
+    tx.delete(circles).where(eq(circles.id, id)).run();
+  });
 }
 
 /** Records whether this account has silenced a circle's notifications. */

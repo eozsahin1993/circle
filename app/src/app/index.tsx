@@ -15,7 +15,7 @@ import { completeProfileSetup } from '@/domain/usecases/account/onboarding';
 import { signInWithApple, signInWithGoogle } from '@/domain/usecases/account/sign-in';
 import { downloadAndCompressImage } from '@/services/image';
 import { getAuthToken } from '@/services/keystore';
-import { postAuthDestination } from '@/services/pending-deep-link';
+import { goPostAuth } from '@/services/pending-deep-link';
 
 type Provider = 'apple' | 'google';
 
@@ -62,7 +62,7 @@ export default function WelcomeScreen() {
       // A returning device (local profile already exists — e.g. this was
       // just a re-auth after signing out) has nothing new to fill in.
       if (hasProfile) {
-        router.push(await postAuthDestination());
+        await goPostAuth(router);
         return;
       }
 
@@ -76,7 +76,7 @@ export default function WelcomeScreen() {
         try {
           const { bytes } = await downloadAndCompressImage(result.suggestedPictureUrl);
           await completeProfileSetup({ name: result.suggestedName, picture: bytes });
-          router.push(await postAuthDestination());
+          await goPostAuth(router);
           return;
         } catch (err) {
           console.error('Failed to auto-complete profile from sign-in', err);

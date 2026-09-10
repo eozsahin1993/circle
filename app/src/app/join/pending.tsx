@@ -1,6 +1,6 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, AppState, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/navbar/screen-header';
@@ -8,7 +8,13 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { getPendingJoinRequest } from '@/data/db';
-import { checkPendingJoinRequest } from '@/domain/usecases/circle/join-circle';
+import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/domain/usecases/circle/join-circle';
+
+/**
+ * Faster than the sync scheduler's 30s: this is someone watching a screen
+ * for one specific answer, not background housekeeping.
+ */
+const CHECK_INTERVAL_MS = 5_000;
 
 export default function JoinPendingScreen() {
   const { requestId } = useLocalSearchParams<{ requestId: string }>();
@@ -16,12 +22,17 @@ export default function JoinPendingScreen() {
   const [inviterName, setInviterName] = useState('');
   const [gone, setGone] = useState(false);
 
-  // Re-checked on every focus (app foreground, returning to this screen)
-  // rather than a timer — same app-lifecycle-triggered polling as the
-  // rest of this flow, never dependent on push (see
-  // server/INVITE_FLOW.md's goals). Also survives the app being closed
-  // and reopened entirely: `pendingJoinRequests` is the local source for
-  // `circleName` below, not component state carried from the previous screen.
+  // Polled while this screen is up, not only on focus. Focus alone meant
+  // the one screen whose entire job is waiting never noticed the thing it
+  // was waiting for: staying put fires nothing, and returning from the
+  // background fires nothing either, since navigation focus was never
+  // lost. Approval arrived and the screen kept saying "waiting" until you
+  // navigated away and back.
+  //
+  // Never dependent on push (see server/INVITE_FLOW.md's goals). Also
+  // survives the app being closed and reopened entirely:
+  // `pendingJoinRequests` is the local source for `circleName` below, not
+  // component state carried from the previous screen.
   useFocusEffect(
     useCallback(() => {
       if (!requestId) return;
@@ -35,19 +46,59 @@ export default function JoinPendingScreen() {
         setInviterName(pending.createdByName);
       });
 
-      checkPendingJoinRequest(requestId)
-        .then((result) => {
-          if (result.joined) {
-            router.replace({ pathname: '/circle/feed', params: { circleId: result.circleId, justJoined: '1' } });
-            return;
-          }
-          // Denied, or aged out. Nothing will ever answer it, so say so
-          // rather than leaving this screen waiting indefinitely.
-          if ('gone' in result) setGone(true);
-        })
-        .catch((err) => console.error('Failed to check pending join request', err));
+      let stopped = false;
+      const check = () => {
+        if (stopped) return;
+        checkPendingJoinRequest(requestId)
+          .then((result) => {
+            if (stopped) return;
+            if (result.joined) {
+              stopped = true;
+              router.replace({ pathname: '/circle/feed', params: { circleId: result.circleId, justJoined: '1' } });
+              return;
+            }
+            // Denied, or aged out. Nothing will ever answer it, so say so
+            // rather than leaving this screen waiting indefinitely.
+            if ('gone' in result) {
+              stopped = true;
+              setGone(true);
+            }
+          })
+          .catch((err) => console.error('Failed to check pending join request', err));
+      };
+
+      check();
+      const interval = setInterval(check, CHECK_INTERVAL_MS);
+      const subscription = AppState.addEventListener('change', (state) => {
+        if (state === 'active') check();
+      });
+
+      return () => {
+        stopped = true;
+        clearInterval(interval);
+        subscription.remove();
+      };
     }, [requestId]),
   );
+
+  function handleCancel() {
+    if (!requestId) return;
+    Alert.alert('Withdraw this request?', 'You can ask again with a new key.', [
+      { text: 'Keep waiting', style: 'cancel' },
+      {
+        text: 'Withdraw',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await cancelPendingJoinRequest(requestId);
+          } catch (err) {
+            console.error('Failed to withdraw join request', err);
+          }
+          router.dismissTo('/circle');
+        },
+      },
+    ]);
+  }
 
   return (
     <ThemedView style={styles.screen}>
@@ -68,9 +119,15 @@ export default function JoinPendingScreen() {
               <ThemedText type="screenTitle">Waiting for approval</ThemedText>
               <ThemedText type="onboardingHeadline">{circleName}</ThemedText>
               <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
-                {inviterName || 'Whoever shared this key'} needs to let you in. Come back to this
-                screen once they have — or just reopen the app.
+                {inviterName || 'Whoever shared this key'} needs to let you in. This screen moves on
+                by itself once they have.
               </ThemedText>
+
+              <Pressable onPress={handleCancel} style={styles.cancel}>
+                <ThemedText type="captionFeed" themeColor="danger">
+                  Withdraw request
+                </ThemedText>
+              </Pressable>
             </>
           )}
         </View>
@@ -94,5 +151,9 @@ const styles = StyleSheet.create({
   },
   body: {
     marginTop: -8,
+  },
+  cancel: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
   },
 });

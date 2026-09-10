@@ -14,7 +14,7 @@ import { getProfile } from '@/data/db';
 import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/services/image';
 import { completeProfileSetup } from '@/domain/usecases/account/onboarding';
 import { useTheme } from '@/hooks/use-theme';
-import { postAuthDestination } from '@/services/pending-deep-link';
+import { goPostAuth } from '@/services/pending-deep-link';
 
 export default function ProfileSetupScreen() {
   const theme = useTheme();
@@ -66,7 +66,7 @@ export default function ProfileSetupScreen() {
     setError(null);
     try {
       await completeProfileSetup({ name: name.trim(), picture: picture?.bytes ?? null });
-      router.replace(await postAuthDestination());
+      await goPostAuth(router);
     } catch (err) {
       console.error('Failed to save profile', err);
       setError("Couldn't save your profile — try again.");

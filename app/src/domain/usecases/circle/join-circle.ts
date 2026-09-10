@@ -20,6 +20,7 @@ import {
 } from '@/services/crypto';
 import {
   deletePendingJoinRequest,
+  getAllPendingJoinRequests,
   getPendingJoinRequest,
   getProfile,
   insertCircle,
@@ -38,6 +39,7 @@ import { compressToThumbnail } from '@/services/image';
 import { deletePendingJoinKeypair, getMasterSeed, getPendingJoinKeypair, saveCircleIdentity, saveCircleKeyMap, savePendingJoinKeypair } from '@/services/keystore';
 import {
   JoinRequestGoneError,
+  deleteJoinRequest,
   getInvitePreview,
   getJoinRequestApproval,
   putJoinRequest,
@@ -85,6 +87,13 @@ export async function previewInvite(inviteCode: string): Promise<InvitePreviewPa
  * reopened before approval ever lands (see server/INVITE_FLOW.md, step 4).
  */
 export async function requestToJoin(inviteCode: string): Promise<{ requestId: string }> {
+  // Asking twice for the same key is the same ask. Without this, reopening
+  // an invite link stacks a second request — its own keypair, its own
+  // mailbox row, its own waiting row — and the admin sees a queue of
+  // identical strangers to judge.
+  const existing = await findPendingJoinRequestForInvite(inviteCode);
+  if (existing) return { requestId: existing.id };
+
   const preview = await previewInvite(inviteCode);
 
   const masterSeed = await getMasterSeed();
@@ -288,4 +297,36 @@ export async function checkPendingJoinRequest(requestId: string): Promise<Pendin
   const keyMap = Object.fromEntries(Object.entries(envelope.approval.keyMap).map(([version, hex]) => [Number(version), hexToBytes(hex)]));
   const { circleId } = await completeJoin(pending, keyMap, envelope.approval.syncId, envelope.approval.circleName);
   return { joined: true, circleId };
+}
+
+/**
+ * Withdraws a join request this device made.
+ *
+ * The mailbox row goes first so the admin stops seeing a request nobody
+ * is waiting on — the relay gates that on nothing but the invite tag and
+ * requester id, both of which the requester has. It's best-effort:
+ * failing to reach the relay shouldn't leave someone stuck watching a
+ * screen they asked to leave, and an unreachable row ages out on the
+ * invite's own retention.
+ *
+ * Local state goes either way, keypair included. Without the keypair an
+ * approval that lands afterwards can't be opened, which is the point —
+ * cancelling means cancelling, not pausing.
+ */
+export async function cancelPendingJoinRequest(requestId: string): Promise<void> {
+  const pending = await getPendingJoinRequest(requestId);
+  if (!pending) return;
+
+  await deleteJoinRequest(deriveInviteTag(pending.inviteCode), requestId).catch((err) =>
+    console.error(`Withdrew join request ${requestId} locally, but the relay still holds it`, err)
+  );
+
+  await deletePendingJoinKeypair(requestId);
+  await deletePendingJoinRequest(requestId);
+}
+
+/** The request already outstanding for an invite code, if this device made one. */
+export async function findPendingJoinRequestForInvite(inviteCode: string): Promise<PendingJoinRequest | null> {
+  const requests = await getAllPendingJoinRequests();
+  return requests.find((request) => request.inviteCode === inviteCode) ?? null;
 }

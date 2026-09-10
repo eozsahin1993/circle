@@ -1,8 +1,9 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { getCircleMembers, markCircleLeft, MemberRoles, recordMemberRemoved } from '@/data/db';
+import { getCircleMembers, MemberRoles, recordMemberRemoved } from '@/data/db';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
-import { deleteCircleKeys, getCircleIdentity } from '@/services/keystore';
+import { purgeCircleLocally } from '@/domain/usecases/circle/purge-circle';
+import { getCircleIdentity } from '@/services/keystore';
 import { asRecord, numberField, stringField, type EntryHandler } from '@/sync/entry-handlers/types';
 
 /** What `remove-member.ts` puts in a `member_removed` entry. */
@@ -80,8 +81,7 @@ export const memberRemovedHandler: EntryHandler = {
 
     const identity = await getCircleIdentity(circleId);
     if (identity && bytesToHex(identity.publicKey) === payload.identityPublicKey) {
-      await markCircleLeft(circleId);
-      await deleteCircleKeys(circleId);
+      await purgeCircleLocally(circleId);
       await syncAccountManifestBestEffort();
     }
   },

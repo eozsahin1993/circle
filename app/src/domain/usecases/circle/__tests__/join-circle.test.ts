@@ -13,13 +13,14 @@ import { getPendingJoinKeypair } from '@/services/keystore';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import { approveJoinRequest, getOrCreateInvite } from '@/domain/usecases/circle/invite-to-circle';
 import type { JoinApprovalEnvelope, JoinApprovalPayload, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
-import { checkPendingJoinRequest, requestToJoin } from '@/domain/usecases/circle/join-circle';
+import { cancelPendingJoinRequest, checkPendingJoinRequest, requestToJoin } from '@/domain/usecases/circle/join-circle';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
-import { decrypt, deriveJoinRequestKey, encrypt, generateIdentity, sealToPublicKey, sign } from '@/services/crypto';
+import { decrypt, deriveInviteTag, deriveJoinRequestKey, encrypt, generateIdentity, sealToPublicKey, sign } from '@/services/crypto';
 import { compressToThumbnail } from '@/services/image';
 import {
   getInvitePreview,
   JoinRequestGoneError,
+  deleteJoinRequest,
   getJoinRequestApproval,
   listJoinRequests,
   putInvitePreview,
@@ -290,4 +291,33 @@ test('a transient failure leaves the request in place', async () => {
   await expect(checkPendingJoinRequest(requestId)).rejects.toThrow('offline');
 
   expect(await getPendingJoinRequest(requestId)).not.toBeNull();
+});
+
+test('cancelling a pending request withdraws it from the mailbox and clears local state', async () => {
+  const { invite } = await makeCircleWithInvite('Family Circle');
+  (putJoinRequest as jest.Mock).mockResolvedValue(undefined);
+  (deleteJoinRequest as jest.Mock).mockResolvedValue(undefined);
+
+  const { requestId } = await requestToJoin(invite.code);
+
+  await cancelPendingJoinRequest(requestId);
+
+  expect(deleteJoinRequest).toHaveBeenCalledWith(deriveInviteTag(invite.code), requestId);
+  expect(await getPendingJoinRequest(requestId)).toBeNull();
+  // The keypair goes too: without it an approval that lands afterwards
+  // can't be opened, which is what cancelling should mean.
+  expect(await getPendingJoinKeypair(requestId)).toBeNull();
+});
+
+// Withdrawing must not depend on reaching the relay — someone asking to
+// stop waiting shouldn't be held on a screen by a network error.
+test('cancelling clears local state even when the relay is unreachable', async () => {
+  const { invite } = await makeCircleWithInvite('Family Circle');
+  (putJoinRequest as jest.Mock).mockResolvedValue(undefined);
+  (deleteJoinRequest as jest.Mock).mockRejectedValue(new Error('offline'));
+
+  const { requestId } = await requestToJoin(invite.code);
+
+  await expect(cancelPendingJoinRequest(requestId)).resolves.toBeUndefined();
+  expect(await getPendingJoinRequest(requestId)).toBeNull();
 });

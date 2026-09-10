@@ -20,12 +20,15 @@ export async function takePendingInviteCode(): Promise<string | null> {
 }
 
 /**
- * Where to send someone right after sign-in/profile-setup finishes — a
- * saved invite code (from tapping a link before either was ready) takes
- * priority over the default circle list, so the flow that brought them
- * here in the first place actually continues.
+ * Lands on the circle list, then opens a saved invite over it if there is
+ * one. Two navigations rather than one because the invite is a sheet:
+ * sending someone straight to it leaves whatever they signed in from
+ * behind it — the welcome screen, complete with sign-in buttons — instead
+ * of the circles they just arrived at.
  */
-export async function postAuthDestination() {
-  const code = await takePendingInviteCode();
-  return code ? ({ pathname: '/join/[code]', params: { code } } as const) : ('/circle' as const);
+export async function goPostAuth(router: { replace: (href: '/circle') => void }): Promise<void> {
+  // Always the circle list. A saved invite code stays saved — the list
+  // reads it on mount and opens the join sheet over itself, so there is no
+  // second destination to navigate to.
+  router.replace('/circle');
 }

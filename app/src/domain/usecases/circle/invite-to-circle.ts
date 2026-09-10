@@ -29,7 +29,7 @@ import {
 import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinApprovalPayload, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
-import { bytesToDataUri, parsePictureThumbnail } from '@/services/image';
+import { bytesToDataUri, compressToThumbnail, parsePictureThumbnail } from '@/services/image';
 import { pullMeta } from '@/sync/pull-log';
 import { getCircleIdentity, getCircleKeyMap } from '@/services/keystore';
 import { deleteJoinRequest, listJoinRequests, putInvitePreview, putJoinApproval } from '@/services/mailbox-relay';
@@ -75,7 +75,18 @@ export async function requireAdminPublicKey(circleId: string, message = "Only an
  */
 async function writeInvitePreview(code: string, circleName: string, createdByPublicKey: string): Promise<void> {
   const profile = await getProfile();
-  const payload: InvitePreviewPayload = { name: circleName, createdByName: profile?.name ?? '', createdByPublicKey };
+  // Best-effort, like the one on a join request: a thumbnail that won't
+  // compress shouldn't stop an invite being created.
+  let createdByPicture: string | undefined;
+  if (profile?.picture) {
+    try {
+      createdByPicture = Buffer.from(await compressToThumbnail(profile.picture)).toString('base64');
+    } catch (err) {
+      console.error('Failed to compress profile picture for invite preview', err);
+    }
+  }
+
+  const payload: InvitePreviewPayload = { name: circleName, createdByName: profile?.name ?? '', createdByPublicKey, createdByPicture };
   const key = deriveInvitePreviewKey(code);
   await putInvitePreview(deriveInviteTag(code), encryptJSON(payload, key));
 }
@@ -159,7 +170,10 @@ export type PendingRequest = {
  * otherwise keep reappearing here with nothing left to do).
  */
 export async function discoverPendingRequests(circleId: string): Promise<PendingRequest[]> {
-  const { invite } = await requireInviteCreatorPublicKey(circleId);
+  const own = await getOwnMember(circleId);
+  const invite = await getCurrentInvite(circleId);
+  if (!own || !invite || own.publicKey !== invite.createdByPublicKey) return [];
+
   const key = deriveJoinRequestKey(invite.code);
 
   const requests = await listJoinRequests(deriveInviteTag(invite.code));

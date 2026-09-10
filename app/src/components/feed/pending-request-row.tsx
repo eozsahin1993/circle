@@ -57,11 +57,10 @@ export function usePendingRequestRows({ circleId, onRosterChanged }: PendingRequ
         setRequests(found);
       })
       .catch((err) => {
-        // Showing nothing is right — a device that didn't create this
-        // invite has no business listing its requests — but silence made
-        // "not the creator", "relay unreachable" and "genuinely none"
-        // indistinguishable while debugging.
-        console.error(`No pending requests shown for circle ${circleId}`, err);
+        // A genuine failure now — reaching the mailbox, or decrypting what
+        // came back. Having no invite out, or not being the one who made
+        // it, resolves empty rather than throwing.
+        console.error(`Could not load join requests for circle ${circleId}`, err);
         setRequests([]);
       });
   }, [circleId]);

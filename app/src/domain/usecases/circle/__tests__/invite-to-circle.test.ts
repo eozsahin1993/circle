@@ -5,7 +5,11 @@ jest.mock('@/services/relay');
 
 import { Buffer } from 'buffer';
 
+import { eq } from 'drizzle-orm';
+
 import { initDatabase } from '@/data/db';
+import { db } from '@/data/db/connection';
+import { circleInvites } from '@/data/db/schema';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import {
   approveJoinRequest,
@@ -49,8 +53,19 @@ test('a failed preview write surfaces as a rejection, not a silently-broken invi
   await expect(getOrCreateInvite(circleId)).rejects.toThrow('offline');
 });
 
-test('discoverPendingRequests throws for a device with no identity in the circle', async () => {
-  await expect(discoverPendingRequests('not-a-real-circle-id')).rejects.toThrow();
+// Listing is a question and answers empty; approving is an action and
+// refuses. Throwing on the question meant the feed logged an error on
+// almost every render, since most circles have no invite out at all.
+test('discoverPendingRequests resolves empty for a device with nothing to list', async () => {
+  await expect(discoverPendingRequests('not-a-real-circle-id')).resolves.toEqual([]);
+});
+
+test('discoverPendingRequests resolves empty for a circle whose invite this device did not create', async () => {
+  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const invite = await getOrCreateInvite(circleId);
+  await db.update(circleInvites).set({ createdByPublicKey: 'somebody-elses-public-key' }).where(eq(circleInvites.code, invite.code));
+
+  await expect(discoverPendingRequests(circleId)).resolves.toEqual([]);
 });
 
 test('approveJoinRequest throws for a device with no identity in the circle', async () => {

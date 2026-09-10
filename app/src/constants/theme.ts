@@ -10,6 +10,7 @@ import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import ArrowUp from 'lucide-react-native/icons/arrow-up';
 import Bookmark from 'lucide-react-native/icons/bookmark';
 import Check from 'lucide-react-native/icons/check';
+import Clock from 'lucide-react-native/icons/clock';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import CircleAlert from 'lucide-react-native/icons/circle-alert';
 import CloudDownload from 'lucide-react-native/icons/cloud-download';
@@ -189,6 +190,8 @@ export const Icons = {
   album: Album,
   /** Whether one post is kept in that album — the album seen from a single photo. Solid when it is; see `Icon`'s `filled`. */
   inAlbum: Bookmark,
+  /** A circle asked to join but not yet let into — waiting on someone else, not on the network. */
+  waiting: Clock,
   /** Sends a circle's key to someone who isn't in the room. */
   inviteLink: Link,
   /** Shows that key as a code to scan, for someone who is. */

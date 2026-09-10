@@ -1,7 +1,6 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import {
-  deleteCircle,
   discardPendingOutboxEntries,
   getCircle,
   getCircleMembers,
@@ -13,13 +12,13 @@ import {
   recordMemberRemovedLocally,
 } from '@/data/db';
 import { removeCircleNotificationChannel } from '@/services/push/channels';
-import { deleteCirclePhotoFiles } from '@/services/photo-cache';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { queueDepartingHandover } from '@/domain/usecases/circle/authority';
+import { purgeCircleLocally } from '@/domain/usecases/circle/purge-circle';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { generateUUID } from '@/services/crypto';
-import { deleteCircleKeys, getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
+import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
 import { pullMeta } from '@/sync/pull-log';
 
 /**
@@ -146,22 +145,13 @@ export async function finishDeparture(circleId: string): Promise<void> {
     return;
   }
 
-  // Read before the drain: a clean outbox afterwards is exactly what
-  // removes the evidence of which kind of exit this was.
-  const deleting = (await getPendingOutboxEntries(circleId)).some((entry) => entry.entryType === EntryTypes.CIRCLE_DELETED);
-
   await drainOutbox(circleId);
 
-  // Still queued means the push failed — leave the keys alone and let the
-  // next pass retry. Only a clean outbox proves the circle has heard.
+  // Still queued means the push failed — leave everything alone and let
+  // the next pass retry. Only a clean outbox proves the circle has heard.
   if ((await getPendingOutboxEntries(circleId)).length > 0) return;
 
-  if (deleting) {
-    // The teardown every other device runs on replaying the tombstone.
-    await deleteCircle(circleId);
-    deleteCirclePhotoFiles(circleId);
-  }
-  await deleteCircleKeys(circleId);
+  await purgeCircleLocally(circleId);
 }
 
 /**

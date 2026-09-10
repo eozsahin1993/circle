@@ -25,6 +25,14 @@ export type InvitePreviewPayload = {
    */
   createdByName: string;
   /**
+   * The creator's avatar as a base64 JPEG thumbnail, when they have one —
+   * so the join sheet can show who is inviting you rather than a blank
+   * circle. Same self-reported tier as `createdByName`, validated on the
+   * way out by `parsePictureThumbnail` like every other picture that
+   * crosses a trust boundary.
+   */
+  createdByPicture?: string;
+  /**
    * Hex-encoded Ed25519 public key — the invite creator's own circle
    * identity (see `deriveCircleIdentity`). Carried here, not fetched from
    * anywhere else, because the requester has no other way to learn it
