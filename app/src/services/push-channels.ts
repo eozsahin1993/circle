@@ -1,9 +1,3 @@
-import {
-  AndroidImportance,
-  deleteNotificationChannelAsync,
-  setNotificationChannelAsync,
-  setNotificationChannelGroupAsync,
-} from 'expo-notifications';
 import { Platform } from 'react-native';
 
 /**
@@ -23,6 +17,22 @@ import { Platform } from 'react-native';
 const CIRCLES_GROUP_ID = 'circles';
 
 /**
+ * Required lazily, and never at module scope: `expo-notifications` binds a
+ * native module, so a JS bundle running against a binary built before it
+ * was added throws on *import* and takes the whole app down. A channel is
+ * organisation, not correctness — it degrades to nothing.
+ */
+function notifications(): typeof import('expo-notifications') | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('expo-notifications');
+  } catch (err) {
+    console.error('expo-notifications is missing from this build; skipping channel setup', err);
+    return null;
+  }
+}
+
+/**
  * Stable per circle, so a rename updates the row rather than leaving a
  * second one behind. Offering a tone picker *in the app* would force this
  * to carry the sound too, since a channel's sound is frozen once created
@@ -39,12 +49,14 @@ export function circleChannelId(circleId: string): string {
  */
 export async function ensureCircleChannel(circleId: string, circleName: string): Promise<void> {
   if (Platform.OS !== 'android') return;
+  const api = notifications();
+  if (!api) return;
 
-  await setNotificationChannelGroupAsync(CIRCLES_GROUP_ID, { name: 'Circles' });
-  await setNotificationChannelAsync(circleChannelId(circleId), {
+  await api.setNotificationChannelGroupAsync(CIRCLES_GROUP_ID, { name: 'Circles' });
+  await api.setNotificationChannelAsync(circleChannelId(circleId), {
     name: circleName,
     groupId: CIRCLES_GROUP_ID,
-    importance: AndroidImportance.DEFAULT,
+    importance: api.AndroidImportance.DEFAULT,
   });
 }
 
@@ -55,6 +67,8 @@ export async function ensureCircleChannel(circleId: string, circleName: string):
  */
 export async function removeCircleChannel(circleId: string): Promise<void> {
   if (Platform.OS !== 'android') return;
+  const api = notifications();
+  if (!api) return;
 
-  await deleteNotificationChannelAsync(circleChannelId(circleId));
+  await api.deleteNotificationChannelAsync(circleChannelId(circleId));
 }

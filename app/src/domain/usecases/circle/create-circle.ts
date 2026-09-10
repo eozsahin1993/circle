@@ -20,7 +20,7 @@ import { compressToThumbnail } from '@/services/image';
 import { writeCoverFile } from '@/services/photo-cache';
 import { bootstrapCircle, appendEntry } from '@/services/relay';
 import { defaultCircleMask } from '@/domain/usecases/push/push-preferences';
-import { ensureCircleChannel } from '@/services/notification-channels';
+import { ensureCircleChannel } from '@/services/push-channels';
 import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap } from '@/services/keystore';
 
 export type CreateCircleInput = {

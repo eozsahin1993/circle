@@ -6,14 +6,14 @@ jest.mock('expo-notifications', () => ({
   deleteNotificationChannelGroupAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
-import {
+const {
   deleteNotificationChannelAsync,
   setNotificationChannelAsync,
   setNotificationChannelGroupAsync,
-} from 'expo-notifications';
+} = jest.requireMock('expo-notifications');
 import { Platform } from 'react-native';
 
-import { circleChannelId, ensureCircleChannel, removeCircleChannel } from '@/services/notification-channels';
+import { circleChannelId, ensureCircleChannel, removeCircleChannel } from '@/services/push-channels';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -55,6 +55,20 @@ test('leaving removes only that circle channel', async () => {
 
 test('the channel id is stable per circle', () => {
   expect(circleChannelId('circle-1')).toBe('circle-circle-1');
+});
+
+/**
+ * A binary built before expo-notifications was added throws on require.
+ * Channels are organisation, not correctness, so that must not be fatal.
+ */
+test('a build without the native module degrades instead of throwing', async () => {
+  jest.isolateModules(() => {
+    jest.doMock('expo-notifications', () => {
+      throw new Error("Cannot find native module 'ExpoPushTokenManager'");
+    });
+  });
+
+  await expect(ensureCircleChannel('circle-1', 'Family Circle')).resolves.toBeUndefined();
 });
 
 test('does nothing on iOS, which has no channels', async () => {

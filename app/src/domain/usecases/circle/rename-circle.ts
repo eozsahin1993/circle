@@ -2,7 +2,7 @@ import { deriveWriteToken, generateUUID } from '@/services/crypto';
 import { getCircle, updateCircleName } from '@/data/db';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
-import { ensureCircleChannel } from '@/services/notification-channels';
+import { ensureCircleChannel } from '@/services/push-channels';
 import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
 import { appendEntry } from '@/services/relay';
 

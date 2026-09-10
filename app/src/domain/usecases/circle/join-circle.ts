@@ -29,7 +29,7 @@ import {
 import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
 import { writeCoverFile } from '@/services/photo-cache';
 import { defaultCircleMask } from '@/domain/usecases/push/push-preferences';
-import { ensureCircleChannel } from '@/services/notification-channels';
+import { ensureCircleChannel } from '@/services/push-channels';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { compressToThumbnail } from '@/services/image';

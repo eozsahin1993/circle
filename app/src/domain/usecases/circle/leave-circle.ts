@@ -11,7 +11,7 @@ import {
   OutboxStatuses,
   recordMemberRemovedLocally,
 } from '@/data/db';
-import { removeCircleChannel } from '@/services/notification-channels';
+import { removeCircleChannel } from '@/services/push-channels';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
