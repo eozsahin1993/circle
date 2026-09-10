@@ -20,7 +20,7 @@ import { Platform } from 'react-native';
  * No-ops everywhere but Android. iOS has no channel concept.
  */
 
-const CIRCLES_GROUP_ID = 'circles';
+const PUSH_CHANNEL_GROUP_ID = 'circles';
 
 /**
  * Stable per circle, so a rename updates the row rather than leaving a
@@ -29,7 +29,7 @@ const CIRCLES_GROUP_ID = 'circles';
  * and only a new channel can change it — Android's own settings already
  * offer that per channel, so this stays simple until we don't.
  */
-export function circleChannelId(circleId: string): string {
+export function circleNotificationChannelId(circleId: string): string {
   return `circle-${circleId}`;
 }
 
@@ -37,13 +37,13 @@ export function circleChannelId(circleId: string): string {
  * Creates or updates a circle's channel. Safe to call repeatedly: the name
  * updates in place, which is how a renamed circle keeps a correct row.
  */
-export async function ensureCircleChannel(circleId: string, circleName: string): Promise<void> {
+export async function ensureCircleNotificationChannel(circleId: string, circleName: string): Promise<void> {
   if (Platform.OS !== 'android') return;
 
-  await setNotificationChannelGroupAsync(CIRCLES_GROUP_ID, { name: 'Circles' });
-  await setNotificationChannelAsync(circleChannelId(circleId), {
+  await setNotificationChannelGroupAsync(PUSH_CHANNEL_GROUP_ID, { name: 'Circles' });
+  await setNotificationChannelAsync(circleNotificationChannelId(circleId), {
     name: circleName,
-    groupId: CIRCLES_GROUP_ID,
+    groupId: PUSH_CHANNEL_GROUP_ID,
     importance: AndroidImportance.DEFAULT,
   });
 }
@@ -53,8 +53,8 @@ export async function ensureCircleChannel(circleId: string, circleName: string):
  * stays: it is shared, and deleting it would take every other circle's
  * channel with it.
  */
-export async function removeCircleChannel(circleId: string): Promise<void> {
+export async function removeCircleNotificationChannel(circleId: string): Promise<void> {
   if (Platform.OS !== 'android') return;
 
-  await deleteNotificationChannelAsync(circleChannelId(circleId));
+  await deleteNotificationChannelAsync(circleNotificationChannelId(circleId));
 }

@@ -1,5 +1,5 @@
 jest.mock('@/services/relay');
-jest.mock('@/services/push-channels');
+jest.mock('@/services/push-notification-channels');
 jest.mock('@/domain/usecases/account/account-manifest');
 
 import { bytesToHex } from '@noble/curves/utils.js';
@@ -10,7 +10,7 @@ import type { LogEntryEnvelope } from '@/domain/usecases/circle/log-entry';
 import { generateIdentity, generateUUID } from '@/services/crypto';
 import { getCircleIdentity, saveMasterSeed } from '@/services/keystore';
 import { appendEntry, bootstrapCircle } from '@/services/relay';
-import { ensureCircleChannel } from '@/services/push-channels';
+import { ensureCircleNotificationChannel } from '@/services/push-notification-channels';
 import { circleRenamedHandler } from '@/sync/entry-handlers/circle-renamed';
 
 beforeAll(async () => {
@@ -82,7 +82,7 @@ describe('apply', () => {
 
     await circleRenamedHandler.apply(circleId, envelope(founder, { name: 'Nana House', createdAt: 2 }), 1);
 
-    expect(ensureCircleChannel).toHaveBeenCalledWith(circleId, 'Nana House');
+    expect(ensureCircleNotificationChannel).toHaveBeenCalledWith(circleId, 'Nana House');
   });
 
   test('renames the circle', async () => {
