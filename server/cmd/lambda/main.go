@@ -8,16 +8,22 @@ package main
 import (
 	"context"
 	"log"
+	"sync"
 
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 
 	"circle-relay/internal/api"
 	"circle-relay/internal/api/auth/oidcverify"
+	"circle-relay/internal/api/push"
 	"circle-relay/internal/config"
+	"circle-relay/internal/fcm"
+	"circle-relay/internal/pushcredential"
 	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
 	blobs3 "circle-relay/internal/storage/blobstore/s3"
 	invitedynamodb "circle-relay/internal/storage/invitestore/dynamodb"
@@ -55,11 +61,10 @@ func main() {
 	appleVerifier := oidcverify.New(appleIssuer, appleJWKSURL, nonEmpty(cfg.AppleClientIDIOS))
 
 	pushStore := pushdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.PushTableName)
-	// No Dispatch: the APNs/FCM credentials don't exist yet, so fanout
-	// resolves and reports but delivers nothing. See server/PUSH_DESIGN.md.
 	pushDeps := api.PushDeps{
 		Store:          pushStore,
 		RecipientLimit: ratelimitdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.RateLimitTableName, "push", int(cfg.RateLimitPushMaxRequests), cfg.RateLimitWindow()),
+		Dispatch:       pushDispatcher(awsCfg, cfg.FCMCredentialParameter),
 	}
 
 	mux := api.NewRouter(logStore, blobStore, authStore, manifestStore, inviteStore, writeRateLimitStore, readRateLimitStore, googleVerifier, appleVerifier, pushDeps)
@@ -82,4 +87,42 @@ func nonEmpty(values ...string) []string {
 		}
 	}
 	return out
+}
+
+// pushDispatcher delivers resolved pushes. The credential is fetched on the
+// first send rather than at boot, so a relay without one still serves every
+// other route — push is the only thing that needs it.
+//
+// Fire-and-forget by design: a push is best-effort, and a failed one must
+// not fail the append that triggered it.
+func pushDispatcher(awsCfg aws.Config, parameterName string) func(push.Delivery, []byte) {
+	loader := &pushcredential.Loader{Client: ssm.NewFromConfig(awsCfg), ParameterName: parameterName}
+	var (
+		once   sync.Once
+		sender *fcm.Sender
+	)
+
+	return func(delivery push.Delivery, payload []byte) {
+		// iOS goes direct to APNs, which isn't built yet.
+		if delivery.Platform != "android" {
+			return
+		}
+
+		ctx := context.Background()
+		once.Do(func() {
+			account, err := loader.Load(ctx)
+			if err != nil {
+				log.Printf("push disabled: %v", err)
+				return
+			}
+			sender = fcm.New(account)
+		})
+		if sender == nil {
+			return
+		}
+
+		if err := sender.Send(ctx, string(delivery.PushToken), payload); err != nil {
+			log.Printf("failed to deliver a push: %v", err)
+		}
+	}
 }
