@@ -1,8 +1,7 @@
+import { getPermissionsAsync } from 'expo-notifications';
+
 import { getAllCircles } from '@/data/db';
-import {
-  categoriesFromMask,
-  circlePushPreferences,
-} from '@/domain/usecases/push/push-preferences';
+import { circlePushPreferences } from '@/domain/usecases/push/push-preferences';
 import { registerPushForCircle } from '@/domain/usecases/push/push-registration';
 import { getDevicePushToken } from '@/services/push/tokens';
 
@@ -36,11 +35,22 @@ export async function enablePushEverywhere(): Promise<void> {
   }
 }
 
-/** Registers one circle, for the moment right after joining or creating it. */
-export async function enablePushForCircle(circleId: string, categoryMask: number): Promise<void> {
-  // Asks here, where there is a circle on screen to explain why.
+/**
+ * Asks for notification permission and registers one circle. Called from
+ * the feed, which is the only place with that circle on screen to explain
+ * what is being asked for — a usecase should not be popping OS dialogs.
+ *
+ * Returns immediately once permission has been answered either way, so
+ * opening a feed costs nothing after the first time.
+ */
+export async function askForPushOnCircle(circleId: string): Promise<void> {
+  // Granted means launch already registered this circle; denied means the
+  // OS will not ask again.
+  if ((await getPermissionsAsync()).status !== 'undetermined') return;
+
   const device = await getDevicePushToken({ ask: true });
   if (!device) return;
 
-  await registerPushForCircle(circleId, { ...device, categories: categoriesFromMask(categoryMask) });
+  const { categories } = await circlePushPreferences(circleId);
+  await registerPushForCircle(circleId, { ...device, categories });
 }

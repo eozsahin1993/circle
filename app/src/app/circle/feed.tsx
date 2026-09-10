@@ -11,6 +11,7 @@ import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedView } from '@/components/themed-view';
 import { Icons, Spacing } from '@/constants/theme';
 import { markCircleViewed } from '@/data/db';
+import { askForPushOnCircle } from '@/domain/usecases/push/enable-push';
 import { useCircleFeed } from '@/hooks/use-circle-feed';
 
 /**
@@ -39,6 +40,10 @@ export default function FeedScreen() {
       // genuine proof it was seen — unlike a comment, which can land on any
       // post regardless of age (see the viewability tracking below).
       if (circleId) markCircleViewed(circleId).catch((err) => console.error('Failed to mark the circle viewed', err));
+      // Here rather than at create or join: the circle is on screen, so
+      // the prompt has something to be about. No-ops once permission has
+      // been answered either way.
+      if (circleId) askForPushOnCircle(circleId).catch((error) => console.error('Failed to set up notifications', error));
     }, [circleId, reload]),
   );
 

@@ -19,7 +19,6 @@ import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account
 import { compressToThumbnail } from '@/services/image';
 import { writeCoverFile } from '@/services/photo-cache';
 import { bootstrapCircle, appendEntry } from '@/services/relay';
-import { enablePushForCircle } from '@/domain/usecases/push/enable-push';
 import { defaultCircleMask } from '@/domain/usecases/push/push-preferences';
 import { ensureCircleNotificationChannel } from '@/services/push/channels';
 import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap } from '@/services/keystore';
@@ -139,9 +138,6 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
   });
 
   await ensureCircleNotificationChannel(circleId, input.name);
-  enablePushForCircle(circleId, pushCategoryMask).catch((err) =>
-    console.error('Failed to enable notifications for the new circle', err),
-  );
 
   await syncAccountManifestBestEffort();
 
