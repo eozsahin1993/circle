@@ -1,6 +1,6 @@
 import { getAllCircles, getCircleMembers } from '@/data/db';
 import { EntryTypes } from '@/domain/usecases/circle/log-entry';
-import { verifyLogEntry } from '@/domain/usecases/circle/log-entry';
+import { verifyLogEntry, type LogEntryEnvelope } from '@/domain/usecases/circle/log-entry';
 import { derivePushRoutingId } from '@/services/crypto';
 import { getCircleKeyMap, getMasterSeed } from '@/services/keystore';
 import { circleNotificationChannelId } from '@/services/push/channels';
@@ -48,7 +48,7 @@ export async function handlePush(data: PushData): Promise<PushNotification | nul
   const envelope = verifyLogEntry(new Uint8Array(Buffer.from(payload, 'base64')), key);
   if (!envelope) return null;
 
-  const body = await describeEntry(circle.id, envelope.type, envelope.authorPubkey);
+  const body = await describeEntry(circle.id, envelope);
   if (!body) return null;
   return { circleId: circle.id, channelId: circleNotificationChannelId(circle.id), title: circle.name, body };
 }
@@ -68,18 +68,24 @@ async function circleForRoutingId(pushRoutingId: string) {
 }
 
 /** Null for an entry type that shouldn't interrupt anyone. */
-async function describeEntry(circleId: string, type: string, authorPubkey: string): Promise<string | null> {
-  const name = await authorName(circleId, authorPubkey);
+async function describeEntry(circleId: string, envelope: LogEntryEnvelope): Promise<string | null> {
+  // `member_added` is signed by the admin who approved it, not by the
+  // person joining, so the author is the wrong name here. It carries the
+  // joiner's own — which is also the only name available, since this
+  // arrives before the sync that would put them on the roster.
+  if (envelope.type === EntryTypes.MEMBER_ADDED) {
+    const joined = (envelope.payload as { name?: unknown })?.name;
+    return `${typeof joined === 'string' && joined ? joined : 'Someone'} joined`;
+  }
 
-  switch (type) {
+  const name = await authorName(circleId, envelope.authorPubkey);
+  switch (envelope.type) {
     case EntryTypes.POST:
       return `${name} added a photo`;
     case EntryTypes.COMMENT:
       return `${name} commented`;
     case EntryTypes.REACTION:
       return `${name} reacted to a photo`;
-    case EntryTypes.MEMBER_ADDED:
-      return `${name} joined`;
     default:
       return null;
   }

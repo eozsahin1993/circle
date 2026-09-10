@@ -26,10 +26,19 @@ export async function ensureNotificationPermission(): Promise<boolean> {
 
 export type DevicePushToken = { pushToken: string; platform: 'ios' | 'android' };
 
-/** Null when permission was refused, or on a platform with no push. */
-export async function getDevicePushToken(): Promise<DevicePushToken | null> {
+/**
+ * Null when permission hasn't been granted, or on a platform with no push.
+ *
+ * `ask` decides whether a refusal is final: launch passes false, because
+ * the OS shows its prompt once and a cold start is the worst moment to
+ * spend it — nothing on screen explains what is being asked for. Joining or
+ * creating a circle passes true, where the reason is obvious.
+ */
+export async function getDevicePushToken({ ask = false } = {}): Promise<DevicePushToken | null> {
   if (Platform.OS !== 'ios' && Platform.OS !== 'android') return null;
-  if (!(await ensureNotificationPermission())) return null;
+
+  const granted = ask ? await ensureNotificationPermission() : (await getPermissionsAsync()).granted;
+  if (!granted) return null;
 
   const { data } = await getDevicePushTokenAsync();
   // FCM and APNs both hand back a string here; the union covers web, which

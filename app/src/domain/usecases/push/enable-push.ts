@@ -19,6 +19,8 @@ import { getDevicePushToken } from '@/services/push/tokens';
  * ever surface as an error to whoever just opened the app.
  */
 export async function enablePushEverywhere(): Promise<void> {
+  // Never prompts: this runs on every launch, and the OS spends its one
+  // prompt on whatever asks first.
   const device = await getDevicePushToken();
   if (!device) return;
 
@@ -36,7 +38,8 @@ export async function enablePushEverywhere(): Promise<void> {
 
 /** Registers one circle, for the moment right after joining or creating it. */
 export async function enablePushForCircle(circleId: string, categoryMask: number): Promise<void> {
-  const device = await getDevicePushToken();
+  // Asks here, where there is a circle on screen to explain why.
+  const device = await getDevicePushToken({ ask: true });
   if (!device) return;
 
   await registerPushForCircle(circleId, { ...device, categories: categoriesFromMask(categoryMask) });

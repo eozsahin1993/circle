@@ -140,6 +140,39 @@ test.each([
   await expect(handlePush(data)).resolves.toBeNull();
 });
 
+/**
+ * `member_added` is signed by the admin who approved it, so naming the
+ * author would announce the wrong person entirely.
+ */
+test('a join names the person who joined, not the admin who approved', async () => {
+  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const approver = (await getCircleIdentity(circleId))!;
+
+  const notification = await handlePush(
+    await pushFor(circleId, EntryTypes.MEMBER_ADDED, approver, {
+      identityPublicKey: bytesToHex(generateIdentity().publicKey),
+      encPublicKey: 'cc',
+      name: 'Marcus',
+      role: MemberRoles.member,
+      createdAt: 1,
+    }),
+  );
+
+  expect(notification?.body).toBe('Marcus joined');
+});
+
+/** They arrive before the sync that would put them on the roster. */
+test('a join with no name still says something', async () => {
+  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const approver = (await getCircleIdentity(circleId))!;
+
+  const notification = await handlePush(
+    await pushFor(circleId, EntryTypes.MEMBER_ADDED, approver, { role: MemberRoles.member, createdAt: 1 }),
+  );
+
+  expect(notification?.body).toBe('Someone joined');
+});
+
 /** Reactions and posts interrupt; a rename or a key rotation must not. */
 test('an entry type that should not interrupt shows nothing', async () => {
   const { id: circleId } = await createCircle({ name: 'Family Circle' });
