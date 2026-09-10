@@ -6,19 +6,14 @@ jest.mock('expo-notifications', () => ({
   deleteNotificationChannelGroupAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
-const {
+import {
   deleteNotificationChannelAsync,
   setNotificationChannelAsync,
   setNotificationChannelGroupAsync,
-} = jest.requireMock('expo-notifications');
+} from 'expo-notifications';
 import { Platform } from 'react-native';
 
-import {
-  circleChannelId,
-  ensureAllCircleChannels,
-  ensureCircleChannel,
-  removeCircleChannel,
-} from '@/services/push-channels';
+import { circleChannelId, ensureCircleChannel, removeCircleChannel } from '@/services/push-channels';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -60,32 +55,6 @@ test('leaving removes only that circle channel', async () => {
 
 test('the channel id is stable per circle', () => {
   expect(circleChannelId('circle-1')).toBe('circle-circle-1');
-});
-
-/**
- * A binary built before expo-notifications was added throws on require.
- * Channels are organisation, not correctness, so that must not be fatal.
- */
-test('a build without the native module degrades instead of throwing', async () => {
-  jest.isolateModules(() => {
-    jest.doMock('expo-notifications', () => {
-      throw new Error("Cannot find native module 'ExpoPushTokenManager'");
-    });
-  });
-
-  await expect(ensureCircleChannel('circle-1', 'Family Circle')).resolves.toBeUndefined();
-});
-
-/** Circles that predate channels have none, so launch reconciles them. */
-test('reconciling covers every circle, and one failure does not stop the rest', async () => {
-  (setNotificationChannelAsync as jest.Mock).mockRejectedValueOnce(new Error('nope'));
-
-  await ensureAllCircleChannels([
-    { id: 'circle-1', name: 'Family Circle' },
-    { id: 'circle-2', name: 'Book Club' },
-  ]);
-
-  expect(setNotificationChannelAsync).toHaveBeenCalledTimes(2);
 });
 
 test('does nothing on iOS, which has no channels', async () => {

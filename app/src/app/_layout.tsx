@@ -10,8 +10,7 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import { Snackbar } from '@/components/snackbar';
 import { Colors } from '@/constants/theme';
-import { initDatabase, listCircles } from '@/data/db';
-import { ensureAllCircleChannels } from '@/services/push-channels';
+import { initDatabase } from '@/data/db';
 import { AppSettingsProvider, useAppSettings } from '@/hooks/use-app-settings';
 import { useMessages } from '@/hooks/use-messages';
 import { getAppSettings, type AppSettings } from '@/services/settings';
@@ -91,10 +90,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     initDatabase()
-      .then(async () => {
-        setDbReady(true);
-        await ensureAllCircleChannels(await listCircles());
-      })
+      .then(() => setDbReady(true))
       .catch((error) => console.error('Failed to initialize database', error));
     getAppSettings()
       .then(setSettings)
