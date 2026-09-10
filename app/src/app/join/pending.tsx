@@ -39,7 +39,11 @@ export default function JoinPendingScreen() {
         .then((result) => {
           if (result.joined) {
             router.replace({ pathname: '/circle/feed', params: { circleId: result.circleId, justJoined: '1' } });
+            return;
           }
+          // Denied, or aged out. Nothing will ever answer it, so say so
+          // rather than leaving this screen waiting indefinitely.
+          if ('gone' in result) setGone(true);
         })
         .catch((err) => console.error('Failed to check pending join request', err));
     }, [requestId]),
@@ -55,7 +59,8 @@ export default function JoinPendingScreen() {
             <>
               <ThemedText type="screenTitle">Request no longer available</ThemedText>
               <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
-                This might mean it already went through on another device.
+                It may have gone through on another device, or whoever shared the key turned it
+                down.
               </ThemedText>
             </>
           ) : (

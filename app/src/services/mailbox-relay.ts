@@ -70,13 +70,25 @@ export async function listJoinRequests(inviteTag: string): Promise<MailboxJoinRe
 }
 
 /**
+ * Raised when a join request's row is gone: the creator denied it, or it
+ * aged out. Permanent either way — a caller that keeps polling will keep
+ * getting it, so this is the signal to stop and say so.
+ */
+export class JoinRequestGoneError extends Error {
+  constructor() {
+    super('That join request is no longer waiting for an answer.');
+    this.name = 'JoinRequestGoneError';
+  }
+}
+
+/**
  * Polls a specific join request's approval field — GET
  * /v1/invites/{inviteTag}/requests/{requesterId}. Requester-side
- * ("complete"). Returns null while still pending; throws if the request
- * row itself is gone (invite expired/evicted before anyone approved it).
+ * ("complete"). Null while still pending.
  */
 export async function getJoinRequestApproval(inviteTag: string, requesterId: string): Promise<Uint8Array | null> {
   const response = await authorizedFetch(`/v1/invites/${inviteTag}/requests/${requesterId}`);
+  if (response.status === 404) throw new JoinRequestGoneError();
   if (!response.ok) {
     throw new Error(`Failed to check join request: ${response.status}`);
   }

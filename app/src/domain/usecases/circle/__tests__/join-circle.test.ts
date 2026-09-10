@@ -9,6 +9,7 @@ import { Buffer } from 'buffer';
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 import { getCircle, getCircleMembers, getPendingJoinRequest, initDatabase, saveProfile } from '@/data/db';
+import { getPendingJoinKeypair } from '@/services/keystore';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import { approveJoinRequest, getOrCreateInvite } from '@/domain/usecases/circle/invite-to-circle';
 import type { JoinApprovalEnvelope, JoinApprovalPayload, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
@@ -18,6 +19,7 @@ import { decrypt, deriveJoinRequestKey, encrypt, generateIdentity, sealToPublicK
 import { compressToThumbnail } from '@/services/image';
 import {
   getInvitePreview,
+  JoinRequestGoneError,
   getJoinRequestApproval,
   listJoinRequests,
   putInvitePreview,
@@ -258,4 +260,34 @@ test('an approval signed by anyone other than the invite creator is rejected, ev
   await expect(checkPendingJoinRequest(requestId)).resolves.toEqual({ joined: false });
   // The pending row survives a rejected forgery, so a later legitimate approval can still land.
   await expect(getPendingJoinRequest(requestId)).resolves.not.toBeNull();
+});
+
+/**
+ * A denied or aged-out request will never be answered, so polling it
+ * forever leaves the requester on "waiting for approval" indefinitely and
+ * logs a failure on every pass.
+ */
+test('a request the relay no longer has is reported gone and forgotten locally', async () => {
+  const { invite } = await makeCircleWithInvite('Family Circle');
+  (putJoinRequest as jest.Mock).mockResolvedValue(undefined);
+  const { requestId } = await requestToJoin(invite.code);
+  (getJoinRequestApproval as jest.Mock).mockRejectedValue(new JoinRequestGoneError());
+
+  await expect(checkPendingJoinRequest(requestId)).resolves.toEqual({ joined: false, gone: true });
+
+  // Forgotten, so nothing polls it again.
+  expect(await getPendingJoinRequest(requestId)).toBeNull();
+  expect(await getPendingJoinKeypair(requestId)).toBeNull();
+});
+
+/** A relay that is merely unreachable must not discard a live request. */
+test('a transient failure leaves the request in place', async () => {
+  const { invite } = await makeCircleWithInvite('Family Circle');
+  (putJoinRequest as jest.Mock).mockResolvedValue(undefined);
+  const { requestId } = await requestToJoin(invite.code);
+  (getJoinRequestApproval as jest.Mock).mockRejectedValue(new Error('offline'));
+
+  await expect(checkPendingJoinRequest(requestId)).rejects.toThrow('offline');
+
+  expect(await getPendingJoinRequest(requestId)).not.toBeNull();
 });

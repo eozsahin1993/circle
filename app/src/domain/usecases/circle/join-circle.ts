@@ -34,7 +34,12 @@ import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { compressToThumbnail } from '@/services/image';
 import { deletePendingJoinKeypair, getMasterSeed, getPendingJoinKeypair, saveCircleIdentity, saveCircleKeyMap, savePendingJoinKeypair } from '@/services/keystore';
-import { getInvitePreview, getJoinRequestApproval, putJoinRequest } from '@/services/mailbox-relay';
+import {
+  JoinRequestGoneError,
+  getInvitePreview,
+  getJoinRequestApproval,
+  putJoinRequest,
+} from '@/services/mailbox-relay';
 import { getBlob } from '@/services/relay';
 
 /**
@@ -229,7 +234,11 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
   return { circleId };
 }
 
-export type PendingJoinCheck = { joined: true; circleId: string } | { joined: false };
+export type PendingJoinCheck =
+  | { joined: true; circleId: string }
+  | { joined: false }
+  /** The request is over and was not accepted — denied, or aged out. */
+  | { joined: false; gone: true };
 
 /**
  * Checks whether a pending join request has been approved yet — polled,
@@ -247,7 +256,18 @@ export async function checkPendingJoinRequest(requestId: string): Promise<Pendin
   const pending = await getPendingJoinRequest(requestId);
   if (!pending) return { joined: false };
 
-  const approval = await getJoinRequestApproval(deriveInviteTag(pending.inviteCode), requestId);
+  let approval: Uint8Array | null;
+  try {
+    approval = await getJoinRequestApproval(deriveInviteTag(pending.inviteCode), requestId);
+  } catch (err) {
+    if (!(err instanceof JoinRequestGoneError)) throw err;
+    // Nothing will ever answer this one, so stop asking. Left in place it
+    // polls and fails forever, and the person waiting is never told they
+    // were declined.
+    await deletePendingJoinKeypair(requestId);
+    await deletePendingJoinRequest(requestId);
+    return { joined: false, gone: true };
+  }
   if (!approval) return { joined: false };
 
   const keypair = await getPendingJoinKeypair(requestId);
