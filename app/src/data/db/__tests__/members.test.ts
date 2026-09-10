@@ -38,6 +38,7 @@ function makeMember(
     identityPublicKey: `pk-${generateUUID()}`,
     encPublicKey: `x25519-${generateUUID()}`,
     pushRoutingId: '',
+    authorityPublicKey: '',
     memberId: generateUUID(),
     role: overrides.role ?? MemberRoles.member,
     name: overrides.name ?? 'Grandma',

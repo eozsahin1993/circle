@@ -72,6 +72,20 @@ export type JoinRequestPayload = {
    * target with no registration behind it.
    */
   pushRoutingId?: string;
+  /**
+   * Hex-encoded Ed25519 authority public key (see
+   * `deriveAuthorityKeypair`), carried for the same reason
+   * `identityPublicKey` is — the approver can't derive it, and putting it
+   * on `member_added` is what makes this member promotable later without
+   * their device having to be online to publish it first.
+   */
+  authorityPublicKey?: string;
+  /**
+   * Signature by that authority key over `identityPublicKey` — see
+   * `deriveAuthorityKeyProofMessage`. Without it the approver would be
+   * vouching, with their own signature, for a key they cannot check.
+   */
+  authorityKeyProof?: string;
   selfReportedName: string;
   /**
    * Base64-encoded avatar-sized JPEG thumbnail (see

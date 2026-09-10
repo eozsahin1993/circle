@@ -22,6 +22,7 @@ import { addComment } from '@/domain/usecases/post/comment-on-post';
 import { createPost } from '@/domain/usecases/post/create-post';
 import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
 import {
+  deriveAuthorityKeyProofMessage,
   deriveJoinRequestKey,
   encrypt,
   encryptJSON,
@@ -29,12 +30,14 @@ import {
   generateIdentity,
   generateUUID,
   hashBytes,
+  sign,
 } from '@/services/crypto';
 import { listJoinRequests, putInvitePreview, putJoinApproval } from '@/services/mailbox-relay';
 import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
 import {
   appendEntry,
   bootstrapCircle,
+  changeAuthority,
   fetchEntries,
   fetchEpochs,
   getBlob,
@@ -56,6 +59,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   (bootstrapCircle as jest.Mock).mockResolvedValue(undefined);
   (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
+  (changeAuthority as jest.Mock).mockResolvedValue({ epoch: 2, receivedAt: Date.now() });
   (getUploadTarget as jest.Mock).mockResolvedValue({ url: 'https://s3', fields: {} });
   (uploadBlob as jest.Mock).mockResolvedValue(undefined);
   (fetchEntries as jest.Mock).mockResolvedValue({ entries: [], currentEpoch: 0 });
@@ -207,6 +211,15 @@ test('a post this device just pushed comes straight back on the same pass withou
  * and pulled back — including when this device is the author, which works
  * only because pull-log has no "skip what I wrote" filter.
  */
+/** A published authority key plus the proof its owner holds it. */
+function authorityClaim(identityPublicKey: string) {
+  const authority = generateIdentity();
+  return {
+    authorityPublicKey: bytesToHex(authority.publicKey),
+    authorityKeyProof: bytesToHex(sign(deriveAuthorityKeyProofMessage(identityPublicKey), authority.secretKey)),
+  };
+}
+
 test('a role change made here writes no history until its own entry echoes back', async () => {
   await saveProfile({ name: 'Nadia', picture: null, createdAt: 1, updatedAt: 1 });
   const { id: circleId } = await createCircle({ name: 'Family Circle' });
@@ -221,7 +234,17 @@ test('a role change made here writes no history until its own entry echoes back'
     receivedAt: Date.now(),
     encryptedMeta: buildAndEncryptLogEntry(
       'member_added',
-      { identityPublicKey: otherKey, encPublicKey: 'cc', name: 'Marcus', role: 'member', createdAt: 1_000 },
+      {
+        identityPublicKey: otherKey,
+        encPublicKey: 'cc',
+        name: 'Marcus',
+        role: 'member',
+        createdAt: 1_000,
+        // Without a published authority key — proof and all — there is
+        // nothing to put in the relay's set, so a promotion has nothing
+        // to name. See `provenAuthorityKey`.
+        ...authorityClaim(otherKey),
+      },
       founder,
       contentKey
     ),
@@ -229,27 +252,30 @@ test('a role change made here writes no history until its own entry echoes back'
   relayServes({ meta: [memberAdded] });
   await syncCircle(circleId);
 
-  // createCircle appended the founder's own member_added, so clear first
-  // — otherwise the entry picked up below is that one, not the promotion.
-  (appendEntry as jest.Mock).mockClear();
   await setMemberRole(circleId, otherKey, 'admin');
   // setMemberRole drains fire-and-forget; settle it so the append below
   // is in hand before anything is asserted about it.
   await drainOutbox(circleId).catch(() => {});
 
-  // The roster already reflects the promotion, optimistically...
+  // Nothing has changed yet, roster included: an authority change is one
+  // the relay can genuinely refuse, so the entry replaying back is the
+  // only thing that writes it.
   expect((await getCircleMembers(circleId)).find((member) => member.identityPublicKey === otherKey)?.role).toBe(
-    'admin'
+    'member'
   );
-  // ...but the feed has nothing to show for it yet.
   expect((await getCircleMemberEvents(circleId)).map((event) => event.kind)).toEqual(['added']);
 
   // Serve back the very bytes this device pushed, rather than a
-  // reconstruction — that's the whole point of the round trip.
-  const pushed = (appendEntry as jest.Mock).mock.calls.find((call) => call[1] === 'meta')![3];
+  // reconstruction — that's the whole point of the round trip. A
+  // promotion leaves by `changeAuthority`, not the generic append: the
+  // relay has to move its authority set in the same transaction.
+  const pushed = (changeAuthority as jest.Mock).mock.calls[0][0].encryptedMeta;
   relayServes({ meta: [memberAdded, { epoch: 2, keyVersion: 1, receivedAt: Date.now(), encryptedMeta: pushed }] });
 
   await syncCircle(circleId);
+
+  // The role lands on the replay, never before it.
+  expect((await getCircleMembers(circleId)).find((member) => member.identityPublicKey === otherKey)?.role).toBe('admin');
 
   const [newest] = await getCircleMemberEvents(circleId);
   expect(newest).toMatchObject({

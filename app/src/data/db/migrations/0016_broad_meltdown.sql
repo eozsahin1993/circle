@@ -1,0 +1,1 @@
+ALTER TABLE `circle_members` DROP COLUMN `authority_registered`;

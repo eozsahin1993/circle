@@ -1,7 +1,8 @@
 // Package rotatelog is the whole vertical slice for POST
-// /circles/{syncId}/rotate — see logstore.Store.Rotate. The one write
-// path gated by both capabilities at once: the write token (proving
-// current membership) and an authority signature (proving admin status),
+// /circles/{syncId}/rotate — see logstore.Store.Rotate. One of the two
+// write paths gated by both capabilities at once (changeauthority is the
+// other): the write token (proving current membership) and an authority
+// signature (proving admin status),
 // atomically alongside appending the key_rotation entry and swapping in
 // the new write token — see server/SYNC_DESIGN.md's "Authorization"
 // section.

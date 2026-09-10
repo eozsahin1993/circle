@@ -11,7 +11,7 @@ import {
   initDatabase,
   insertPost,
   MemberRoles,
-  recordRoleChangedLocally,
+  recordRoleChanged,
 } from '@/data/db';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import { verifyLogEntry } from '@/domain/usecases/circle/log-entry';
@@ -88,9 +88,12 @@ test('refuses a plain member re-filing someone else’s photo, and queues nothin
   const { circleId, identity } = await circleWithPost();
   // Demote this device: the founder is an admin, and an admin may re-file
   // anything. The post below belongs to someone else.
-  await recordRoleChangedLocally({
+  await recordRoleChanged({
     circleId,
+    epoch: 2,
     subjectPublicKey: bytesToHex(identity.publicKey),
+    actorPublicKey: bytesToHex(identity.publicKey),
+    occurredAt: 2_000,
     role: MemberRoles.member,
   });
   const stranger = bytesToHex(generateIdentity().publicKey);

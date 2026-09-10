@@ -1,7 +1,6 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import {
-  deleteCircle,
   discardPendingOutboxEntries,
   getCircle,
   getLeftCircles,
@@ -13,7 +12,7 @@ import {
 } from '@/data/db';
 import { removeCircleNotificationChannel } from '@/services/push/channels';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
-import { isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
+import { queueDepartingHandover } from '@/domain/usecases/circle/authority';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { generateUUID } from '@/services/crypto';
@@ -21,8 +20,10 @@ import { deleteCircleKeys, getCircleIdentity, getCurrentContentKey } from '@/ser
 import { pullMeta } from '@/sync/pull-log';
 
 /**
- * Leaves a circle without deleting it locally — already-synced posts stay
- * as a local archive.
+ * Leaves a circle without deleting it locally. The rows stay, but nothing
+ * surfaces them: every circle-list query filters on `leftAt IS NULL`, so
+ * a left circle is invisible rather than an archive. Whether they should
+ * be deleted outright is undecided.
  *
  * **Leaving is announced on the log.** A `member_removed` naming this
  * device's own identity, signed by it, is queued for the relay. Without
@@ -47,14 +48,28 @@ import { pullMeta } from '@/sync/pull-log';
  * when they pull this entry back. This one never sees it: it stops
  * syncing the circle once the departure has gone out, so its own archive
  * keeps the roster as it stood, minus itself.
+ *
+ * **Authority is handed back first** — see `queueDepartingHandover`.
  */
 export async function leaveCircle(circleId: string): Promise<void> {
   const circle = await getCircle(circleId);
   if (!circle) throw new Error('No local circle row for this id.');
   const identity = await getCircleIdentity(circleId);
   if (!identity) throw new Error('No circle identity on this device.');
+  if (!(await getCurrentContentKey(circleId))) throw new Error('No content key on this device.');
+
+  // A stale roster hands the circle to someone who already left, and the
+  // relay reads no rosters. Best-effort: leaving can't need a connection.
+  await pullMeta(circleId).catch((err) => console.error(`Leaving circle ${circleId} without catching up on meta first`, err));
+
+  // The pull may have carried this device's own removal, which already
+  // tore the circle down — the departure it was about to announce.
   const current = await getCurrentContentKey(circleId);
-  if (!current) throw new Error('No content key on this device.');
+  if (!current) return;
+
+  // The outbox drains in order, so the handover has to be queued ahead of
+  // the departure to reach the relay while this device can still sign it.
+  await queueDepartingHandover(circleId);
 
   const ownPublicKey = bytesToHex(identity.publicKey);
   // Carried on the entry for the same reason member_added and
@@ -140,20 +155,4 @@ export async function finishPendingDepartures(): Promise<void> {
       console.error(`Failed to finish leaving circle ${circle.id}`, err);
     }
   }
-}
-
-/**
- * Deletes a circle entirely on this device — admin only. Only removes
- * this device's own copy; propagating the deletion to every other
- * member's device is relay work (see `deleteCircle`'s doc comment and
- * server/DESIGN.md), not something this can do alone today.
- */
-export async function deleteCircleForEveryone(circleId: string): Promise<void> {
-  const admin = await isCircleAdmin(circleId);
-  if (!admin) throw new Error('Only an admin can delete this circle.');
-
-  await deleteCircle(circleId);
-  await deleteCircleKeys(circleId);
-  await removeCircleNotificationChannel(circleId);
-  await syncAccountManifestBestEffort();
 }

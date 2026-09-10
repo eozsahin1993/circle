@@ -4,7 +4,7 @@ jest.mock('@/services/mailbox-relay');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { initDatabase, MemberRoles, recordMemberAddedLocally, recordRoleChangedLocally } from '@/data/db';
+import { initDatabase, MemberRoles, recordMemberAddedLocally, recordRoleChanged } from '@/data/db';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import { loadCircleDetails } from '@/domain/usecases/circle/circle-details';
 import { getOrCreateInvite } from '@/domain/usecases/circle/invite-to-circle';
@@ -51,7 +51,14 @@ test('gathers the circle, its roster, and who the reader is', async () => {
 test('reports a plain member as not an admin', async () => {
   const { id: circleId } = await createCircle({ name: 'Family Circle' });
   const own = bytesToHex((await getCircleIdentity(circleId))!.publicKey);
-  await recordRoleChangedLocally({ circleId, subjectPublicKey: own, role: MemberRoles.member });
+  await recordRoleChanged({
+    circleId,
+    epoch: 2,
+    subjectPublicKey: own,
+    actorPublicKey: own,
+    occurredAt: 2_000,
+    role: MemberRoles.member,
+  });
 
   expect((await loadCircleDetails(circleId)).ownIsAdmin).toBe(false);
 });

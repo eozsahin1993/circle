@@ -63,6 +63,8 @@ export type AddedMemberProfile = {
   picture: Uint8Array | null;
   /** Push routing id, '' when this member had notifications off at join time. */
   pushRoutingId?: string;
+  /** Authority public key, '' on entries written before members published one. */
+  authorityPublicKey?: string;
 };
 
 /**
@@ -96,6 +98,7 @@ export async function recordMemberAdded(event: EventBase & { profile: AddedMembe
       encPublicKey: event.profile.encPublicKey,
       memberId: event.profile.memberId,
       pushRoutingId: event.profile.pushRoutingId ?? '',
+      authorityPublicKey: event.profile.authorityPublicKey ?? '',
       role: event.profile.role,
       name: event.profile.name,
       picture: event.profile.picture,
@@ -112,6 +115,7 @@ export async function recordMemberAdded(event: EventBase & { profile: AddedMembe
         joinedAt: event.occurredAt,
         removedAt: null,
         ...(event.profile.pushRoutingId ? { pushRoutingId: event.profile.pushRoutingId } : {}),
+        ...(event.profile.authorityPublicKey ? { authorityPublicKey: event.profile.authorityPublicKey } : {}),
       },
     });
 }
@@ -155,6 +159,7 @@ export async function recordMemberAddedLocally(local: {
       encPublicKey: profile.encPublicKey,
       memberId: profile.memberId,
       pushRoutingId: profile.pushRoutingId ?? '',
+      authorityPublicKey: profile.authorityPublicKey ?? '',
       role: profile.role,
       name: profile.name,
       picture: profile.picture,
@@ -163,7 +168,11 @@ export async function recordMemberAddedLocally(local: {
     })
     .onConflictDoUpdate({
       target: [circleMembers.circleId, circleMembers.identityPublicKey],
-      set: { joinedAt, removedAt: null },
+      set: {
+        joinedAt,
+        removedAt: null,
+        ...(profile.authorityPublicKey ? { authorityPublicKey: profile.authorityPublicKey } : {}),
+      },
     });
 }
 
@@ -194,30 +203,13 @@ export async function recordMemberRemovedLocally(local: {
 }
 
 /**
- * The optimistic half of a role change, for the admin performing it.
- * State only — see `recordMemberAddedLocally`. Skips removed members: a
- * role on someone who has left means nothing, and if they rejoin
- * `recordMemberAdded` writes the role the new add carries.
+ * Records a promotion or demotion. Recorded even while nothing renders it,
+ * so the history exists when something does.
+ *
+ * The only writer for `role`: every role change commits atomically with
+ * the relay's authority-set change, so replaying the entry is what makes
+ * `role === admin` mean "the relay accepts their authority signature".
  */
-export async function recordRoleChangedLocally(local: {
-  circleId: string;
-  subjectPublicKey: string;
-  role: MemberRole;
-}): Promise<void> {
-  const { circleId, subjectPublicKey, role } = local;
-  await db
-    .update(circleMembers)
-    .set({ role })
-    .where(
-      and(
-        eq(circleMembers.circleId, circleId),
-        eq(circleMembers.identityPublicKey, subjectPublicKey),
-        isNull(circleMembers.removedAt)
-      )
-    );
-}
-
-/** Records a promotion or demotion. Recorded even while nothing renders it, so the history exists when something does. */
 export async function recordRoleChanged(event: EventBase & { role: MemberRole }): Promise<void> {
   await insertEvent({ ...event, kind: 'role_changed', role: event.role });
 

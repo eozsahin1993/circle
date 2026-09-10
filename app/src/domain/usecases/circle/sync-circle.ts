@@ -4,17 +4,27 @@ import { PushCategories, type PushCategory } from '@/domain/usecases/push/push-c
 import { EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { timed, timedSync } from '@/services/timing';
 import { getCurrentContentKey, getMasterSeed } from '@/services/keystore';
-import { deriveAuthorityKeypair, deriveDeleteBlobMessage, deriveWriteToken, encrypt, sign } from '@/services/crypto';
+import {
+  deriveAuthorityChangeMessage,
+  deriveAuthorityKeypair,
+  deriveDeleteBlobMessage,
+  deriveWriteToken,
+  encrypt,
+  sign,
+} from '@/services/crypto';
 import {
   appendEntry,
   BlobAlreadyExistsError,
   BlobDeleteRefusedError,
+  changeAuthority,
   deleteBlob,
   getUploadTarget,
   uploadBlob,
+  type AppendResult,
   type Namespace,
 } from '@/services/relay';
 import { getPendingOutboxEntries, markOutboxEntrySynced, type OutboxEntry } from '@/data/db';
+import { hexToBytes } from '@noble/curves/utils.js';
 import { getAttachment } from '@/data/db/attachments';
 
 /**
@@ -145,6 +155,45 @@ async function deleteBlobFor(circleId: string, syncId: string, blobEntryId: stri
   }
 }
 
+/**
+ * Sends a queued authority change — see `authorityAction` on the outbox
+ * schema. The signature is produced here rather than at queue time
+ * because it's over the entry id and the target key, and the authority
+ * keypair is seed-derived and never stored; the same reason
+ * `deleteBlobFor` derives its own.
+ *
+ * Writes nothing locally: the entry this pushes comes straight back on
+ * the same sync pass, and its replay is the single writer for both the
+ * role and its registration.
+ */
+async function pushAuthorityChange(
+  circleId: string,
+  syncId: string,
+  entry: OutboxEntry,
+  keyVersion: number,
+  writeToken: Uint8Array
+): Promise<AppendResult> {
+  const action = entry.authorityAction;
+  const target = entry.authorityTargetKey;
+  if (!action || !target) throw new Error('Queued authority change is missing its action or target key.');
+
+  const masterSeed = await getMasterSeed();
+  if (!masterSeed) throw new Error('No master seed on this device.');
+  const keypair = deriveAuthorityKeypair(masterSeed, circleId);
+
+  return changeAuthority({
+    syncId,
+    entryId: entry.entryId,
+    encryptedMeta: entry.encryptedMeta,
+    keyVersion,
+    writeToken,
+    action,
+    targetAuthorityPublicKey: hexToBytes(target),
+    signerAuthorityPublicKey: keypair.publicKey,
+    signature: sign(deriveAuthorityChangeMessage(action, syncId, entry.entryId, target), keypair.secretKey),
+  });
+}
+
 async function pushPendingEntries(circleId: string): Promise<void> {
   const circle = await getCircle(circleId);
   if (!circle) throw new Error('No local circle row for this id.');
@@ -178,7 +227,12 @@ async function pushPendingEntries(circleId: string): Promise<void> {
       }
     }
 
-    const { epoch } = await appendEntry(circle.syncId, namespace, entry.entryId, entry.encryptedMeta, current.version, writeToken);
+    // A promotion or demotion can't go down the generic append path: the
+    // relay commits the authority-set change and this entry together or
+    // not at all, so it has an endpoint of its own.
+    const { epoch } = entry.authorityAction
+      ? await pushAuthorityChange(circleId, circle.syncId, entry, current.version, writeToken)
+      : await appendEntry(circle.syncId, namespace, entry.entryId, entry.encryptedMeta, current.version, writeToken);
 
     // Notified from here rather than from each usecase: this is the one
     // place that knows an entry actually landed, and it forwards the same

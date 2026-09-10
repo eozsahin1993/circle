@@ -11,6 +11,47 @@ import { showError } from '@/services/messages';
 import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
 
 /**
+ * Queues one circle's `profile_update` and applies it to this device's own
+ * roster row. The local write is optimistic and safe to be: this entry
+ * goes down the generic append path, so there is no check that could
+ * later disagree with it.
+ *
+ * Throws when this device holds no identity or content key for the
+ * circle — nothing is queued in that case, so no later sync retries it
+ * and the caller has to say so rather than fail silently.
+ */
+async function queueProfileUpdate(
+  circleId: string,
+  profile: { name: string; picture: Uint8Array | null; pictureThumbnail?: string }
+): Promise<void> {
+  const identity = await getCircleIdentity(circleId);
+  const current = await getCurrentContentKey(circleId);
+  if (!identity || !current) {
+    throw new Error(`This device has no ${identity ? 'content key' : 'circle identity'} for circle ${circleId}.`);
+  }
+
+  const entry = buildAndEncryptLogEntry(
+    EntryTypes.PROFILE_UPDATE,
+    { name: profile.name, picture: profile.pictureThumbnail },
+    identity,
+    current.key
+  );
+  await insertOutboxEntry({
+    circleId,
+    entryType: EntryTypes.PROFILE_UPDATE,
+    entryId: generateUUID(),
+    status: OutboxStatuses.pending,
+    epoch: null,
+    blobEntryId: null,
+    encryptedMeta: entry,
+  });
+
+  await updateMemberProfile(circleId, bytesToHex(identity.publicKey), { name: profile.name, picture: profile.picture });
+
+  drainOutbox(circleId).catch((err) => console.error(`Failed to push profile_update for circle ${circleId}`, err));
+}
+
+/**
  * Broadcasts this device's current name/picture to every circle it's a
  * member of, one `profile_update` meta entry each — the only way a change
  * made *after* joining ever reaches another device's copy of this
@@ -30,48 +71,12 @@ import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
 export async function broadcastProfileUpdate(name: string, picture: Uint8Array | null): Promise<void> {
   const pictureThumbnail = picture ? Buffer.from(await compressToThumbnail(picture)).toString('base64') : undefined;
 
-  const circles = await listCircles();
   /** Circles nothing was queued for, by name — see the message below. */
   const missed: string[] = [];
 
-  for (const circle of circles) {
+  for (const circle of await listCircles()) {
     try {
-      const identity = await getCircleIdentity(circle.id);
-      const current = await getCurrentContentKey(circle.id);
-      // Worth a line even though there's nothing to do about it: unlike a
-      // failed push, nothing is queued, so no later sync retries this and
-      // the circle simply never learns. Silence made that indistinguishable
-      // from success.
-      if (!identity || !current) {
-        console.error(
-          `Skipped the profile update for circle ${circle.id}: this device has no ${identity ? 'content key' : 'circle identity'} for it.`,
-        );
-        missed.push(circle.name);
-        continue;
-      }
-
-      const entry = buildAndEncryptLogEntry(
-        EntryTypes.PROFILE_UPDATE,
-        { name, picture: pictureThumbnail },
-        identity,
-        current.key
-      );
-      await insertOutboxEntry({
-        circleId: circle.id,
-        entryType: EntryTypes.PROFILE_UPDATE,
-        entryId: generateUUID(),
-        status: OutboxStatuses.pending,
-        epoch: null,
-        blobEntryId: null,
-        encryptedMeta: entry,
-      });
-
-      // Applied locally too, so this device's own view of itself (e.g.
-      // circle details) reflects the change immediately rather than only
-      // once this same entry round-trips back through a future sync pass.
-      await updateMemberProfile(circle.id, bytesToHex(identity.publicKey), { name, picture: picture ?? null });
-
-      drainOutbox(circle.id).catch((err) => console.error(`Failed to push profile_update for circle ${circle.id}`, err));
+      await queueProfileUpdate(circle.id, { name, picture, pictureThumbnail });
     } catch (err) {
       console.error(`Failed to broadcast profile update to circle ${circle.id}`, err);
       missed.push(circle.name);

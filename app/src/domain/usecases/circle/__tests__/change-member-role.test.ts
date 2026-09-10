@@ -3,7 +3,7 @@ jest.mock('@/services/relay');
 
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
-import { decrypt, generateIdentity, generateUUID, verify } from '@/services/crypto';
+import { decrypt, generateIdentity, generateUUID, sign, verify, deriveAuthorityKeyProofMessage } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
 import { getCircleMembers, getPendingOutboxEntries, initDatabase, insertMember, MemberRoles } from '@/data/db';
 import { setMemberRole } from '@/domain/usecases/circle/change-member-role';
@@ -22,58 +22,48 @@ beforeEach(() => {
   (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
 });
 
+/** A circle plus one other member, carrying the authority key their `member_added` would have published. */
 async function makeCircleWithMember() {
   const { id: circleId } = await createCircle({ name: 'Test Circle' });
 
   const target = generateIdentity();
+  const authority = generateIdentity();
   const identityPublicKey = bytesToHex(target.publicKey);
   await insertMember({
     circleId,
     identityPublicKey,
     encPublicKey: 'cc',
     memberId: generateUUID(),
+    authorityPublicKey: bytesToHex(authority.publicKey),
     role: MemberRoles.member,
     name: 'Marcus',
     picture: null,
     joinedAt: Date.now(),
     removedAt: null,
   });
-  return { circleId, identityPublicKey };
+  return { circleId, identityPublicKey, authorityPublicKey: bytesToHex(authority.publicKey) };
 }
 
-test('setMemberRole promotes a plain member to admin locally', async () => {
-  const { circleId, identityPublicKey } = await makeCircleWithMember();
+test('setMemberRole queues a promotion tagged to move the relay authority set', async () => {
+  const { circleId, identityPublicKey, authorityPublicKey } = await makeCircleWithMember();
 
   await setMemberRole(circleId, identityPublicKey, 'admin');
 
-  const member = (await getCircleMembers(circleId)).find((m) => m.identityPublicKey === identityPublicKey);
-  expect(member?.role).toBe('admin');
+  const queued = (await getPendingOutboxEntries(circleId)).find((entry) => entry.entryType === 'role_change');
+  expect(queued).toMatchObject({ authorityAction: 'add', authorityTargetKey: authorityPublicKey });
 });
 
-test('setMemberRole demotes an admin to a plain member locally', async () => {
-  const { circleId, identityPublicKey } = await makeCircleWithMember();
-  await setMemberRole(circleId, identityPublicKey, 'admin');
-
-  await setMemberRole(circleId, identityPublicKey, 'member');
-
-  const member = (await getCircleMembers(circleId)).find((m) => m.identityPublicKey === identityPublicKey);
-  expect(member?.role).toBe('member');
-});
-
-test('setMemberRole queues a signed, verifiable role_change meta entry', async () => {
+// The bug: a promotion the relay never heard about produced an admin
+// every client honoured and the relay rejected.
+test('a promotion queues a signed, verifiable role_change', async () => {
   const { circleId, identityPublicKey } = await makeCircleWithMember();
   const current = (await getCurrentContentKey(circleId))!;
 
   await setMemberRole(circleId, identityPublicKey, 'admin');
 
-  const pending = await getPendingOutboxEntries(circleId);
-  const queued = pending.find((entry) => entry.entryType === 'role_change');
-  expect(queued).toBeDefined();
-
-  const envelope = JSON.parse(new TextDecoder().decode(decrypt(queued!.encryptedMeta, current.key)));
+  const queued = (await getPendingOutboxEntries(circleId)).find((entry) => entry.entryType === 'role_change')!;
+  const envelope = JSON.parse(new TextDecoder().decode(decrypt(queued.encryptedMeta, current.key)));
   expect(envelope.type).toBe('role_change');
-  // `createdAt` is the author's clock, carried so replaying devices date
-  // the change the same way instead of stamping their own receipt time.
   expect(envelope.payload).toMatchObject({ identityPublicKey, role: 'admin' });
   expect(typeof envelope.payload.createdAt).toBe('number');
   const verified = verify(
@@ -84,13 +74,37 @@ test('setMemberRole queues a signed, verifiable role_change meta entry', async (
   expect(verified).toBe(true);
 });
 
+/**
+ * The relay can genuinely refuse an authority change, so the roster must
+ * not claim it happened until the entry comes back — otherwise the badge
+ * is exactly the lie this whole path exists to stop telling.
+ */
+test('setMemberRole changes nothing locally until the entry replays back', async () => {
+  const { circleId, identityPublicKey } = await makeCircleWithMember();
+
+  await setMemberRole(circleId, identityPublicKey, 'admin');
+
+  const member = (await getCircleMembers(circleId)).find((m) => m.identityPublicKey === identityPublicKey);
+  expect(member?.role).toBe('member');
+});
+
 test('setMemberRole refuses to change your own role', async () => {
   const { id: circleId } = await createCircle({ name: 'Test Circle' });
   const founder = (await getCircleIdentity(circleId))!;
 
-  await expect(setMemberRole(circleId, bytesToHex(founder.publicKey), 'member')).rejects.toThrow("own role");
+  await expect(setMemberRole(circleId, bytesToHex(founder.publicKey), 'member')).rejects.toThrow('own role');
 });
 
 test('setMemberRole throws for a device with no identity in the circle', async () => {
   await expect(setMemberRole('not-a-real-circle-id', 'aa', 'admin')).rejects.toThrow();
+});
+
+/** A key nobody can prove they hold is worth nothing — see `provenAuthorityKey`. */
+test('the published authority key carries a proof its owner holds it', async () => {
+  const authority = generateIdentity();
+  const identityPublicKey = bytesToHex(generateIdentity().publicKey);
+  const proof = sign(deriveAuthorityKeyProofMessage(identityPublicKey), authority.secretKey);
+
+  expect(verify(proof, deriveAuthorityKeyProofMessage(identityPublicKey), authority.publicKey)).toBe(true);
+  expect(verify(proof, deriveAuthorityKeyProofMessage('deadbeef'), authority.publicKey)).toBe(false);
 });

@@ -133,7 +133,7 @@ them. It keys off **which operation the client invokes**:
 |---|---|
 | **append** (any entry, either namespace) | write token *(counter bump rides along)* |
 | **rotate** (append + token swap, atomic) | write token **+ authority signature** |
-| **authority change** (add/remove key) | authority signature |
+| **authority change** (append + set change, atomic) | write token **+ authority signature** |
 
 - **Write token** = *"may I append?"*
 - **Authority signature** = *"may I change the rules?"* — and the rules are
@@ -142,6 +142,10 @@ them. It keys off **which operation the client invokes**:
   mutate `#control` too, but they're mechanical consequences of an
   authorized append, not discretionary changes, so they ride on the write
   token.
+- **An authority change carries an entry, so it needs both.** It appends
+  the `role_change` that records it, and every append is possession-gated
+  — so the write token rides alongside the signature, exactly as rotate
+  does.
 
 **The relay has no destructive operations.** It appends, and it mutates
 those two control fields. It never deletes an entry or a blob. This keeps
@@ -257,25 +261,41 @@ one is simply discarded.
    it as "sync, retry."
 
 ### 6. Promote an admin
-1. Promotee publishes their authority **public** key via a signed meta
-   entry.
+1. The promotee's authority **public** key is already on the log — it rode
+   their `member_added`, with a signature by that key over their identity
+   key proving they hold it.
 2. → **one atomic transaction**: add the key to `#control.authoritySet`
-   (**[relay checks]** signer ∈ set) **and** append `role_change`. Never
-   one without the other — divergence between `#control` and meta can brick
-   writes (relay accepts a swap whose rotation entry every client
-   discards).
+   (**[relay checks]** write token, and signer ∈ set) **and** append
+   `role_change`. Never one without the other — divergence between
+   `#control` and meta can brick writes (relay accepts a swap whose
+   rotation entry every client discards).
 - **No key material moves and no roster handoff** — the promotee
   self-derived their authority key and already holds the roster and K-map
   from ordinary eager meta sync. Promotion grants *authority*, not data.
 
 ### 7. Demote an admin
 1. → **one atomic transaction**: remove the key from `authoritySet`
-   (**[relay checks]** signer ∈ set) **and** append `role_change`.
-- **Guard: never remove the last authority key.** Otherwise no one can ever
-  rotate, promote, or remove again — governance is permanently bricked.
+   (**[relay checks]** write token, and signer ∈ set) **and** append
+   `role_change`.
+- **Guard: never remove the last authority key.** Enforced inside the
+  compare-and-swap as `size(authoritySet) > 1`, because otherwise no one
+  could ever rotate, promote, or remove again — and DynamoDB drops a string
+  set attribute entirely at zero elements, leaving nothing to add a key
+  back to.
+- **A signer may remove their own key**, which is how leaving hands
+  authority back — just never as the last one out.
 - **Demote ≠ remove**: they stay a member, no content-key rotation.
 - **Irreducible race**: A-removes-B vs B-removes-A are both validly signed;
   first to land wins. No protocol adjudicates equals.
+
+### 7b. Leaving as the last admin
+1. Promote the longest-tenured remaining member (operation 6), **then**
+   remove your own key (operation 7), **then** announce the departure.
+   Order is forced twice over: the set-size guard rejects the removal if it
+   would empty the set, and this device's keys are wiped once the departure
+   lands, after which nothing can sign the key out again.
+- **Leaving is never blocked.** A circle whose members have no usable
+  authority key is left ungovernable rather than the leaver held in it.
 
 ### 8. Account recovery (new device)
 1. Sign in with **any** provider account → a session. Which account is
@@ -535,7 +555,20 @@ for why opaque tags weren't worth their cost.
 **Per-admin authority keys.** Each admin derives their own from their own
 seed; the relay holds the set of public halves. Promotion adds a key,
 demotion removes one — no key material moves, each admin recovers their own
-from their own phrase. Today the set holds just the founder's.
+from their own phrase.
+
+Since only its owner can derive a key, the owner *publishes* the public
+half on their `member_added` — the joiner supplies it in their sealed join
+request, the founder puts their own on the entry they self-author. It
+travels with a signature by that key over the member's identity public
+key: `member_added` is signed by the approving admin, not by the person it
+describes, so without that proof anyone could publish someone else's key
+as their own and have a promotion install the wrong governor.
+
+Because every member arrives with a key and every change to the set is
+atomic with its `role_change`, a client's `role == admin` and membership
+of `authoritySet` are the same fact. Clients therefore reason about roles
+alone and never track registration separately.
 
 **Discovery replaces the account manifest.** The old `accounts` table held
 one document per account, `{circleIds, provider}`. Two problems: the array

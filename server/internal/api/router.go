@@ -15,6 +15,7 @@ import (
 	"circle-relay/internal/api/auth/google"
 	"circle-relay/internal/api/auth/logout"
 	"circle-relay/internal/api/auth/oidcverify"
+	"circle-relay/internal/api/changeauthority"
 	"circle-relay/internal/api/createlog"
 	"circle-relay/internal/api/deleteblob"
 	"circle-relay/internal/api/getblob"
@@ -81,7 +82,7 @@ func newV1Mux(
 ) *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// Grouped under one sub-mux so RequireSession wraps all seven at once —
+	// Grouped under one sub-mux so RequireSession wraps all eight at once —
 	// each endpoint also checks its own write token/authority signature
 	// beyond this shared session check (server/SYNC_DESIGN.md's
 	// "Authorization" section). Rate limiting wraps each handler
@@ -94,6 +95,7 @@ func newV1Mux(
 	createlog.Register(circleMux, &createlog.Service{LogStore: logStore}, writeLimit)
 	appendlog.Register(circleMux, &appendlog.Service{LogStore: logStore}, writeLimit)
 	rotatelog.Register(circleMux, &rotatelog.Service{LogStore: logStore}, writeLimit)
+	changeauthority.Register(circleMux, &changeauthority.Service{LogStore: logStore}, writeLimit)
 	getlog.Register(circleMux, &getlog.Service{LogStore: logStore}, readLimit)
 	getblob.Register(circleMux, &getblob.Service{BlobStore: blobStore}, readLimit)
 	getuploadtarget.Register(circleMux, &getuploadtarget.Service{BlobStore: blobStore, LogStore: logStore}, writeLimit)

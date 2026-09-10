@@ -8,9 +8,10 @@
 // paged) — gated by two relay-enforced capabilities. A write token
 // (derived from the circle's current content key) proves "a current
 // member," required for every append. An authority signature proves "an
-// admin," required only for rotating the write token. Everything else
-// about an entry — type, author — is opaque to the relay; only clients
-// decrypt and verify that.
+// admin," required on top of it for the two discretionary fields of
+// control state: the write token (Rotate) and the authority set itself
+// (ChangeAuthority). Everything else about an entry — type, author — is
+// opaque to the relay; only clients decrypt and verify that.
 package logstore
 
 import (
@@ -30,6 +31,19 @@ const (
 
 func (ns Namespace) Valid() bool {
 	return ns == NamespaceMeta || ns == NamespaceContent
+}
+
+// AuthorityAction is which way ChangeAuthority moves a key across the
+// circle's authority set.
+type AuthorityAction string
+
+const (
+	AuthorityAdd    AuthorityAction = "add"
+	AuthorityRemove AuthorityAction = "remove"
+)
+
+func (a AuthorityAction) Valid() bool {
+	return a == AuthorityAdd || a == AuthorityRemove
 }
 
 // Sentinel errors a Store implementation returns so the API layer can map
@@ -52,6 +66,17 @@ var (
 	ErrWriteTokenMismatch = errors.New("logstore: write token does not match current control state")
 	// ErrAuthorityNotRecognized: authorityPublicKey isn't in the circle's current authority set.
 	ErrAuthorityNotRecognized = errors.New("logstore: authority key not recognized for this circle")
+	// ErrInvalidAuthorityAction: action wasn't AuthorityAdd or AuthorityRemove.
+	ErrInvalidAuthorityAction = errors.New("logstore: invalid authority action")
+	// ErrInvalidAuthorityKey: the key ChangeAuthority was asked to add or
+	// remove isn't a hex-encoded ed25519 public key. Checked because a
+	// malformed key added to the set can only ever be removed by someone
+	// else — nothing can sign as it.
+	ErrInvalidAuthorityKey = errors.New("logstore: authority key is not a hex-encoded ed25519 public key")
+	// ErrWouldEmptyAuthoritySet: a ChangeAuthority remove would take the
+	// last key out. Nobody could then rotate, promote or demote again —
+	// the circle's governance would be permanently stuck.
+	ErrWouldEmptyAuthoritySet = errors.New("logstore: removing that key would leave the authority set empty")
 	// ErrInvalidSignature: checked before any storage call, so this never reflects a race, only a bad request.
 	ErrInvalidSignature = errors.New("logstore: signature does not verify")
 	// ErrConcurrentModification: a Rotate lost its compare-and-swap race
@@ -99,12 +124,42 @@ type Epochs struct {
 	Content int64
 }
 
+// AuthorityChange is one promotion or demotion, whole — the capabilities
+// it's checked against, the set mutation it makes, and the meta entry
+// recording it.
+type AuthorityChange struct {
+	SyncID           string
+	EntryID          string
+	EncryptedPayload []byte
+	// KeyVersion: nothing rotates here, so unlike Rotate there's no
+	// pre/post distinction.
+	KeyVersion               int64
+	WriteToken               string
+	Action                   AuthorityAction
+	TargetAuthorityPublicKey string
+	SignerAuthorityPublicKey string
+	Signature                []byte
+}
+
+// Message is the exact byte sequence Signature must cover — same
+// version-prefixed, null-byte-joined construction as RotateMessage, and
+// bound to every part of what it authorizes: the circle, the action (so a
+// promotion's signature can't be replayed as the demotion of the same
+// person), the target key, and the entry (so one signature moves the set
+// exactly once).
+//
+// Both the relay and every client must construct this identically.
+func (c AuthorityChange) Message() []byte {
+	return []byte("circle-relay/authority-change/v1\x00" + string(c.Action) + "\x00" + c.SyncID + "\x00" + c.EntryID + "\x00" + c.TargetAuthorityPublicKey)
+}
+
 // Store is storage for the append-only per-circle log, plus the small
 // piece of relay-visible control state (see server/SYNC_DESIGN.md's
-// "#control") that authorizes writes to it. Bootstrap/Append/Rotate are
-// each expected to use the backend's real transaction primitive for
-// atomicity (DynamoDB: TransactWriteItems + a compare-and-swap read)
-// rather than composing smaller calls and hoping nothing races.
+// "#control") that authorizes writes to it. Bootstrap, Append, Rotate and
+// ChangeAuthority are each expected to use the backend's real transaction
+// primitive for atomicity (DynamoDB: TransactWriteItems + a
+// compare-and-swap read) rather than composing smaller calls and hoping
+// nothing races.
 type Store interface {
 	// Bootstrap creates syncID's control state: founderAuthorityPublicKey
 	// as the sole initial authority-set member, initialWriteTokenHash as
@@ -137,6 +192,26 @@ type Store interface {
 	// key_rotation entry itself is encrypted under the key being rotated
 	// away from, not the new one.
 	Rotate(ctx context.Context, syncID, entryID string, encryptedPayload []byte, currentKeyVersion int64, currentWriteToken, newWriteTokenHash, authorityPublicKey string, signature []byte) (CommitResult, error)
+
+	// ChangeAuthority is the capability-gated write path for a promotion or
+	// demotion — always a meta-namespace entry. Atomically: verifies
+	// WriteToken, verifies SignerAuthorityPublicKey is in the authority
+	// set, appends the entry, and adds or removes
+	// TargetAuthorityPublicKey — all or none. Both halves commit together
+	// because the circle keeps two records of who governs it, the set and
+	// the log, and nothing repairs a disagreement between them from the
+	// log alone.
+	//
+	// Signature must verify against SignerAuthorityPublicKey for the
+	// change's Message() — checked before any storage call, so a forged
+	// signature never touches control state. Authority only ever comes
+	// from authority: nothing seeds the set but a key already in it.
+	//
+	// A signer may remove their own key — that's how leaving hands back
+	// authority — but never the last one (ErrWouldEmptyAuthoritySet):
+	// DynamoDB drops a string set attribute once its last element goes,
+	// leaving nothing to add a key back to.
+	ChangeAuthority(ctx context.Context, change AuthorityChange) (CommitResult, error)
 
 	// Read never deletes or evicts — retention is permanent (invariant 1).
 	Read(ctx context.Context, syncID string, ns Namespace, since int64) (FetchResult, error)

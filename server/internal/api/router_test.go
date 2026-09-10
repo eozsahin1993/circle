@@ -258,3 +258,121 @@ func TestEndToEnd_BootstrapAppendFetchRotateAndDownload(t *testing.T) {
 		t.Fatalf("expected redirect location to reference %s, got %q", wantSuffix, location)
 	}
 }
+
+// The founder is not permanently irreplaceable: a promoted co-admin gets
+// real relay powers, and can then demote the founder without ever being
+// able to strand the circle with nobody in charge.
+func TestEndToEnd_PromoteAdminThenHandOverGovernance(t *testing.T) {
+	syncID := testsupport.UniqueSyncID(t)
+	mux, google, _ := testsupport.NewRouterWithAuth(t)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	claims := validClaims(t, testsupport.UniqueEmail(t), testsupport.TestGoogleClientID)
+	claims["iss"] = google.Issuer
+	authToken := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
+
+	founderPub, founderPriv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	promotedPub, promotedPriv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	founderPubHex := hex.EncodeToString(founderPub)
+	promotedPubHex := hex.EncodeToString(promotedPub)
+	writeToken := randomHex(t, 32)
+
+	bootstrapResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID, authToken,
+		`{"founderAuthorityPublicKey":"`+founderPubHex+`","initialWriteTokenHash":"`+hashToken(writeToken)+`"}`)
+	defer bootstrapResp.Body.Close()
+	if bootstrapResp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 from bootstrap, got %d", bootstrapResp.StatusCode)
+	}
+
+	authorityBody := func(entryID, action, target, signer string, priv ed25519.PrivateKey, token string) string {
+		change := logstore.AuthorityChange{
+			SyncID:                   syncID,
+			EntryID:                  entryID,
+			Action:                   logstore.AuthorityAction(action),
+			TargetAuthorityPublicKey: target,
+		}
+		sig := ed25519.Sign(priv, change.Message())
+		return `{"entryId":"` + entryID + `","keyVersion":1,"encryptedMeta":"` +
+			base64.StdEncoding.EncodeToString([]byte("role_change payload")) +
+			`","writeToken":"` + token + `","action":"` + action +
+			`","targetAuthorityPublicKey":"` + target +
+			`","signerAuthorityPublicKey":"` + signer +
+			`","signature":"` + hex.EncodeToString(sig) + `"}`
+	}
+	postAuthority := func(body string) *http.Response {
+		return authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/authority", authToken, body)
+	}
+
+	// A stranger can't let themselves in.
+	strangerResp := postAuthority(authorityBody("promote-0", "add", promotedPubHex, promotedPubHex, promotedPriv, writeToken))
+	defer strangerResp.Body.Close()
+	if strangerResp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 for a self-promotion by a non-authority, got %d", strangerResp.StatusCode)
+	}
+
+	promoteResp := postAuthority(authorityBody("promote-1", "add", promotedPubHex, founderPubHex, founderPriv, writeToken))
+	defer promoteResp.Body.Close()
+	if promoteResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 from promote, got %d", promoteResp.StatusCode)
+	}
+
+	// The promoted admin's authority is real: they can rotate.
+	newWriteToken := randomHex(t, 32)
+	newWriteTokenHash := hashToken(newWriteToken)
+	rotateSig := ed25519.Sign(promotedPriv, logstore.RotateMessage(syncID, "rotate-1", newWriteTokenHash))
+	rotateResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/rotate", authToken,
+		`{"entryId":"rotate-1","currentKeyVersion":1,"encryptedMeta":"`+base64.StdEncoding.EncodeToString([]byte("key_rotation payload"))+
+			`","currentWriteToken":"`+writeToken+`","newWriteTokenHash":"`+newWriteTokenHash+
+			`","authorityPublicKey":"`+promotedPubHex+`","signature":"`+hex.EncodeToString(rotateSig)+`"}`)
+	defer rotateResp.Body.Close()
+	if rotateResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 from a promoted admin's rotate, got %d", rotateResp.StatusCode)
+	}
+
+	// Handover: the new admin demotes the founder.
+	demoteResp := postAuthority(authorityBody("demote-1", "remove", founderPubHex, promotedPubHex, promotedPriv, newWriteToken))
+	defer demoteResp.Body.Close()
+	if demoteResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 from demote, got %d", demoteResp.StatusCode)
+	}
+
+	// The founder is now an ordinary member as far as the relay cares.
+	strandedHash := hashToken(randomHex(t, 32))
+	strandedSig := ed25519.Sign(founderPriv, logstore.RotateMessage(syncID, "rotate-2", strandedHash))
+	strandedResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/rotate", authToken,
+		`{"entryId":"rotate-2","currentKeyVersion":2,"encryptedMeta":"`+base64.StdEncoding.EncodeToString([]byte("x"))+
+			`","currentWriteToken":"`+newWriteToken+`","newWriteTokenHash":"`+strandedHash+
+			`","authorityPublicKey":"`+founderPubHex+`","signature":"`+hex.EncodeToString(strandedSig)+`"}`)
+	defer strandedResp.Body.Close()
+	if strandedResp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 from the demoted founder's rotate, got %d", strandedResp.StatusCode)
+	}
+
+	// ...and can't then resign, because there'd be nobody left.
+	lastResp := postAuthority(authorityBody("resign-1", "remove", promotedPubHex, promotedPubHex, promotedPriv, newWriteToken))
+	defer lastResp.Body.Close()
+	if lastResp.StatusCode != http.StatusConflict {
+		t.Fatalf("expected 409 for emptying the authority set, got %d", lastResp.StatusCode)
+	}
+
+	// Every authority change is on meta too, so clients replaying the log
+	// see the same set the relay enforces.
+	fetchResp := authedRequest(t, http.MethodGet, server.URL+"/v1/circles/"+syncID+"/entries?namespace=meta&since=0", authToken, "")
+	defer fetchResp.Body.Close()
+	var fetched struct {
+		Entries []json.RawMessage `json:"entries"`
+	}
+	if err := json.NewDecoder(fetchResp.Body).Decode(&fetched); err != nil {
+		t.Fatal(err)
+	}
+	if len(fetched.Entries) != 3 {
+		t.Fatalf("expected promote + rotation + demote on meta, got %d entries", len(fetched.Entries))
+	}
+}

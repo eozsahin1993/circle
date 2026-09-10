@@ -1,4 +1,7 @@
+import { hexToBytes } from '@noble/curves/utils.js';
+
 import { getMemberByPublicKey } from '@/data/db';
+import { deriveAuthorityKeyProofMessage, verify } from '@/services/crypto';
 import type { LogEntryEnvelope } from '@/domain/usecases/circle/log-entry';
 
 /**
@@ -72,6 +75,31 @@ export function hexField(record: Record<string, unknown>, key: string, byteLengt
   if (typeof value !== 'string') return null;
   if (value.length !== byteLength * 2) return null;
   return LOWERCASE_HEX.test(value) ? value : null;
+}
+
+/**
+ * A published authority public key, accepted only with a signature made
+ * by that key over `identityPublicKey` — proof its publisher actually
+ * holds it. Without that, anyone could publish someone else's real
+ * authority key as their own, and a promotion would then put a key in the
+ * relay's set belonging to a different person than the log names.
+ *
+ * Returns '' rather than rejecting whenever the proof is missing or
+ * doesn't verify: this is one field on entries that carry a whole
+ * profile, and dropping the entry would lose the rest of it permanently
+ * on replay (server/SYNC_DESIGN.md invariant 1).
+ */
+export function provenAuthorityKey(record: Record<string, unknown>, identityPublicKey: string): string {
+  const authorityPublicKey = hexField(record, 'authorityPublicKey', 32);
+  const proof = hexField(record, 'authorityKeyProof', 64);
+  if (!authorityPublicKey || !proof) return '';
+
+  try {
+    const message = deriveAuthorityKeyProofMessage(identityPublicKey);
+    return verify(hexToBytes(proof), message, hexToBytes(authorityPublicKey)) ? authorityPublicKey : '';
+  } catch {
+    return '';
+  }
 }
 
 export function numberField(record: Record<string, unknown>, key: string): number | null {

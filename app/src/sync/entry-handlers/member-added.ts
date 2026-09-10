@@ -1,7 +1,7 @@
 import { getCircleMembers, MemberRoles, recordMemberAdded, type MemberRole } from '@/data/db';
 import { generateUUID } from '@/services/crypto';
 import { parsePictureThumbnail } from '@/services/image';
-import { asRecord, hexField, numberField, type EntryHandler } from '@/sync/entry-handlers/types';
+import { asRecord, hexField, numberField, provenAuthorityKey, type EntryHandler } from '@/sync/entry-handlers/types';
 
 /** What `createCircle` and `invite-to-circle.ts`'s `approveJoinRequest` put in a `member_added` entry. */
 type MemberAddedPayload = {
@@ -28,6 +28,14 @@ type MemberAddedPayload = {
   createdAt?: number;
   /** Empty when this member had notifications off at join time. */
   pushRoutingId: string;
+  /**
+   * Empty unless the entry carried a key *and* a proof the joiner holds
+   * it — see `provenAuthorityKey`. The proof carries the weight here:
+   * this entry is signed by the approving admin, not by the member it
+   * describes, so the admin's signature says nothing about whose
+   * authority key this is.
+   */
+  authorityPublicKey: string;
 };
 
 function parse(payload: unknown): MemberAddedPayload | null {
@@ -49,6 +57,7 @@ function parse(payload: unknown): MemberAddedPayload | null {
     // have none, and a check here would drop them forever on replay
     // (server/SYNC_DESIGN.md invariant 1). A later push_enabled fills it in.
     pushRoutingId: hexField(record, 'pushRoutingId', 32) ?? '',
+    authorityPublicKey: provenAuthorityKey(record, identityPublicKey),
   };
 }
 
@@ -119,6 +128,7 @@ export const memberAddedHandler: EntryHandler = {
         name: payload.name,
         picture: payload.picture ?? null,
         pushRoutingId: payload.pushRoutingId,
+        authorityPublicKey: payload.authorityPublicKey,
       },
     });
   },

@@ -29,7 +29,10 @@ function parse(payload: unknown): ProfileUpdatePayload | null {
   // legitimate update, not a malformed entry.
   const name = stringField(record, 'name', { allowEmpty: true });
   if (name === null) return null;
-  return { name, picture: parsePictureThumbnail(record.picture) ?? undefined };
+  return {
+    name,
+    picture: parsePictureThumbnail(record.picture) ?? undefined,
+  };
 }
 
 export const profileUpdateHandler: EntryHandler = {

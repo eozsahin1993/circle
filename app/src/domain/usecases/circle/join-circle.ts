@@ -3,7 +3,9 @@ import { Buffer } from 'buffer';
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 import {
+  buildAuthorityKeyClaim,
   decrypt,
+  deriveAuthorityKeypair,
   deriveCircleIdentity,
   derivePushRoutingId,
   deriveCircleSealingKeypair,
@@ -117,6 +119,7 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
 
   const request: JoinRequestPayload = {
     pushRoutingId: derivePushRoutingId(masterSeed, circleId),
+    ...buildAuthorityKeyClaim(masterSeed, circleId, bytesToHex(identity.publicKey)),
     ephemeralPublicKey: bytesToHex(keypair.publicKey),
     identityPublicKey: bytesToHex(identity.publicKey),
     encPublicKey: bytesToHex(sealingKeypair.publicKey),
@@ -216,6 +219,7 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
       encPublicKey,
       memberId,
       pushRoutingId: derivePushRoutingId(masterSeed, circleId),
+      authorityPublicKey: bytesToHex(deriveAuthorityKeypair(masterSeed, circleId).publicKey),
       role: MemberRoles.member,
       name: profile?.name ?? '',
       picture: profile?.picture ?? null,

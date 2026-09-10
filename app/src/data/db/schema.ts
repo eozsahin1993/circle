@@ -59,6 +59,14 @@ export const circleMembers = sqliteTable(
      * never opted into notifications stays untargetable.
      */
     pushRoutingId: text('push_routing_id').notNull().default(''),
+    /**
+     * This member's authority (Ed25519) public key, hex — see
+     * `deriveAuthorityKeypair`. Only its owner can derive it, so it
+     * arrives on their `member_added` with a signature by that key
+     * proving they hold it; whoever promotes them needs it, because the
+     * relay's authority set is keyed on this and not on the identity key.
+     */
+    authorityPublicKey: text('authority_public_key').notNull().default(''),
     memberId: text('member_id').notNull(),
     role: text('role', { enum: ['admin', 'member'] }).notNull().default('member'),
     name: text('name').notNull(),
@@ -409,6 +417,23 @@ export const outbox = sqliteTable(
      * be deleted offline.
      */
     blobEntryId: text('blob_entry_id'),
+    /**
+     * How this entry must move the relay's authority set when it goes
+     * out, for a `role_change` that promotes or demotes. Null for
+     * everything else — including a demotion of someone the relay never
+     * registered, which has no set entry to remove.
+     *
+     * Sitting on the row for the same reason `blobEntryId` does: it's
+     * what lets the change be made offline. The relay commits the set
+     * mutation and the entry together or not at all, so the drain has to
+     * call a different endpoint for these rows and needs both halves to
+     * build the request — the signature is over the action and target,
+     * and is only produced at drain time, from a seed-derived key this
+     * row never holds.
+     */
+    authorityAction: text('authority_action', { enum: ['add', 'remove'] }),
+    /** The authority public key `authorityAction` applies to. Null whenever that is. */
+    authorityTargetKey: text('authority_target_key'),
   },
   (t) => [index('outbox_circle_id').on(t.circleId)]
 );

@@ -15,6 +15,9 @@ import m0010 from './0010_chilly_the_anarchist.sql';
 import m0011 from './0011_bright_monster_badoon.sql';
 import m0012 from './0012_wide_starfox.sql';
 import m0013 from './0013_jittery_magik.sql';
+import m0014 from './0014_late_wasp.sql';
+import m0015 from './0015_steep_bloodaxe.sql';
+import m0016 from './0016_broad_meltdown.sql';
 
   export default {
     journal,
@@ -32,7 +35,10 @@ m0009,
 m0010,
 m0011,
 m0012,
-m0013
+m0013,
+m0014,
+m0015,
+m0016
     }
   }
   

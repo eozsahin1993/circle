@@ -22,7 +22,8 @@ import { resolveCircleCoverUri } from '@/domain/usecases/circle/circle-cover';
 import { loadCircleDetails, type CircleDetails } from '@/domain/usecases/circle/circle-details';
 import { buildDebugKeysetFlags } from '@/domain/usecases/circle/debug-keyset';
 import { getOrCreateInvite, replaceInvite } from '@/domain/usecases/circle/invite-to-circle';
-import { deleteCircleForEveryone, leaveCircle } from '@/domain/usecases/circle/leave-circle';
+import { departingSuccessor } from '@/domain/usecases/circle/authority';
+import { leaveCircle } from '@/domain/usecases/circle/leave-circle';
 import { removeMember } from '@/domain/usecases/circle/remove-member';
 import { renameCircle } from '@/domain/usecases/circle/rename-circle';
 import { setCoverPhoto } from '@/domain/usecases/circle/set-cover-photo';
@@ -143,6 +144,10 @@ export default function CircleDetailsScreen() {
     try {
       await setMemberRole(circleId, member.identityPublicKey, role);
       await reload();
+      // Nothing on the roster moves until the relay accepts the change
+      // and the entry syncs back, so say so rather than leave the tap
+      // looking like it did nothing.
+      showDone(role === MemberRoles.admin ? 'They become an admin once this syncs' : 'They stop being an admin once this syncs');
     } catch (err) {
       console.error('Failed to change member role', err);
       showError('Could not change their role');
@@ -254,11 +259,23 @@ export default function CircleDetailsScreen() {
     );
   }
 
-  function handleLeave() {
+  async function handleLeave() {
     if (!circleId) return;
+    // Named rather than left as a surprise: leaving as the last admin
+    // hands the circle to someone, and this is where that can be
+    // cancelled and overridden with "Make admin" on someone else.
+    const successor = await departingSuccessor(circleId).catch(() => null);
+    // Nobody left to invite you back, so this one really is final — worth
+    // saying outright rather than letting "you will need a new key" imply
+    // a way back that doesn't exist.
+    const lastMember = members.length === 1;
     Alert.alert(
       `Leave ${circle?.name ?? 'this circle'}?`,
-      'The circle disappears from this phone, and you will need a new key to come back.',
+      lastMember
+        ? `You are the only one left. Leaving removes ${circle?.name ?? 'this circle'} and every photo in it from this phone, and there is nobody who could invite you back.`
+        : successor
+          ? `The circle disappears from this phone, and ${successor.name || 'the longest-standing member'} becomes admin.`
+          : 'The circle disappears from this phone, and you will need a new key to come back.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -319,29 +336,6 @@ export default function CircleDetailsScreen() {
     }
   }
 
-  function handleDeleteForEveryone() {
-    if (!circleId) return;
-    Alert.alert(
-      'Delete for everyone?',
-      "This erases the circle from this phone, and can't be undone here. Other members keep their copy until the relay can carry a deletion.",
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteCircleForEveryone(circleId);
-              router.dismissTo('/circle');
-            } catch (err) {
-              console.error('Failed to delete circle', err);
-              showError('Could not delete the circle');
-            }
-          },
-        },
-      ],
-    );
-  }
 
   /**
    * The three things you can do with a circle's key. Its own group rather
@@ -442,16 +436,6 @@ export default function CircleDetailsScreen() {
           description: 'The circle disappears from this phone. You will need a new key to come back.',
           destructive: true,
           onPress: handleLeave,
-        },
-        admin && {
-          label: 'Delete for everyone',
-          // Deliberately not "every phone erases its copy":
-          // `deleteCircleForEveryone` only clears this device, and
-          // propagating a deletion is relay work that doesn't exist yet.
-          description:
-            "Admins only. Erases this phone's copy. Other members keep theirs until the relay can carry a deletion.",
-          destructive: true,
-          onPress: handleDeleteForEveryone,
         },
       ],
     },

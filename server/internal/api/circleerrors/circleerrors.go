@@ -33,6 +33,12 @@ func Status(err error) (int, string) {
 		return http.StatusForbidden, "write token does not match current circle state"
 	case errors.Is(err, logstore.ErrAuthorityNotRecognized):
 		return http.StatusForbidden, "authority key not recognized for this circle"
+	case errors.Is(err, logstore.ErrInvalidAuthorityAction):
+		return http.StatusBadRequest, "authority action must be add or remove"
+	case errors.Is(err, logstore.ErrInvalidAuthorityKey):
+		return http.StatusBadRequest, "authority key must be a hex-encoded ed25519 public key"
+	case errors.Is(err, logstore.ErrWouldEmptyAuthoritySet):
+		return http.StatusConflict, "that would leave the circle with no admin the relay recognizes"
 	case errors.Is(err, logstore.ErrInvalidSignature):
 		return http.StatusBadRequest, "signature does not verify"
 	case errors.Is(err, logstore.ErrConcurrentModification):

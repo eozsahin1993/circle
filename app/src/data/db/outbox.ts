@@ -7,7 +7,12 @@ import { type Post } from '@/data/db/posts';
 import { attachments, outbox, posts } from '@/data/db/schema';
 
 export type OutboxEntry = typeof outbox.$inferSelect;
-export type NewOutboxEntry = Omit<OutboxEntry, 'sequenceNum'>;
+/** The authority fields default to null — only a promotion or demotion sets them. */
+export type NewOutboxEntry = Omit<OutboxEntry, 'sequenceNum' | 'authorityAction' | 'authorityTargetKey'> &
+  Partial<Pick<OutboxEntry, 'authorityAction' | 'authorityTargetKey'>>;
+
+/** How a queued entry must move the relay's authority set — see `authorityAction` on the schema. */
+export type OutboxAuthorityAction = NonNullable<OutboxEntry['authorityAction']>;
 
 /** The states an outbox entry can be in — see `status` on `outbox` in schema.ts. */
 export type OutboxStatus = OutboxEntry['status'];

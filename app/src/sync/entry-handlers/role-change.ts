@@ -22,7 +22,11 @@ function parse(payload: unknown): RoleChangePayload | null {
   if (!identityPublicKey) return null;
   const { role } = record;
   if (role !== MemberRoles.admin && role !== MemberRoles.member) return null;
-  return { identityPublicKey, role: role as MemberRole, createdAt: numberField(record, 'createdAt') ?? undefined };
+  return {
+    identityPublicKey,
+    role: role as MemberRole,
+    createdAt: numberField(record, 'createdAt') ?? undefined,
+  };
 }
 
 export const roleChangeHandler: EntryHandler = {

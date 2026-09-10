@@ -61,6 +61,34 @@ func (k authorityKey) sign(syncID, entryID, newWriteTokenHash string) []byte {
 	return ed25519.Sign(k.private, logstore.RotateMessage(syncID, entryID, newWriteTokenHash))
 }
 
+// authorityChange builds a fully-populated, correctly-signed
+// AuthorityChange — tests that want a *wrong* one edit a field after the
+// signature is made, which is exactly the tamper each is checking for.
+func authorityChange(signer authorityKey, syncID, entryID string, action logstore.AuthorityAction, target, token string) logstore.AuthorityChange {
+	change := logstore.AuthorityChange{
+		SyncID:                   syncID,
+		EntryID:                  entryID,
+		EncryptedPayload:         []byte("role_change payload"),
+		KeyVersion:               1,
+		WriteToken:               token,
+		Action:                   action,
+		TargetAuthorityPublicKey: target,
+		SignerAuthorityPublicKey: signer.publicKeyHex,
+	}
+	change.Signature = ed25519.Sign(signer.private, change.Message())
+	return change
+}
+
+// grant promotes target by adding its key to syncID's authority set,
+// signed by signer — the setup step for every test that needs a second
+// admin, which nothing but ChangeAuthority can produce.
+func grant(t *testing.T, store logstore.Store, syncID, entryID string, signer, target authorityKey, token string) {
+	t.Helper()
+	if _, err := store.ChangeAuthority(context.Background(), authorityChange(signer, syncID, entryID, logstore.AuthorityAdd, target.publicKeyHex, token)); err != nil {
+		t.Fatalf("granting authority failed: %v", err)
+	}
+}
+
 func bootstrap(t *testing.T, store logstore.Store, syncID string, founder authorityKey, token string) {
 	t.Helper()
 	if err := store.Bootstrap(context.Background(), syncID, founder.publicKeyHex, hashToken(t, token)); err != nil {
@@ -494,5 +522,297 @@ func TestLogStore_Peek_EmptyInputReturnsEmptyResult(t *testing.T) {
 	}
 	if len(epochs) != 0 {
 		t.Fatalf("expected an empty result for no syncIDs, got %d entries", len(epochs))
+	}
+}
+
+// The bug this whole path exists to fix: before ChangeAuthority the
+// authority set was written once at Bootstrap and never again, so a
+// promoted admin's Rotate was rejected forever and the founder could
+// never be replaced.
+func TestLogStore_ChangeAuthority_AddedKeyCanThenRotate(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	promoted := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	// Before the promotion, the promotee is nobody.
+	rejectedHash := hashToken(t, newToken(t))
+	_, err := store.Rotate(ctx, syncID, "rotate-early", []byte("payload"), 1, token, rejectedHash, promoted.publicKeyHex, promoted.sign(syncID, "rotate-early", rejectedHash))
+	if !errors.Is(err, logstore.ErrAuthorityNotRecognized) {
+		t.Fatalf("expected an unpromoted key to be rejected, got %v", err)
+	}
+
+	grant(t, store, syncID, "promote-1", founder, promoted, token)
+
+	newTokenValue := newToken(t)
+	newHash := hashToken(t, newTokenValue)
+	commit, err := store.Rotate(ctx, syncID, "rotate-1", []byte("key_rotation payload"), 1, token, newHash, promoted.publicKeyHex, promoted.sign(syncID, "rotate-1", newHash))
+	if err != nil {
+		t.Fatalf("a promoted admin must be able to rotate: %v", err)
+	}
+	if commit.Epoch != 2 {
+		t.Fatalf("expected the rotation at meta epoch 2 (behind the promotion's own entry), got %d", commit.Epoch)
+	}
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, "post-1", []byte("c"), 2, newTokenValue); err != nil {
+		t.Fatalf("expected the promoted admin's new write token to work: %v", err)
+	}
+}
+
+func TestLogStore_ChangeAuthority_AppendsItsEntryInTheSameTransaction(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	promoted := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	commit, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-1", logstore.AuthorityAdd, promoted.publicKeyHex, token))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if commit.Epoch != 1 {
+		t.Fatalf("expected the promotion to land as meta's first entry, got %d", commit.Epoch)
+	}
+
+	metaRead, err := store.Read(ctx, syncID, logstore.NamespaceMeta, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(metaRead.Entries) != 1 || string(metaRead.Entries[0].EncryptedMeta) != "role_change payload" {
+		t.Fatalf("expected the promotion's own entry readable back from meta, got %+v", metaRead.Entries)
+	}
+}
+
+func TestLogStore_ChangeAuthority_RemovedKeyCanNoLongerRotate(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	promoted := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+	grant(t, store, syncID, "promote-1", founder, promoted, token)
+
+	if _, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "demote-1", logstore.AuthorityRemove, promoted.publicKeyHex, token)); err != nil {
+		t.Fatal(err)
+	}
+
+	newHash := hashToken(t, newToken(t))
+	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, promoted.publicKeyHex, promoted.sign(syncID, "rotate-1", newHash))
+	if !errors.Is(err, logstore.ErrAuthorityNotRecognized) {
+		t.Fatalf("expected a demoted admin's rotate to be rejected, got %v", err)
+	}
+	// A demotion that left relay powers behind would be worse than no
+	// demotion at all — the founder must still be able to rotate.
+	if _, err := store.Rotate(ctx, syncID, "rotate-2", []byte("payload"), 1, token, newHash, founder.publicKeyHex, founder.sign(syncID, "rotate-2", newHash)); err != nil {
+		t.Fatalf("the founder must still hold authority after demoting someone else: %v", err)
+	}
+}
+
+func TestLogStore_ChangeAuthority_RejectsASignerOutsideTheSet(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	impostor := newAuthorityKey(t)
+	accomplice := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	_, err := store.ChangeAuthority(ctx, authorityChange(impostor, syncID, "promote-1", logstore.AuthorityAdd, accomplice.publicKeyHex, token))
+	if !errors.Is(err, logstore.ErrAuthorityNotRecognized) {
+		t.Fatalf("expected ErrAuthorityNotRecognized for a non-authority signer, got %v", err)
+	}
+
+	newHash := hashToken(t, newToken(t))
+	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, accomplice.publicKeyHex, accomplice.sign(syncID, "rotate-1", newHash)); !errors.Is(err, logstore.ErrAuthorityNotRecognized) {
+		t.Fatalf("a rejected promotion must not have added the key anyway, got %v", err)
+	}
+}
+
+// The signature covers the action, so authorizing a promotion can't be
+// turned into the demotion of the same person by editing one field.
+func TestLogStore_ChangeAuthority_SignatureDoesNotCarryAcrossActions(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	promoted := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+	grant(t, store, syncID, "promote-1", founder, promoted, token)
+
+	change := authorityChange(founder, syncID, "demote-1", logstore.AuthorityAdd, promoted.publicKeyHex, token)
+	change.Action = logstore.AuthorityRemove
+	_, err := store.ChangeAuthority(ctx, change)
+	if !errors.Is(err, logstore.ErrInvalidSignature) {
+		t.Fatalf("expected an add signature to be useless for a remove, got %v", err)
+	}
+}
+
+// ...nor across circles, which is what binding the message to syncID buys.
+func TestLogStore_ChangeAuthority_SignatureDoesNotCarryAcrossCircles(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	founder := newAuthorityKey(t)
+	promoted := newAuthorityKey(t)
+
+	tokenA := newToken(t)
+	syncA := testsupport.UniqueSyncID(t) + "-a"
+	bootstrap(t, store, syncA, founder, tokenA)
+	tokenB := newToken(t)
+	syncB := testsupport.UniqueSyncID(t) + "-b"
+	bootstrap(t, store, syncB, founder, tokenB)
+
+	change := authorityChange(founder, syncA, "promote-1", logstore.AuthorityAdd, promoted.publicKeyHex, tokenB)
+	change.SyncID = syncB
+	_, err := store.ChangeAuthority(ctx, change)
+	if !errors.Is(err, logstore.ErrInvalidSignature) {
+		t.Fatalf("expected a signature bound to another circle to be rejected, got %v", err)
+	}
+}
+
+// Leaving a circle removes your own key, so self-removal has to work —
+// it just can't be the last one out.
+func TestLogStore_ChangeAuthority_SignerMayRemoveTheirOwnKeyButNotTheLast(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	promoted := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	_, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "resign-early", logstore.AuthorityRemove, founder.publicKeyHex, token))
+	if !errors.Is(err, logstore.ErrWouldEmptyAuthoritySet) {
+		t.Fatalf("expected the sole authority's resignation to be refused, got %v", err)
+	}
+
+	// With a successor in place it goes through — this is the handover.
+	grant(t, store, syncID, "promote-1", founder, promoted, token)
+	if _, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "resign-1", logstore.AuthorityRemove, founder.publicKeyHex, token)); err != nil {
+		t.Fatalf("a departing authority must be able to remove their own key: %v", err)
+	}
+
+	newHash := hashToken(t, newToken(t))
+	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, founder.publicKeyHex, founder.sign(syncID, "rotate-1", newHash)); !errors.Is(err, logstore.ErrAuthorityNotRecognized) {
+		t.Fatalf("a resigned authority must lose its powers, got %v", err)
+	}
+	if _, err := store.Rotate(ctx, syncID, "rotate-2", []byte("payload"), 1, token, newHash, promoted.publicKeyHex, promoted.sign(syncID, "rotate-2", newHash)); err != nil {
+		t.Fatalf("the successor must still be able to govern: %v", err)
+	}
+}
+
+// The other way to empty the set: demote your way down rather than
+// resign. Both must hit the same floor.
+func TestLogStore_ChangeAuthority_RefusesToDemoteDownToAnEmptySet(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	promoted := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+	grant(t, store, syncID, "promote-1", founder, promoted, token)
+
+	// Two in the set, so demoting the founder is fine.
+	if _, err := store.ChangeAuthority(ctx, authorityChange(promoted, syncID, "demote-1", logstore.AuthorityRemove, founder.publicKeyHex, token)); err != nil {
+		t.Fatal(err)
+	}
+	// One left, so there is nowhere further down to go.
+	_, err := store.ChangeAuthority(ctx, authorityChange(promoted, syncID, "demote-2", logstore.AuthorityRemove, promoted.publicKeyHex, token))
+	if !errors.Is(err, logstore.ErrWouldEmptyAuthoritySet) {
+		t.Fatalf("expected ErrWouldEmptyAuthoritySet, got %v", err)
+	}
+
+	newHash := hashToken(t, newToken(t))
+	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, promoted.publicKeyHex, promoted.sign(syncID, "rotate-1", newHash)); err != nil {
+		t.Fatalf("the circle must still be governable: %v", err)
+	}
+}
+
+func TestLogStore_ChangeAuthority_RejectsAMalformedTargetKey(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	for name, target := range map[string]string{
+		"not hex":    "zzzz",
+		"wrong size": "aabbcc",
+	} {
+		_, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-"+name, logstore.AuthorityAdd, target, token))
+		if !errors.Is(err, logstore.ErrInvalidAuthorityKey) {
+			t.Fatalf("%s: expected ErrInvalidAuthorityKey, got %v", name, err)
+		}
+	}
+}
+
+func TestLogStore_ChangeAuthority_RejectsAnUnknownAction(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	promoted := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	_, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-1", "replace", promoted.publicKeyHex, token))
+	if !errors.Is(err, logstore.ErrInvalidAuthorityAction) {
+		t.Fatalf("expected ErrInvalidAuthorityAction, got %v", err)
+	}
+}
+
+// Authority alone isn't enough: the entry it appends is still an append,
+// and every append is possession-gated.
+func TestLogStore_ChangeAuthority_RejectsAStaleWriteToken(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	promoted := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	_, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-1", logstore.AuthorityAdd, promoted.publicKeyHex, newToken(t)))
+	if !errors.Is(err, logstore.ErrWriteTokenMismatch) {
+		t.Fatalf("expected ErrWriteTokenMismatch, got %v", err)
+	}
+}
+
+func TestLogStore_ChangeAuthority_RetryWithTheSameEntryIDIsIdempotent(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	promoted := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	change := authorityChange(founder, syncID, "promote-1", logstore.AuthorityAdd, promoted.publicKeyHex, token)
+	first, err := store.ChangeAuthority(ctx, change)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := store.ChangeAuthority(ctx, change)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Epoch != second.Epoch {
+		t.Fatalf("expected a retry to converge on epoch %d, got %d", first.Epoch, second.Epoch)
+	}
+
+	metaRead, err := store.Read(ctx, syncID, logstore.NamespaceMeta, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(metaRead.Entries) != 1 {
+		t.Fatalf("expected the retry to append nothing, got %d meta entries", len(metaRead.Entries))
 	}
 }

@@ -7,7 +7,6 @@ import {
   recordMemberRemoved,
   recordMemberRemovedLocally,
   recordRoleChanged,
-  recordRoleChangedLocally,
   type AddedMemberProfile,
 } from '@/data/db/member-events';
 import { getCircleMembers, getMemberByPublicKey, MemberRoles } from '@/data/db/members';
@@ -149,9 +148,8 @@ describe('the roster projection', () => {
     const subject = key();
 
     await recordMemberAddedLocally({ circleId: circle.id, subjectPublicKey: subject, joinedAt: 1_000, profile: profile({ role: MemberRoles.member }) });
-    await recordRoleChangedLocally({ circleId: circle.id, subjectPublicKey: subject, role: MemberRoles.admin });
 
-    expect((await getMemberByPublicKey(circle.id, subject))?.role).toBe(MemberRoles.admin);
+    expect((await getMemberByPublicKey(circle.id, subject))?.role).toBe(MemberRoles.member);
     // No epoch existed for any of it, so no event row could be keyed —
     // those arrive when the outbox entries are pulled back.
     expect(await getCircleMemberEvents(circle.id)).toHaveLength(0);

@@ -5,7 +5,7 @@ import { File, Paths, UploadType } from 'expo-file-system';
 import { NativeModules, Platform } from 'react-native';
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { generateUUID } from '@/services/crypto';
+import { generateUUID, type AuthorityAction } from '@/services/crypto';
 import { getAuthToken } from '@/services/keystore';
 
 /**
@@ -246,6 +246,52 @@ export async function rotateLog(
   }
   if (!response.ok) {
     throw new Error(await describeError(response, 'Failed to rotate'));
+  }
+  const body = await response.json();
+  return { epoch: body.epoch, receivedAt: body.receivedAt };
+}
+
+/**
+ * Adds or removes a key from a circle's authority set — POST
+ * /v1/circles/{syncId}/authority. Appends the role_change meta entry and
+ * mutates the set atomically, the same way `rotateLog` pairs an entry
+ * with its token swap; the relay refuses to do one without the other.
+ * `signature` must verify against `deriveAuthorityChangeMessage(action,
+ * syncId, entryId, targetAuthorityPublicKey)` — see crypto.ts.
+ *
+ * The signer must already be in the set, and cannot name their own key
+ * for removal — see `ErrCannotRemoveSelf` on the relay.
+ */
+export async function changeAuthority(change: {
+  syncId: string;
+  entryId: string;
+  encryptedMeta: Uint8Array;
+  keyVersion: number;
+  writeToken: Uint8Array;
+  action: AuthorityAction;
+  targetAuthorityPublicKey: Uint8Array;
+  signerAuthorityPublicKey: Uint8Array;
+  signature: Uint8Array;
+}): Promise<AppendResult> {
+  const response = await authorizedFetch(`/v1/circles/${change.syncId}/authority`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      entryId: change.entryId,
+      encryptedMeta: Buffer.from(change.encryptedMeta).toString('base64'),
+      keyVersion: change.keyVersion,
+      writeToken: bytesToHex(change.writeToken),
+      action: change.action,
+      targetAuthorityPublicKey: bytesToHex(change.targetAuthorityPublicKey),
+      signerAuthorityPublicKey: bytesToHex(change.signerAuthorityPublicKey),
+      signature: bytesToHex(change.signature),
+    }),
+  });
+  if (response.status === 429) {
+    throw new RateLimitedError();
+  }
+  if (!response.ok) {
+    throw new Error(await describeError(response, 'Failed to change authority'));
   }
   const body = await response.json();
   return { epoch: body.epoch, receivedAt: body.receivedAt };

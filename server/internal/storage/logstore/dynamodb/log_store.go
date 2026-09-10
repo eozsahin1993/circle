@@ -242,11 +242,86 @@ func (s *Store) Rotate(ctx context.Context, syncID, entryID string, encryptedPay
 	return logstore.CommitResult{}, logstore.ErrConcurrentModification
 }
 
-// commit runs the three-item transaction shared by Append and Rotate: the
-// caller-supplied conditional update to #control (a counter bump, or a
-// counter bump plus a token swap), the entry Put, and the idempotency
-// marker Put. Returns the raw TransactWriteItems error unexamined —
-// callers use convergeOnRace to interpret it.
+// ChangeAuthority runs the same verify-then-CAS shape as Rotate, over
+// authoritySet rather than writeTokenHash.
+func (s *Store) ChangeAuthority(ctx context.Context, change logstore.AuthorityChange) (logstore.CommitResult, error) {
+	if !change.Action.Valid() {
+		return logstore.CommitResult{}, logstore.ErrInvalidAuthorityAction
+	}
+	if !validAuthorityKeyHex(change.TargetAuthorityPublicKey) {
+		return logstore.CommitResult{}, logstore.ErrInvalidAuthorityKey
+	}
+	if err := verifyAuthoritySignature(change.SignerAuthorityPublicKey, change.Message(), change.Signature); err != nil {
+		return logstore.CommitResult{}, err
+	}
+
+	if existing, err := s.lookupIdempotencyMarker(ctx, change.SyncID, logstore.NamespaceMeta, change.EntryID); err != nil {
+		return logstore.CommitResult{}, err
+	} else if existing != nil {
+		return *existing, nil
+	}
+
+	expectedHash, hashErr := hashWriteToken(change.WriteToken)
+
+	setClause := "SET metaCounter = :next "
+	condition := "writeTokenHash = :hash AND metaCounter = :current AND contains(authoritySet, :signer)"
+	values := map[string]types.AttributeValue{}
+	if change.Action == logstore.AuthorityAdd {
+		setClause += "ADD authoritySet :target"
+	} else {
+		setClause += "DELETE authoritySet :target"
+		// Removing the last key would strand the circle, and DynamoDB
+		// drops the attribute entirely at zero elements, leaving nothing
+		// to add one back to. Self-removal is otherwise legal — that's
+		// how leaving hands authority back.
+		condition += " AND size(authoritySet) > :one"
+		values[":one"] = &types.AttributeValueMemberN{Value: "1"}
+	}
+
+	for attempt := 0; attempt < maxCASAttempts; attempt++ {
+		control, err := s.getControlState(ctx, change.SyncID, true)
+		if err != nil {
+			return logstore.CommitResult{}, err
+		}
+		if hashErr != nil || control.writeTokenHash != expectedHash {
+			return logstore.CommitResult{}, logstore.ErrWriteTokenMismatch
+		}
+		if !control.authoritySet[change.SignerAuthorityPublicKey] {
+			return logstore.CommitResult{}, logstore.ErrAuthorityNotRecognized
+		}
+		if change.Action == logstore.AuthorityRemove && len(control.authoritySet) <= 1 {
+			return logstore.CommitResult{}, logstore.ErrWouldEmptyAuthoritySet
+		}
+
+		current := control.metaCounter
+		nextEpoch := current + 1
+		receivedAt := dynamoutil.NowMillis()
+
+		result, err := s.commit(ctx, change.SyncID, logstore.NamespaceMeta, change.EntryID, change.EncryptedPayload, change.KeyVersion, nextEpoch, receivedAt, types.Update{
+			TableName:                 aws.String(s.tableName),
+			Key:                       controlKey(change.SyncID),
+			UpdateExpression:          aws.String(setClause),
+			ConditionExpression:       aws.String(condition),
+			ExpressionAttributeValues: withCASValues(values, expectedHash, current, nextEpoch, change),
+		})
+		if err == nil {
+			return result, nil
+		}
+		if converged, convErr := s.convergeOnRace(ctx, change.SyncID, logstore.NamespaceMeta, change.EntryID, err); convErr != nil {
+			return logstore.CommitResult{}, convErr
+		} else if converged != nil {
+			return *converged, nil
+		}
+	}
+	return logstore.CommitResult{}, logstore.ErrConcurrentModification
+}
+
+// commit runs the three-item transaction shared by Append, Rotate and
+// ChangeAuthority: the caller-supplied conditional update to #control (a
+// counter bump, plus whichever discretionary field the caller is
+// changing), the entry Put, and the idempotency marker Put. Returns the
+// raw TransactWriteItems error unexamined — callers use convergeOnRace to
+// interpret it.
 func (s *Store) commit(ctx context.Context, syncID string, ns logstore.Namespace, entryID string, encryptedPayload []byte, keyVersion, epoch, receivedAt int64, controlUpdate types.Update) (logstore.CommitResult, error) {
 	_, err := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
 		TransactItems: []types.TransactWriteItem{
@@ -324,8 +399,9 @@ func (c *controlState) counter(ns logstore.Namespace) int64 {
 	return c.metaCounter
 }
 
-// getControlState is the read half of the compare-and-swap Append and
-// Rotate build on — a separate read because TransactWriteItems's Update
+// getControlState is the read half of the compare-and-swap Append, Rotate
+// and ChangeAuthority build on — a separate read because
+// TransactWriteItems's Update
 // action can't hand back the value it just wrote (only standalone
 // UpdateItem supports ReturnValues). So the counter's *next* value is
 // computed from a value read beforehand, and the transaction's
@@ -614,4 +690,28 @@ func verifyAuthoritySignature(authorityPublicKeyHex string, message []byte, sign
 		return logstore.ErrInvalidSignature
 	}
 	return nil
+}
+
+// withCASValues fills in the placeholders every ChangeAuthority attempt
+// shares, alongside whichever the action added.
+func withCASValues(values map[string]types.AttributeValue, expectedHash string, current, nextEpoch int64, change logstore.AuthorityChange) map[string]types.AttributeValue {
+	merged := map[string]types.AttributeValue{
+		":hash":    &types.AttributeValueMemberS{Value: expectedHash},
+		":current": &types.AttributeValueMemberN{Value: strconv.FormatInt(current, 10)},
+		":next":    &types.AttributeValueMemberN{Value: strconv.FormatInt(nextEpoch, 10)},
+		":signer":  &types.AttributeValueMemberS{Value: change.SignerAuthorityPublicKey},
+		":target":  &types.AttributeValueMemberSS{Value: []string{change.TargetAuthorityPublicKey}},
+	}
+	for key, value := range values {
+		merged[key] = value
+	}
+	return merged
+}
+
+// validAuthorityKeyHex checks a key being written *into* the set, which
+// no signature covers — the key's owner isn't the one calling. Nothing
+// can sign as a malformed one, so it could never remove itself again.
+func validAuthorityKeyHex(publicKeyHex string) bool {
+	raw, err := hex.DecodeString(publicKeyHex)
+	return err == nil && len(raw) == ed25519.PublicKeySize
 }
