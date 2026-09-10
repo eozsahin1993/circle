@@ -53,7 +53,14 @@ export function usePendingRequestRows({ circleId, onRosterChanged }: PendingRequ
     if (!circleId) return;
     discoverPendingRequests(circleId)
       .then(setRequests)
-      .catch(() => setRequests([]));
+      .catch((err) => {
+        // Showing nothing is right — a device that didn't create this
+        // invite has no business listing its requests — but silence made
+        // "not the creator", "relay unreachable" and "genuinely none"
+        // indistinguishable while debugging.
+        console.error(`No pending requests shown for circle ${circleId}`, err);
+        setRequests([]);
+      });
   }, [circleId]);
 
   const answer = useCallback(
