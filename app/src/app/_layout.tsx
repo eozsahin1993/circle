@@ -94,11 +94,12 @@ export default function RootLayout() {
     initDatabase()
       .then(() => setDbReady(true))
       .catch((error) => console.error('Failed to initialize database', error));
-    // Best-effort and unawaited: a refused permission or an offline relay
-    // must not hold up the first screen.
-    startPushHandling()
-      .then(enablePushEverywhere)
-      .catch((error) => console.error('Failed to set up notifications', error));
+    // Two independent best-efforts, not a chain: registering the background
+    // task fails on a build without the remote-notification entitlement, and
+    // that must not also stop this device registering to *receive* pushes.
+    // Neither should hold up the first screen either, so nothing is awaited.
+    startPushHandling().catch((error) => console.error('Failed to register the push task', error));
+    enablePushEverywhere().catch((error) => console.error('Failed to register for notifications', error));
     getAppSettings()
       .then(setSettings)
       .catch((error) => console.error('Failed to load app settings', error));
