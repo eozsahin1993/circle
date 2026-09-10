@@ -22,19 +22,19 @@ func jsonBody(b []byte) io.Reader { return bytes.NewReader(b) }
 
 // registerPush puts a routing id's prefs and one device in place, and
 // returns the fanout token a sender would need for it.
-func registerPush(t *testing.T, serverURL, token, routingID string) []byte {
+func registerPush(t *testing.T, serverURL, token, pushRoutingID string) []byte {
 	t.Helper()
-	fanoutToken := []byte("fanout-token-for-" + routingID)
+	pushFanoutToken := []byte("fanout-token-for-" + pushRoutingID)
 
 	body, err := json.Marshal(map[string]any{
-		"fanoutHash": b64(push.FanoutHash(fanoutToken, routingID)),
-		"categories": []int64{0, 1},
-		"keyVersion": 1,
+		"pushFanoutHash": b64(push.PushFanoutHash(pushFanoutToken, pushRoutingID)),
+		"categories":     []int64{0, 1},
+		"keyVersion":     1,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp := authedRequest(t, http.MethodPut, serverURL+"/v1/push/"+routingID, token, string(body))
+	resp := authedRequest(t, http.MethodPut, serverURL+"/v1/push/"+pushRoutingID, token, string(body))
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 from PUT prefs, got %d", resp.StatusCode)
@@ -48,21 +48,21 @@ func registerPush(t *testing.T, serverURL, token, routingID string) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deviceResp := authedRequest(t, http.MethodPut, serverURL+"/v1/push/"+routingID+"/devices/device-1", token, string(deviceBody))
+	deviceResp := authedRequest(t, http.MethodPut, serverURL+"/v1/push/"+pushRoutingID+"/devices/device-1", token, string(deviceBody))
 	defer deviceResp.Body.Close()
 	if deviceResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 from PUT device, got %d", deviceResp.StatusCode)
 	}
-	return fanoutToken
+	return pushFanoutToken
 }
 
-func sendPush(t *testing.T, serverURL string, routingIDs []string, fanoutToken []byte, category int64) (int, map[string]int) {
+func sendPush(t *testing.T, serverURL string, pushRoutingIDs []string, pushFanoutToken []byte, category int64) (int, map[string]int) {
 	t.Helper()
 	body, err := json.Marshal(map[string]any{
-		"routingIds":  routingIDs,
-		"fanoutToken": b64(fanoutToken),
-		"category":    category,
-		"payload":     b64([]byte("ciphertext")),
+		"pushRoutingIds":  pushRoutingIDs,
+		"pushFanoutToken": b64(pushFanoutToken),
+		"category":        category,
+		"payload":         b64([]byte("ciphertext")),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -112,10 +112,10 @@ func TestEndToEnd_Push_SendDoesNotRequireAuth(t *testing.T) {
 	claims["iss"] = google.Issuer
 	token := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
 
-	routingID := testsupport.UniqueInviteTag(t)
-	fanoutToken := registerPush(t, server.URL, token, routingID)
+	pushRoutingID := testsupport.UniqueInviteTag(t)
+	pushFanoutToken := registerPush(t, server.URL, token, pushRoutingID)
 
-	status, result := sendPush(t, server.URL, []string{routingID}, fanoutToken, 0)
+	status, result := sendPush(t, server.URL, []string{pushRoutingID}, pushFanoutToken, 0)
 	if status != http.StatusOK {
 		t.Fatalf("expected 200 from an unauthenticated send, got %d", status)
 	}
@@ -133,10 +133,10 @@ func TestEndToEnd_Push_WrongFanoutTokenDeliversNothing(t *testing.T) {
 	claims["iss"] = google.Issuer
 	token := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
 
-	routingID := testsupport.UniqueInviteTag(t)
-	registerPush(t, server.URL, token, routingID)
+	pushRoutingID := testsupport.UniqueInviteTag(t)
+	registerPush(t, server.URL, token, pushRoutingID)
 
-	status, result := sendPush(t, server.URL, []string{routingID}, []byte("another-circles-token"), 0)
+	status, result := sendPush(t, server.URL, []string{pushRoutingID}, []byte("another-circles-token"), 0)
 	if status != http.StatusOK {
 		t.Fatalf("expected 200, got %d", status)
 	}
@@ -156,16 +156,16 @@ func TestEndToEnd_Push_UnregisteringSilencesTheCircle(t *testing.T) {
 	claims["iss"] = google.Issuer
 	token := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
 
-	routingID := testsupport.UniqueInviteTag(t)
-	fanoutToken := registerPush(t, server.URL, token, routingID)
+	pushRoutingID := testsupport.UniqueInviteTag(t)
+	pushFanoutToken := registerPush(t, server.URL, token, pushRoutingID)
 
-	deleteResp := authedRequest(t, http.MethodDelete, server.URL+"/v1/push/"+routingID, token, "")
+	deleteResp := authedRequest(t, http.MethodDelete, server.URL+"/v1/push/"+pushRoutingID, token, "")
 	defer deleteResp.Body.Close()
 	if deleteResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 from DELETE, got %d", deleteResp.StatusCode)
 	}
 
-	_, result := sendPush(t, server.URL, []string{routingID}, fanoutToken, 0)
+	_, result := sendPush(t, server.URL, []string{pushRoutingID}, pushFanoutToken, 0)
 	if result["delivered"] != 0 {
 		t.Fatalf("a silenced circle must deliver nothing, got %+v", result)
 	}
@@ -180,10 +180,10 @@ func TestEndToEnd_Push_RejectsShortFanoutHash(t *testing.T) {
 	claims["iss"] = google.Issuer
 	token := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
 
-	body, _ := json.Marshal(map[string]any{"fanoutHash": b64([]byte("short")), "categories": []int64{0}})
+	body, _ := json.Marshal(map[string]any{"pushFanoutHash": b64([]byte("short")), "categories": []int64{0}})
 	resp := authedRequest(t, http.MethodPut, server.URL+"/v1/push/"+testsupport.UniqueInviteTag(t), token, string(body))
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("expected 400 for a short fanoutHash, got %d", resp.StatusCode)
+		t.Fatalf("expected 400 for a short pushFanoutHash, got %d", resp.StatusCode)
 	}
 }

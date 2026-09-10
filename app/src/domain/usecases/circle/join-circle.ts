@@ -5,6 +5,7 @@ import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 import {
   decrypt,
   deriveCircleIdentity,
+  derivePushRoutingId,
   deriveCircleSealingKeypair,
   deriveInvitePreviewKey,
   deriveInviteTag,
@@ -108,6 +109,7 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
   }
 
   const request: JoinRequestPayload = {
+    pushRoutingId: derivePushRoutingId(masterSeed, circleId),
     ephemeralPublicKey: bytesToHex(keypair.publicKey),
     identityPublicKey: bytesToHex(identity.publicKey),
     encPublicKey: bytesToHex(sealingKeypair.publicKey),
@@ -204,6 +206,7 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
     profile: {
       encPublicKey,
       memberId,
+      pushRoutingId: derivePushRoutingId(masterSeed, circleId),
       role: MemberRoles.member,
       name: profile?.name ?? '',
       picture: profile?.picture ?? null,

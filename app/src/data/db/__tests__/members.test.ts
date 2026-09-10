@@ -37,6 +37,7 @@ function makeMember(
     circleId,
     identityPublicKey: `pk-${generateUUID()}`,
     encPublicKey: `x25519-${generateUUID()}`,
+    pushRoutingId: '',
     memberId: generateUUID(),
     role: overrides.role ?? MemberRoles.member,
     name: overrides.name ?? 'Grandma',
@@ -68,7 +69,8 @@ describe('members CRUD', () => {
     const member = makeMember(circle.id);
     await insertMember(member);
 
-    await expect(insertMember({ ...member, memberId: generateUUID() })).rejects.toThrow();
+    await expect(insertMember({ ...member, pushRoutingId: '',
+    memberId: generateUUID() })).rejects.toThrow();
   });
 
   test('getCircleMembers returns every member of a circle, ordered by joinedAt', async () => {

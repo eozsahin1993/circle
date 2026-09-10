@@ -10,11 +10,11 @@ import (
 )
 
 type fanoutRequest struct {
-	RoutingIDs []string `json:"routingIds"`
+	PushRoutingIDs []string `json:"pushRoutingIds"`
 	// Base64. Proves the sender holds the circle's content key, without
 	// naming the circle or the sender.
-	FanoutToken string `json:"fanoutToken"`
-	Category    int64  `json:"category"`
+	PushFanoutToken string `json:"pushFanoutToken"`
+	Category        int64  `json:"category"`
 	// Base64 ciphertext plus the fixed placeholder. Forwarded untouched.
 	Payload string `json:"payload"`
 }
@@ -45,9 +45,9 @@ func (h *FanoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fanoutToken, err := base64.StdEncoding.DecodeString(req.FanoutToken)
-	if err != nil || len(fanoutToken) == 0 {
-		httputil.WriteError(w, http.StatusBadRequest, "fanoutToken must be non-empty base64")
+	pushFanoutToken, err := base64.StdEncoding.DecodeString(req.PushFanoutToken)
+	if err != nil || len(pushFanoutToken) == 0 {
+		httputil.WriteError(w, http.StatusBadRequest, "pushFanoutToken must be non-empty base64")
 		return
 	}
 	payload, err := base64.StdEncoding.DecodeString(req.Payload)
@@ -55,14 +55,14 @@ func (h *FanoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusBadRequest, "payload must be non-empty base64")
 		return
 	}
-	if len(req.RoutingIDs) == 0 {
-		httputil.WriteError(w, http.StatusBadRequest, "routingIds is required")
+	if len(req.PushRoutingIDs) == 0 {
+		httputil.WriteError(w, http.StatusBadRequest, "pushRoutingIds is required")
 		return
 	}
 
-	result, err := h.Service.Fanout(r.Context(), req.RoutingIDs, fanoutToken, req.Category)
+	result, err := h.Service.Fanout(r.Context(), req.PushRoutingIDs, pushFanoutToken, req.Category)
 	if errors.Is(err, ErrTooManyTargets) {
-		httputil.WriteError(w, http.StatusBadRequest, "too many routingIds")
+		httputil.WriteError(w, http.StatusBadRequest, "too many pushRoutingIds")
 		return
 	}
 	if err != nil {

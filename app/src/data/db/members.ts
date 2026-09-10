@@ -30,7 +30,7 @@ function normalizeMember(member: Member): Member {
  * which upserts and writes the matching history row. Kept for test
  * fixtures that want a roster without a log behind it.
  */
-export async function insertMember(member: Member): Promise<void> {
+export async function insertMember(member: typeof circleMembers.$inferInsert): Promise<void> {
   await db.insert(circleMembers).values(member);
 }
 
@@ -80,4 +80,12 @@ export async function getCircleMemberCount(circleId: string): Promise<number> {
     .from(circleMembers)
     .where(and(eq(circleMembers.circleId, circleId), isNull(circleMembers.removedAt)));
   return rows[0]?.count ?? 0;
+}
+
+/** Records the push routing id a member published — see server/PUSH_DESIGN.md. */
+export async function setMemberPushRoutingId(circleId: string, identityPublicKey: string, pushRoutingId: string): Promise<void> {
+  await db
+    .update(circleMembers)
+    .set({ pushRoutingId })
+    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.identityPublicKey, identityPublicKey)));
 }

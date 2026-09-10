@@ -29,20 +29,20 @@ type Service struct {
 // ErrTooManyTargets is returned when a send exceeds MaxFanoutTargets.
 var ErrTooManyTargets = errors.New("push: too many fanout targets")
 
-func (s *Service) PutPrefs(ctx context.Context, routingID string, prefs pushstore.Prefs) error {
-	return s.PushStore.PutPrefs(ctx, routingID, prefs)
+func (s *Service) PutPrefs(ctx context.Context, pushRoutingID string, prefs pushstore.Prefs) error {
+	return s.PushStore.PutPrefs(ctx, pushRoutingID, prefs)
 }
 
-func (s *Service) PutDevice(ctx context.Context, routingID string, device pushstore.Device) error {
-	return s.PushStore.PutDevice(ctx, routingID, device)
+func (s *Service) PutDevice(ctx context.Context, pushRoutingID string, device pushstore.Device) error {
+	return s.PushStore.PutDevice(ctx, pushRoutingID, device)
 }
 
-func (s *Service) DeleteDevice(ctx context.Context, routingID, deviceID string) error {
-	return s.PushStore.DeleteDevice(ctx, routingID, deviceID)
+func (s *Service) DeleteDevice(ctx context.Context, pushRoutingID, deviceID string) error {
+	return s.PushStore.DeleteDevice(ctx, pushRoutingID, deviceID)
 }
 
-func (s *Service) DeleteRouting(ctx context.Context, routingID string) error {
-	return s.PushStore.DeleteRouting(ctx, routingID)
+func (s *Service) DeleteRouting(ctx context.Context, pushRoutingID string) error {
+	return s.PushStore.DeleteRouting(ctx, pushRoutingID)
 }
 
 // Delivery is one resolved target.
@@ -66,14 +66,14 @@ type FanoutResult struct {
 //
 // A failed target is skipped, never fatal: one recipient over budget must
 // not silence the rest of the circle.
-func (s *Service) Fanout(ctx context.Context, routingIDs []string, fanoutToken []byte, category int64) (FanoutResult, error) {
-	if len(routingIDs) > MaxFanoutTargets {
+func (s *Service) Fanout(ctx context.Context, pushRoutingIDs []string, pushFanoutToken []byte, category int64) (FanoutResult, error) {
+	if len(pushRoutingIDs) > MaxFanoutTargets {
 		return FanoutResult{}, ErrTooManyTargets
 	}
 
 	var result FanoutResult
-	for _, routingID := range routingIDs {
-		deliveries, err := s.resolve(ctx, routingID, fanoutToken, category)
+	for _, pushRoutingID := range pushRoutingIDs {
+		deliveries, err := s.resolve(ctx, pushRoutingID, pushFanoutToken, category)
 		if err != nil {
 			return FanoutResult{}, err
 		}
@@ -89,9 +89,9 @@ func (s *Service) Fanout(ctx context.Context, routingIDs []string, fanoutToken [
 // resolve returns one routing id's deliveries, or nil to skip. Only a
 // storage failure is an error — the caller must not learn which targets
 // were rejected, or why.
-func (s *Service) resolve(ctx context.Context, routingID string, fanoutToken []byte, category int64) ([]Delivery, error) {
-	prefs, err := s.PushStore.GetPrefs(ctx, routingID)
-	if errors.Is(err, pushstore.ErrRoutingNotFound) {
+func (s *Service) resolve(ctx context.Context, pushRoutingID string, pushFanoutToken []byte, category int64) ([]Delivery, error) {
+	prefs, err := s.PushStore.GetPrefs(ctx, pushRoutingID)
+	if errors.Is(err, pushstore.ErrPushRoutingNotFound) {
 		return nil, nil
 	}
 	if err != nil {
@@ -99,14 +99,14 @@ func (s *Service) resolve(ctx context.Context, routingID string, fanoutToken []b
 	}
 
 	// Constant time, or a caller could test tokens a byte at a time.
-	if !hmac.Equal(prefs.FanoutHash, FanoutHash(fanoutToken, routingID)) {
+	if !hmac.Equal(prefs.PushFanoutHash, PushFanoutHash(pushFanoutToken, pushRoutingID)) {
 		return nil, nil
 	}
 	if category < 0 || category > MaxCategory || prefs.CategoryMask&(1<<uint(category)) == 0 {
 		return nil, nil
 	}
 
-	allowed, err := s.RecipientLimit.Allow(ctx, routingID)
+	allowed, err := s.RecipientLimit.Allow(ctx, pushRoutingID)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (s *Service) resolve(ctx context.Context, routingID string, fanoutToken []b
 		return nil, nil
 	}
 
-	devices, err := s.PushStore.ListDevices(ctx, routingID)
+	devices, err := s.PushStore.ListDevices(ctx, pushRoutingID)
 	if err != nil {
 		return nil, err
 	}

@@ -30,6 +30,7 @@ const META_ENTRY_TYPES: OutboxEntry['entryType'][] = [
   EntryTypes.ROLE_CHANGE,
   EntryTypes.COVER_PHOTO_SET,
   EntryTypes.CIRCLE_RENAMED,
+  EntryTypes.PUSH_ENABLED,
   // Never actually queued — rotateLog's atomic write-token swap doesn't
   // fit the generic append path (see remove-member.ts) — but listed so
   // the mapping is right if it ever is.

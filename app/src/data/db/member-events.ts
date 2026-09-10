@@ -61,6 +61,8 @@ export type AddedMemberProfile = {
   role: MemberRole;
   name: string;
   picture: Uint8Array | null;
+  /** Push routing id, '' when this member had notifications off at join time. */
+  pushRoutingId?: string;
 };
 
 /**
@@ -143,6 +145,7 @@ export async function recordMemberAddedLocally(local: {
       identityPublicKey: subjectPublicKey,
       encPublicKey: profile.encPublicKey,
       memberId: profile.memberId,
+      pushRoutingId: profile.pushRoutingId ?? '',
       role: profile.role,
       name: profile.name,
       picture: profile.picture,

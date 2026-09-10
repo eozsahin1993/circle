@@ -11,13 +11,13 @@ import (
 	"errors"
 )
 
-// ErrRoutingNotFound means a routing id has no prefs row. Distinct from a
+// ErrPushRoutingNotFound means a routing id has no prefs row. Distinct from a
 // storage failure so a send to a stale id skips rather than fails.
-var ErrRoutingNotFound = errors.New("pushstore: routing id not registered")
+var ErrPushRoutingNotFound = errors.New("pushstore: routing id not registered")
 
 // Prefs is one routing id's control row.
 type Prefs struct {
-	FanoutHash []byte
+	PushFanoutHash []byte
 	// Enabled-bits, not disabled: a row written before a category existed
 	// has that bit unset, so a new category stays off until the device
 	// re-registers rather than switching itself on for everyone.
@@ -38,15 +38,15 @@ type Device struct {
 // Store persists one prefs row per routing id, plus a device row per
 // device wanting delivery under it.
 type Store interface {
-	PutPrefs(ctx context.Context, routingID string, prefs Prefs) error
-	GetPrefs(ctx context.Context, routingID string) (*Prefs, error)
+	PutPrefs(ctx context.Context, pushRoutingID string, prefs Prefs) error
+	GetPrefs(ctx context.Context, pushRoutingID string) (*Prefs, error)
 	// Independent of PutPrefs: re-registering a rotated push token must not
 	// restate the account's categories.
-	PutDevice(ctx context.Context, routingID string, device Device) error
+	PutDevice(ctx context.Context, pushRoutingID string, device Device) error
 	// Returns disabled rows too — a caller can then tell "no devices" from
 	// "all muted" without a second read.
-	ListDevices(ctx context.Context, routingID string) ([]Device, error)
-	DeleteDevice(ctx context.Context, routingID, deviceID string) error
+	ListDevices(ctx context.Context, pushRoutingID string) ([]Device, error)
+	DeleteDevice(ctx context.Context, pushRoutingID, deviceID string) error
 	// Prefs and every device row with it. Idempotent.
-	DeleteRouting(ctx context.Context, routingID string) error
+	DeleteRouting(ctx context.Context, pushRoutingID string) error
 }

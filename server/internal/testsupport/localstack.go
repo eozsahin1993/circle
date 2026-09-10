@@ -16,6 +16,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -105,9 +106,14 @@ func UniqueAccountID(t testing.TB) string {
 // UniqueInviteTag returns an opaque string standing in for hash(invite_code)
 // — for adapter-level tests that only care about key uniqueness, not about
 // how a real invite tag is derived (see server/INVITE_FLOW.md).
+// The counter, not just the clock: two calls in one statement can land on
+// the same tick, and callers that need two distinct tags usually write them
+// exactly that way.
+var uniqueTagCounter atomic.Uint64
+
 func UniqueInviteTag(t testing.TB) string {
 	t.Helper()
-	return fmt.Sprintf("invite-%s-%d", t.Name(), time.Now().UnixNano())
+	return fmt.Sprintf("invite-%s-%d-%d", t.Name(), time.Now().UnixNano(), uniqueTagCounter.Add(1))
 }
 
 func loadConfig(t testing.TB) aws.Config {

@@ -5,6 +5,7 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import {
   deriveAuthorityKeypair,
   deriveCircleIdentity,
+  derivePushRoutingId,
   deriveCircleSealingKeypair,
   deriveWriteToken,
   generateContentKey,
@@ -80,6 +81,9 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
       sealedContentKey: bytesToHex(sealToPublicKey(contentKey, sealingKeypair.publicKey)),
       picture: pictureThumbnail,
       createdAt: now,
+      // On the entry, not just the local row: a joiner walks meta from
+      // epoch 0 and this is the only place they learn the founder's.
+      pushRoutingId: derivePushRoutingId(masterSeed, circleId),
     },
     identity,
     contentKey
@@ -122,6 +126,7 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
     profile: {
       encPublicKey: bytesToHex(sealingKeypair.publicKey),
       memberId,
+      pushRoutingId: derivePushRoutingId(masterSeed, circleId),
       role: MemberRoles.admin,
       name: profile?.name ?? '',
       picture: profile?.picture ?? null,

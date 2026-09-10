@@ -43,6 +43,12 @@ export const circleMembers = sqliteTable(
      * `ALTER TABLE ADD COLUMN` stays valid against existing rows.
      */
     encPublicKey: text('enc_public_key').notNull().default(''),
+    /**
+     * This member's push routing id (hex) — see server/PUSH_DESIGN.md.
+     * Empty until they publish one, which is also how a member who has
+     * never opted into notifications stays untargetable.
+     */
+    pushRoutingId: text('push_routing_id').notNull().default(''),
     memberId: text('member_id').notNull(),
     role: text('role', { enum: ['admin', 'member'] }).notNull().default('member'),
     name: text('name').notNull(),
@@ -344,6 +350,7 @@ export const outbox = sqliteTable(
         'circle_renamed',
         'album_visibility',
         'post_delete',
+        'push_enabled',
       ],
     }).notNull(),
     /**

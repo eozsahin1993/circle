@@ -1,0 +1,121 @@
+import { bytesToHex } from '@noble/curves/utils.js';
+
+import { getCircleMembers, insertOutboxEntry, OutboxStatuses, setMemberPushRoutingId } from '@/data/db';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
+import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
+import {
+  derivePushDeviceId,
+  derivePushFanoutHash,
+  derivePushFanoutToken,
+  derivePushRoutingId,
+  generateUUID,
+} from '@/services/crypto';
+import { getCircleIdentity, getCurrentContentKey, getMasterSeed, getPushDeviceSecret } from '@/services/keystore';
+import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/services/push-relay';
+
+/**
+ * Registering this account and device for a circle's notifications, and
+ * publishing where to reach them — see server/PUSH_DESIGN.md.
+ *
+ * Two halves that must both happen: the relay learns where to deliver
+ * (`putPushPrefs`/`putPushDevice`), and the circle learns this account's
+ * routing id (a `push_enabled` entry, since senders read it from their
+ * own roster).
+ */
+
+/**
+ * The notification kinds a category id names. Bit positions in the relay's
+ * mask, so these values are permanent — add to the end, never renumber.
+ */
+export const PushCategories = {
+  newPhoto: 0,
+  commentOrReaction: 1,
+  memberJoined: 2,
+} as const;
+
+export type PushCategory = (typeof PushCategories)[keyof typeof PushCategories];
+
+export type PushRegistration = {
+  /** Native push token bytes, from the platform SDK. */
+  pushToken: Uint8Array;
+  platform: 'ios' | 'android';
+  categories: PushCategory[];
+};
+
+/**
+ * Registers one circle. Re-run after a key rotation: the fanout token
+ * follows the current content key, so a stale registration stops
+ * verifying and this device quietly goes dark until it re-registers.
+ */
+export async function registerPushForCircle(circleId: string, registration: PushRegistration): Promise<void> {
+  const masterSeed = await getMasterSeed();
+  const current = await getCurrentContentKey(circleId);
+  if (!masterSeed || !current) return;
+
+  const pushRoutingId = derivePushRoutingId(masterSeed, circleId);
+  const pushFanoutToken = derivePushFanoutToken(current.key);
+  const deviceId = derivePushDeviceId(await getPushDeviceSecret(), pushRoutingId);
+
+  await putPushPrefs(pushRoutingId, derivePushFanoutHash(pushFanoutToken, pushRoutingId), registration.categories, current.version);
+  await putPushDevice(pushRoutingId, deviceId, registration.pushToken, registration.platform, true);
+  await publishPushRoutingId(circleId, pushRoutingId);
+}
+
+/**
+ * Tells the circle where to reach this account. Queued through the outbox
+ * like every other meta write, so an offline device still gets there.
+ *
+ * Skipped when the roster already agrees: this runs on every launch, and
+ * a routing id only changes if the seed does.
+ */
+async function publishPushRoutingId(circleId: string, pushRoutingId: string): Promise<void> {
+  const identity = await getCircleIdentity(circleId);
+  const current = await getCurrentContentKey(circleId);
+  if (!identity || !current) return;
+
+  const ownPublicKey = bytesToHex(identity.publicKey);
+  const members = await getCircleMembers(circleId);
+  if (members.some((member) => member.identityPublicKey === ownPublicKey && member.pushRoutingId === pushRoutingId)) return;
+
+  const entry = buildAndEncryptLogEntry(
+    EntryTypes.PUSH_ENABLED,
+    { pushRoutingId, createdAt: Date.now() },
+    identity,
+    current.key,
+  );
+  await insertOutboxEntry({
+    circleId,
+    entryType: EntryTypes.PUSH_ENABLED,
+    entryId: generateUUID(),
+    status: OutboxStatuses.pending,
+    epoch: null,
+    blobEntryId: null,
+    encryptedMeta: entry,
+  });
+  await setMemberPushRoutingId(circleId, ownPublicKey, pushRoutingId);
+
+  drainOutbox(circleId).catch((err) => console.error('Failed to drain outbox', err));
+}
+
+/** Stops this one device receiving a circle's notifications. Others keep theirs. */
+export async function unregisterDeviceForCircle(circleId: string): Promise<void> {
+  const masterSeed = await getMasterSeed();
+  if (!masterSeed) return;
+
+  const pushRoutingId = derivePushRoutingId(masterSeed, circleId);
+  await deletePushDevice(pushRoutingId, derivePushDeviceId(await getPushDeviceSecret(), pushRoutingId));
+}
+
+/**
+ * Silences a circle for every device on this account.
+ *
+ * Enforced by unregistering rather than by filtering on arrival: iOS shows
+ * a card for any delivered alert push, so the only way to show nothing is
+ * for nothing to be delivered.
+ */
+export async function silenceCircle(circleId: string): Promise<void> {
+  const masterSeed = await getMasterSeed();
+  if (!masterSeed) return;
+
+  await deletePushRouting(derivePushRoutingId(masterSeed, circleId));
+}

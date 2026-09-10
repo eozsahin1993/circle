@@ -19,22 +19,22 @@ type fakeStore struct {
 
 func (f *fakeStore) PutPrefs(context.Context, string, pushstore.Prefs) error { return nil }
 
-func (f *fakeStore) GetPrefs(_ context.Context, routingID string) (*pushstore.Prefs, error) {
+func (f *fakeStore) GetPrefs(_ context.Context, pushRoutingID string) (*pushstore.Prefs, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
-	prefs, ok := f.prefs[routingID]
+	prefs, ok := f.prefs[pushRoutingID]
 	if !ok {
-		return nil, pushstore.ErrRoutingNotFound
+		return nil, pushstore.ErrPushRoutingNotFound
 	}
 	return &prefs, nil
 }
 
 func (f *fakeStore) PutDevice(context.Context, string, pushstore.Device) error { return nil }
 
-func (f *fakeStore) ListDevices(_ context.Context, routingID string) ([]pushstore.Device, error) {
+func (f *fakeStore) ListDevices(_ context.Context, pushRoutingID string) ([]pushstore.Device, error) {
 	f.listCalls++
-	return f.devices[routingID], nil
+	return f.devices[pushRoutingID], nil
 }
 
 func (f *fakeStore) DeleteDevice(context.Context, string, string) error { return nil }
@@ -58,8 +58,8 @@ func newService(t *testing.T, limit *countingLimit) (*Service, *fakeStore) {
 	t.Helper()
 	store := &fakeStore{
 		prefs: map[string]pushstore.Prefs{
-			"routing-a": {FanoutHash: FanoutHash([]byte(token), "routing-a"), CategoryMask: 0b011},
-			"routing-b": {FanoutHash: FanoutHash([]byte(token), "routing-b"), CategoryMask: 0b011},
+			"routing-a": {PushFanoutHash: PushFanoutHash([]byte(token), "routing-a"), CategoryMask: 0b011},
+			"routing-b": {PushFanoutHash: PushFanoutHash([]byte(token), "routing-b"), CategoryMask: 0b011},
 		},
 		devices: map[string][]pushstore.Device{
 			"routing-a": {{DeviceID: "d1", PushToken: []byte("t1"), Platform: "ios", Enabled: true}},
@@ -100,8 +100,8 @@ func TestFanout_HashIsBoundToItsRoutingID(t *testing.T) {
 	service, store := newService(t, &countingLimit{allow: true})
 	// Give routing-b the hash that belongs to routing-a.
 	store.prefs["routing-b"] = pushstore.Prefs{
-		FanoutHash:   FanoutHash([]byte(token), "routing-a"),
-		CategoryMask: 0b011,
+		PushFanoutHash: PushFanoutHash([]byte(token), "routing-a"),
+		CategoryMask:   0b011,
 	}
 
 	result, err := service.Fanout(context.Background(), []string{"routing-b"}, []byte(token), 0)

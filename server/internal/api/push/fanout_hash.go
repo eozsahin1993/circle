@@ -2,7 +2,7 @@ package push
 
 import "crypto/sha256"
 
-// FanoutHash is sha256(fanoutToken || routingId) — stored on the prefs
+// PushFanoutHash is sha256(pushFanoutToken || pushRoutingId) — stored on the prefs
 // row, recomputed on each send.
 //
 // Salted by routing id because every member of a circle derives the same
@@ -10,9 +10,9 @@ import "crypto/sha256"
 // rows and cluster its membership straight out of a table scan.
 //
 // Clients compute this too, so the concatenation order is contract.
-func FanoutHash(fanoutToken []byte, routingID string) []byte {
+func PushFanoutHash(pushFanoutToken []byte, pushRoutingID string) []byte {
 	sum := sha256.New()
-	sum.Write(fanoutToken)
-	sum.Write([]byte(routingID))
+	sum.Write(pushFanoutToken)
+	sum.Write([]byte(pushRoutingID))
 	return sum.Sum(nil)
 }

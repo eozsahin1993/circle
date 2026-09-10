@@ -26,6 +26,8 @@ type MemberAddedPayload = {
    * which fall back to receipt time (see `apply`).
    */
   createdAt?: number;
+  /** Empty when this member had notifications off at join time. */
+  pushRoutingId: string;
 };
 
 function parse(payload: unknown): MemberAddedPayload | null {
@@ -43,6 +45,11 @@ function parse(payload: unknown): MemberAddedPayload | null {
     role: role as MemberRole,
     picture: parsePictureThumbnail(record.picture) ?? undefined,
     createdAt: numberField(record, 'createdAt') ?? undefined,
+    // Tolerant, never rejecting: entries written before push existed have
+    // no pushRoutingId, and a check here would drop them forever on replay
+    // (server/SYNC_DESIGN.md invariant 1). Absent means "not reachable
+    // yet", which a later push_enabled entry fills in.
+    pushRoutingId: typeof record.pushRoutingId === 'string' && /^[0-9a-f]{64}$/.test(record.pushRoutingId) ? record.pushRoutingId : '',
   };
 }
 
@@ -112,6 +119,7 @@ export const memberAddedHandler: EntryHandler = {
         role: payload.role,
         name: payload.name,
         picture: payload.picture ?? null,
+        pushRoutingId: payload.pushRoutingId,
       },
     });
   },

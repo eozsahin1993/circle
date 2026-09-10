@@ -64,6 +64,14 @@ export type JoinRequestPayload = {
    * handshake and is discarded after it.
    */
   encPublicKey: string;
+  /**
+   * Hex push routing id (see server/PUSH_DESIGN.md), carried so the
+   * approver can put it on `member_added` and this member is reachable
+   * from the moment they join. Always sent, whether or not notifications
+   * are on yet: it only names where to deliver, and the relay drops a
+   * target with no registration behind it.
+   */
+  pushRoutingId?: string;
   selfReportedName: string;
   /**
    * Base64-encoded avatar-sized JPEG thumbnail (see

@@ -22,6 +22,7 @@ export const EntryTypes = {
   CIRCLE_RENAMED: 'circle_renamed',
   ALBUM_VISIBILITY: 'album_visibility',
   POST_DELETE: 'post_delete',
+  PUSH_ENABLED: 'push_enabled',
 } as const;
 
 export type EntryType = (typeof EntryTypes)[keyof typeof EntryTypes];

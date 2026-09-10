@@ -15,9 +15,9 @@ import (
 const MaxPushTokenBytes = 4096
 
 type putPrefsRequest struct {
-	// Base64 sha256(fanoutToken || routingId), computed client-side. The
+	// Base64 sha256(pushFanoutToken || pushRoutingId), computed client-side. The
 	// relay never holds the token itself.
-	FanoutHash string `json:"fanoutHash"`
+	PushFanoutHash string `json:"pushFanoutHash"`
 	// A list, not the bitmask it becomes: encoding the mask client-side
 	// would pin the storage format into the wire contract.
 	Categories []int64 `json:"categories"`
@@ -49,7 +49,7 @@ type PutPrefsHandler struct {
 }
 
 func (h *PutPrefsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	routingID := r.PathValue("routingId")
+	pushRoutingID := r.PathValue("pushRoutingId")
 
 	var req putPrefsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -57,15 +57,15 @@ func (h *PutPrefsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fanoutHash, err := base64.StdEncoding.DecodeString(req.FanoutHash)
+	pushFanoutHash, err := base64.StdEncoding.DecodeString(req.PushFanoutHash)
 	if err != nil {
-		httputil.WriteError(w, http.StatusBadRequest, "fanoutHash must be base64-encoded")
+		httputil.WriteError(w, http.StatusBadRequest, "pushFanoutHash must be base64-encoded")
 		return
 	}
 	// Exactly sha256's width: a short hash still compares equal to itself,
 	// so a one-byte "hash" would be forgeable by guessing a byte.
-	if len(fanoutHash) != 32 {
-		httputil.WriteError(w, http.StatusBadRequest, "fanoutHash must be 32 bytes")
+	if len(pushFanoutHash) != 32 {
+		httputil.WriteError(w, http.StatusBadRequest, "pushFanoutHash must be 32 bytes")
 		return
 	}
 	categoryMask, err := packCategories(req.Categories)
@@ -74,8 +74,8 @@ func (h *PutPrefsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prefs := pushstore.Prefs{FanoutHash: fanoutHash, CategoryMask: categoryMask, KeyVersion: req.KeyVersion}
-	if err := h.Service.PutPrefs(r.Context(), routingID, prefs); err != nil {
+	prefs := pushstore.Prefs{PushFanoutHash: pushFanoutHash, CategoryMask: categoryMask, KeyVersion: req.KeyVersion}
+	if err := h.Service.PutPrefs(r.Context(), pushRoutingID, prefs); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to store push preferences")
 		return
 	}
@@ -95,7 +95,7 @@ type PutDeviceHandler struct {
 }
 
 func (h *PutDeviceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	routingID := r.PathValue("routingId")
+	pushRoutingID := r.PathValue("pushRoutingId")
 	deviceID := r.PathValue("deviceId")
 
 	var req putDeviceRequest
@@ -128,7 +128,7 @@ func (h *PutDeviceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Platform:  req.Platform,
 		Enabled:   req.Enabled,
 	}
-	if err := h.Service.PutDevice(r.Context(), routingID, device); err != nil {
+	if err := h.Service.PutDevice(r.Context(), pushRoutingID, device); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to store push device")
 		return
 	}
@@ -141,7 +141,7 @@ type DeleteDeviceHandler struct {
 }
 
 func (h *DeleteDeviceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := h.Service.DeleteDevice(r.Context(), r.PathValue("routingId"), r.PathValue("deviceId")); err != nil {
+	if err := h.Service.DeleteDevice(r.Context(), r.PathValue("pushRoutingId"), r.PathValue("deviceId")); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to remove push device")
 		return
 	}
@@ -154,7 +154,7 @@ type DeleteRoutingHandler struct {
 }
 
 func (h *DeleteRoutingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := h.Service.DeleteRouting(r.Context(), r.PathValue("routingId")); err != nil {
+	if err := h.Service.DeleteRouting(r.Context(), r.PathValue("pushRoutingId")); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to remove push routing")
 		return
 	}

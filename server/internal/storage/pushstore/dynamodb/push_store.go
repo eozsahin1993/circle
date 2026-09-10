@@ -1,5 +1,5 @@
 // Package dynamodb implements pushstore.Store. Same single-table shape as
-// invitestore/dynamodb: PK = routingId, SK splits prefs from device rows.
+// invitestore/dynamodb: PK = pushRoutingId, SK splits prefs from device rows.
 //
 // No TTL, unlike the invite table: a routing id is how a device stays
 // reachable between posts, not a handoff that expires.
@@ -40,13 +40,13 @@ func New(client *dynamodb.Client, tableName string) *Store {
 
 var _ pushstore.Store = (*Store)(nil)
 
-func (s *Store) PutPrefs(ctx context.Context, routingID string, prefs pushstore.Prefs) error {
+func (s *Store) PutPrefs(ctx context.Context, pushRoutingID string, prefs pushstore.Prefs) error {
 	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(s.tableName),
 		Item: map[string]types.AttributeValue{
-			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: routingID},
+			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: pushRoutingID},
 			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: prefsSK},
-			"fanoutHash":      &types.AttributeValueMemberB{Value: prefs.FanoutHash},
+			"pushFanoutHash":  &types.AttributeValueMemberB{Value: prefs.PushFanoutHash},
 			"categoryMask":    &types.AttributeValueMemberN{Value: strconv.FormatInt(prefs.CategoryMask, 10)},
 			"keyVersion":      &types.AttributeValueMemberN{Value: strconv.FormatInt(prefs.KeyVersion, 10)},
 		},
@@ -57,11 +57,11 @@ func (s *Store) PutPrefs(ctx context.Context, routingID string, prefs pushstore.
 	return nil
 }
 
-func (s *Store) GetPrefs(ctx context.Context, routingID string) (*pushstore.Prefs, error) {
+func (s *Store) GetPrefs(ctx context.Context, pushRoutingID string) (*pushstore.Prefs, error) {
 	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
-			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: routingID},
+			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: pushRoutingID},
 			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: prefsSK},
 		},
 	})
@@ -69,37 +69,37 @@ func (s *Store) GetPrefs(ctx context.Context, routingID string) (*pushstore.Pref
 		return nil, fmt.Errorf("get push prefs: %w", err)
 	}
 	if out.Item == nil {
-		return nil, pushstore.ErrRoutingNotFound
+		return nil, pushstore.ErrPushRoutingNotFound
 	}
 
 	// A row missing these wasn't written by this code — reading it as
 	// zeroes would authorize an empty token.
-	fanoutHash, ok := dynamoutil.AttrBytes(out.Item, "fanoutHash")
+	pushFanoutHash, ok := dynamoutil.AttrBytes(out.Item, "pushFanoutHash")
 	if !ok {
-		return nil, fmt.Errorf("push prefs row for %q has no fanoutHash", routingID)
+		return nil, fmt.Errorf("push prefs row for %q has no pushFanoutHash", pushRoutingID)
 	}
 	categoryMask, err := dynamoutil.AttrInt(out.Item, "categoryMask")
 	if err != nil {
-		return nil, fmt.Errorf("push prefs row for %q: %w", routingID, err)
+		return nil, fmt.Errorf("push prefs row for %q: %w", pushRoutingID, err)
 	}
 	keyVersion, err := dynamoutil.AttrInt(out.Item, "keyVersion")
 	if err != nil {
-		return nil, fmt.Errorf("push prefs row for %q: %w", routingID, err)
+		return nil, fmt.Errorf("push prefs row for %q: %w", pushRoutingID, err)
 	}
 
 	prefs := pushstore.Prefs{
-		FanoutHash:   fanoutHash,
-		CategoryMask: categoryMask,
-		KeyVersion:   keyVersion,
+		PushFanoutHash: pushFanoutHash,
+		CategoryMask:   categoryMask,
+		KeyVersion:     keyVersion,
 	}
 	return &prefs, nil
 }
 
-func (s *Store) PutDevice(ctx context.Context, routingID string, device pushstore.Device) error {
+func (s *Store) PutDevice(ctx context.Context, pushRoutingID string, device pushstore.Device) error {
 	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(s.tableName),
 		Item: map[string]types.AttributeValue{
-			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: routingID},
+			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: pushRoutingID},
 			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: deviceSK(device.DeviceID)},
 			"pushToken":       &types.AttributeValueMemberB{Value: device.PushToken},
 			"platform":        &types.AttributeValueMemberS{Value: device.Platform},
@@ -112,12 +112,12 @@ func (s *Store) PutDevice(ctx context.Context, routingID string, device pushstor
 	return nil
 }
 
-func (s *Store) ListDevices(ctx context.Context, routingID string) ([]pushstore.Device, error) {
+func (s *Store) ListDevices(ctx context.Context, pushRoutingID string) ([]pushstore.Device, error) {
 	out, err := s.client.Query(ctx, &dynamodb.QueryInput{
 		TableName:              aws.String(s.tableName),
 		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :pk AND begins_with(%s, :prefix)", dynamoutil.PKAttr, dynamoutil.SKAttr)),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pk":     &types.AttributeValueMemberS{Value: routingID},
+			":pk":     &types.AttributeValueMemberS{Value: pushRoutingID},
 			":prefix": &types.AttributeValueMemberS{Value: deviceSKPrefix},
 		},
 	})
@@ -146,11 +146,11 @@ func (s *Store) ListDevices(ctx context.Context, routingID string) ([]pushstore.
 	return devices, nil
 }
 
-func (s *Store) DeleteDevice(ctx context.Context, routingID, deviceID string) error {
+func (s *Store) DeleteDevice(ctx context.Context, pushRoutingID, deviceID string) error {
 	_, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
-			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: routingID},
+			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: pushRoutingID},
 			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: deviceSK(deviceID)},
 		},
 	})
@@ -162,15 +162,15 @@ func (s *Store) DeleteDevice(ctx context.Context, routingID, deviceID string) er
 
 // Not transactional. A partial failure orphans device rows, which is
 // harmless: a send reads prefs first, so they're already unreachable.
-func (s *Store) DeleteRouting(ctx context.Context, routingID string) error {
-	devices, err := s.ListDevices(ctx, routingID)
+func (s *Store) DeleteRouting(ctx context.Context, pushRoutingID string) error {
+	devices, err := s.ListDevices(ctx, pushRoutingID)
 	if err != nil {
 		return err
 	}
 
 	var errs []error
 	for _, device := range devices {
-		if err := s.DeleteDevice(ctx, routingID, device.DeviceID); err != nil {
+		if err := s.DeleteDevice(ctx, pushRoutingID, device.DeviceID); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -178,7 +178,7 @@ func (s *Store) DeleteRouting(ctx context.Context, routingID string) error {
 	_, err = s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
-			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: routingID},
+			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: pushRoutingID},
 			dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: prefsSK},
 		},
 	})

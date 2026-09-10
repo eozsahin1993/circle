@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
+import { bytesToHex, hexToBytes, randomBytes } from '@noble/curves/utils.js';
 
 import type { Keypair } from '@/services/crypto';
 
@@ -171,4 +171,22 @@ export async function getAuthToken(): Promise<string | null> {
 /** Removes the stored session token — logout, or before signing in again with a different account. */
 export async function deleteAuthToken(): Promise<void> {
   await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+}
+
+const PUSH_DEVICE_SECRET_KEY = 'push_device_secret';
+
+/**
+ * This device's push secret, generated on first use — see
+ * server/PUSH_DESIGN.md. Every device id derives from it, so it must not
+ * come from the master seed: devices share that after a transfer and would
+ * all produce the same id, which is exactly what lets the relay group
+ * them.
+ */
+export async function getPushDeviceSecret(): Promise<Uint8Array> {
+  const stored = await SecureStore.getItemAsync(PUSH_DEVICE_SECRET_KEY);
+  if (stored) return hexToBytes(stored);
+
+  const secret = randomBytes(32);
+  await SecureStore.setItemAsync(PUSH_DEVICE_SECRET_KEY, bytesToHex(secret));
+  return secret;
 }

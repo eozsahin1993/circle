@@ -216,7 +216,7 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   if (!request) throw new Error('That join request is no longer available.');
 
   const requestKey = deriveJoinRequestKey(invite.code);
-  const { ephemeralPublicKey, identityPublicKey, encPublicKey, selfReportedName, pictureThumbnail } = JSON.parse(
+  const { ephemeralPublicKey, identityPublicKey, encPublicKey, pushRoutingId, selfReportedName, pictureThumbnail } = JSON.parse(
     new TextDecoder().decode(decrypt(request.encryptedRequest, requestKey))
   ) as JoinRequestPayload;
   // Validated once here, not trusted as-is — a requester's own device is
@@ -267,6 +267,9 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
       keyVersion: currentVersion,
       picture: picturePayload,
       createdAt: joinedAt,
+      // Copied from the request, not derived: only the joiner's own seed
+      // produces it.
+      pushRoutingId,
     },
     identity,
     keyMap[currentVersion]

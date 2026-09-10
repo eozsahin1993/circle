@@ -15,24 +15,24 @@ func newStore(t *testing.T) pushstore.Store {
 }
 
 func samplePrefs() pushstore.Prefs {
-	return pushstore.Prefs{FanoutHash: []byte("thirty-two-bytes-of-hash-here!!!"), CategoryMask: 0b101, KeyVersion: 3}
+	return pushstore.Prefs{PushFanoutHash: []byte("thirty-two-bytes-of-hash-here!!!"), CategoryMask: 0b101, KeyVersion: 3}
 }
 
 func TestPrefsRoundTrip(t *testing.T) {
 	store := newStore(t)
-	routingID := testsupport.UniqueInviteTag(t)
+	pushRoutingID := testsupport.UniqueInviteTag(t)
 	ctx := context.Background()
 
-	if err := store.PutPrefs(ctx, routingID, samplePrefs()); err != nil {
+	if err := store.PutPrefs(ctx, pushRoutingID, samplePrefs()); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := store.GetPrefs(ctx, routingID)
+	got, err := store.GetPrefs(ctx, pushRoutingID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got.FanoutHash) != string(samplePrefs().FanoutHash) {
-		t.Fatalf("fanoutHash did not round-trip: %q", got.FanoutHash)
+	if string(got.PushFanoutHash) != string(samplePrefs().PushFanoutHash) {
+		t.Fatalf("pushFanoutHash did not round-trip: %q", got.PushFanoutHash)
 	}
 	if got.CategoryMask != 0b101 || got.KeyVersion != 3 {
 		t.Fatalf("expected mask 0b101 and version 3, got %b and %d", got.CategoryMask, got.KeyVersion)
@@ -43,48 +43,48 @@ func TestGetPrefsUnregistered(t *testing.T) {
 	store := newStore(t)
 
 	_, err := store.GetPrefs(context.Background(), testsupport.UniqueInviteTag(t))
-	if !errors.Is(err, pushstore.ErrRoutingNotFound) {
-		t.Fatalf("expected ErrRoutingNotFound, got %v", err)
+	if !errors.Is(err, pushstore.ErrPushRoutingNotFound) {
+		t.Fatalf("expected ErrPushRoutingNotFound, got %v", err)
 	}
 }
 
 // A rotation rewrites prefs in place; the old hash must not survive.
 func TestPutPrefsReplaces(t *testing.T) {
 	store := newStore(t)
-	routingID := testsupport.UniqueInviteTag(t)
+	pushRoutingID := testsupport.UniqueInviteTag(t)
 	ctx := context.Background()
 
-	if err := store.PutPrefs(ctx, routingID, samplePrefs()); err != nil {
+	if err := store.PutPrefs(ctx, pushRoutingID, samplePrefs()); err != nil {
 		t.Fatal(err)
 	}
-	rotated := pushstore.Prefs{FanoutHash: []byte("a-completely-different-hash-here"), CategoryMask: 0b1, KeyVersion: 4}
-	if err := store.PutPrefs(ctx, routingID, rotated); err != nil {
+	rotated := pushstore.Prefs{PushFanoutHash: []byte("a-completely-different-hash-here"), CategoryMask: 0b1, KeyVersion: 4}
+	if err := store.PutPrefs(ctx, pushRoutingID, rotated); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := store.GetPrefs(ctx, routingID)
+	got, err := store.GetPrefs(ctx, pushRoutingID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got.FanoutHash) != string(rotated.FanoutHash) || got.KeyVersion != 4 {
+	if string(got.PushFanoutHash) != string(rotated.PushFanoutHash) || got.KeyVersion != 4 {
 		t.Fatalf("expected the rotated prefs, got version %d", got.KeyVersion)
 	}
 }
 
 func TestDevicesRoundTrip(t *testing.T) {
 	store := newStore(t)
-	routingID := testsupport.UniqueInviteTag(t)
+	pushRoutingID := testsupport.UniqueInviteTag(t)
 	ctx := context.Background()
 
 	phone := pushstore.Device{DeviceID: "phone", PushToken: []byte("enc-phone"), Platform: "ios", Enabled: true}
 	tablet := pushstore.Device{DeviceID: "tablet", PushToken: []byte("enc-tablet"), Platform: "android", Enabled: false}
 	for _, device := range []pushstore.Device{phone, tablet} {
-		if err := store.PutDevice(ctx, routingID, device); err != nil {
+		if err := store.PutDevice(ctx, pushRoutingID, device); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	devices, err := store.ListDevices(ctx, routingID)
+	devices, err := store.ListDevices(ctx, pushRoutingID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,14 +110,14 @@ func TestDevicesRoundTrip(t *testing.T) {
 // sort-key prefix would have ListDevices return the prefs row as a device.
 func TestListDevicesExcludesPrefsRow(t *testing.T) {
 	store := newStore(t)
-	routingID := testsupport.UniqueInviteTag(t)
+	pushRoutingID := testsupport.UniqueInviteTag(t)
 	ctx := context.Background()
 
-	if err := store.PutPrefs(ctx, routingID, samplePrefs()); err != nil {
+	if err := store.PutPrefs(ctx, pushRoutingID, samplePrefs()); err != nil {
 		t.Fatal(err)
 	}
 
-	devices, err := store.ListDevices(ctx, routingID)
+	devices, err := store.ListDevices(ctx, pushRoutingID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,17 +146,17 @@ func TestListDevicesIsScopedToItsRoutingID(t *testing.T) {
 
 func TestDeleteDevice(t *testing.T) {
 	store := newStore(t)
-	routingID := testsupport.UniqueInviteTag(t)
+	pushRoutingID := testsupport.UniqueInviteTag(t)
 	ctx := context.Background()
 
-	if err := store.PutDevice(ctx, routingID, pushstore.Device{DeviceID: "phone", PushToken: []byte("t"), Enabled: true}); err != nil {
+	if err := store.PutDevice(ctx, pushRoutingID, pushstore.Device{DeviceID: "phone", PushToken: []byte("t"), Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.DeleteDevice(ctx, routingID, "phone"); err != nil {
+	if err := store.DeleteDevice(ctx, pushRoutingID, "phone"); err != nil {
 		t.Fatal(err)
 	}
 
-	devices, err := store.ListDevices(ctx, routingID)
+	devices, err := store.ListDevices(ctx, pushRoutingID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,33 +165,33 @@ func TestDeleteDevice(t *testing.T) {
 	}
 
 	// Idempotent: unregistering twice is a normal retry.
-	if err := store.DeleteDevice(ctx, routingID, "phone"); err != nil {
+	if err := store.DeleteDevice(ctx, pushRoutingID, "phone"); err != nil {
 		t.Fatalf("deleting an absent device should succeed: %v", err)
 	}
 }
 
 func TestDeleteRoutingRemovesPrefsAndDevices(t *testing.T) {
 	store := newStore(t)
-	routingID := testsupport.UniqueInviteTag(t)
+	pushRoutingID := testsupport.UniqueInviteTag(t)
 	ctx := context.Background()
 
-	if err := store.PutPrefs(ctx, routingID, samplePrefs()); err != nil {
+	if err := store.PutPrefs(ctx, pushRoutingID, samplePrefs()); err != nil {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"phone", "tablet"} {
-		if err := store.PutDevice(ctx, routingID, pushstore.Device{DeviceID: id, PushToken: []byte("t"), Enabled: true}); err != nil {
+		if err := store.PutDevice(ctx, pushRoutingID, pushstore.Device{DeviceID: id, PushToken: []byte("t"), Enabled: true}); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	if err := store.DeleteRouting(ctx, routingID); err != nil {
+	if err := store.DeleteRouting(ctx, pushRoutingID); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := store.GetPrefs(ctx, routingID); !errors.Is(err, pushstore.ErrRoutingNotFound) {
+	if _, err := store.GetPrefs(ctx, pushRoutingID); !errors.Is(err, pushstore.ErrPushRoutingNotFound) {
 		t.Fatalf("expected the prefs row gone, got %v", err)
 	}
-	devices, err := store.ListDevices(ctx, routingID)
+	devices, err := store.ListDevices(ctx, pushRoutingID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +199,7 @@ func TestDeleteRoutingRemovesPrefsAndDevices(t *testing.T) {
 		t.Fatalf("expected every device row gone, got %+v", devices)
 	}
 
-	if err := store.DeleteRouting(ctx, routingID); err != nil {
+	if err := store.DeleteRouting(ctx, pushRoutingID); err != nil {
 		t.Fatalf("deleting absent routing should succeed: %v", err)
 	}
 }
@@ -208,17 +208,17 @@ func TestDeleteRoutingRemovesPrefsAndDevices(t *testing.T) {
 // categories — the two rows are written independently on purpose.
 func TestPutDeviceLeavesPrefsAlone(t *testing.T) {
 	store := newStore(t)
-	routingID := testsupport.UniqueInviteTag(t)
+	pushRoutingID := testsupport.UniqueInviteTag(t)
 	ctx := context.Background()
 
-	if err := store.PutPrefs(ctx, routingID, samplePrefs()); err != nil {
+	if err := store.PutPrefs(ctx, pushRoutingID, samplePrefs()); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.PutDevice(ctx, routingID, pushstore.Device{DeviceID: "phone", PushToken: []byte("t"), Enabled: true}); err != nil {
+	if err := store.PutDevice(ctx, pushRoutingID, pushstore.Device{DeviceID: "phone", PushToken: []byte("t"), Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := store.GetPrefs(ctx, routingID)
+	got, err := store.GetPrefs(ctx, pushRoutingID)
 	if err != nil {
 		t.Fatal(err)
 	}

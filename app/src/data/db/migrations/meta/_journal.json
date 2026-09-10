@@ -78,6 +78,13 @@
       "when": 1788879769564,
       "tag": "0010_chilly_the_anarchist",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1789057603583,
+      "tag": "0011_bright_monster_badoon",
+      "breakpoints": true
     }
   ]
 }

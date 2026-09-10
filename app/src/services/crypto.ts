@@ -299,6 +299,54 @@ export function deriveJoinRequestKey(inviteCode: string): Uint8Array {
   return hkdf(sha256, new TextEncoder().encode(inviteCode), undefined, JOIN_REQUEST_KEY_DOMAIN, 32);
 }
 
+const PUSH_ENABLED_DOMAIN = new TextEncoder().encode('push-enabled');
+const PUSH_DEVICE_DOMAIN = new TextEncoder().encode('push-device');
+const PUSH_FANOUT_DOMAIN = new TextEncoder().encode('push-fanout');
+
+/**
+ * This account's push routing id for one circle, hex — see
+ * server/PUSH_DESIGN.md.
+ *
+ * Derived from the seed, so every device you own computes the same one and
+ * notification preferences need no syncing. Never from `accountId`: the
+ * relay knows that and would be able to compute every routing id itself.
+ */
+export function derivePushRoutingId(masterSeed: Uint8Array, circleId: string): string {
+  return bytesToHex(hkdf(sha256, masterSeed, undefined, concatBytes(PUSH_ENABLED_DOMAIN, new TextEncoder().encode(circleId)), 32));
+}
+
+/**
+ * This device's id under one routing id, hex.
+ *
+ * Per routing id, not per device: one value reused across circles would
+ * let the relay group your routing ids straight out of the sort key.
+ */
+export function derivePushDeviceId(deviceSecret: Uint8Array, pushRoutingId: string): string {
+  return bytesToHex(hkdf(sha256, deviceSecret, undefined, concatBytes(PUSH_DEVICE_DOMAIN, new TextEncoder().encode(pushRoutingId)), 32));
+}
+
+/**
+ * The token a sender presents to fan out to a circle —
+ * `HKDF(contentKey, "push-fanout")`, same shape as `deriveWriteToken`.
+ *
+ * Never stored or published: every member derives it from the content key
+ * they already hold. Because it follows the *current* key, removing a
+ * member revokes their push access through the rotation that already
+ * happens.
+ */
+export function derivePushFanoutToken(contentKey: Uint8Array): Uint8Array {
+  return hkdf(sha256, contentKey, undefined, PUSH_FANOUT_DOMAIN, 32);
+}
+
+/**
+ * `sha256(fanoutToken || pushRoutingId)` — what the relay stores and compares.
+ * Salted by routing id: a bare hash would be identical across a circle's
+ * rows and cluster its membership out of a table scan.
+ */
+export function derivePushFanoutHash(fanoutToken: Uint8Array, pushRoutingId: string): Uint8Array {
+  return sha256(concatBytes(fanoutToken, new TextEncoder().encode(pushRoutingId)));
+}
+
 const DEVICE_TRANSFER_TAG_DOMAIN = new TextEncoder().encode('device-transfer-tag');
 const DEVICE_TRANSFER_REQUEST_KEY_DOMAIN = new TextEncoder().encode('device-transfer-request');
 
