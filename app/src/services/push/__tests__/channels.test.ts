@@ -13,7 +13,7 @@ import {
 } from 'expo-notifications';
 import { Platform } from 'react-native';
 
-import { circleNotificationChannelId, ensureCircleNotificationChannel, removeCircleNotificationChannel } from '@/services/push-notification-channels';
+import { circleNotificationChannelId, ensureCircleNotificationChannel, removeCircleNotificationChannel } from '@/services/push/channels';
 
 beforeEach(() => {
   jest.clearAllMocks();

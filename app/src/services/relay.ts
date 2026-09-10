@@ -103,7 +103,7 @@ let announced: string | null = null;
  * applied on a real phone, where 10.0.2.2 is unroutable and every call
  * would hang ~20s before the kernel gave up.
  */
-/** Exported for push-relay.ts, whose send call is deliberately unauthenticated. */
+/** Exported for push/relay.ts, whose send call is deliberately unauthenticated. */
 export function baseUrl(): string {
   const host = __DEV__ ? devHost() : null;
   const configured = host ? `http://${host}:${DEV_RELAY_PORT}` : process.env.EXPO_PUBLIC_RELAY_URL;

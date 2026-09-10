@@ -1,7 +1,7 @@
 jest.mock('@/domain/usecases/circle/sync-circle');
 jest.mock('@/domain/usecases/account/account-manifest');
 jest.mock('@/services/relay');
-jest.mock('@/services/push-relay');
+jest.mock('@/services/push/relay');
 jest.mock('@/services/image');
 
 import { bytesToHex } from '@noble/curves/utils.js';
@@ -29,7 +29,7 @@ import {
   getMasterSeed,
   saveMasterSeed,
 } from '@/services/keystore';
-import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/services/push-relay';
+import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/services/push/relay';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { appendEntry, bootstrapCircle } from '@/services/relay';
 

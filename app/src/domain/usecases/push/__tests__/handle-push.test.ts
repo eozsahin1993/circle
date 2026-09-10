@@ -1,10 +1,10 @@
 jest.mock('@/domain/usecases/circle/sync-circle');
 jest.mock('@/domain/usecases/account/account-manifest');
 jest.mock('@/services/relay');
-jest.mock('@/services/push-relay');
+jest.mock('@/services/push/relay');
 // Only the Android calls are stubbed; the channel id is a pure function
 // and is exactly what this asserts.
-jest.mock('@/services/push-notification-channels', () => ({
+jest.mock('@/services/push/channels', () => ({
   ensureCircleNotificationChannel: jest.fn().mockResolvedValue(undefined),
   removeCircleNotificationChannel: jest.fn().mockResolvedValue(undefined),
   circleNotificationChannelId: (circleId: string) => `circle-${circleId}`,

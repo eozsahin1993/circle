@@ -3,7 +3,7 @@ import { EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { verifyLogEntry } from '@/domain/usecases/circle/log-entry';
 import { derivePushRoutingId } from '@/services/crypto';
 import { getCircleKeyMap, getMasterSeed } from '@/services/keystore';
-import { circleNotificationChannelId } from '@/services/push-notification-channels';
+import { circleNotificationChannelId } from '@/services/push/channels';
 
 /**
  * Turning a delivered push into the words on the lock screen — see

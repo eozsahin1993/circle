@@ -4,7 +4,7 @@ import { getCircleMembers } from '@/data/db';
 import type { PushCategory } from '@/domain/usecases/push/push-categories';
 import { derivePushFanoutToken } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
-import { sendPush } from '@/services/push-relay';
+import { sendPush } from '@/services/push/relay';
 
 /**
  * Asks the relay to notify a circle about an entry that was just

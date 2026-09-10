@@ -21,7 +21,7 @@ import { writeCoverFile } from '@/services/photo-cache';
 import { bootstrapCircle, appendEntry } from '@/services/relay';
 import { enablePushForCircle } from '@/domain/usecases/push/enable-push';
 import { defaultCircleMask } from '@/domain/usecases/push/push-preferences';
-import { ensureCircleNotificationChannel } from '@/services/push-notification-channels';
+import { ensureCircleNotificationChannel } from '@/services/push/channels';
 import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap } from '@/services/keystore';
 
 export type CreateCircleInput = {

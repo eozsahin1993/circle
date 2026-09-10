@@ -30,7 +30,7 @@ import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinRequestPayload } f
 import { writeCoverFile } from '@/services/photo-cache';
 import { enablePushForCircle } from '@/domain/usecases/push/enable-push';
 import { defaultCircleMask } from '@/domain/usecases/push/push-preferences';
-import { ensureCircleNotificationChannel } from '@/services/push-notification-channels';
+import { ensureCircleNotificationChannel } from '@/services/push/channels';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { compressToThumbnail } from '@/services/image';

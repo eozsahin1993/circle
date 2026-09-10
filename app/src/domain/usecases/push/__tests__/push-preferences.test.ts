@@ -1,7 +1,7 @@
 jest.mock('@/domain/usecases/circle/sync-circle');
 jest.mock('@/domain/usecases/account/account-manifest');
 jest.mock('@/services/relay');
-jest.mock('@/services/push-relay');
+jest.mock('@/services/push/relay');
 jest.mock('@/services/image');
 jest.mock('@/services/settings');
 
@@ -20,7 +20,7 @@ import {
 } from '@/domain/usecases/push/push-preferences';
 import { PushCategories } from '@/domain/usecases/push/push-categories';
 import { saveMasterSeed } from '@/services/keystore';
-import { deletePushRouting, putPushPrefs } from '@/services/push-relay';
+import { deletePushRouting, putPushPrefs } from '@/services/push/relay';
 import { appendEntry, bootstrapCircle } from '@/services/relay';
 import { getAppSettings } from '@/services/settings';
 

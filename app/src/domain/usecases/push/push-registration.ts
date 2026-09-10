@@ -12,7 +12,7 @@ import {
   generateUUID,
 } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey, getMasterSeed, getPushDeviceSecret } from '@/services/keystore';
-import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/services/push-relay';
+import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/services/push/relay';
 
 /**
  * Registering this account and device for a circle's notifications, and

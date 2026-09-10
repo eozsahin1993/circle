@@ -12,7 +12,7 @@ import { Snackbar } from '@/components/snackbar';
 import { Colors } from '@/constants/theme';
 import { initDatabase } from '@/data/db';
 import { enablePushEverywhere } from '@/domain/usecases/push/enable-push';
-import { startPushHandling } from '@/services/push-task';
+import { startPushHandling } from '@/services/push/task';
 import { AppSettingsProvider, useAppSettings } from '@/hooks/use-app-settings';
 import { useMessages } from '@/hooks/use-messages';
 import { getAppSettings, type AppSettings } from '@/services/settings';

@@ -1,5 +1,5 @@
 import { getCircleMembers, MemberRoles, updateCircleName } from '@/data/db';
-import { ensureCircleNotificationChannel } from '@/services/push-notification-channels';
+import { ensureCircleNotificationChannel } from '@/services/push/channels';
 import { asRecord, numberField, stringField, type EntryHandler } from '@/sync/entry-handlers/types';
 
 /** What `renameCircle` puts in a `circle_renamed` entry. */

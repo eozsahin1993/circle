@@ -1,7 +1,7 @@
 jest.mock('@/domain/usecases/circle/sync-circle');
 jest.mock('@/domain/usecases/account/account-manifest');
 jest.mock('@/services/relay');
-jest.mock('@/services/push-relay');
+jest.mock('@/services/push/relay');
 jest.mock('@/services/image');
 
 import { bytesToHex } from '@noble/curves/utils.js';
@@ -13,7 +13,7 @@ import { notifyCircle } from '@/domain/usecases/push/notify-circle';
 import { PushCategories } from '@/domain/usecases/push/push-categories';
 import { derivePushFanoutToken, derivePushRoutingId, generateIdentity, generateUUID } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey, getMasterSeed, saveMasterSeed } from '@/services/keystore';
-import { sendPush } from '@/services/push-relay';
+import { sendPush } from '@/services/push/relay';
 import { appendEntry, bootstrapCircle } from '@/services/relay';
 
 const payload = new Uint8Array([7, 7, 7]);
