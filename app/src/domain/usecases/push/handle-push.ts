@@ -3,6 +3,7 @@ import { EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { verifyLogEntry } from '@/domain/usecases/circle/log-entry';
 import { derivePushRoutingId } from '@/services/crypto';
 import { getCircleKeyMap, getMasterSeed } from '@/services/keystore';
+import { circleNotificationChannelId } from '@/services/push-notification-channels';
 
 /**
  * Turning a delivered push into the words on the lock screen — see
@@ -17,7 +18,7 @@ export const PUSH_PLACEHOLDER = 'New activity';
 
 export type PushNotification = { circleId: string; channelId: string; title: string; body: string };
 
-type PushData = { pushRoutingId?: string; payload?: string };
+type PushData = { pushRoutingId?: string; keyVersion?: string; payload?: string };
 
 /**
  * Decrypts a push and writes its notification, or null if it cannot —
@@ -29,7 +30,7 @@ type PushData = { pushRoutingId?: string; payload?: string };
  * always produces a card.
  */
 export async function handlePush(data: PushData): Promise<PushNotification | null> {
-  const { pushRoutingId, payload } = data;
+  const { pushRoutingId, keyVersion, payload } = data;
   if (!pushRoutingId || !payload) return null;
 
   const circle = await circleForRoutingId(pushRoutingId);
@@ -38,18 +39,18 @@ export async function handlePush(data: PushData): Promise<PushNotification | nul
   const keyMap = await getCircleKeyMap(circle.id);
   if (!keyMap) return null;
 
-  // Every version, since the push doesn't name one. Cheap — a circle holds
-  // a handful — and it avoids putting a plaintext key version on the wire.
-  const ciphertext = new Uint8Array(Buffer.from(payload, 'base64'));
-  for (const key of Object.values(keyMap)) {
-    const envelope = verifyLogEntry(ciphertext, key);
-    if (!envelope) continue;
+  // The push names its version, so this is one decrypt rather than one per
+  // version held. A version this device doesn't have means an entry it was
+  // never meant to read.
+  const key = keyMap[Number(keyVersion)];
+  if (!key) return null;
 
-    const body = await describeEntry(circle.id, envelope.type, envelope.authorPubkey);
-    if (!body) return null;
-    return { circleId: circle.id, channelId: `circle-${circle.id}`, title: circle.name, body };
-  }
-  return null;
+  const envelope = verifyLogEntry(new Uint8Array(Buffer.from(payload, 'base64')), key);
+  if (!envelope) return null;
+
+  const body = await describeEntry(circle.id, envelope.type, envelope.authorPubkey);
+  if (!body) return null;
+  return { circleId: circle.id, channelId: circleNotificationChannelId(circle.id), title: circle.name, body };
 }
 
 /**

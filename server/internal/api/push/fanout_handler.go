@@ -15,6 +15,9 @@ type fanoutRequest struct {
 	// naming the circle or the sender.
 	PushFanoutToken string `json:"pushFanoutToken"`
 	Category        int64  `json:"category"`
+	// Which content-key version the payload is encrypted under. Already
+	// plaintext on every append, so it costs nothing to name here.
+	KeyVersion int64 `json:"keyVersion"`
 	// Base64 ciphertext plus the fixed placeholder. Forwarded untouched.
 	Payload string `json:"payload"`
 }
@@ -35,7 +38,7 @@ type FanoutHandler struct {
 	Service *Service
 	// Nil until the platform credentials exist. Split out so tests can run
 	// the resolution path without APNs or FCM.
-	Dispatch func(delivery Delivery, payload []byte)
+	Dispatch func(delivery Delivery, keyVersion int64, payload []byte)
 }
 
 func (h *FanoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +74,7 @@ func (h *FanoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, delivery := range result.Deliveries {
-		h.Dispatch(delivery, payload)
+		h.Dispatch(delivery, req.KeyVersion, payload)
 	}
 
 	httputil.WriteJSON(w, http.StatusOK, fanoutResponse{Delivered: len(result.Deliveries), Skipped: result.Skipped})

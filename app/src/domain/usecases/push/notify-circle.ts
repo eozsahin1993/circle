@@ -14,7 +14,12 @@ import { sendPush } from '@/services/push-relay';
  * cannot read it, and the receiving device decrypts and writes the
  * notification text itself.
  */
-export async function notifyCircle(circleId: string, category: PushCategory, payload: Uint8Array): Promise<void> {
+export async function notifyCircle(
+  circleId: string,
+  category: PushCategory,
+  keyVersion: number,
+  payload: Uint8Array,
+): Promise<void> {
   const identity = await getCircleIdentity(circleId);
   const current = await getCurrentContentKey(circleId);
   if (!identity || !current) return;
@@ -30,15 +35,20 @@ export async function notifyCircle(circleId: string, category: PushCategory, pay
 
   // Shuffled: sending in roster order would leak the roster's ordering
   // across posts, which is stable and therefore correlatable.
-  await sendPush(shuffle(routingIds), derivePushFanoutToken(current.key), category, payload);
+  await sendPush(shuffle(routingIds), derivePushFanoutToken(current.key), category, keyVersion, payload);
 }
 
 /**
  * Best-effort wrapper — a notification that doesn't go out must never fail
  * the post that triggered it. Fire without awaiting.
  */
-export function notifyCircleBestEffort(circleId: string, category: PushCategory, payload: Uint8Array): void {
-  notifyCircle(circleId, category, payload).catch((err) => console.error('Failed to notify circle', err));
+export function notifyCircleBestEffort(
+  circleId: string,
+  category: PushCategory,
+  keyVersion: number,
+  payload: Uint8Array,
+): void {
+  notifyCircle(circleId, category, keyVersion, payload).catch((err) => console.error('Failed to notify circle', err));
 }
 
 function shuffle<T>(items: T[]): T[] {

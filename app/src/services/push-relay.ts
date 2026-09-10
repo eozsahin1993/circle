@@ -76,6 +76,7 @@ export async function sendPush(
   pushRoutingIds: string[],
   pushFanoutToken: Uint8Array,
   category: number,
+  keyVersion: number,
   payload: Uint8Array,
 ): Promise<FanoutResult> {
   const response = await fetch(`${baseUrl()}/v1/push/send`, {
@@ -85,6 +86,7 @@ export async function sendPush(
       pushRoutingIds,
       pushFanoutToken: Buffer.from(pushFanoutToken).toString('base64'),
       category,
+      keyVersion,
       payload: Buffer.from(payload).toString('base64'),
     }),
   });

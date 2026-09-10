@@ -43,7 +43,7 @@ type PushDeps struct {
 	RecipientLimit ratelimitstore.Store
 	// Nil until the platform credentials exist: fanout still resolves and
 	// reports, it just drops the deliveries.
-	Dispatch func(push.Delivery, []byte)
+	Dispatch func(push.Delivery, int64, []byte)
 }
 
 func NewRouter(
@@ -139,7 +139,7 @@ func newV1Mux(
 
 		dispatch := pushDeps.Dispatch
 		if dispatch == nil {
-			dispatch = func(push.Delivery, []byte) {}
+			dispatch = func(push.Delivery, int64, []byte) {}
 		}
 		push.RegisterFanout(mux, &push.FanoutHandler{Service: pushService, Dispatch: dispatch})
 	}

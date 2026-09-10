@@ -115,14 +115,14 @@ func nonEmpty(values ...string) []string {
 //
 // Fire-and-forget by design: a push is best-effort, and a failed one must
 // not fail the append that triggered it.
-func pushDispatcher(awsCfg aws.Config, parameterName string) func(push.Delivery, []byte) {
+func pushDispatcher(awsCfg aws.Config, parameterName string) func(push.Delivery, int64, []byte) {
 	loader := &pushcredential.Loader{Client: ssm.NewFromConfig(awsCfg), ParameterName: parameterName}
 	var (
 		once   sync.Once
 		sender *fcm.Sender
 	)
 
-	return func(delivery push.Delivery, payload []byte) {
+	return func(delivery push.Delivery, keyVersion int64, payload []byte) {
 		// iOS goes direct to APNs, which isn't built yet.
 		if delivery.Platform != "android" {
 			return
@@ -141,7 +141,7 @@ func pushDispatcher(awsCfg aws.Config, parameterName string) func(push.Delivery,
 			return
 		}
 
-		if err := sender.Send(ctx, string(delivery.PushToken), delivery.PushRoutingID, payload); err != nil {
+		if err := sender.Send(ctx, string(delivery.PushToken), delivery.PushRoutingID, keyVersion, payload); err != nil {
 			log.Printf("failed to deliver a push: %v", err)
 		}
 	}

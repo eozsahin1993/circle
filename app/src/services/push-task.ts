@@ -40,8 +40,7 @@ defineTask<NotificationTaskPayload>(PUSH_TASK, async ({ data, error }) => {
 
     await scheduleNotificationAsync({
       content: { title: notification.title, body: notification.body },
-      trigger: null,
-      identifier: undefined,
+      trigger: { channelId: notification.channelId },
     });
   } catch (err) {
     console.error('Failed to handle a push', err);
@@ -52,11 +51,12 @@ defineTask<NotificationTaskPayload>(PUSH_TASK, async ({ data, error }) => {
  * FCM data values arrive as strings, but the shape differs between a
  * delivered notification and a response to one being tapped.
  */
-function pushDataFrom(data: unknown): { pushRoutingId?: string; payload?: string } {
+function pushDataFrom(data: unknown): { pushRoutingId?: string; keyVersion?: string; payload?: string } {
   const record = (data ?? {}) as Record<string, unknown>;
   const body = (record.data ?? record) as Record<string, unknown>;
   return {
     pushRoutingId: typeof body.pushRoutingId === 'string' ? body.pushRoutingId : undefined,
+    keyVersion: typeof body.keyVersion === 'string' ? body.keyVersion : undefined,
     payload: typeof body.payload === 'string' ? body.payload : undefined,
   };
 }

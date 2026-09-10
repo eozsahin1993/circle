@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"circle-relay/internal/pushcredential"
@@ -48,7 +49,7 @@ func New(account *pushcredential.ServiceAccount) *Sender {
 //
 // The placeholder rides alongside so the card is not blank when the
 // handler doesn't run.
-func (s *Sender) Send(ctx context.Context, deviceToken, pushRoutingID string, payload []byte) error {
+func (s *Sender) Send(ctx context.Context, deviceToken, pushRoutingID string, keyVersion int64, payload []byte) error {
 	accessToken, err := s.tokens.accessToken(ctx)
 	if err != nil {
 		return err
@@ -64,8 +65,12 @@ func (s *Sender) Send(ctx context.Context, deviceToken, pushRoutingID string, pa
 				// naming it, and without it the device would have to
 				// trial-decrypt against every circle it is in.
 				"pushRoutingId": pushRoutingID,
-				"payload":       base64.StdEncoding.EncodeToString(payload),
-				"placeholder":   Placeholder,
+				// Already plaintext on every append, so naming it here reveals
+				// nothing the relay hasn't seen — and it saves the device
+				// trial-decrypting against every version it holds.
+				"keyVersion":  strconv.FormatInt(keyVersion, 10),
+				"payload":     base64.StdEncoding.EncodeToString(payload),
+				"placeholder": Placeholder,
 			},
 			"android": map[string]any{
 				// High priority, or Doze defers a data-only message

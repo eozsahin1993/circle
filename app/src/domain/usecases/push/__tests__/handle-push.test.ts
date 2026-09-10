@@ -2,7 +2,13 @@ jest.mock('@/domain/usecases/circle/sync-circle');
 jest.mock('@/domain/usecases/account/account-manifest');
 jest.mock('@/services/relay');
 jest.mock('@/services/push-relay');
-jest.mock('@/services/push-notification-channels');
+// Only the Android calls are stubbed; the channel id is a pure function
+// and is exactly what this asserts.
+jest.mock('@/services/push-notification-channels', () => ({
+  ensureCircleNotificationChannel: jest.fn().mockResolvedValue(undefined),
+  removeCircleNotificationChannel: jest.fn().mockResolvedValue(undefined),
+  circleNotificationChannelId: (circleId: string) => `circle-${circleId}`,
+}));
 jest.mock('@/services/image');
 
 import { Buffer } from 'buffer';
@@ -35,6 +41,7 @@ async function pushFor(circleId: string, type: string, author: Keypair, payload:
   const entry = buildAndEncryptLogEntry(type, payload, author, current.key);
   return {
     pushRoutingId: derivePushRoutingId((await getMasterSeed())!, circleId),
+    keyVersion: String(current.version),
     payload: Buffer.from(entry).toString('base64'),
   };
 }
@@ -47,6 +54,7 @@ test('a post becomes the author name and the circle', async () => {
 
   const notification = await handlePush({
     pushRoutingId: derivePushRoutingId((await getMasterSeed())!, circleId),
+    keyVersion: String(current.version),
     payload: Buffer.from(entry).toString('base64'),
   });
 
@@ -77,13 +85,14 @@ test('a payload this device cannot decrypt shows nothing', async () => {
 
   const notification = await handlePush({
     pushRoutingId: derivePushRoutingId((await getMasterSeed())!, circleId),
+    keyVersion: '1',
     payload: Buffer.from('not our ciphertext').toString('base64'),
   });
 
   expect(notification).toBeNull();
 });
 
-/** Key versions aren't named on the wire, so every held version is tried. */
+/** The push names its version, so a rotation doesn't strand older entries. */
 test('an entry encrypted under an older key still decrypts', async () => {
   const { id: circleId } = await createCircle({ name: 'Family Circle' });
   const identity = (await getCircleIdentity(circleId))!;
@@ -94,21 +103,38 @@ test('an entry encrypted under an older key still decrypts', async () => {
 
   const notification = await handlePush({
     pushRoutingId: derivePushRoutingId((await getMasterSeed())!, circleId),
+    keyVersion: String(original.version),
     payload: Buffer.from(entry).toString('base64'),
   });
 
   expect(notification?.body).toContain('added a photo');
 });
 
+/** A version this device doesn't hold is an entry it was never meant to read. */
+test('a key version this device does not hold shows nothing', async () => {
+  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const identity = (await getCircleIdentity(circleId))!;
+  const current = (await getCurrentContentKey(circleId))!;
+  const entry = buildAndEncryptLogEntry(EntryTypes.POST, { postId: 'p1', createdAt: 1 }, identity, current.key);
+
+  const notification = await handlePush({
+    pushRoutingId: derivePushRoutingId((await getMasterSeed())!, circleId),
+    keyVersion: '99',
+    payload: Buffer.from(entry).toString('base64'),
+  });
+
+  expect(notification).toBeNull();
+});
+
 test('a routing id for no circle here shows nothing', async () => {
   await createCircle({ name: 'Family Circle' });
 
-  await expect(handlePush({ pushRoutingId: 'f'.repeat(64), payload: 'AAAA' })).resolves.toBeNull();
+  await expect(handlePush({ pushRoutingId: 'f'.repeat(64), keyVersion: '1', payload: 'AAAA' })).resolves.toBeNull();
 });
 
 test.each([
   ['no routing id', { payload: 'AAAA' }],
-  ['no payload', { pushRoutingId: 'f'.repeat(64) }],
+  ['no payload', { pushRoutingId: 'f'.repeat(64), keyVersion: '1' }],
   ['nothing at all', {}],
 ])('%s shows nothing', async (_label, data) => {
   await expect(handlePush(data)).resolves.toBeNull();

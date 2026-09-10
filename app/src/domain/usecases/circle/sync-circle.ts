@@ -185,7 +185,7 @@ async function pushPendingEntries(circleId: string): Promise<void> {
     // ciphertext the log holds, which is all the relay is ever given.
     const category = PUSH_CATEGORIES[entry.entryType];
     if (category !== undefined) {
-      notifyCircleBestEffort(circleId, category, entry.encryptedMeta);
+      notifyCircleBestEffort(circleId, category, current.version, entry.encryptedMeta);
     }
 
     // After the append, never before: the entry is what every device
