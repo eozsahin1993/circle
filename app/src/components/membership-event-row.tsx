@@ -138,11 +138,18 @@ const styles = StyleSheet.create({
    * and `basis: 0` keeps the two of them the same length so the line
    * stays centred.
    */
+  /**
+   * A whole point, not `hairlineWidth`. A hairline is one *device* pixel,
+   * so as the list translates during a scroll it lands on fractional
+   * offsets and rasterises differently — one crisp row at some positions,
+   * two half-lit rows at others. The line visibly shimmers, and two rows
+   * sitting at different offsets read as different colours.
+   */
   rule: {
     flexGrow: 1,
     flexBasis: 0,
     minWidth: 8,
-    height: StyleSheet.hairlineWidth,
+    height: 1,
   },
   text: {
     flexShrink: 1,
