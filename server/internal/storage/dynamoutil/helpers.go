@@ -56,3 +56,26 @@ func AttrString(item map[string]types.AttributeValue, key string) (string, bool)
 	}
 	return s.Value, true
 }
+
+// AttrBytes reads a Binary attribute, reporting presence like AttrString.
+func AttrBytes(item map[string]types.AttributeValue, key string) ([]byte, bool) {
+	attr, ok := item[key]
+	if !ok {
+		return nil, false
+	}
+	b, ok := attr.(*types.AttributeValueMemberB)
+	if !ok {
+		return nil, false
+	}
+	return b.Value, true
+}
+
+// AttrBool reads a Boolean attribute. Missing reads as false: an item
+// written before a flag existed hasn't opted into it.
+func AttrBool(item map[string]types.AttributeValue, key string) bool {
+	attr, ok := item[key].(*types.AttributeValueMemberBOOL)
+	if !ok {
+		return false
+	}
+	return attr.Value
+}

@@ -37,6 +37,8 @@ import (
 	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
 	"circle-relay/internal/storage/manifeststore"
 	manifestdynamodb "circle-relay/internal/storage/manifeststore/dynamodb"
+	"circle-relay/internal/storage/pushstore"
+	pushdynamodb "circle-relay/internal/storage/pushstore/dynamodb"
 	"circle-relay/internal/storage/ratelimitstore"
 	ratelimitdynamodb "circle-relay/internal/storage/ratelimitstore/dynamodb"
 )
@@ -49,6 +51,7 @@ const (
 	accountsTableName  = "test-accounts"
 	inviteTableName    = "test-invites"
 	rateLimitTableName = "test-rate-limit"
+	pushTableName      = "test-push"
 )
 
 var (
@@ -66,6 +69,9 @@ var (
 
 	inviteTableOnce sync.Once
 	inviteTableErr  error
+
+	pushTableOnce sync.Once
+	pushTableErr  error
 
 	rateLimitTableOnce sync.Once
 	rateLimitTableErr  error
@@ -246,6 +252,23 @@ func RawInviteDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 	return client, inviteTableName
 }
 
+// NewPushStore returns a real dynamodb-backed pushstore.Store against
+// LocalStack, creating the push table once per test binary run (see
+// server/provision/push_table.tf).
+func NewPushStore(t testing.TB) pushstore.Store {
+	t.Helper()
+	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
+		o.BaseEndpoint = aws.String(localstackEndpoint)
+	})
+
+	pushTableOnce.Do(func() { pushTableErr = createPushTable(client) })
+	if pushTableErr != nil {
+		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", pushTableErr)
+	}
+
+	return pushdynamodb.New(client, pushTableName)
+}
+
 // NewRateLimitStore returns a real dynamodb-backed ratelimitstore.Store
 // against LocalStack, creating the rate-limit table once per test binary
 // run (see server/provision/rate_limit_table.tf). Unlike the other New*
@@ -334,6 +357,31 @@ func createInviteTable(client *awsdynamodb.Client) error {
 	}
 	waiter := awsdynamodb.NewTableExistsWaiter(client)
 	return waiter.Wait(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(inviteTableName)}, 30*time.Second)
+}
+
+func createPushTable(client *awsdynamodb.Client) error {
+	ctx := context.Background()
+	_, err := client.CreateTable(ctx, &awsdynamodb.CreateTableInput{
+		TableName:   aws.String(pushTableName),
+		BillingMode: ddbtypes.BillingModePayPerRequest,
+		KeySchema: []ddbtypes.KeySchemaElement{
+			{AttributeName: aws.String("pk"), KeyType: ddbtypes.KeyTypeHash},
+			{AttributeName: aws.String("sk"), KeyType: ddbtypes.KeyTypeRange},
+		},
+		AttributeDefinitions: []ddbtypes.AttributeDefinition{
+			{AttributeName: aws.String("pk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
+			{AttributeName: aws.String("sk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
+		},
+	})
+	if err != nil {
+		var inUse *ddbtypes.ResourceInUseException
+		if errors.As(err, &inUse) {
+			return nil // already created by an earlier test package's run
+		}
+		return err
+	}
+	waiter := awsdynamodb.NewTableExistsWaiter(client)
+	return waiter.Wait(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(pushTableName)}, 30*time.Second)
 }
 
 func createRateLimitTable(client *awsdynamodb.Client) error {

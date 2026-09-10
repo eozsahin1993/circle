@@ -33,6 +33,10 @@ func NewRouterWithAuth(t testing.TB) (mux *http.ServeMux, google, apple *FakeOID
 		NewRateLimitStore(t, "read", testRateLimitMaxRequests, time.Hour),
 		oidcverify.New(google.Issuer, google.JWKSURL, []string{TestGoogleClientID}),
 		oidcverify.New(apple.Issuer, apple.JWKSURL, []string{TestAppleClientID}),
+		api.PushDeps{
+			Store:          NewPushStore(t),
+			RecipientLimit: NewRateLimitStore(t, "push", testRateLimitMaxRequests, time.Hour),
+		},
 	)
 	return mux, google, apple
 }

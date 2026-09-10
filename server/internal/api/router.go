@@ -23,6 +23,7 @@ import (
 	"circle-relay/internal/api/getlog"
 	"circle-relay/internal/api/getuploadtarget"
 	"circle-relay/internal/api/invite"
+	"circle-relay/internal/api/push"
 	"circle-relay/internal/api/ratelimit"
 	"circle-relay/internal/api/rotatelog"
 	"circle-relay/internal/storage/authstore"
@@ -30,8 +31,20 @@ import (
 	"circle-relay/internal/storage/invitestore"
 	"circle-relay/internal/storage/logstore"
 	"circle-relay/internal/storage/manifeststore"
+	"circle-relay/internal/storage/pushstore"
 	"circle-relay/internal/storage/ratelimitstore"
 )
+
+// PushDeps groups the push slice's dependencies. A struct because
+// NewRouter already takes two ratelimitstore.Store values, and a third
+// positional one would be easy to pass in the wrong order silently.
+type PushDeps struct {
+	Store          pushstore.Store
+	RecipientLimit ratelimitstore.Store
+	// Nil until the platform credentials exist: fanout still resolves and
+	// reports, it just drops the deliveries.
+	Dispatch func(push.Delivery, []byte)
+}
 
 func NewRouter(
 	logStore logstore.Store,
@@ -43,9 +56,10 @@ func NewRouter(
 	readRateLimitStore ratelimitstore.Store,
 	googleVerifier *oidcverify.Verifier,
 	appleVerifier *oidcverify.Verifier,
+	pushDeps PushDeps,
 ) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.Handle("/v1/", http.StripPrefix("/v1", newV1Mux(logStore, blobStore, authStore, manifestStore, inviteStore, writeRateLimitStore, readRateLimitStore, googleVerifier, appleVerifier)))
+	mux.Handle("/v1/", http.StripPrefix("/v1", newV1Mux(logStore, blobStore, authStore, manifestStore, inviteStore, writeRateLimitStore, readRateLimitStore, googleVerifier, appleVerifier, pushDeps)))
 	return mux
 }
 
@@ -63,6 +77,7 @@ func newV1Mux(
 	readRateLimitStore ratelimitstore.Store,
 	googleVerifier *oidcverify.Verifier,
 	appleVerifier *oidcverify.Verifier,
+	pushDeps PushDeps,
 ) *http.ServeMux {
 	mux := http.NewServeMux()
 
@@ -110,6 +125,24 @@ func newV1Mux(
 	epochsMux := http.NewServeMux()
 	getepochs.Register(epochsMux, &getepochs.Service{LogStore: logStore}, readLimit)
 	mux.Handle("/epochs/", auth.RequireSession(authStore, epochsMux))
+
+	// Registration is session-gated; the send route is not, and mounts on
+	// the parent mux — see push.FanoutHandler. "POST /push/send" is more
+	// specific than "/push/" so it wins the match; changing either pattern
+	// risks silently authenticating the one route that must not be.
+	if pushDeps.Store != nil {
+		pushService := &push.Service{PushStore: pushDeps.Store, RecipientLimit: pushDeps.RecipientLimit}
+
+		pushMux := http.NewServeMux()
+		push.Register(pushMux, pushService)
+		mux.Handle("/push/", auth.RequireSession(authStore, pushMux))
+
+		dispatch := pushDeps.Dispatch
+		if dispatch == nil {
+			dispatch = func(push.Delivery, []byte) {}
+		}
+		push.RegisterFanout(mux, &push.FanoutHandler{Service: pushService, Dispatch: dispatch})
+	}
 
 	google.Register(mux, &google.Service{AuthStore: authStore, Verifier: googleVerifier})
 	apple.Register(mux, &apple.Service{AuthStore: authStore, Verifier: appleVerifier})

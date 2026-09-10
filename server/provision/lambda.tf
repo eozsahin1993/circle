@@ -110,6 +110,22 @@ data "aws_iam_policy_document" "lambda_storage_access" {
     resources = [aws_dynamodb_table.rate_limit.arn]
   }
 
+  # Its own table again (see push_table.tf). Matches pushstore.Store
+  # exactly: PutItem for both row kinds, GetItem for prefs, Query for a
+  # routing id's devices, DeleteItem for unregistering. No Scan — nothing
+  # here ever enumerates the table, which is also what keeps a full read
+  # of it off the hot path.
+  statement {
+    sid = "PushTableAccess"
+    actions = [
+      "dynamodb:PutItem",
+      "dynamodb:GetItem",
+      "dynamodb:Query",
+      "dynamodb:DeleteItem",
+    ]
+    resources = [aws_dynamodb_table.push.arn]
+  }
+
   statement {
     sid       = "KMSAccess"
     actions   = ["kms:Decrypt"]
@@ -153,6 +169,7 @@ resource "aws_lambda_function" "relay" {
       ACCOUNTS_TABLE_NAME           = aws_dynamodb_table.accounts.name
       INVITE_TABLE_NAME             = module.storage.invite_table_name
       RATE_LIMIT_TABLE_NAME         = aws_dynamodb_table.rate_limit.name
+      PUSH_TABLE_NAME               = aws_dynamodb_table.push.name
       GOOGLE_CLIENT_ID_IOS          = var.google_client_id_ios
       GOOGLE_CLIENT_ID_ANDROID      = var.google_client_id_android
       GOOGLE_CLIENT_ID_WEB          = var.google_client_id_web

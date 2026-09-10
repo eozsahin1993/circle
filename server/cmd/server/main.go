@@ -23,6 +23,7 @@ import (
 	invitedynamodb "circle-relay/internal/storage/invitestore/dynamodb"
 	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
 	manifestdynamodb "circle-relay/internal/storage/manifeststore/dynamodb"
+	pushdynamodb "circle-relay/internal/storage/pushstore/dynamodb"
 	ratelimitdynamodb "circle-relay/internal/storage/ratelimitstore/dynamodb"
 )
 
@@ -54,7 +55,15 @@ func main() {
 	googleVerifier := oidcverify.New(googleIssuer, googleJWKSURL, nonEmpty(cfg.GoogleClientIDIOS, cfg.GoogleClientIDAndroid, cfg.GoogleClientIDWeb))
 	appleVerifier := oidcverify.New(appleIssuer, appleJWKSURL, nonEmpty(cfg.AppleClientIDIOS))
 
-	mux := api.NewRouter(logStore, blobStore, authStore, manifestStore, inviteStore, writeRateLimitStore, readRateLimitStore, googleVerifier, appleVerifier)
+	pushStore := pushdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.PushTableName)
+	// No Dispatch: the APNs/FCM credentials don't exist yet, so fanout
+	// resolves and reports but delivers nothing. See server/PUSH_DESIGN.md.
+	pushDeps := api.PushDeps{
+		Store:          pushStore,
+		RecipientLimit: ratelimitdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.RateLimitTableName, "push", int(cfg.RateLimitPushMaxRequests), cfg.RateLimitWindow()),
+	}
+
+	mux := api.NewRouter(logStore, blobStore, authStore, manifestStore, inviteStore, writeRateLimitStore, readRateLimitStore, googleVerifier, appleVerifier, pushDeps)
 
 	addr := ":" + cfg.Port
 	log.Printf("listening on %s", addr)

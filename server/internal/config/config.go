@@ -33,11 +33,21 @@ type Config struct {
 	// and read budgets below; ratelimitdynamodb.New's keyPrefix keeps their
 	// rows from colliding.
 	RateLimitTableName string
+	// PushTableName is the standalone push routing table — routing id
+	// prefs plus one row per device. Separate from every other table for
+	// the same reason the others are: different lifecycle, different
+	// access pattern, and nothing joins across them.
+	PushTableName string
 	// RateLimitWriteMaxRequests/RateLimitReadMaxRequests are starting
 	// guesses, not measurements — env-tunable so they can be adjusted from
 	// real traffic without a redeploy.
 	RateLimitWriteMaxRequests int64
 	RateLimitReadMaxRequests  int64
+	// RateLimitPushMaxRequests budgets how many pushes one recipient
+	// routing id may receive per window. Generous on purpose: a lively
+	// circle legitimately generates a lot of received notifications, so
+	// this bounds the pathological case rather than the merely noisy one.
+	RateLimitPushMaxRequests int64
 	// RateLimitWindowMinutes is the fixed window both budgets reset on.
 	RateLimitWindowMinutes int64
 	// GoogleClientIDIOS/Android/Web are the accepted "aud" values for
@@ -86,8 +96,10 @@ func Load() Config {
 		AccountsTableName:         mustEnv("ACCOUNTS_TABLE_NAME"),
 		InviteTableName:           mustEnv("INVITE_TABLE_NAME"),
 		RateLimitTableName:        mustEnv("RATE_LIMIT_TABLE_NAME"),
+		PushTableName:             mustEnv("PUSH_TABLE_NAME"),
 		RateLimitWriteMaxRequests: intEnv("RATE_LIMIT_WRITE_MAX_REQUESTS", 500),
 		RateLimitReadMaxRequests:  intEnv("RATE_LIMIT_READ_MAX_REQUESTS", 2000),
+		RateLimitPushMaxRequests:  intEnv("RATE_LIMIT_PUSH_MAX_REQUESTS", 500),
 		RateLimitWindowMinutes:    intEnv("RATE_LIMIT_WINDOW_MINUTES", 10),
 		GoogleClientIDIOS:         envOr("GOOGLE_CLIENT_ID_IOS", ""),
 		GoogleClientIDAndroid:     envOr("GOOGLE_CLIENT_ID_ANDROID", ""),
