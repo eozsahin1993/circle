@@ -73,3 +73,12 @@ variable "rate_limit_window_minutes" {
   type        = number
   default     = 10
 }
+
+# Where the FCM service-account key lives in SSM Parameter Store. The
+# parameter itself is created by hand — see the IAM statement in lambda.tf
+# for why it is not a Terraform resource.
+variable "fcm_credential_parameter" {
+  description = "SSM SecureString parameter holding the FCM service-account JSON"
+  type        = string
+  default     = "/circle/fcm-service-account"
+}

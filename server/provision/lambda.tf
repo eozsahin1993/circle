@@ -126,6 +126,17 @@ data "aws_iam_policy_document" "lambda_storage_access" {
     resources = [aws_dynamodb_table.push.arn]
   }
 
+  # The FCM service-account key, created by hand in the console and
+  # deliberately not a Terraform resource — declaring it would put the value
+  # in state. Scoped to the one parameter, not "*": this key can put
+  # arbitrary text on every user's lock screen, so a broad grant here is
+  # worse than a broad grant anywhere else in this policy.
+  statement {
+    sid       = "PushCredentialAccess"
+    actions   = ["ssm:GetParameter"]
+    resources = ["arn:aws:ssm:${var.aws_region}:*:parameter${var.fcm_credential_parameter}"]
+  }
+
   statement {
     sid       = "KMSAccess"
     actions   = ["kms:Decrypt"]
@@ -170,6 +181,7 @@ resource "aws_lambda_function" "relay" {
       INVITE_TABLE_NAME             = module.storage.invite_table_name
       RATE_LIMIT_TABLE_NAME         = aws_dynamodb_table.rate_limit.name
       PUSH_TABLE_NAME               = aws_dynamodb_table.push.name
+      FCM_CREDENTIAL_PARAMETER      = var.fcm_credential_parameter
       GOOGLE_CLIENT_ID_IOS          = var.google_client_id_ios
       GOOGLE_CLIENT_ID_ANDROID      = var.google_client_id_android
       GOOGLE_CLIENT_ID_WEB          = var.google_client_id_web

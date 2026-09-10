@@ -38,6 +38,10 @@ type Config struct {
 	// the same reason the others are: different lifecycle, different
 	// access pattern, and nothing joins across them.
 	PushTableName string
+	// FCMCredentialParameter is the SSM SecureString holding the FCM
+	// service-account key. Created by hand, never by Terraform — a
+	// Terraform-managed value lands in state as plaintext.
+	FCMCredentialParameter string
 	// RateLimitWriteMaxRequests/RateLimitReadMaxRequests are starting
 	// guesses, not measurements — env-tunable so they can be adjusted from
 	// real traffic without a redeploy.
@@ -97,6 +101,7 @@ func Load() Config {
 		InviteTableName:           mustEnv("INVITE_TABLE_NAME"),
 		RateLimitTableName:        mustEnv("RATE_LIMIT_TABLE_NAME"),
 		PushTableName:             mustEnv("PUSH_TABLE_NAME"),
+		FCMCredentialParameter:    strEnv("FCM_CREDENTIAL_PARAMETER", "/circle/fcm-service-account"),
 		RateLimitWriteMaxRequests: intEnv("RATE_LIMIT_WRITE_MAX_REQUESTS", 500),
 		RateLimitReadMaxRequests:  intEnv("RATE_LIMIT_READ_MAX_REQUESTS", 2000),
 		RateLimitPushMaxRequests:  intEnv("RATE_LIMIT_PUSH_MAX_REQUESTS", 500),
@@ -127,6 +132,13 @@ func mustEnv(name string) string {
 }
 
 func envOr(name, fallback string) string {
+	if value := os.Getenv(name); value != "" {
+		return value
+	}
+	return fallback
+}
+
+func strEnv(name, fallback string) string {
 	if value := os.Getenv(name); value != "" {
 		return value
 	}
