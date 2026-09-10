@@ -20,5 +20,8 @@ provision/**/*.tfvars
 
 # The FCM service-account key, for local runs (see FCM_CREDENTIAL_FILE).
 # Anyone holding one can push arbitrary text to every user's lock screen.
+# Matched anywhere in the name, not as a prefix: these arrive named after
+# whatever project generated them.
 *firebase-adminsdk*.json
-fcm-service-account*.json
+*fcm*service*account*.json
+*service-account*.json

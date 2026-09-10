@@ -47,5 +47,7 @@ example
 # anyone holding one can push arbitrary text to every user's lock screen.
 # google-services.json is fine (it ships inside the APK, and its API key is
 # restricted to this package and signing certificate).
+# Matched anywhere in the name, not as a prefix: these arrive named after
+# whatever project generated them.
 *firebase-adminsdk*.json
-service-account*.json
+*service-account*.json
