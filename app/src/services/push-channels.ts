@@ -72,3 +72,20 @@ export async function removeCircleChannel(circleId: string): Promise<void> {
 
   await api.deleteNotificationChannelAsync(circleChannelId(circleId));
 }
+
+/**
+ * Brings every circle's channel into line — on launch, so circles that
+ * predate channels get one and any renamed while this device was away
+ * catch up.
+ */
+export async function ensureAllCircleChannels(circles: { id: string; name: string }[]): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  for (const circle of circles) {
+    try {
+      await ensureCircleChannel(circle.id, circle.name);
+    } catch (err) {
+      console.error(`Failed to set up a notification channel for circle ${circle.id}`, err);
+    }
+  }
+}

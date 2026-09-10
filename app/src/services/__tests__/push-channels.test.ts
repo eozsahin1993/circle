@@ -13,7 +13,12 @@ const {
 } = jest.requireMock('expo-notifications');
 import { Platform } from 'react-native';
 
-import { circleChannelId, ensureCircleChannel, removeCircleChannel } from '@/services/push-channels';
+import {
+  circleChannelId,
+  ensureAllCircleChannels,
+  ensureCircleChannel,
+  removeCircleChannel,
+} from '@/services/push-channels';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -69,6 +74,18 @@ test('a build without the native module degrades instead of throwing', async () 
   });
 
   await expect(ensureCircleChannel('circle-1', 'Family Circle')).resolves.toBeUndefined();
+});
+
+/** Circles that predate channels have none, so launch reconciles them. */
+test('reconciling covers every circle, and one failure does not stop the rest', async () => {
+  (setNotificationChannelAsync as jest.Mock).mockRejectedValueOnce(new Error('nope'));
+
+  await ensureAllCircleChannels([
+    { id: 'circle-1', name: 'Family Circle' },
+    { id: 'circle-2', name: 'Book Club' },
+  ]);
+
+  expect(setNotificationChannelAsync).toHaveBeenCalledTimes(2);
 });
 
 test('does nothing on iOS, which has no channels', async () => {

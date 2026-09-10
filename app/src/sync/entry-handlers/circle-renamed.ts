@@ -1,4 +1,5 @@
 import { getCircleMembers, MemberRoles, updateCircleName } from '@/data/db';
+import { ensureCircleChannel } from '@/services/push-channels';
 import { asRecord, numberField, stringField, type EntryHandler } from '@/sync/entry-handlers/types';
 
 /** What `renameCircle` puts in a `circle_renamed` entry. */
@@ -36,5 +37,8 @@ export const circleRenamedHandler: EntryHandler = {
     if (!payload) return;
 
     await updateCircleName(circleId, payload.name);
+    // Most renames arrive here rather than from this device, so the
+    // Android channel would otherwise keep the old name forever.
+    await ensureCircleChannel(circleId, payload.name);
   },
 };
