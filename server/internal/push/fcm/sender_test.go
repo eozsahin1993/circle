@@ -13,20 +13,18 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"circle-relay/internal/pushcredential"
 )
 
 // A real key, generated per run — the assertion is genuinely signed, so
 // the JWT path is exercised rather than stubbed.
-func testAccount(t *testing.T, tokenURI string) *pushcredential.ServiceAccount {
+func testAccount(t *testing.T, tokenURI string) *ServiceAccount {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
 	}
 	encoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
-	return &pushcredential.ServiceAccount{
+	return &ServiceAccount{
 		ProjectID:   "circle-test",
 		ClientEmail: "sender@circle-test.iam.gserviceaccount.com",
 		PrivateKey:  string(encoded),
@@ -180,7 +178,7 @@ func TestSendReportsAFailedStatus(t *testing.T) {
 }
 
 func TestAMalformedKeyDoesNotLeakItself(t *testing.T) {
-	account := &pushcredential.ServiceAccount{
+	account := &ServiceAccount{
 		ProjectID:   "circle-test",
 		ClientEmail: "sender@circle-test.iam.gserviceaccount.com",
 		PrivateKey:  "-----BEGIN PRIVATE KEY-----\nnot-a-key\n-----END PRIVATE KEY-----\n",

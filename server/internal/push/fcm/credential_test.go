@@ -1,4 +1,4 @@
-package pushcredential
+package fcm
 
 import (
 	"context"

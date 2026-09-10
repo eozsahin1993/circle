@@ -1,10 +1,13 @@
-// Package pushcredential loads the FCM service-account key the relay signs
-// its sends with — see server/PUSH_DESIGN.md.
+// Loading the service-account key this package signs its sends with.
 //
-// The parameter is created by hand rather than by Terraform, because a
+// FCM-specific despite reading from a generic place: APNs takes a .p8
+// ES256 key plus a key id, team id and bundle id, which is a different
+// shape entirely and will want its own loader under internal/push/apns.
+//
+// The SSM parameter is created by hand rather than by Terraform, because a
 // Terraform-managed value ends up in state as plaintext. Nothing here
 // writes it; this only reads.
-package pushcredential
+package fcm
 
 import (
 	"context"

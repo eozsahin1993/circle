@@ -16,8 +16,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-
-	"circle-relay/internal/pushcredential"
 )
 
 const (
@@ -35,7 +33,7 @@ const (
 // Cached because a token lasts an hour and a Lambda serves many sends per
 // cold start; minting per send would add a round trip to every push.
 type tokenSource struct {
-	account *pushcredential.ServiceAccount
+	account *ServiceAccount
 	client  *http.Client
 
 	mu        sync.Mutex

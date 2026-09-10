@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-
-	"circle-relay/internal/pushcredential"
 )
 
 // Placeholder is what a device shows when it cannot decrypt the payload —
@@ -31,7 +29,7 @@ type Sender struct {
 }
 
 // New builds a Sender from a loaded service-account key.
-func New(account *pushcredential.ServiceAccount) *Sender {
+func New(account *ServiceAccount) *Sender {
 	client := &http.Client{Timeout: 10 * time.Second}
 	return &Sender{
 		ProjectID: account.ProjectID,

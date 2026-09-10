@@ -22,8 +22,8 @@ import (
 	"circle-relay/internal/api/auth/oidcverify"
 	"circle-relay/internal/api/push"
 	"circle-relay/internal/config"
-	"circle-relay/internal/fcm"
-	"circle-relay/internal/pushcredential"
+	"circle-relay/internal/push/fcm"
+
 	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
 	blobs3 "circle-relay/internal/storage/blobstore/s3"
 	invitedynamodb "circle-relay/internal/storage/invitestore/dynamodb"
@@ -116,7 +116,7 @@ func nonEmpty(values ...string) []string {
 // Fire-and-forget by design: a push is best-effort, and a failed one must
 // not fail the append that triggered it.
 func pushDispatcher(awsCfg aws.Config, parameterName, filePath string) func(push.Delivery, int64, []byte) {
-	loader := &pushcredential.Loader{
+	loader := &fcm.Loader{
 		Client:        ssm.NewFromConfig(awsCfg),
 		ParameterName: parameterName,
 		FilePath:      filePath,
