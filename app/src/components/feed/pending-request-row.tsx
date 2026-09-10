@@ -52,7 +52,10 @@ export function usePendingRequestRows({ circleId, onRosterChanged }: PendingRequ
   const reload = useCallback(() => {
     if (!circleId) return;
     discoverPendingRequests(circleId)
-      .then(setRequests)
+      .then((found) => {
+        if (__DEV__) console.log(`Pending join requests for circle ${circleId}: ${found.length}`);
+        setRequests(found);
+      })
       .catch((err) => {
         // Showing nothing is right — a device that didn't create this
         // invite has no business listing its requests — but silence made
@@ -113,9 +116,11 @@ export function pendingRequestRow(request: PendingRequest, actions: RequestRowAc
   return {
     key: `request:${request.requesterId}`,
     spacing: Spacing.cardListGap,
-    // Someone is waiting on an answer only this device can give — it
-    // shouldn't scroll away behind photographs.
-    sticky: true,
+    // Not sticky, despite wanting to be. This was the only sticky row in
+    // the feed, and under Fabric on Android it reserved its height and
+    // drew nothing — so the request was invisible rather than merely
+    // scrollable. `orderRows` already pins it to the top (no `at`), so it
+    // is still the first thing on screen when the feed opens.
     render: () => (
       <ThemedView style={styles.row}>
         <PendingJoinRequestCard

@@ -52,9 +52,23 @@ describe('buildFeedRows', () => {
 });
 
 describe('each row decides for itself', () => {
-  test('a join request sticks; a roster change does not', () => {
-    expect(pendingRequestRow({ requesterId: 'a', selfReportedName: 'M', createdAt: 1 }, noRequestActions).sticky).toBe(true);
+  /**
+   * Nothing is sticky today: the join request was the only row that ever
+   * was, and under Fabric on Android it reserved its height and drew
+   * nothing. It stays at the top through `orderRows` instead.
+   */
+  test('no row asks to stick', () => {
+    expect(pendingRequestRow({ requesterId: 'a', selfReportedName: 'M', createdAt: 1 }, noRequestActions).sticky).toBeUndefined();
     expect(rosterChangeRow(event('e1', 1), null).sticky).toBeUndefined();
+  });
+
+  /** Pinned without being sticky — no `at` keeps it above the timeline. */
+  test('a join request stays above dated rows', () => {
+    const rows = buildFeedRows([
+      rosterChangeRow(event('e1', 9_000), null),
+      pendingRequestRow({ requesterId: 'a', selfReportedName: 'M', createdAt: 1 }, noRequestActions),
+    ]);
+    expect(rows[0].key).toBe('request:a');
   });
 
   test('only a timeline row carries a time', () => {
