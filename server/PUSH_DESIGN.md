@@ -247,6 +247,55 @@ switch is the `enabled` flag on the token row. "Silence this circle"
 unregisters or disables that circle's rows; nothing needs to sync, and no
 log entry is written.
 
+## Levels, and Android channels
+
+The relay stores a category bitmask per routing id and knows nothing about
+what the bits mean. The client presents them as a **ladder** rather than
+independent switches — new photos, then comments, then reactions — because
+nobody wants reactions but not photos, and one choice beats four toggles.
+
+**Someone joining is in every level**, not the top rung. It is a security
+event rather than a social one: a new member can see every photo already in
+the circle, only the invite's creator saw the approval screen, and the name
+and picture on it were supplied by the requester. Telling everyone else is
+how another member gets to say "wait, who is that?". It is rare enough to
+cost nothing in volume. Silencing the circle covers it; nothing else does.
+
+**Reactions are where the default stops.** One photo in a six-person family
+can draw five of them, and none say anything a comment doesn't. Easier to
+turn notifications up than to win back someone who switched them off.
+
+A level is stored as the mask it expands to, not by name, so an unfamiliar
+combination from another device survives being read back — `levelForMask`
+rounds *down* to the nearest level whose categories are a subset, so an
+unknown mask reads as quieter than it is rather than louder.
+
+### Channels and groups (not built)
+
+**One notification channel per circle**, created on join. That is what gives
+Android users per-circle sound, vibration and enable/disable in system
+settings, which is where they will look — the shape WhatsApp uses per
+conversation.
+
+A channel's sound, vibration and importance are frozen once created. Its
+**name and description are not**, so re-calling `createNotificationChannel`
+with the same id is how a renamed circle keeps a correct label. Changing a
+tone means creating a *new* channel and pointing at it; Android remembers
+deleted channel ids, so key them on the settings (`circle-<id>-<soundHash>`)
+rather than reusing one.
+
+**Notification groups** are separate: bundle a circle's notifications so
+several photos collapse into one stack with a summary rather than five rows.
+
+**The two silences differ, and the UI must not pretend otherwise.** The
+in-app toggle stops *delivery* — the relay has no row to send to. Disabling
+the channel stops *display*; the push still arrives. They drift apart the
+moment someone uses system settings, so on Android the in-app row should
+read the channel's enabled state and reflect it.
+
+iOS has no channel concept: the extension sets `sound` on the notification
+it builds, and vibration follows the sound and the ringer switch.
+
 ## What this leaks, honestly
 
 **At rest, nothing that groups anyone.** A stolen table yields opaque
