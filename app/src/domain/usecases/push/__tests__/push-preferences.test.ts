@@ -18,7 +18,7 @@ import {
   setCircleSilenced,
   syncPushPreferences,
 } from '@/domain/usecases/push/push-preferences';
-import { PushCategories } from '@/domain/usecases/push/push-registration';
+import { PushCategories } from '@/domain/usecases/push/push-categories';
 import { saveMasterSeed } from '@/services/keystore';
 import { deletePushRouting, putPushPrefs } from '@/services/push-relay';
 import { appendEntry, bootstrapCircle } from '@/services/relay';

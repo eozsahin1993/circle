@@ -19,6 +19,7 @@ import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account
 import { compressToThumbnail } from '@/services/image';
 import { writeCoverFile } from '@/services/photo-cache';
 import { bootstrapCircle, appendEntry } from '@/services/relay';
+import { enablePushForCircle } from '@/domain/usecases/push/enable-push';
 import { defaultCircleMask } from '@/domain/usecases/push/push-preferences';
 import { ensureCircleNotificationChannel } from '@/services/push-notification-channels';
 import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap } from '@/services/keystore';
@@ -47,6 +48,7 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
   if (!masterSeed) throw new Error('No master seed yet — onboarding must generate one before any circle exists.');
 
   const now = Date.now();
+  const pushCategoryMask = await defaultCircleMask();
   const circleId = generateUUID();
   const syncId = generateUUID();
   const memberId = generateUUID();
@@ -110,7 +112,7 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
     name: input.name,
     picture: input.picture ?? null,
     syncId,
-    pushCategoryMask: await defaultCircleMask(),
+    pushCategoryMask,
     createdAt: now,
     leftAt: null,
     // Deliberately *not* 1, though this device wrote epoch 1 itself. The
@@ -137,6 +139,9 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
   });
 
   await ensureCircleNotificationChannel(circleId, input.name);
+  enablePushForCircle(circleId, pushCategoryMask).catch((err) =>
+    console.error('Failed to enable notifications for the new circle', err),
+  );
 
   await syncAccountManifestBestEffort();
 

@@ -1,4 +1,6 @@
 import { getCircle } from '@/data/db';
+import { notifyCircleBestEffort } from '@/domain/usecases/push/notify-circle';
+import { PushCategories, type PushCategory } from '@/domain/usecases/push/push-categories';
 import { EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { timed, timedSync } from '@/services/timing';
 import { getCurrentContentKey, getMasterSeed } from '@/services/keystore';
@@ -36,6 +38,17 @@ const META_ENTRY_TYPES: OutboxEntry['entryType'][] = [
   // the mapping is right if it ever is.
   EntryTypes.KEY_ROTATION,
 ];
+
+/**
+ * Which entry types are worth interrupting someone for, and as what. Types
+ * absent from here never notify — a rename or a key rotation is not news.
+ */
+const PUSH_CATEGORIES: Partial<Record<OutboxEntry['entryType'], PushCategory>> = {
+  [EntryTypes.POST]: PushCategories.newPost,
+  [EntryTypes.COMMENT]: PushCategories.comment,
+  [EntryTypes.REACTION]: PushCategories.reaction,
+  [EntryTypes.MEMBER_ADDED]: PushCategories.memberJoined,
+};
 
 export function namespaceFor(entryType: OutboxEntry['entryType']): Namespace {
   return META_ENTRY_TYPES.includes(entryType) ? 'meta' : 'content';
@@ -166,6 +179,14 @@ async function pushPendingEntries(circleId: string): Promise<void> {
     }
 
     const { epoch } = await appendEntry(circle.syncId, namespace, entry.entryId, entry.encryptedMeta, current.version, writeToken);
+
+    // Notified from here rather than from each usecase: this is the one
+    // place that knows an entry actually landed, and it forwards the same
+    // ciphertext the log holds, which is all the relay is ever given.
+    const category = PUSH_CATEGORIES[entry.entryType];
+    if (category !== undefined) {
+      notifyCircleBestEffort(circleId, category, entry.encryptedMeta);
+    }
 
     // After the append, never before: the entry is what every device
     // converges on, and bytes removed ahead of it would leave the photo

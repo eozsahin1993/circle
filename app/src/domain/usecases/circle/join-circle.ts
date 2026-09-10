@@ -28,6 +28,7 @@ import {
 } from '@/data/db';
 import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
 import { writeCoverFile } from '@/services/photo-cache';
+import { enablePushForCircle } from '@/domain/usecases/push/enable-push';
 import { defaultCircleMask } from '@/domain/usecases/push/push-preferences';
 import { ensureCircleNotificationChannel } from '@/services/push-notification-channels';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
@@ -176,6 +177,7 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
   const currentKey = keyMap[currentVersion];
 
   const now = Date.now();
+  const pushCategoryMask = await defaultCircleMask();
   const { circleId } = pending;
   const memberId = generateUUID();
   const identity = deriveCircleIdentity(masterSeed, circleId);
@@ -191,7 +193,7 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
     name: circleName,
     picture,
     syncId,
-    pushCategoryMask: await defaultCircleMask(),
+    pushCategoryMask,
     createdAt: now,
     leftAt: null,
     metaCursor: 0,
@@ -217,6 +219,9 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
   });
 
   await ensureCircleNotificationChannel(circleId, circleName);
+  enablePushForCircle(circleId, pushCategoryMask).catch((err) =>
+    console.error('Failed to enable notifications for the new circle', err),
+  );
 
   await syncAccountManifestBestEffort();
 

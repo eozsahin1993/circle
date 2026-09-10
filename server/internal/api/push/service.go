@@ -53,6 +53,9 @@ func (s *Service) DeleteRouting(ctx context.Context, pushRoutingID string) error
 type Delivery struct {
 	PushToken []byte
 	Platform  string
+	// Which routing id resolved to this device — the receiving app uses it
+	// to find the circle without trial-decrypting against all of them.
+	PushRoutingID string
 }
 
 // FanoutResult is counts, not per-target detail: saying *which* ids failed
@@ -131,7 +134,11 @@ func (s *Service) resolve(ctx context.Context, pushRoutingID string, pushFanoutT
 		if !device.Enabled {
 			continue
 		}
-		deliveries = append(deliveries, Delivery{PushToken: device.PushToken, Platform: device.Platform})
+		deliveries = append(deliveries, Delivery{
+			PushToken:     device.PushToken,
+			Platform:      device.Platform,
+			PushRoutingID: pushRoutingID,
+		})
 	}
 	return deliveries, nil
 }

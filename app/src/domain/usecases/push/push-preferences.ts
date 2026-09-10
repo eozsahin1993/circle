@@ -1,6 +1,7 @@
 import { getAppSettings } from '@/services/settings';
 import { getAllCircles, getCircle, setCirclePushCategoryMask, setCirclePushSilenced } from '@/data/db';
-import { silenceCircle, syncCirclePushPrefs, PushCategories, type PushCategory } from '@/domain/usecases/push/push-registration';
+import { PushCategories, type PushCategory } from '@/domain/usecases/push/push-categories';
+import { silenceCircle, syncCirclePushPrefs } from '@/domain/usecases/push/push-registration';
 
 /**
  * Which notifications this account wants, and for which circles.

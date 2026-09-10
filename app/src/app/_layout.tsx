@@ -11,6 +11,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import { Snackbar } from '@/components/snackbar';
 import { Colors } from '@/constants/theme';
 import { initDatabase } from '@/data/db';
+import { enablePushEverywhere } from '@/domain/usecases/push/enable-push';
+import { startPushHandling } from '@/services/push-task';
 import { AppSettingsProvider, useAppSettings } from '@/hooks/use-app-settings';
 import { useMessages } from '@/hooks/use-messages';
 import { getAppSettings, type AppSettings } from '@/services/settings';
@@ -92,6 +94,11 @@ export default function RootLayout() {
     initDatabase()
       .then(() => setDbReady(true))
       .catch((error) => console.error('Failed to initialize database', error));
+    // Best-effort and unawaited: a refused permission or an offline relay
+    // must not hold up the first screen.
+    startPushHandling()
+      .then(enablePushEverywhere)
+      .catch((error) => console.error('Failed to set up notifications', error));
     getAppSettings()
       .then(setSettings)
       .catch((error) => console.error('Failed to load app settings', error));

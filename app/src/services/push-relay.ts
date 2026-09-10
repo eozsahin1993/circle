@@ -36,14 +36,14 @@ export async function putPushPrefs(
 export async function putPushDevice(
   pushRoutingId: string,
   deviceId: string,
-  pushToken: Uint8Array,
+  pushToken: string,
   platform: 'ios' | 'android',
   enabled: boolean,
 ): Promise<void> {
   const response = await authorizedFetch(`/v1/push/${pushRoutingId}/devices/${deviceId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pushToken: Buffer.from(pushToken).toString('base64'), platform, enabled }),
+    body: JSON.stringify({ pushToken: Buffer.from(pushToken, 'utf8').toString('base64'), platform, enabled }),
   });
   if (!response.ok) {
     throw new Error(`Failed to register push device: ${response.status}`);

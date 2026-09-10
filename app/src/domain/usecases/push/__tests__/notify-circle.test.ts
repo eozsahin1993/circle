@@ -10,7 +10,7 @@ import { initDatabase, MemberRoles, recordMemberAddedLocally, setMemberPushRouti
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import { resetLocalDataForTesting } from '@/domain/usecases/dev-reset';
 import { notifyCircle } from '@/domain/usecases/push/notify-circle';
-import { PushCategories } from '@/domain/usecases/push/push-registration';
+import { PushCategories } from '@/domain/usecases/push/push-categories';
 import { derivePushFanoutToken, derivePushRoutingId, generateIdentity, generateUUID } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey, getMasterSeed, saveMasterSeed } from '@/services/keystore';
 import { sendPush } from '@/services/push-relay';

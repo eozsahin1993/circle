@@ -15,8 +15,8 @@ import {
 import { EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import { resetLocalDataForTesting } from '@/domain/usecases/dev-reset';
+import { PushCategories } from '@/domain/usecases/push/push-categories';
 import {
-  PushCategories,
   registerPushForCircle,
   silenceCircle,
   unregisterDeviceForCircle,
@@ -34,7 +34,7 @@ import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { appendEntry, bootstrapCircle } from '@/services/relay';
 
 const registration = {
-  pushToken: new Uint8Array([1, 2, 3]),
+  pushToken: 'fcm-registration-token',
   platform: 'android' as const,
   categories: [PushCategories.newPost, PushCategories.comment],
 };

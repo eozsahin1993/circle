@@ -48,7 +48,7 @@ func New(account *pushcredential.ServiceAccount) *Sender {
 //
 // The placeholder rides alongside so the card is not blank when the
 // handler doesn't run.
-func (s *Sender) Send(ctx context.Context, deviceToken string, payload []byte) error {
+func (s *Sender) Send(ctx context.Context, deviceToken, pushRoutingID string, payload []byte) error {
 	accessToken, err := s.tokens.accessToken(ctx)
 	if err != nil {
 		return err
@@ -58,8 +58,14 @@ func (s *Sender) Send(ctx context.Context, deviceToken string, payload []byte) e
 		"message": map[string]any{
 			"token": deviceToken,
 			"data": map[string]string{
-				"payload":     base64.StdEncoding.EncodeToString(payload),
-				"placeholder": Placeholder,
+				// Which circle this belongs to, as far as the device is
+				// concerned. It derives its own routing ids, so this is a
+				// lookup key it already holds — the relay learns nothing by
+				// naming it, and without it the device would have to
+				// trial-decrypt against every circle it is in.
+				"pushRoutingId": pushRoutingID,
+				"payload":       base64.StdEncoding.EncodeToString(payload),
+				"placeholder":   Placeholder,
 			},
 			"android": map[string]any{
 				// High priority, or Doze defers a data-only message

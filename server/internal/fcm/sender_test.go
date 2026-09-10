@@ -69,7 +69,7 @@ func TestSendPostsADataOnlyMessage(t *testing.T) {
 	sender := New(testAccount(t, tokens.URL))
 	sender.Client.Transport = redirectTo(fcmAPI.URL)
 
-	if err := sender.Send(context.Background(), "device-token", []byte("ciphertext")); err != nil {
+	if err := sender.Send(context.Background(), "device-token", "routing-1", []byte("ciphertext")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -89,6 +89,9 @@ func TestSendPostsADataOnlyMessage(t *testing.T) {
 	data := message["data"].(map[string]any)
 	if data["payload"] != base64.StdEncoding.EncodeToString([]byte("ciphertext")) {
 		t.Fatalf("payload did not survive: %v", data["payload"])
+	}
+	if data["pushRoutingId"] != "routing-1" {
+		t.Fatalf("the device needs the routing id to find its circle, got %v", data["pushRoutingId"])
 	}
 	if data["placeholder"] != Placeholder {
 		t.Fatalf("expected the fixed placeholder, got %v", data["placeholder"])
@@ -114,7 +117,7 @@ func TestAccessTokenIsReusedAcrossSends(t *testing.T) {
 	sender.Client.Transport = redirectTo(fcmAPI.URL)
 
 	for range 3 {
-		if err := sender.Send(context.Background(), "device-token", []byte("x")); err != nil {
+		if err := sender.Send(context.Background(), "device-token", "routing-1", []byte("x")); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -140,7 +143,7 @@ func TestAnAlmostExpiredTokenIsRefreshed(t *testing.T) {
 	sender.Client.Transport = redirectTo(fcmAPI.URL)
 
 	for range 2 {
-		if err := sender.Send(context.Background(), "device-token", []byte("x")); err != nil {
+		if err := sender.Send(context.Background(), "device-token", "routing-1", []byte("x")); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -163,7 +166,7 @@ func TestSendReportsAFailedStatus(t *testing.T) {
 	sender := New(testAccount(t, tokens.URL))
 	sender.Client.Transport = redirectTo(fcmAPI.URL)
 
-	err := sender.Send(context.Background(), "device-token", []byte("x"))
+	err := sender.Send(context.Background(), "device-token", "routing-1", []byte("x"))
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -180,7 +183,7 @@ func TestAMalformedKeyDoesNotLeakItself(t *testing.T) {
 		PrivateKey:  "-----BEGIN PRIVATE KEY-----\nnot-a-key\n-----END PRIVATE KEY-----\n",
 	}
 
-	err := New(account).Send(context.Background(), "device-token", []byte("x"))
+	err := New(account).Send(context.Background(), "device-token", "routing-1", []byte("x"))
 	if err == nil {
 		t.Fatal("expected an error")
 	}

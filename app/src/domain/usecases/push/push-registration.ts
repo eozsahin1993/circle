@@ -2,6 +2,7 @@ import { bytesToHex } from '@noble/curves/utils.js';
 
 import { getCircleMembers, insertOutboxEntry, OutboxStatuses, setMemberPushRoutingId } from '@/data/db';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
+import { type PushCategory } from '@/domain/usecases/push/push-categories';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import {
   derivePushDeviceId,
@@ -23,22 +24,10 @@ import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from
  * own roster).
  */
 
-/**
- * Bit positions in the relay's mask, so these values are permanent — add to
- * the end, never renumber.
- */
-export const PushCategories = {
-  newPost: 0,
-  comment: 1,
-  reaction: 2,
-  memberJoined: 3,
-} as const;
-
-export type PushCategory = (typeof PushCategories)[keyof typeof PushCategories];
 
 export type PushRegistration = {
-  /** Native push token bytes, from the platform SDK. */
-  pushToken: Uint8Array;
+  /** The platform's own token — FCM registration id, or an APNs token. */
+  pushToken: string;
   platform: 'ios' | 'android';
   categories: PushCategory[];
 };

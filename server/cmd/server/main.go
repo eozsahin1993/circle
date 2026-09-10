@@ -141,7 +141,7 @@ func pushDispatcher(awsCfg aws.Config, parameterName string) func(push.Delivery,
 			return
 		}
 
-		if err := sender.Send(ctx, string(delivery.PushToken), payload); err != nil {
+		if err := sender.Send(ctx, string(delivery.PushToken), delivery.PushRoutingID, payload); err != nil {
 			log.Printf("failed to deliver a push: %v", err)
 		}
 	}
