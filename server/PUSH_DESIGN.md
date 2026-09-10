@@ -284,8 +284,20 @@ tone means creating a *new* channel and pointing at it; Android remembers
 deleted channel ids, so key them on the settings (`circle-<id>-<soundHash>`)
 rather than reusing one.
 
-**Notification groups** are separate: bundle a circle's notifications so
-several photos collapse into one stack with a summary rather than five rows.
+Three Android mechanisms, easy to conflate, all keyed `circle-<id>`:
+
+- **Channel** — owns sound, vibration, importance. One per circle.
+- **Channel group** (`createNotificationChannelGroup`) — organises channels
+  in *system settings*. With one channel per circle it only keeps that list
+  tidy, but it leaves room to split into per-category channels later:
+  settings would show the circle as a heading with Photos / Comments /
+  Reactions beneath, finer control than the in-app ladder, with nothing to
+  restructure. Groups can be created and updated freely, unlike channels,
+  and deleting one deletes its channels — which is what leaving a circle
+  should do.
+- **Notification group** (`setGroup` on a posted notification) — bundles a
+  circle's notifications in the *shade*, so several photos collapse into one
+  stack with a summary rather than five rows.
 
 **The two silences differ, and the UI must not pretend otherwise.** The
 in-app toggle stops *delivery* — the relay has no row to send to. Disabling
