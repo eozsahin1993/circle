@@ -72,7 +72,7 @@ func start(t *testing.T) *relay {
 
 	awsCfg, err := localstack.Config(ctx)
 	if err != nil {
-		t.Skipf("cannot configure AWS for LocalStack, skipping: %v", err)
+		unreachable(t, err)
 	}
 
 	ddb := awsdynamodb.NewFromConfig(awsCfg)
@@ -80,7 +80,7 @@ func start(t *testing.T) *relay {
 
 	names := localstack.Unique(suffix(t))
 	if err := localstack.ProvisionSet(ctx, ddb, s3Client, names); err != nil {
-		t.Skipf("LocalStack not reachable, skipping: %v", err)
+		unreachable(t, err)
 	}
 	t.Cleanup(func() { localstack.TeardownSet(context.Background(), ddb, s3Client, names) })
 
@@ -114,6 +114,21 @@ func relayConfig(names localstack.Names) config.Config {
 		RateLimitWindowMinutes:    10,
 		S3ForcePathStyle:          true,
 	}
+}
+
+// unreachable decides what a missing LocalStack means.
+//
+// Skipping is right locally — not everyone has it running, and a red
+// suite for that is noise. It is wrong in CI: a container that failed to
+// start would skip every test here and the run would pass, reporting that
+// nothing is broken because nothing was checked. So CI sets
+// BLACKBOX_REQUIRE_RELAY and gets a failure instead.
+func unreachable(t *testing.T, err error) {
+	t.Helper()
+	if os.Getenv("BLACKBOX_REQUIRE_RELAY") != "" {
+		t.Fatalf("BLACKBOX_REQUIRE_RELAY is set but the relay's storage is unreachable: %v", err)
+	}
+	t.Skipf("LocalStack not reachable, skipping: %v", err)
 }
 
 // suffix is a resource-name-safe id for one test: lowercase, no
