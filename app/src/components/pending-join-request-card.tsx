@@ -42,7 +42,7 @@ export function PendingJoinRequestCard({ request, busy, onApprove, onDeny }: Pen
   return (
     <ThemedView type="surface" style={[styles.card, { borderColor: tints.chipReactedBorder }]}>
       <View style={styles.header}>
-        <Avatar size={44} uri={request.pictureUri} />
+        <Avatar size={44} uri={request.pictureUri} name={request.selfReportedName} />
         <View style={styles.text}>
           <ThemedText type="cardTitle">{request.selfReportedName || 'Someone'}</ThemedText>
           <ThemedText type="meta" themeColor="muted">

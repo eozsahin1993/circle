@@ -318,6 +318,7 @@ export default function PostDetailsScreen() {
                   <Avatar
                     size={36}
                     uri={comment.authorPicture ? bytesToDataUri(comment.authorPicture) : undefined}
+                    name={comment.authorName || profileName}
                   />
                   <View style={styles.commentBody}>
                     <View style={styles.commentByline}>

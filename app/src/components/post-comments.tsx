@@ -10,7 +10,7 @@ import { useTheme, useTints } from '@/hooks/use-theme';
 export type CommentItem = {
   id: string;
   authorName: string;
-  /** Data URI of the author's picture, when known — otherwise the hatch placeholder shows. */
+  /** Data URI of the author's picture, when known — otherwise their initials show. */
   authorPhotoUri?: string;
   body: string;
   /** Relative and short — "3d", "6h" — since the post's own timestamp already gives the absolute anchor. */
@@ -29,6 +29,8 @@ export type PostCommentsProps = {
   onPressShowAll?: () => void;
   /** The reader's own picture — shown beside the composer and the empty-state invitation, both of which are addressed to them. */
   selfPhotoUri?: string;
+  /** Pairs with `selfPhotoUri` — the composer avatar's initials before a picture is set. */
+  selfName?: string;
 };
 
 const AVATAR_SIZE = 30;
@@ -51,7 +53,15 @@ const COMPOSER_HEIGHT = 42;
  * own screen, which is also the only place it can scroll independently of
  * the feed. The summary line is that tap.
  */
-export function PostComments({ latest, total, composerOpen, onSubmit, onPressShowAll, selfPhotoUri }: PostCommentsProps) {
+export function PostComments({
+  latest,
+  total,
+  composerOpen,
+  onSubmit,
+  onPressShowAll,
+  selfPhotoUri,
+  selfName,
+}: PostCommentsProps) {
   const theme = useTheme();
   const tints = useTints();
   const [text, setText] = useState('');
@@ -66,7 +76,7 @@ export function PostComments({ latest, total, composerOpen, onSubmit, onPressSho
     <View style={styles.container}>
       {latest ? (
         <View style={styles.commentRow}>
-          <Avatar size={AVATAR_SIZE} uri={latest.authorPhotoUri} />
+          <Avatar size={AVATAR_SIZE} uri={latest.authorPhotoUri} name={latest.authorName} />
           <View style={styles.commentBody}>
             <ThemedText type="comment" themeColor="secondary">
               <ThemedText type="postAuthor">{latest.authorName}</ThemedText>
@@ -94,7 +104,7 @@ export function PostComments({ latest, total, composerOpen, onSubmit, onPressSho
               avatar — here it's one of three controls on a line, and a
               short circle beside a tall box reads as misaligned however
               it's centred. */}
-          <Avatar size={COMPOSER_HEIGHT} uri={selfPhotoUri} />
+          <Avatar size={COMPOSER_HEIGHT} uri={selfPhotoUri} name={selfName} />
           <TextInput
             value={text}
             onChangeText={setText}

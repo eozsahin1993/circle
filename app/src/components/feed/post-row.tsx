@@ -123,6 +123,7 @@ function postRow(view: FeedPostView, profile: Profile | null, actions: PostRowAc
       <PostCard
         post={post}
         selfPhotoUri={pictureUri(profile?.picture)}
+        selfName={profile?.name}
         onToggleReaction={(emoji) => actions.onToggleReaction(post.id, emoji)}
         onAddComment={(body) => actions.onAddComment(post.id, body)}
         onPressPhoto={() => actions.onOpenPost(post.id)}

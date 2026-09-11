@@ -173,7 +173,7 @@ export default function AccountScreen() {
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.profileRow}>
-            <Avatar size={72} uri={profile?.picture ? bytesToDataUri(profile.picture) : undefined} />
+            <Avatar size={72} uri={profile?.picture ? bytesToDataUri(profile.picture) : undefined} name={profile?.name} />
             <View style={styles.profileText}>
               <ThemedText type="screenTitle" numberOfLines={1}>
                 {profile?.name || 'Add your name'}

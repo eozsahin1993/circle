@@ -1,23 +1,32 @@
 import { Image } from 'expo-image';
 import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { PhotoSlotLight } from '@/constants/theme';
+import { AvatarInk, Fonts, PhotoSlotLight } from '@/constants/theme';
 import { useAppSettings } from '@/hooks/use-app-settings';
 import { useTheme, useTints } from '@/hooks/use-theme';
+import { avatarTintFor, initialsOf } from '@/utils/initials';
 
 export type AvatarProps = {
   size?: number;
   /** Border matching whatever surface it sits on, to separate overlapping avatars. */
   ringColor?: string;
-  /** A real picture to show instead of the hatch placeholder — e.g. a freshly-picked profile photo. */
+  /** A real picture to show instead of the fallback — e.g. a freshly-picked profile photo. */
   uri?: string;
+  /**
+   * Who this is, for the initials shown when there's no picture — pass the
+   * name displayed beside it, so the two agree. Blank falls to the hatch.
+   */
+  name?: string;
   /** Corner radius, defaulting to a circle. Square it off for a thumbnail of a photograph, which isn't a face. */
   radius?: number;
 };
 
-/** Shows `uri` if given, otherwise the diagonal-hatch placeholder — both clipped to a circle. */
-export function Avatar({ size = 44, ringColor, uri, radius }: AvatarProps) {
+/**
+ * A member's picture, else their initials on a colour derived from their
+ * name, else a neutral hatch — strictly in that order.
+ */
+export function Avatar({ size = 44, ringColor, uri, name, radius }: AvatarProps) {
   const { scheme } = useAppSettings();
   const theme = useTheme();
   const tints = useTints();
@@ -25,6 +34,9 @@ export function Avatar({ size = 44, ringColor, uri, radius }: AvatarProps) {
   // Dark mode's hatch sits on `surface`; light mode has no surface dim
   // enough to read as a slot, hence the dedicated PhotoSlotLight.
   const hatchFill = scheme === 'dark' ? theme.surface : PhotoSlotLight;
+  // Not built behind a picture. Conditional where the hatch below can't be:
+  // that Fabric constraint is specific to SvgView, not a plain View.
+  const initials = uri ? '' : initialsOf(name);
 
   return (
     <View
@@ -64,6 +76,18 @@ export function Avatar({ size = 44, ringColor, uri, radius }: AvatarProps) {
           <Rect width="100%" height="100%" fill={`url(#avatarHatch-${size})`} />
         </Svg>
       </View>
+      {initials ? (
+        <View style={[StyleSheet.absoluteFill, styles.initials, { backgroundColor: avatarTintFor(name) }]}>
+          {/* No scheme here, unlike the hatch: see AvatarTints. Font
+              scaling off because the disc can't grow with it. */}
+          <Text
+            allowFontScaling={false}
+            numberOfLines={1}
+            style={[styles.initialsText, { fontSize: Math.round(size * 0.4), lineHeight: Math.round(size * 0.4 * 1.15) }]}>
+            {initials}
+          </Text>
+        </View>
+      ) : null}
       {uri ? <Image source={{ uri }} style={StyleSheet.absoluteFill} /> : null}
     </View>
   );
@@ -72,5 +96,15 @@ export function Avatar({ size = 44, ringColor, uri, radius }: AvatarProps) {
 const styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
+  },
+  initials: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  initialsText: {
+    color: AvatarInk,
+    fontFamily: Fonts.sansSemiBold,
+    // Two capitals set tight read as one glyph at 34px.
+    letterSpacing: 0.5,
   },
 });
