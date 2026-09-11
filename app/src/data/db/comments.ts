@@ -155,3 +155,16 @@ export async function getPostCommentCount(postId: string): Promise<number> {
   const rows = await db.select({ count: count() }).from(postComments).where(eq(postComments.postId, postId));
   return rows[0]?.count ?? 0;
 }
+
+/**
+ * Everyone who has ever commented on a post, once each — who a new comment
+ * should notify besides the post's own author (see notify-circle.ts). No
+ * names or bodies: this is a recipient list, not something rendered.
+ */
+export async function getCommentAuthors(postId: string): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ authorPublicKey: postComments.authorPublicKey })
+    .from(postComments)
+    .where(eq(postComments.postId, postId));
+  return rows.map((row) => row.authorPublicKey);
+}

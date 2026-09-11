@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
 
 import { db } from '@/data/db/connection';
 import { circleMembers, outbox, postReactions } from '@/data/db/schema';
@@ -22,6 +22,27 @@ export async function hasReacted(postId: string, authorPublicKey: string, emoji:
     .select()
     .from(postReactions)
     .where(and(eq(postReactions.postId, postId), eq(postReactions.authorPublicKey, authorPublicKey), eq(postReactions.emoji, emoji)))
+    .limit(1);
+  return rows.length > 0;
+}
+
+/**
+ * Whether authorPublicKey already holds some other active reaction on this
+ * post — used to tell a genuinely new reactor (who should notify the post's
+ * owner) from someone adding a second or third emoji to a post they've
+ * already reacted to (who shouldn't notify anyone again).
+ */
+export async function hasOtherReaction(postId: string, authorPublicKey: string, emoji: string): Promise<boolean> {
+  const rows = await db
+    .select()
+    .from(postReactions)
+    .where(
+      and(
+        eq(postReactions.postId, postId),
+        eq(postReactions.authorPublicKey, authorPublicKey),
+        ne(postReactions.emoji, emoji)
+      )
+    )
     .limit(1);
   return rows.length > 0;
 }

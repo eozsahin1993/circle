@@ -12,7 +12,10 @@
 //
 // Its own importable package, not more *_test.go files beside the tests
 // that use it: Relay/Device/Response are generic to any sequence a future
-// test package writes against this relay, not specific to invites.
+// test package writes against this relay. Circle (see circle.go) is the
+// one thing here that knows a specific flow, and earns its place by being
+// shared across test files rather than living in one of them — the invite
+// steps, used by a single file, stay in invite_test.go.
 package harness
 
 import (
@@ -141,11 +144,11 @@ func (r *Relay) Anon() *Device {
 }
 
 // Body is a JSON object to send. A named type because almost every request
-// here carries one field, and map[string]any at each call site buries
+// here carries one field, and a bare map literal at each call site buries
 // what's actually being sent. any, not string, because not every endpoint's
-// fields are strings — deletecircle's keyVersion is a number, and encoding
-// it as a JSON string would fail to decode into the int64 the handler
-// expects.
+// fields are strings — keyVersion is a number wherever it appears, and
+// quoting it doesn't decode as the wrong type, it fails the whole body as
+// "invalid request body".
 type Body map[string]any
 
 func (d *Device) Get(path string) Response          { return d.send(http.MethodGet, path, nil) }
@@ -153,7 +156,14 @@ func (d *Device) Put(path string, b Body) Response  { return d.send(http.MethodP
 func (d *Device) Post(path string, b Body) Response { return d.send(http.MethodPost, path, b) }
 func (d *Device) Delete(path string) Response       { return d.send(http.MethodDelete, path, nil) }
 
-func (d *Device) send(method, path string, b Body) Response {
+// PostRequest sends a struct rather than a Body — for the endpoints this
+// package models field for field (see circle.go), where a map would drop
+// the names the handler actually decodes and the types it needs them in.
+func (d *Device) PostRequest(path string, request any) Response {
+	return d.send(http.MethodPost, path, request)
+}
+
+func (d *Device) send(method, path string, b any) Response {
 	t := d.relay.t
 	t.Helper()
 
