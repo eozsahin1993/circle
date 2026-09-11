@@ -12,7 +12,10 @@
 //
 // Its own importable package, not more *_test.go files beside the tests
 // that use it: Relay/Device/Response are generic to any sequence a future
-// test package writes against this relay, not specific to invites.
+// test package writes against this relay. Circle (see circle.go) is the
+// one thing here that knows a specific flow, and earns its place by being
+// shared across test files rather than living in one of them — the invite
+// steps, used by a single file, stay in invite_test.go.
 package harness
 
 import (

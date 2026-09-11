@@ -59,17 +59,18 @@ func (a Authority) Sign(message []byte) string {
 	return hex.EncodeToString(ed25519.Sign(a.private, message))
 }
 
-// WriteToken is a circle's write capability and the only half of it the
-// relay ever stores. Hex because the relay hex-decodes the token before
-// hashing it, so a token that isn't hex can never match anything.
+// WriteToken is a circle's write capability. Raw is what a member
+// presents; Hash is the only half the relay ever stores. Both hex,
+// because the relay hex-decodes the token before hashing it — a token
+// that isn't hex can never match anything.
 type WriteToken struct {
-	Token string
-	Hash  string
+	Raw  string
+	Hash string
 }
 
 func NewWriteToken() WriteToken {
 	raw := make([]byte, 32)
 	_, _ = rand.Read(raw)
 	sum := sha256.Sum256(raw)
-	return WriteToken{Token: hex.EncodeToString(raw), Hash: hex.EncodeToString(sum[:])}
+	return WriteToken{Raw: hex.EncodeToString(raw), Hash: hex.EncodeToString(sum[:])}
 }
