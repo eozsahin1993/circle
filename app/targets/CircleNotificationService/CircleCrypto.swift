@@ -7,7 +7,9 @@ import SwiftSodium
 /// bytes this must reproduce — check a change here against those.
 enum CircleCrypto {
   /// derivePushRoutingId in crypto.ts. The domain string is
-  /// "push-enabled", not PUSH_DESIGN.md's "push-routing" — the code won.
+  /// "push-enabled" — an earlier design called it "push-routing", but
+  /// what shipped is what every device must match, so this follows the
+  /// code rather than that name.
   static func pushRoutingId(masterSeed: Data, circleId: String) -> String {
     let info = Data("push-enabled".utf8) + Data(circleId.utf8)
     let key = HKDF<SHA256>.deriveKey(

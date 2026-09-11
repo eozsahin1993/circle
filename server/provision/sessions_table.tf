@@ -2,8 +2,7 @@
 # key (a session is only ever looked up by the token itself). Genuinely
 # separate from accounts_table.tf: token-lookup vs account-lookup are
 # different access patterns, and sessions are ephemeral (TTL'd) where the
-# account document isn't. See server/DESIGN.md's "Email auth" section and
-# server/internal/storage/authstore/dynamodb.
+# account document isn't. See internal/storage/authstore/dynamodb.
 resource "aws_dynamodb_table" "sessions" {
   name         = "${local.name_prefix}-sessions"
   billing_mode = "PAY_PER_REQUEST"
