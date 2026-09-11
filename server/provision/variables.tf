@@ -21,7 +21,7 @@ variable "blob_glacier_transition_days" {
 }
 
 variable "invite_retention_days" {
-  description = "TTL window for invites-table rows (the invite row and each join-request row) — DynamoDB TTL, an expiresAt attribute set at write time — see server/INVITE_FLOW.md and internal/storage/invitestore/dynamodb. Matches the client's INVITE_TTL_MS default of 7 days."
+  description = "TTL window for invites-table rows (the invite row and each join-request row) — DynamoDB TTL, an expiresAt attribute set at write time — see internal/storage/invitestore/dynamodb. Matches the client's INVITE_TTL_MS default of 7 days."
   type        = number
   default     = 7
 }

@@ -1,5 +1,5 @@
-# Single-table design, one partition per syncId — see server/SYNC_DESIGN.md
-# and log_store.go for the key-shape rationale.
+# Single-table design, one partition per syncId — see log_store.go for
+# the key-shape rationale.
 resource "aws_dynamodb_table" "sync_log" {
   name         = "${var.name_prefix}-sync-log"
   billing_mode = "PAY_PER_REQUEST" # unpredictable, low traffic — no capacity to plan for.
@@ -33,8 +33,8 @@ resource "aws_dynamodb_table" "sync_log" {
   }
 }
 
-# Invite/join-request table — see server/INVITE_FLOW.md. Same shape as
-# sync_log above (composite pk/sk, TTL-evicted, no KMS SSE): every row's
+# Invite/join-request table. Same shape as sync_log above (composite
+# pk/sk, TTL-evicted, no KMS SSE): every row's
 # content is already ciphertext encrypted client-side (either with a
 # code-derived key or, for the approval, sealed-box-style to a one-time
 # public key), so a second server-side encryption layer adds nothing —

@@ -45,9 +45,8 @@ func TestEndToEnd_Invite_GetUnknownInviteReturns404(t *testing.T) {
 }
 
 // TestEndToEnd_Invite_FullRoundTrip walks the whole server-side
-// handshake described in server/INVITE_FLOW.md: create invite -> get
-// invite -> put join request -> list requests -> approve -> get request
-// shows the approval.
+// handshake: create invite -> get invite -> put join request -> list
+// requests -> approve -> get request shows the approval.
 func TestEndToEnd_Invite_FullRoundTrip(t *testing.T) {
 	mux, google, _ := testsupport.NewRouterWithAuth(t)
 	server := httptest.NewServer(mux)

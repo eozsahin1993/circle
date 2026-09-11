@@ -323,8 +323,7 @@ func (c *Circle) As(d *Device) *Circle {
 }
 
 // UploadTarget is what the two upload-target endpoints hand back: a
-// presigned S3 POST a client uses directly, never back through the relay
-// (see server/DESIGN.md).
+// presigned S3 POST a client uses directly, never back through the relay.
 type UploadTarget struct {
 	URL    string            `json:"url"`
 	Fields map[string]string `json:"fields"`

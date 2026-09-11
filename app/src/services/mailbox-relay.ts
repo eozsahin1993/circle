@@ -3,11 +3,11 @@ import { Buffer } from 'buffer';
 import { authorizedFetch } from '@/services/relay';
 
 /**
- * Thin fetch-based client for the invite mailbox's endpoints — see
- * server/INVITE_FLOW.md and server/internal/api/invitemailbox. Same
- * division of labor as relay.ts: this module only knows how to talk to
- * the wire, nothing about invite-code derivation or decryption (that's
- * services/crypto.ts and the domain usecases that call this).
+ * Thin fetch-based client for the invite mailbox's endpoints (server-side:
+ * server/internal/api/invitemailbox). Same division of labor as relay.ts:
+ * this module only knows how to talk to the wire, nothing about
+ * invite-code derivation or decryption (that's services/crypto.ts and the
+ * domain usecases that call this).
  */
 
 export type MailboxJoinRequest = {

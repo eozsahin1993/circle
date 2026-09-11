@@ -32,8 +32,8 @@ export type CreateCircleInput = {
 
 /**
  * Creates a circle and makes this device its first member, as `admin`.
- * Two required relay calls, not one (server/SYNC_DESIGN.md operation 1):
- * `bootstrapCircle` registers the control state, then `appendEntry` logs
+ * Two required relay calls, not one: `bootstrapCircle` registers the
+ * control state, then `appendEntry` logs
  * the founder's own `member_added` using the token just registered. Both
  * propagate on failure rather than being swallowed — nothing about this
  * circle works until they succeed.

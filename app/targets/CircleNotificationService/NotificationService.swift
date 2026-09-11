@@ -5,7 +5,7 @@ import UserNotifications
 let appGroup = "group.com.eozsahin.circle"
 
 /// Hardcoded, never read from the payload: a push that can't be decrypted
-/// must not choose its own lock-screen text (server/PUSH_DESIGN.md).
+/// must not choose its own lock-screen text.
 let placeholder = "New activity"
 
 class NotificationService: UNNotificationServiceExtension {

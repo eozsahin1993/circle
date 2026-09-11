@@ -15,9 +15,9 @@ export type JustJoinedRowsInput = {
 
 /**
  * A fresh joiner has the circle secret and roster access but no history
- * yet — pullCircle (syncing an existing circle's past entries) doesn't
- * exist yet (see server/INVITE_FLOW.md). Honest about the gap rather than
- * looking broken.
+ * yet — pulling an existing circle's past entries from the relay isn't
+ * built, so there's nothing to backfill from. Honest about the gap rather
+ * than looking broken.
  *
  * Both halves of "should this show" live here, and neither is a condition
  * the coordinator has to remember: empty when it shouldn't show.

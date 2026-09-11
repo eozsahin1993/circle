@@ -29,7 +29,7 @@ import type { MemberRole } from '@/data/db/members';
  * the two is self-healing — the next replay re-applies the same entry,
  * the event insert no-ops on its `(circleId, epoch)` key, and the
  * projection write runs again. That works because every apply is already
- * required to be idempotent (server/SYNC_DESIGN.md invariant 8).
+ * required to be idempotent.
  *
  * **Each write is total, not a patch.** An apply sets every field its
  * event determines rather than only the ones that changed — most

@@ -1,10 +1,10 @@
 // Package invite is the vertical slice for the invite/join-request
-// routes under /invites/ — see server/INVITE_FLOW.md for the full
-// design. Flat, not nested under api/account: this isn't account-scoped
-// data, it's tag-addressed (by invite tag) exactly like the "mailbox"
-// concept server/DESIGN.md's "Mailbox" section describes — invites are
-// its first consumer, not its only intended one. The relay only ever
-// stores and returns ciphertext; nothing here looks inside it.
+// routes under /invites/. Flat, not nested under api/account: this isn't
+// account-scoped data, it's tag-addressed (by invite tag) — the same
+// generic "mailbox" shape (ephemeral, per-individual, fetch-then-ack-
+// then-delete) meant for any one-shot private handoff, not just invites;
+// invites are just its first consumer. The relay only ever stores and
+// returns ciphertext; nothing here looks inside it.
 package invite
 
 import (

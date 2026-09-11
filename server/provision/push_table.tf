@@ -1,5 +1,5 @@
-# Standalone table for push routing state — see server/PUSH_DESIGN.md.
-# PK = pushRoutingId, SK distinguishes the prefs row ("prefs") from each
+# Standalone table for push routing state. PK = pushRoutingId, SK
+# distinguishes the prefs row ("prefs") from each
 # device's row ("device#<deviceId>"), same single-table shape as the
 # invites and log tables.
 #

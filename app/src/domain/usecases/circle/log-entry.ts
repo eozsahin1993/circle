@@ -29,11 +29,10 @@ export const EntryTypes = {
 export type EntryType = (typeof EntryTypes)[keyof typeof EntryTypes];
 
 /**
- * Every log entry's plaintext envelope, before encryption — see
- * server/SYNC_DESIGN.md's "Entry shape". `signature` covers `{type,
- * payload}` together, not `payload` alone, so a signature can't be
- * reinterpreted as a different type with the same payload shape. Opaque
- * to the relay; every client decrypts and verifies independently.
+ * Every log entry's plaintext envelope, before encryption. `signature`
+ * covers `{type, payload}` together, not `payload` alone, so a signature
+ * can't be reinterpreted as a different type with the same payload shape.
+ * Opaque to the relay; every client decrypts and verifies independently.
  */
 export type LogEntryEnvelope = {
   type: string;
@@ -62,8 +61,9 @@ export function buildAndEncryptLogEntry(type: string, payload: unknown, identity
 
 /**
  * The inverse of `buildAndEncryptLogEntry`, and the sync engine's single
- * default-deny chokepoint (server/SYNC_DESIGN.md invariant 5): decrypt,
- * parse, and check the signature actually covers `{type, payload}` —
+ * default-deny chokepoint: every entry must decrypt, parse, and verify
+ * before it's trusted, never the other way around. Also checks the
+ * signature actually covers `{type, payload}` —
  * re-serialized here exactly as `buildLogEntry` serialized it, since the
  * signature is over those bytes.
  *

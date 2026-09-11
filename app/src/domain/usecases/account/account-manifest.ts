@@ -91,8 +91,10 @@ async function putAccountManifest(
 
 /**
  * Pushes this account's current circleId list to the relay, encrypted
- * under a key derived from the master seed — see server/DESIGN.md's
- * "Account recovery" section. Call after anything that changes local
+ * under a key derived from the master seed. This is the durable record a
+ * lost device leans on during recovery to know which circles to even look
+ * for — the relay is the one party both the old and new device always
+ * talk to, present or not. Call after anything that changes local
  * membership (create, leave, delete). No-op before onboarding generates
  * a seed. Merges onto whatever's already stored (e.g. `provider`) rather
  * than overwriting the whole document, so this can't clobber a field it

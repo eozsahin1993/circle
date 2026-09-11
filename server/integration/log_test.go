@@ -8,11 +8,11 @@ import (
 	"circle-relay/integration/harness"
 )
 
-// createlog, appendlog and getlog, end to end — see server/SYNC_DESIGN.md.
-// Each test is a sequence, because that's where this half of the relay's
-// behaviour lives: what a device gets back when it replays from zero, what
-// a second call with an advanced cursor returns, and what a retry does to
-// a log that is never allowed to hold the same entry twice.
+// createlog, appendlog and getlog, end to end. Each test is a sequence,
+// because that's where this half of the relay's behaviour lives: what a
+// device gets back when it replays from zero, what a second call with an
+// advanced cursor returns, and what a retry does to a log that is never
+// allowed to hold the same entry twice.
 //
 // The endpoints are harness.Circle's methods — see harness/circle.go.
 
@@ -179,8 +179,7 @@ func TestAWriteTokenThatIsntTheCurrentOneIsRefused(t *testing.T) {
 	c := harness.NewCircle(t, r)
 	other := harness.NewCircle(t, r)
 
-	// Every one of these is the same 403, deliberately — see
-	// server/SYNC_DESIGN.md's "possession, not identity". The relay can't
+	// Every one of these is the same 403, deliberately: the relay can't
 	// tell a non-member from a member who hasn't synced past a rotation,
 	// and a malformed token can never be correct either, so all three are
 	// one outcome rather than three.

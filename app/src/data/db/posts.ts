@@ -12,8 +12,9 @@ export type Post = typeof posts.$inferSelect;
  * Inserts a post and its attachment together — the two are one fact, and a
  * post whose attachment row never landed would be permanently invisible to
  * the download queue. `onConflictDoNothing` on both makes re-applying an
- * already-seen log entry a no-op (server/SYNC_DESIGN.md invariant 8)
- * rather than a primary-key error.
+ * already-seen log entry a no-op rather than a primary-key error — sync
+ * can redeliver the same entry more than once, and replay has to stay
+ * harmless when it does.
  */
 export async function insertPost(post: Post, attachment?: NewAttachment): Promise<void> {
   await db.insert(posts).values(post).onConflictDoNothing();
@@ -53,8 +54,8 @@ export type FeedPost = {
  * The feed, in one query: posts joined to their author's roster row and
  * their photo attachment. Author name/picture resolve live rather than
  * being denormalized onto the post, so a member renaming themselves
- * updates every post they ever made (server/SYNC_DESIGN.md's "One
- * identifier, four jobs").
+ * updates every post they ever made — a post carries only the author's
+ * pubkey, never a name/picture snapshot, so there's nothing to go stale.
  *
  * **Every selected column must have a source name unique across the three
  * tables.** drizzle emits joined columns without `AS` aliases
@@ -69,7 +70,7 @@ export type FeedPost = {
  * this one device. Once multi-device sync exists, wall-clock time from
  * different devices isn't a trustworthy shared order — the relay assigns
  * each log entry's order at append time, so ordering should come from
- * that server-assigned sequence instead (see server/SYNC_DESIGN.md).
+ * that server-assigned sequence instead.
  */
 /** Shared by `getCircleFeed` and `getFeedPost` — see the column-collision warning above. */
 function feedPostQuery() {

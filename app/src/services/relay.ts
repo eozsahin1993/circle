@@ -9,11 +9,11 @@ import { generateUUID, type AuthorityAction } from '@/services/crypto';
 import { getAuthToken } from '@/services/keystore';
 
 /**
- * Thin fetch-based client for the relay's circle-log endpoints — see
- * server/SYNC_DESIGN.md and server/internal/api. No retry/queueing logic
- * here; that's `domain/usecases/circle/sync-circle.ts`'s job. This module
- * only knows how to talk to the wire, nothing about outbox/key state.
- * Raw key/token/signature material is always accepted as `Uint8Array` and
+ * Thin fetch-based client for the relay's circle-log endpoints (server-side:
+ * server/internal/api). No retry/queueing logic here; that's
+ * `domain/usecases/circle/sync-circle.ts`'s job. This module only knows
+ * how to talk to the wire, nothing about outbox/key state. Raw
+ * key/token/signature material is always accepted as `Uint8Array` and
  * hex-encoded right here at the wire boundary — callers never hand-encode.
  */
 
@@ -156,10 +156,9 @@ export async function authorizedFetch(path: string, init: RequestInit = {}): Pro
 }
 
 /**
- * Creates a circle's control state — POST /v1/circles/{syncId} (see
- * server/SYNC_DESIGN.md operation 1). Nothing else is written here: the
- * founder's own member_added entry is a separate, subsequent
- * `appendEntry` call using the token this registers.
+ * Creates a circle's control state — POST /v1/circles/{syncId}. Nothing
+ * else is written here: the founder's own member_added entry is a
+ * separate, subsequent `appendEntry` call using the token this registers.
  */
 export async function bootstrapCircle(syncId: string, founderAuthorityPublicKey: Uint8Array, initialWriteTokenHash: string): Promise<void> {
   const response = await authorizedFetch(`/v1/circles/${syncId}`, {
@@ -212,11 +211,11 @@ export async function appendEntry(
 }
 
 /**
- * Rotates a circle's write token — POST /v1/circles/{syncId}/rotate. See
- * server/SYNC_DESIGN.md's "Remove a member" operation: appends the
- * key_rotation meta entry and swaps in the new write token atomically.
- * `signature` must verify against `deriveRotateMessage(syncId, entryId,
- * newWriteTokenHash)` — see crypto.ts.
+ * Rotates a circle's write token — POST /v1/circles/{syncId}/rotate.
+ * Appends the key_rotation meta entry and swaps in the new write token in
+ * one atomic transaction, so a client can never observe one without the
+ * other. `signature` must verify against `deriveRotateMessage(syncId,
+ * entryId, newWriteTokenHash)` — see crypto.ts.
  */
 export async function rotateLog(
   syncId: string,

@@ -82,8 +82,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 
 	// Grouped under one sub-mux so RequireSession wraps all eight at once —
 	// each endpoint also checks its own write token/authority signature
-	// beyond this shared session check (server/SYNC_DESIGN.md's
-	// "Authorization" section). Rate limiting wraps each handler
+	// beyond this shared session check. Rate limiting wraps each handler
 	// individually instead of circleMux as a whole, since writes and reads
 	// carry different budgets (see internal/api/ratelimit).
 	writeLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.WriteLimit, h) }
@@ -112,8 +111,8 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	// same RequireSession wrapping as circleMux/accountMux above. Still
 	// requires a session: an unauthenticated caller can't hit any /invites/
 	// route, even though the routes themselves don't use the caller's
-	// accountID (see server/INVITE_FLOW.md — the relay never learns who's
-	// inviting whom).
+	// accountID — the relay never learns who's inviting whom, only that
+	// some authenticated session is.
 	invitesMux := http.NewServeMux()
 	invite.Register(invitesMux, &invite.Service{InviteStore: deps.Invite})
 	mux.Handle("/invites/", auth.RequireSession(deps.Auth, invitesMux))

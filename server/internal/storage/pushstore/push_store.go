@@ -1,9 +1,10 @@
 // Package pushstore defines the interface domain logic depends on for push
-// routing state — see server/PUSH_DESIGN.md.
+// routing state.
 //
 // No account ids, circle ids, or lists of which routing ids belong
 // together, anywhere in here. There is deliberately no method that could
-// write one.
+// write one: a durable circle-to-routing-id table would hand the relay
+// exactly the group membership this design exists to keep it blind to.
 package pushstore
 
 import (

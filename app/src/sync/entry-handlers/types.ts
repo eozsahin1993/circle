@@ -8,9 +8,7 @@ import type { LogEntryEnvelope } from '@/domain/usecases/circle/log-entry';
  * One entry type's rules, as a pair of small functions. The walker
  * (pull-log.ts) knows only this shape and the tables below — it never
  * branches on an entry type, so supporting a new one means adding a
- * handler and a table row, never touching the walk itself. That's
- * server/SYNC_DESIGN.md's "Adding a type should mean adding a row to the
- * predicate table — not adding a mechanism", taken literally.
+ * handler and a table row, never touching the walk itself.
  */
 export type EntryHandler = {
   /**
@@ -23,8 +21,7 @@ export type EntryHandler = {
   /**
    * Applies the entry locally. Must be idempotent: a crash between
    * applying an entry and advancing the cursor replays it, and a joiner
-   * walking meta from epoch 0 meets its own self-announced entries
-   * (server/SYNC_DESIGN.md invariant 8).
+   * walking meta from epoch 0 meets its own self-announced entries.
    *
    * `epoch` is the entry's relay-assigned position in its namespace —
    * the only per-entry identity a handler gets, since the envelope
@@ -44,11 +41,12 @@ export function asRecord(payload: unknown): Record<string, unknown> | null {
 /**
  * The predicate nearly every content type wants: the author is someone
  * this device has seen join. Membership is "has ever been a member", not
- * "is one now" — removing someone doesn't retract their old content
- * (server/SYNC_DESIGN.md's ever-member set). `getMemberByPublicKey` reads
- * the same `circle_members` table `getCircleMembers` does, but
- * deliberately doesn't filter out removed rows the way that one does —
- * see `removedAt` on the schema and member-removed.ts's handler.
+ * "is one now" — removing someone doesn't retract their old content, so
+ * this must check the ever-member set rather than current membership.
+ * `getMemberByPublicKey` reads the same `circle_members` table
+ * `getCircleMembers` does, but deliberately doesn't filter out removed
+ * rows the way that one does — see `removedAt` on the schema and
+ * member-removed.ts's handler.
  */
 export async function authoredByMember(circleId: string, envelope: LogEntryEnvelope): Promise<boolean> {
   return (await getMemberByPublicKey(circleId, envelope.authorPubkey)) !== null;
@@ -86,8 +84,9 @@ export function hexField(record: Record<string, unknown>, key: string, byteLengt
  *
  * Returns '' rather than rejecting whenever the proof is missing or
  * doesn't verify: this is one field on entries that carry a whole
- * profile, and dropping the entry would lose the rest of it permanently
- * on replay (server/SYNC_DESIGN.md invariant 1).
+ * profile, and a log entry can never be rewritten once written, so
+ * dropping the whole entry over this one field would lose the rest of it
+ * — name, role, picture — permanently, on every future replay.
  */
 export function provenAuthorityKey(record: Record<string, unknown>, identityPublicKey: string): string {
   const authorityPublicKey = hexField(record, 'authorityPublicKey', 32);

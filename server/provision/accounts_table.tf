@@ -1,6 +1,6 @@
 # Standalone table for the one document per account (today: the encrypted
-# circle-membership manifest — see server/DESIGN.md's "Account recovery"
-# section and internal/storage/manifeststore/dynamodb). One item per
+# circle-membership manifest — see internal/storage/manifeststore/dynamodb).
+# One item per
 # account, no sort key — there's exactly one document to look up, never a
 # second dimension to key on. Genuinely separate from sessions_table.tf
 # (different access pattern, no TTL here — kept until the account itself

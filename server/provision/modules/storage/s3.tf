@@ -1,5 +1,5 @@
-# Holds only encrypted ciphertext (see server/DESIGN.md's encryption
-# envelope) — the relay itself can never read what's in here. Stays
+# Holds only encrypted ciphertext — the relay itself can never read what's
+# in here. Stays
 # private regardless: access is entirely gated by short-lived presigned
 # URLs, never by bucket policy or public access.
 resource "aws_s3_bucket" "circle_blobs" {
@@ -32,7 +32,7 @@ resource "aws_s3_bucket_cors_configuration" "circle_blobs" {
 }
 
 # Blobs never expire on a timer — permanent retention, same as the log
-# entries that point to them (server/SYNC_DESIGN.md invariant 1).
+# entries that point to them.
 # Affordable via tiering, not eviction: after blob_glacier_transition_days,
 # objects move to Glacier Instant Retrieval — same millisecond-latency
 # access as Standard, ~6x cheaper per GB. Defaults to Glacier IR's own

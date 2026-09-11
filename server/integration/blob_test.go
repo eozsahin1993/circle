@@ -13,12 +13,14 @@ import (
 // getuploadtarget, getblob, deleteblob and getcoverphotouploadtarget, end
 // to end against a real S3 (LocalStack): a presigned upload target
 // obtained through the relay, used the way a client actually uses it (a
-// plain POST straight to S3, never back through the relay — see
-// server/DESIGN.md), then read back through the relay's own redirect and
-// deleted through it. internal/storage/blobstore/s3's own tests already
-// prove the store's behaviour in isolation; what's missing there is the
-// session, write-token and authority-signature gates in front of it,
-// which only exist in the API layer these tests drive.
+// plain POST straight to S3, never proxied through the relay — bytes stay
+// off the relay's own compute and bandwidth, and the presigned URL is
+// still gated behind the same write-token check that mints it), then read
+// back through the relay's own redirect and deleted through it.
+// internal/storage/blobstore/s3's own tests already prove the store's
+// behaviour in isolation; what's missing there is the session,
+// write-token and authority-signature gates in front of it, which only
+// exist in the API layer these tests drive.
 //
 // The endpoints are harness.Circle's methods — see harness/circle.go.
 // Every call here names which device is acting (harness.Circle.As), since

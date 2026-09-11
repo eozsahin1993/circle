@@ -1,7 +1,7 @@
 // Package dynamodb implements logstore.Store against a single DynamoDB
-// table, one partition per syncID. See server/SYNC_DESIGN.md for the
-// design and internal/storage/logstore's package doc for the two
-// capabilities (write token, authority signature) this enforces.
+// table, one partition per syncID. See internal/storage/logstore's
+// package doc for the two capabilities (write token, authority
+// signature) this enforces.
 package dynamodb
 
 import (
@@ -796,9 +796,11 @@ func (s *Store) lookupIdempotencyMarker(ctx context.Context, syncID string, ns l
 	return &logstore.CommitResult{Epoch: epoch, ReceivedAt: receivedAt}, nil
 }
 
-// Read never deletes or evicts — nothing to reconcile against retention,
-// unlike the pre-redesign version (see server/SYNC_DESIGN.md invariant
-// 1). A circle with no control state yet (never Bootstrapped) reads back
+// Read never deletes or evicts — nothing to reconcile against
+// retention, unlike an earlier TTL-eviction design this store replaced:
+// entries are retained and immutable forever now, so there's no expiry
+// to reconcile against. A circle with no control state yet (never
+// Bootstrapped) reads back
 // as empty rather than an error — Read is used for ordinary catch-up
 // sync, where "nothing here yet" is a normal state, not a caller mistake.
 func (s *Store) Read(ctx context.Context, syncID string, ns logstore.Namespace, since int64) (logstore.FetchResult, error) {

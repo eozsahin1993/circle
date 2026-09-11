@@ -84,7 +84,7 @@ export async function previewInvite(inviteCode: string): Promise<InvitePreviewPa
  * keypair for this handshake (see `openSealedBox`'s doc comment),
  * publishes the request to the mailbox, and records it locally so a
  * "pending for Family Circle" screen survives the app being closed and
- * reopened before approval ever lands (see server/INVITE_FLOW.md, step 4).
+ * reopened before approval ever lands.
  */
 export async function requestToJoin(inviteCode: string): Promise<{ requestId: string }> {
   // Asking twice for the same key is the same ask. Without this, reopening
@@ -105,8 +105,8 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
 
   // The circle identity is derived here rather than at completion because
   // its *public* halves have to travel in this request: only an admin may
-  // write `member_added` (server/SYNC_DESIGN.md's predicate table), so the
-  // approver names this member, and can't do that without their keys.
+  // write `member_added`, so the approver names this member, and can't do
+  // that without their keys.
   // Nothing shared is needed to derive them — circleId is a local id this
   // device invents, and the secret in the derivation is the seed. It's
   // parked on the pending row because the same id must be reused at
@@ -161,9 +161,8 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
  *
  * `keyMap` is the approver's *entire* version→key map, not just the
  * current version — lets this device decrypt history predating its own
- * join (see server/SYNC_DESIGN.md's "Add a member"). Its own
- * `member_added` entry uses the current (highest) version, same as any
- * post would.
+ * join. Its own `member_added` entry uses the current (highest) version,
+ * same as any post would.
  *
  * Adopts the `circleId` minted back at `requestToJoin` rather than
  * generating a fresh one — the identity whose public halves the approver
@@ -171,8 +170,8 @@ export async function requestToJoin(inviteCode: string): Promise<{ requestId: st
  * one here would silently orphan it.
  *
  * This device does *not* announce itself: `member_added` may only be
- * written by an admin (server/SYNC_DESIGN.md's predicate table), so the
- * approver wrote it, and this device meets its own entry when it walks
+ * written by an admin, so the approver wrote it, and this device meets
+ * its own entry when it walks
  * meta from epoch 0 — where it lands as a no-op against the row inserted
  * here. The local insert exists only so the joiner sees themselves
  * immediately, without waiting for a sync pass.
@@ -255,9 +254,10 @@ export type PendingJoinCheck =
 
 /**
  * Checks whether a pending join request has been approved yet — polled,
- * never push-dependent (see server/INVITE_FLOW.md). Returns `{joined:
- * false}` while pending, or once the join has completed, the new
- * circle's id.
+ * and deliberately never dependent on push firing: notifications can be
+ * disabled or never delivered, and approval still has to be discoverable.
+ * Returns `{joined: false}` while pending, or once the join has
+ * completed, the new circle's id.
  *
  * A signature failure is treated the same as no approval yet, not a
  * fatal error — it's the actual gate deciding this came from the

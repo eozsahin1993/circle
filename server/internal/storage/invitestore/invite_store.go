@@ -1,12 +1,12 @@
 // Package invitestore defines the interface domain logic depends on for
 // the invite/join-request flow — implementations live in subpackages,
 // one per backing technology (see invitestore/dynamodb). Ephemeral,
-// per-individual, TTL'd storage — the "mailbox" mechanism described in
-// server/DESIGN.md's "Mailbox" section, applied to this one concrete use
-// (invites are its first consumer, not its only intended one). See
-// server/INVITE_FLOW.md for the full design this exists to support: the
-// relay only ever stores/forwards ciphertext here, same blind-relay
-// property as everything else in this system.
+// per-individual, TTL'd storage: rows expire on their own rather than
+// being deleted the moment they're read, so a device that polls late
+// doesn't lose its response. Invites are its first consumer, not its
+// only intended one — any future one-shot, per-person exchange can reuse
+// the same shape. The relay only ever stores and forwards ciphertext
+// here, same blind-relay property as everything else in this system.
 package invitestore
 
 import (

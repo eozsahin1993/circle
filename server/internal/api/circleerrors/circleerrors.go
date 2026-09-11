@@ -27,9 +27,9 @@ func Status(err error) (int, string) {
 	case errors.Is(err, logstore.ErrWriteTokenMismatch):
 		// Deliberately the same status/message whether the caller was
 		// never a member or just has a stale token from before a
-		// rotation — see server/SYNC_DESIGN.md's "possession, not
-		// identity" principle; the relay isn't in a position to tell
-		// those apart, and shouldn't try to.
+		// rotation — the relay only ever verifies possession of the
+		// current write token, never who someone is, so it isn't in a
+		// position to tell those apart, and shouldn't try to.
 		return http.StatusForbidden, "write token does not match current circle state"
 	case errors.Is(err, logstore.ErrAuthorityNotRecognized):
 		return http.StatusForbidden, "authority key not recognized for this circle"

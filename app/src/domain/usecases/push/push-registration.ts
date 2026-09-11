@@ -16,7 +16,7 @@ import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from
 
 /**
  * Registering this account and device for a circle's notifications, and
- * publishing where to reach them — see server/PUSH_DESIGN.md.
+ * publishing where to reach them.
  *
  * Two halves that must both happen: the relay learns where to deliver
  * (`putPushPrefs`/`putPushDevice`), and the circle learns this account's

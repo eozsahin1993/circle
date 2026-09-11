@@ -34,9 +34,10 @@ import type { Keypair } from '@/services/crypto';
  * parties swapped, so the device that has nothing publishes a one-time
  * public key and the device that has everything seals the seed to it.
  *
- * Runs on the invite mailbox routes unchanged. That's the shape
- * server/DESIGN.md's section 3 intended — a generic tag-addressed
- * mailbox, of which invites are the first use and this is the second.
+ * Runs on the invite mailbox routes unchanged — the mailbox was built as
+ * a generic tag-addressed, ephemeral one-shot channel for private
+ * handoffs that aren't circle content, and this is simply its second use,
+ * invites being the first.
  */
 
 /**
@@ -71,8 +72,9 @@ export type TransferredCircle = {
   /**
    * Every version, not just the current one. Content keys are random
    * rather than derived, so unlike identities they can't be recomputed,
-   * and reading them back out of the log needs `pullCircle` — still
-   * unbuilt (server/INVITE_FLOW.md).
+   * and reading them back out of the log needs `pullCircle` — not built
+   * yet, so shipping every key directly is the only way the new device
+   * gets them at all.
    */
   keyMap: Record<number, string>;
 };

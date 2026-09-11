@@ -1,6 +1,6 @@
-// Package push is the vertical slice for /push/ — see
-// server/PUSH_DESIGN.md. Addressed by routing id, not account: the relay
-// holds no link between the two, so there is nothing to nest under.
+// Package push is the vertical slice for /push/. Addressed by routing id,
+// not account: the relay holds no link between the two, so there is
+// nothing to nest under.
 //
 // Payloads arrive as ciphertext and are forwarded untouched.
 package push

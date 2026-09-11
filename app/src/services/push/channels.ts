@@ -7,8 +7,7 @@ import {
 import { Platform } from 'react-native';
 
 /**
- * Android notification channels, one per circle — see
- * server/PUSH_DESIGN.md's "Channels and groups".
+ * Android notification channels, one per circle.
  *
  * A channel per circle is what gives Android its own per-circle sound,
  * vibration and mute in system settings, which is where people look for

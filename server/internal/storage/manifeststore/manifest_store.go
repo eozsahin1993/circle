@@ -3,17 +3,16 @@
 // live in subpackages, one per backing technology (see
 // manifeststore/dynamodb). The relay never sees plaintext here: the blob
 // is ciphertext the client encrypted under a key derived from its own
-// master seed, so only the account's own device(s) can read it — see
-// server/DESIGN.md's "Account recovery" section.
+// master seed, so only the account's own device(s) can read it.
 //
-// Superseded, not yet migrated: server/SYNC_DESIGN.md's "Discovery"
-// section replaces this one-blob-per-account shape with a row per
-// membership under a seed-derived (not account-keyed) partition — fixes a
-// real bug (this manifest's circleIds can't actually locate anything
-// today, since reaching a log also needs the circle secret, which lives
-// only in Keychain and dies with the device) and removes the last
-// account-keyed storage in the system. Untouched by the sync-log
-// redesign; still the live implementation until that migration happens.
+// Superseded, not yet migrated: this one-blob-per-account shape is due
+// to be replaced by a row per membership under a seed-derived (not
+// account-keyed) partition — fixes a real bug (this manifest's
+// circleIds can't actually locate anything today, since reaching a log
+// also needs the circle secret, which lives only in Keychain and dies
+// with the device) and removes the last account-keyed storage in the
+// system. Untouched by the sync-log redesign; still the live
+// implementation until that migration happens.
 package manifeststore
 
 import "context"

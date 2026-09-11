@@ -30,14 +30,13 @@ var ErrBlobNotFound = errors.New("blobstore: no blob for this entry")
 // Store is storage for the (large, encrypted) blob behind one log entry.
 // GetDownloadURL always succeeds and costs nothing to hand out — pure
 // local signing — so callers never check "does this entry have a blob"
-// first (server/DESIGN.md). GetUploadTarget is different: it checks first
-// and can fail.
+// first. GetUploadTarget is different: it checks first and can fail.
 //
 // Keyed by entryID, not epoch — a client can obtain and use an upload
-// target *before* the entry referencing it is committed. See
-// server/SYNC_DESIGN.md's "Post" operation: uploading the blob first
-// means a crash in between leaves a harmless orphaned blob rather than a
-// permanent entry pointing at nothing, unfixable in an immutable log.
+// target *before* the entry referencing it is committed. Uploading the
+// blob first means a crash in between leaves a harmless orphaned blob
+// rather than a permanent entry pointing at nothing, unfixable in an
+// immutable log.
 type Store interface {
 	// GetUploadTarget returns a short-lived presigned POST for this exact
 	// entry, capped at the store's max blob size — or ErrBlobAlreadyExists
@@ -75,8 +74,8 @@ type Store interface {
 
 	// Delete removes a blob's bytes — the one thing the relay ever
 	// removes. Idempotent, so the client can retry it. The entries naming
-	// the blob stay, immutable (SYNC_DESIGN.md invariant 1); only the
-	// ciphertext goes.
+	// the blob stay, immutable — the log is never mutated or rewritten;
+	// only the ciphertext goes.
 	Delete(ctx context.Context, syncID, entryID string) error
 
 	// DeleteCircle removes every blob a circle owns, cover photo included

@@ -61,8 +61,8 @@ func (s *Sender) host() string {
 // Send delivers one alert push to one device token.
 //
 // mutable-content, never content-available: a silent push is budgeted,
-// deprioritized in Low Power Mode, and dropped after a force-quit (see
-// server/PUSH_DESIGN.md). The alert is the fixed placeholder — the
+// deprioritized in Low Power Mode, and dropped after a force-quit. The
+// alert is the fixed placeholder — the
 // Notification Service Extension rewrites it after decrypting, since the
 // relay cannot compose real text from ciphertext it can't read.
 func (s *Sender) Send(ctx context.Context, deviceToken, pushRoutingID string, keyVersion int64, payload []byte) error {

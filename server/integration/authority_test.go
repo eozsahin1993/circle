@@ -10,9 +10,9 @@ import (
 
 // rotatelog, changeauthority and deletecircle, end to end — the three
 // operations an ordinary member can't perform, and the sequences that
-// decide who can. See server/SYNC_DESIGN.md's "Authorization": possession
-// of the write token proves "a current member", an authority signature on
-// top of it proves "an admin", and these paths need both.
+// decide who can. Possession of the write token proves "a current
+// member"; an authority signature on top of it proves "an admin"; these
+// paths need both.
 //
 // The endpoints are harness.Circle's methods — see harness/circle.go.
 

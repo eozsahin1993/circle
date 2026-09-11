@@ -1,5 +1,6 @@
-// Package apple is the vertical slice for POST /v1/auth/apple — see
-// server/DESIGN.md's "Email auth" section.
+// Package apple is the vertical slice for POST /v1/auth/apple: verifies the
+// client's Apple ID token against Apple's own signing keys and issues this
+// relay's own bearer token for the verified subject.
 package apple
 
 import (
@@ -16,9 +17,10 @@ type Service struct {
 }
 
 // providerName namespaces the accountID so Google's and Apple's sub
-// values, independently issued by unrelated ID spaces, can never collide
-// — see server/DESIGN.md's "Account recovery" section for why identity is
-// keyed on sub, not email.
+// values, independently issued by unrelated ID spaces, can never collide.
+// Identity is keyed on sub, not email: sub is guaranteed stable and
+// present on every token, while email can be withheld, relayed through
+// Apple's private-relay address, or changed later.
 const providerName = "apple"
 
 // SignIn verifies idToken against Apple's own signing keys, then issues a

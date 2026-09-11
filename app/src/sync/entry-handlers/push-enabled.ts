@@ -4,7 +4,7 @@ import { authoredByMember, asRecord, hexField, type EntryHandler } from '@/sync/
 /**
  * What `publishPushRoutingId` puts in a `push_enabled` entry — the author's
  * own push routing id, so other members know where to fan a notification
- * out to (see server/PUSH_DESIGN.md).
+ * out to.
  *
  * For turning notifications on partway through a circle's life. A member
  * who already had them on when they joined carries their routing id on

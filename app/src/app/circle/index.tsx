@@ -140,8 +140,9 @@ export default function CircleListScreen() {
       loadFromDatabase().catch((err) => console.error('Failed to load circles', err));
 
       // Opportunistically completes a join even if the user never reopens
-      // /join/pending directly — same app-lifecycle-triggered polling as
-      // the rest of the invite flow (see server/INVITE_FLOW.md's goals).
+      // /join/pending directly — the invite handshake can't depend on push
+      // to tell the requester they were approved, so this same
+      // app-lifecycle-triggered polling is what actually delivers it.
       completePendingJoins()
         .then((joined) => {
           if (joined) return loadFromDatabase();

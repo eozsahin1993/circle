@@ -6,8 +6,7 @@ import { getCircleKeyMap, getMasterSeed } from '@/services/keystore';
 import { circleNotificationChannelId } from '@/services/push/channels';
 
 /**
- * Turning a delivered push into the words on the lock screen — see
- * server/PUSH_DESIGN.md.
+ * Turning a delivered push into the words on the lock screen.
  *
  * The relay forwards the entry's own ciphertext and cannot read it, so the
  * text is composed here, on the device, from keys the relay never has.

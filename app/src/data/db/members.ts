@@ -82,7 +82,12 @@ export async function getCircleMemberCount(circleId: string): Promise<number> {
   return rows[0]?.count ?? 0;
 }
 
-/** Records the push routing id a member published — see server/PUSH_DESIGN.md. */
+/**
+ * Records the push routing id a member published in their own roster
+ * entry. Kept locally so this device can hand it to the relay as a fanout
+ * target when it posts — the relay itself never sees which routing ids
+ * belong to the same circle, only the anonymous set a poster supplies.
+ */
 export async function setMemberPushRoutingId(circleId: string, identityPublicKey: string, pushRoutingId: string): Promise<void> {
   await db
     .update(circleMembers)

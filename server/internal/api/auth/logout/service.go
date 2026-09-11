@@ -1,5 +1,6 @@
-// Package logout is the vertical slice for POST /v1/auth/logout — see
-// server/DESIGN.md's "Email auth" section.
+// Package logout is the vertical slice for POST /v1/auth/logout: revokes
+// the session token auth.Issue handed out, regardless of which provider
+// (Apple or Google) signed the caller in.
 package logout
 
 import (

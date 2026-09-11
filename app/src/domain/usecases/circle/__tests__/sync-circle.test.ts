@@ -104,9 +104,8 @@ test('drainOutbox obtains an upload target, uploads the blob, appends the entry,
   expect(uploadedBytes).not.toEqual(photo);
   expect(decrypt(uploadedBytes, contentKey)).toEqual(photo);
 
-  // Upload must happen before the append — see server/SYNC_DESIGN.md's
-  // "Post" operation for why (an orphaned blob is recoverable; a log
-  // entry pointing at nothing is not, since the log is immutable).
+  // Upload must happen before the append: an orphaned blob is recoverable,
+  // but a log entry pointing at nothing is not, since the log is immutable.
   const uploadOrder = (uploadBlob as jest.Mock).mock.invocationCallOrder[0];
   const appendOrder = (appendEntry as jest.Mock).mock.invocationCallOrder[0];
   expect(uploadOrder).toBeLessThan(appendOrder);

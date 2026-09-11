@@ -54,7 +54,7 @@ function keyMapStorageKey(circleId: string) {
   return `circle_keys_${circleId}`;
 }
 
-/** One circle's full `{version -> content key}` map — see server/SYNC_DESIGN.md's "Content encryption" section. */
+/** One circle's full `{version -> content key}` map — every version this member has ever held, since old content stays encrypted under whichever key was current when it was posted. */
 export type ContentKeyMap = Record<number, Uint8Array>;
 
 /** Persists this circle's identity (keypair + own member ID) in the device Keychain/Keystore. */
@@ -109,9 +109,8 @@ export async function getCurrentContentKey(circleId: string): Promise<{ version:
 
 /**
  * Merges one new content-key version into whatever's already stored —
- * used when a rotation lands (see server/SYNC_DESIGN.md's "Remove a
- * member" operation), never overwrites older versions: a member needs
- * every version it's ever held to decrypt old content, not just the
+ * used when a rotation lands, never overwrites older versions: a member
+ * needs every version it's ever held to decrypt old content, not just the
  * current one.
  */
 export async function addCircleKeyVersion(circleId: string, version: number, key: Uint8Array): Promise<void> {
@@ -157,11 +156,10 @@ function pendingJoinKeypairStorageKey(requestId: string) {
 }
 
 /**
- * Persists the one-time ephemeral keypair for an outstanding join request
- * (see server/INVITE_FLOW.md) — the secret half of the sealed-box
- * handshake, so it belongs in the Keychain like every other secret key
- * here, not in the local `pendingJoinRequests` row (which only holds the
- * public half).
+ * Persists the one-time ephemeral keypair for an outstanding join request —
+ * the secret half of the sealed-box handshake, so it belongs in the
+ * Keychain like every other secret key here, not in the local
+ * `pendingJoinRequests` row (which only holds the public half).
  */
 export async function savePendingJoinKeypair(requestId: string, keypair: Keypair): Promise<void> {
   const value = JSON.stringify({
@@ -210,11 +208,10 @@ export async function deleteAuthToken(): Promise<void> {
 const PUSH_DEVICE_SECRET_KEY = 'push_device_secret';
 
 /**
- * This device's push secret, generated on first use — see
- * server/PUSH_DESIGN.md. Every device id derives from it, so it must not
- * come from the master seed: devices share that after a transfer and would
- * all produce the same id, which is exactly what lets the relay group
- * them.
+ * This device's push secret, generated on first use. Every device id
+ * derives from it, so it must not come from the master seed: devices share
+ * that after a transfer and would all produce the same id, which is
+ * exactly what lets the relay group them.
  */
 export async function getPushDeviceSecret(): Promise<Uint8Array> {
   const stored = await getSecret(PUSH_DEVICE_SECRET_KEY);
