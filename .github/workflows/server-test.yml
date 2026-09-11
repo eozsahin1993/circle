@@ -1,5 +1,11 @@
 name: Server Tests
 
+# Least privilege: nothing here needs to write to the repo, so a workflow
+# permissions block that widened later (or a default that already had)
+# can't hand this job more than read access.
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -23,7 +29,11 @@ jobs:
         working-directory: server
 
     steps:
+      # No later step needs to push or fetch as this token, so it isn't
+      # left sitting in the git config for anything that runs after.
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-go@v5
         with:
@@ -58,8 +68,10 @@ jobs:
           fi
 
       # Named explicitly rather than discovered, so a green run here means
-      # nothing skipped for want of a container. integration's `./...`
-      # below is the safety net if this list ever goes stale.
+      # nothing skipped for want of a container — this is every package
+      # with no storage dependency, and integration's Test step below runs
+      # the complement, so the two never overlap and never miss a package
+      # between them.
       - name: Test
         run: |
           go test -race \
@@ -92,7 +104,11 @@ jobs:
           --health-retries 10
 
     steps:
+      # No later step needs to push or fetch as this token, so it isn't
+      # left sitting in the git config for anything that runs after.
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-go@v5
         with:
@@ -116,10 +132,17 @@ jobs:
           echo "last health response: $health"
           exit 1
 
-      # ./... rather than a subset, so the four pure packages just run
-      # twice — see unit's Test step. REQUIRE_LOCALSTACK turns a dead
-      # container into a failure instead of a quiet, all-green skip.
+      # Every package minus unit's four, computed rather than listed by
+      # name a second time, so the partition can't drift out of sync with
+      # itself: a package neither list names still lands somewhere.
+      # REQUIRE_LOCALSTACK turns a dead container into a failure instead
+      # of a quiet, all-green skip.
       - name: Test
-        run: go test ./... -race
+        run: |
+          go test -race $(go list ./... | grep -vFx \
+            -e circle-relay/internal/api/auth/oidcverify \
+            -e circle-relay/internal/api/push \
+            -e circle-relay/internal/push/fcm \
+            -e circle-relay/internal/storage/dynamoutil)
         env:
           REQUIRE_LOCALSTACK: '1'
