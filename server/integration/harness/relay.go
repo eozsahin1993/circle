@@ -1,0 +1,226 @@
+// Package harness drives a relay the way a client does: over HTTP, with
+// no access to anything inside it. Not for handler coverage — internal/api's
+// own tests already have that — but for the sequences between calls, where
+// a client's real problems live: create an invite, request against it,
+// approve, then find the approval readable when it shouldn't be.
+//
+// The relay is blind (SYNC_DESIGN invariant 3), so an entry body is any
+// bytes at all — no client crypto to reproduce, nothing to drift out of
+// step with the app. Each Start gets its own relay over its own tables
+// (see localstack.Unique), so an assertion can claim a list holds exactly
+// one row rather than merely holding its own.
+//
+// Its own importable package, not more *_test.go files beside the tests
+// that use it: Relay/Device/Response are generic to any sequence a future
+// test package writes against this relay, not specific to invites.
+package harness
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"testing"
+	"time"
+
+	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+
+	"circle-relay/internal/api"
+	"circle-relay/internal/app"
+	"circle-relay/internal/localstack"
+	"circle-relay/internal/storage/authstore"
+)
+
+// sessionTTL only has to outlast one test.
+const sessionTTL = time.Hour
+
+// requestTimeout bounds every request this package sends. Generous enough
+// for a real handler plus its own DynamoDB/S3 calls; short enough that a
+// hung relay fails the one request that hung, not the whole test binary.
+const requestTimeout = 30 * time.Second
+
+// Relay is a running relay and the means to talk to it. It carries the
+// test, so nothing downstream has to be handed one again.
+type Relay struct {
+	t       *testing.T
+	baseURL string
+	// sessions is how SignIn gets a bearer token in without a round trip,
+	// when this package also owns the store: nil when RELAY_URL points
+	// at somebody else's relay, since minting a session there through a
+	// store this process can't reach would be minting it in the wrong
+	// place. SignIn falls back to /testonly/session in that case — see
+	// registerTestOnly in cmd/testrelay, which every RELAY_URL target is
+	// expected to expose.
+	sessions authstore.Store
+}
+
+// Start builds a relay of this test's own and registers its teardown.
+// httptest.NewServer, not the mux directly, so requests cross a real
+// socket. Set RELAY_URL to aim at a running cmd/testrelay instead — no
+// local LocalStack access needed, since SignIn mints sessions through
+// that relay's own /testonly/session rather than writing to a store here.
+func Start(t *testing.T) *Relay {
+	t.Helper()
+
+	if baseURL := os.Getenv("RELAY_URL"); baseURL != "" {
+		return &Relay{t: t, baseURL: baseURL}
+	}
+
+	ctx := context.Background()
+
+	awsCfg, err := localstack.Config(ctx)
+	if err != nil {
+		unreachable(t, err)
+	}
+
+	ddb := awsdynamodb.NewFromConfig(awsCfg)
+	s3Client := awss3.NewFromConfig(awsCfg, func(o *awss3.Options) { o.UsePathStyle = true })
+
+	names := localstack.Unique(Suffix())
+	if err := localstack.ProvisionSet(ctx, ddb, s3Client, names); err != nil {
+		unreachable(t, err)
+	}
+	t.Cleanup(func() { localstack.TeardownSet(context.Background(), ddb, s3Client, names) })
+
+	deps := app.Deps(localstack.RelayConfig(names), awsCfg)
+	server := httptest.NewServer(api.NewRouter(deps))
+	t.Cleanup(server.Close)
+
+	return &Relay{t: t, baseURL: server.URL, sessions: deps.Auth}
+}
+
+// unreachable skips, or fails when the environment says a missing
+// LocalStack is a broken pipeline — see localstack.Required, which
+// internal/testsupport consults for the same decision.
+func unreachable(t *testing.T, err error) {
+	t.Helper()
+	if localstack.Required() {
+		t.Fatalf("%s is set but the relay's storage is unreachable: %v", localstack.RequireEnv, err)
+	}
+	t.Skipf("LocalStack not reachable, skipping: %v", err)
+}
+
+// Device is one caller of the relay. Named for what it is on the relay's
+// side: an account with a session, holding no circle state of its own.
+type Device struct {
+	relay *Relay
+	token string
+}
+
+// SignIn mints a session for a fresh account, skipping Google and Apple.
+// Provider verification is internal/api's business; what matters here is
+// that requests carry a credential the relay accepts.
+func (r *Relay) SignIn() *Device {
+	r.t.Helper()
+	accountID := "test:" + Suffix()
+	d := &Device{relay: r, token: Suffix()}
+
+	if r.sessions != nil {
+		session := authstore.Session{AccountID: accountID, ExpiresAt: time.Now().Add(sessionTTL)}
+		if err := r.sessions.SaveSession(context.Background(), d.token, session); err != nil {
+			r.t.Fatalf("failed to mint a session: %v", err)
+		}
+		return d
+	}
+
+	// RELAY_URL mode: this process holds no store the target relay reads
+	// from, so the session has to be minted on its side — see
+	// registerTestOnly in cmd/testrelay, which is POST, not PUT.
+	r.Anon().Post("/testonly/session", Body{"accountId": accountID, "token": d.token}).
+		Expect(http.StatusNoContent)
+	return d
+}
+
+// Anon is a caller with no session, for the routes that must refuse one.
+func (r *Relay) Anon() *Device {
+	return &Device{relay: r}
+}
+
+// Body is a JSON object to send. A named type because almost every request
+// here carries one field, and map[string]string at each call site buries
+// what's actually being sent.
+type Body map[string]string
+
+func (d *Device) Get(path string) Response          { return d.send(http.MethodGet, path, nil) }
+func (d *Device) Put(path string, b Body) Response  { return d.send(http.MethodPut, path, b) }
+func (d *Device) Post(path string, b Body) Response { return d.send(http.MethodPost, path, b) }
+func (d *Device) Delete(path string) Response       { return d.send(http.MethodDelete, path, nil) }
+
+func (d *Device) send(method, path string, b Body) Response {
+	t := d.relay.t
+	t.Helper()
+
+	var payload io.Reader
+	if b != nil {
+		encoded, err := json.Marshal(b)
+		if err != nil {
+			t.Fatalf("failed to encode the request body: %v", err)
+		}
+		payload = bytes.NewReader(encoded)
+	}
+
+	// Bounded rather than context.Background(): a hung relay or LocalStack
+	// call otherwise blocks until the whole test binary's own -timeout
+	// gives up, which reads as the suite stalling rather than naming which
+	// request never returned.
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, method, d.relay.baseURL+path, payload)
+	if err != nil {
+		t.Fatalf("failed to build the request: %v", err)
+	}
+	if b != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if d.token != "" {
+		req.Header.Set("Authorization", "Bearer "+d.token)
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("%s %s failed: %v", method, path, err)
+	}
+	defer res.Body.Close()
+
+	read, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("failed to read the response to %s %s: %v", method, path, err)
+	}
+	return Response{t: t, method: method, path: path, status: res.StatusCode, body: read}
+}
+
+// Response is one HTTP reply, kept whole so a test can assert on the
+// status and the body without re-reading either — see AssertEqual and
+// AssertTrue for comparisons that aren't about a response specifically.
+type Response struct {
+	t      *testing.T
+	method string
+	path   string
+	status int
+	body   []byte
+}
+
+// Expect fails unless the status matches, naming the request and quoting
+// the body — where the relay says why, and the first thing anyone wants
+// when this goes red.
+func (res Response) Expect(status int) Response {
+	res.t.Helper()
+	if res.status != status {
+		res.t.Fatalf("%s %s: got %d, want %d: %s", res.method, res.path, res.status, status, res.body)
+	}
+	return res
+}
+
+// Decode reads the body into target.
+func (res Response) Decode(target any) Response {
+	res.t.Helper()
+	if err := json.Unmarshal(res.body, target); err != nil {
+		res.t.Fatalf("%s %s: failed to decode %q: %v", res.method, res.path, res.body, err)
+	}
+	return res
+}

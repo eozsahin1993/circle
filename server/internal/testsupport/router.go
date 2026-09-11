@@ -23,29 +23,31 @@ func NewRouterWithAuth(t testing.TB) (mux *http.ServeMux, google, apple *FakeOID
 	t.Helper()
 	google = NewFakeOIDCProvider(t, "https://accounts.google.com")
 	apple = NewFakeOIDCProvider(t, "https://appleid.apple.com")
-	mux = api.NewRouter(
-		NewLogStore(t),
-		NewBlobStore(t),
-		NewAuthStore(t),
-		NewManifestStore(t),
-		NewInviteStore(t, 0),
-		NewRateLimitStore(t, "write", testRateLimitMaxRequests, time.Hour),
-		NewRateLimitStore(t, "read", testRateLimitMaxRequests, time.Hour),
-		oidcverify.New(google.Issuer, google.JWKSURL, []string{TestGoogleClientID}),
-		oidcverify.New(apple.Issuer, apple.JWKSURL, []string{TestAppleClientID}),
-		api.PushDeps{
+	mux = api.NewRouter(api.Deps{
+		Log:        NewLogStore(t),
+		Blob:       NewBlobStore(t),
+		Auth:       NewAuthStore(t),
+		Manifest:   NewManifestStore(t),
+		Invite:     NewInviteStore(t, 0),
+		WriteLimit: NewRateLimitStore(t, "write", testRateLimitMaxRequests, time.Hour),
+		ReadLimit:  NewRateLimitStore(t, "read", testRateLimitMaxRequests, time.Hour),
+		Google:     oidcverify.New(google.Issuer, google.JWKSURL, []string{TestGoogleClientID}),
+		Apple:      oidcverify.New(apple.Issuer, apple.JWKSURL, []string{TestAppleClientID}),
+		Push: api.PushDeps{
 			Store:          NewPushStore(t),
 			RecipientLimit: NewRateLimitStore(t, "push", testRateLimitMaxRequests, time.Hour),
 		},
-	)
+	})
 	return mux, google, apple
 }
 
-// NewRouter is NewRouterWithAuth without the provider handles, for tests
-// that just need a working router and don't touch auth endpoints — the one
-// router construction path every other end-to-end test in package api_test
-// should use, so a change to api.NewRouter's signature only means updating
-// this one place, not every test file.
+// NewRouter is NewRouterWithAuth without the provider handles — the one
+// router construction path every end-to-end test in package api_test
+// should use, so a change to api.Deps means updating this one place.
+//
+// Builds its own api.Deps rather than going through internal/app: these
+// stores are LocalStack-backed with per-test table names, not the real
+// wiring app.Deps assembles — see the integration suite for that.
 func NewRouter(t testing.TB) *http.ServeMux {
 	t.Helper()
 	mux, _, _ := NewRouterWithAuth(t)
