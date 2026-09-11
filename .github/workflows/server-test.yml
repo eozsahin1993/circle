@@ -1,14 +1,14 @@
-name: Server Unit Tests
+name: Server Tests
 
 on:
   push:
     branches: [main]
     # Includes this workflow itself, so a change to it is validated by
     # the run it defines rather than waiting for the next server/ commit.
-    paths: ['server/**', '.github/workflows/server-unit-test.yml']
+    paths: ['server/**', '.github/workflows/server-test.yml']
   pull_request:
     branches: [main]
-    paths: ['server/**', '.github/workflows/server-unit-test.yml']
+    paths: ['server/**', '.github/workflows/server-test.yml']
   workflow_dispatch:
 
 jobs:
