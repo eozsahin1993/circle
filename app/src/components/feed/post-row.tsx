@@ -104,14 +104,20 @@ export function usePostRows({
   return useMemo(
     () => ({
       rows: posts.map((view) =>
-        postRow(view, profile, actions, ownIsAdmin || view.post.authorPublicKey === ownPublicKey),
+        postRow(view, profile, actions, ownIsAdmin || view.post.authorPublicKey === ownPublicKey, ownPublicKey),
       ),
     }),
     [posts, profile, actions, ownPublicKey, ownIsAdmin],
   );
 }
 
-function postRow(view: FeedPostView, profile: Profile | null, actions: PostRowActions, canEditAlbum: boolean): FeedRow {
+function postRow(
+  view: FeedPostView,
+  profile: Profile | null,
+  actions: PostRowActions,
+  canEditAlbum: boolean,
+  ownPublicKey: string | null
+): FeedRow {
   const post = toPostCard(view, profile);
 
   return {
@@ -123,6 +129,12 @@ function postRow(view: FeedPostView, profile: Profile | null, actions: PostRowAc
       <PostCard
         post={post}
         selfPhotoUri={pictureUri(profile?.picture)}
+        selfName={profile?.name}
+        // The reader's own identity key, not their name: it's what everyone
+        // else's copy of their avatar is coloured from, and seeding the
+        // composer differently would show you two colours for yourself on
+        // one screen.
+        selfKey={ownPublicKey ?? undefined}
         onToggleReaction={(emoji) => actions.onToggleReaction(post.id, emoji)}
         onAddComment={(body) => actions.onAddComment(post.id, body)}
         onPressPhoto={() => actions.onOpenPost(post.id)}
@@ -168,6 +180,7 @@ function toPostCard(view: FeedPostView, profile: Profile | null): Post {
     id: post.id,
     authorName: post.authorName || profile?.name || 'Unknown member',
     authorPhotoUri: pictureUri(picture),
+    authorKey: post.authorPublicKey,
     timestamp: formatTimestamp(post.createdAt),
     photoUri: view.photoUri,
     missingPhoto: view.photoUri ? undefined : missingPhotoFor(post.photoStatus),
@@ -191,6 +204,7 @@ function toCommentItem(comment: CommentWithAuthor, ownName?: string): CommentIte
     id: comment.id,
     authorName: comment.authorName || ownName || 'Unknown member',
     authorPhotoUri: pictureUri(comment.authorPicture),
+    authorKey: comment.authorPublicKey,
     body: comment.body,
     timestamp: formatRelative(comment.createdAt),
   };

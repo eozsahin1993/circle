@@ -15,6 +15,9 @@ export type AvatarStackProps = {
  * separate them. Past `max`, the last slot becomes a "+N" chip instead of
  * silently dropping members — otherwise a circle of 5 and a circle of 50
  * render identically.
+ *
+ * Deliberately the anonymous placeholder rather than initials: this takes a
+ * count, not a roster, so there's nobody in particular in any given slot.
  */
 export function AvatarStack({ count, size = 34, max = 5 }: AvatarStackProps) {
   const overflow = count > max;

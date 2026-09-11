@@ -40,7 +40,10 @@ export function PendingJoinRequestCard({ request, busy, onApprove, onDeny }: Pen
   return (
     <ThemedView type="surface" style={styles.card}>
       <View style={styles.header}>
-        <Avatar size={44} uri={request.pictureUri} />
+        {/* The name is self-reported and unverified — the initials are
+            no more of a claim than the name beside them, which is the
+            whole basis the creator judges a request on. */}
+        <Avatar size={44} uri={request.pictureUri} name={request.selfReportedName} seed={request.requesterId} />
         <View style={styles.text}>
           <ThemedText type="cardTitle">{request.selfReportedName || 'Someone'}</ThemedText>
           <ThemedText type="meta" themeColor="muted">

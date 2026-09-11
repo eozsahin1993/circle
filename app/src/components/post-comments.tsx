@@ -10,8 +10,10 @@ import { useTheme } from '@/hooks/use-theme';
 export type CommentItem = {
   id: string;
   authorName: string;
-  /** Data URI of the author's picture, when known — otherwise the hatch placeholder shows. */
+  /** Data URI of the author's picture, when known — otherwise their initials show. */
   authorPhotoUri?: string;
+  /** The author's identity key, which fixes the colour their initials sit on — see Avatar's `seed`. */
+  authorKey?: string;
   body: string;
   /** Relative and short — "3d", "6h" — since the post's own timestamp already gives the absolute anchor. */
   timestamp: string;
@@ -29,6 +31,9 @@ export type PostCommentsProps = {
   onPressShowAll?: () => void;
   /** The reader's own picture — shown beside the composer and the empty-state invitation, both of which are addressed to them. */
   selfPhotoUri?: string;
+  /** The reader's own name and key, for the composer avatar's initials before they've set a picture. */
+  selfName?: string;
+  selfKey?: string;
 };
 
 const AVATAR_SIZE = 30;
@@ -51,7 +56,16 @@ const COMPOSER_HEIGHT = 42;
  * own screen, which is also the only place it can scroll independently of
  * the feed. The summary line is that tap.
  */
-export function PostComments({ latest, total, composerOpen, onSubmit, onPressShowAll, selfPhotoUri }: PostCommentsProps) {
+export function PostComments({
+  latest,
+  total,
+  composerOpen,
+  onSubmit,
+  onPressShowAll,
+  selfPhotoUri,
+  selfName,
+  selfKey,
+}: PostCommentsProps) {
   const theme = useTheme();
   const [text, setText] = useState('');
 
@@ -65,7 +79,7 @@ export function PostComments({ latest, total, composerOpen, onSubmit, onPressSho
     <View style={styles.container}>
       {latest ? (
         <View style={styles.commentRow}>
-          <Avatar size={AVATAR_SIZE} uri={latest.authorPhotoUri} />
+          <Avatar size={AVATAR_SIZE} uri={latest.authorPhotoUri} name={latest.authorName} seed={latest.authorKey} />
           <View style={styles.commentBody}>
             <ThemedText type="comment" themeColor="secondary">
               <ThemedText type="postAuthor">{latest.authorName}</ThemedText>
@@ -93,7 +107,7 @@ export function PostComments({ latest, total, composerOpen, onSubmit, onPressSho
               avatar — here it's one of three controls on a line, and a
               short circle beside a tall box reads as misaligned however
               it's centred. */}
-          <Avatar size={COMPOSER_HEIGHT} uri={selfPhotoUri} />
+          <Avatar size={COMPOSER_HEIGHT} uri={selfPhotoUri} name={selfName} seed={selfKey} />
           <TextInput
             value={text}
             onChangeText={setText}

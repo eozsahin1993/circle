@@ -92,6 +92,31 @@ export const AlternateAccents = {
   moss: '#4E6B54',
 } as const;
 
+/**
+ * The fills an initials avatar can land on — see utils/initials.ts, which
+ * picks one by hashing the member's identity key rather than at random.
+ *
+ * All eight are the same measured luminance, differing only in hue: that
+ * keeps `text` above 4.5:1 on every one of them while each still clears
+ * 3:1 against `background`, which is a narrow band to sit in and the
+ * reason these aren't just the accents darkened by eye. Equal luminance
+ * also means colour alone doesn't distinguish them for everyone — fine,
+ * because the initials carry who it is and the colour only helps you scan.
+ *
+ * Scheme-independent on purpose: a filled disc supplies the contrast for
+ * its own label, so the same eight work over a light page as a dark one.
+ */
+export const AvatarTints = [
+  '#7B6332', // ochre
+  '#94573C', // terracotta
+  '#9F4F47', // clay
+  '#8F5471', // plum
+  '#6E5E93', // indigo
+  '#4B698B', // steel
+  '#386F71', // teal
+  '#3D7244', // moss
+] as const;
+
 /** Non-solid fills — always composited over `surface` or `background`, dark mode only. */
 export const Tints = {
   chipIdleBg: 'rgba(245,239,230,0.06)',

@@ -22,8 +22,10 @@ export type Reaction = {
 export type Post = {
   id: string;
   authorName: string;
-  /** Data URI of the author's profile picture, when it's known — otherwise the hatch placeholder shows. */
+  /** Data URI of the author's profile picture, when it's known — otherwise their initials show. */
   authorPhotoUri?: string;
+  /** The author's identity key, which fixes the colour their initials sit on — see Avatar's `seed`. */
+  authorKey?: string;
   timestamp: string;
   /** Data URI of the actual photo, when it's known — otherwise the hatch placeholder shows. */
   photoUri?: string;
@@ -53,6 +55,9 @@ export type PostCardProps = {
   onExpandComments?: () => void;
   /** The reader's own picture, for the composer — the same on every card, so it rides on the card rather than each post. */
   selfPhotoUri?: string;
+  /** The reader's own name and key, for the composer avatar's initials — same reasoning as `selfPhotoUri`: one per card, not per post. */
+  selfName?: string;
+  selfKey?: string;
   /** Adds or removes the photo from the circle's album. */
   onToggleAlbum?: () => void;
 };
@@ -76,6 +81,8 @@ export function PostCard({
   onPressComments,
   onExpandComments,
   selfPhotoUri,
+  selfName,
+  selfKey,
   onToggleAlbum,
 }: PostCardProps) {
   const theme = useTheme();
@@ -112,7 +119,7 @@ export function PostCard({
   return (
     <ThemedView style={styles.card}>
       <View style={styles.header}>
-        <Avatar uri={post.authorPhotoUri} />
+        <Avatar uri={post.authorPhotoUri} name={post.authorName} seed={post.authorKey} />
         <View style={styles.byline}>
           <ThemedText type="postAuthor">{post.authorName}</ThemedText>
           {/* Everyone can see that a photo is kept; only its author or an
@@ -212,6 +219,8 @@ export function PostCard({
           composerOpen={composerOpen}
           onPressShowAll={handleShowAll}
           selfPhotoUri={selfPhotoUri}
+          selfName={selfName}
+          selfKey={selfKey}
         />
       </View>
     </ThemedView>

@@ -103,7 +103,7 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
                 rather than screen-height. The circle's name carries the
                 weight; who sent the key is context, not the headline. */}
             <View style={styles.header}>
-              <Avatar size={48} uri={inviterPictureUri} />
+              <Avatar size={48} uri={inviterPictureUri} name={inviterName} />
               <View style={styles.headerText}>
                 <ThemedText type="meta" themeColor="muted" numberOfLines={1}>
                   {inviterName ? `${inviterName} invited you to` : "You've been invited to"}

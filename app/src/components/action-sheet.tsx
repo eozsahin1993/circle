@@ -30,6 +30,13 @@ export type ActionSheetProps = {
   subtitle?: string;
   /** Shown next to `title`, e.g. the member's avatar — omit for a plain text-only header. */
   avatarUri?: string;
+  /**
+   * Who the avatar is, for its initials when there's no picture — see
+   * Avatar. Left unset where the avatar is a photograph rather than a
+   * face, which wants the neutral placeholder instead.
+   */
+  avatarName?: string;
+  avatarSeed?: string;
   /** Squares off that image, for a sheet about a photograph rather than a person. */
   avatarRadius?: number;
   options: ActionSheetOption[];
@@ -55,6 +62,8 @@ export function ActionSheet({
   title,
   subtitle,
   avatarUri,
+  avatarName,
+  avatarSeed,
   avatarRadius,
   options,
 }: ActionSheetProps) {
@@ -99,7 +108,7 @@ export function ActionSheet({
 
             {title ? (
               <View style={styles.header}>
-                <Avatar size={44} uri={avatarUri} radius={avatarRadius} />
+                <Avatar size={44} uri={avatarUri} name={avatarName} seed={avatarSeed} radius={avatarRadius} />
                 <View style={styles.headerTitle}>
                   <ThemedText type="cardTitle" numberOfLines={1}>
                     {title}

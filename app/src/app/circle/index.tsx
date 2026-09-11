@@ -60,6 +60,9 @@ async function resolveLatestActivity(circleId: string): Promise<string | undefin
 
 export default function CircleListScreen() {
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
+  // Only for the header avatar's initials until a picture is set — the
+  // name itself isn't shown on this screen.
+  const [profileName, setProfileName] = useState<string | undefined>();
   const [circles, setCircles] = useState<CircleListItem[]>([]);
   // Avoids flashing the empty state before the first load resolves.
   const [loaded, setLoaded] = useState(false);
@@ -75,6 +78,7 @@ export default function CircleListScreen() {
   const loadFromDatabase = useCallback(async () => {
     const profile = await getProfile();
     setAvatarUri(profile?.picture ? bytesToDataUri(profile.picture) : undefined);
+    setProfileName(profile?.name);
 
     // listCircles rather than getAllCircles: the latter is select(), so it
     // drags every circle's cover blob into JS on each focus. See circles.ts.
@@ -200,7 +204,7 @@ export default function CircleListScreen() {
           </View>
 
           <Pressable onPress={() => router.push('/account')}>
-            <Avatar size={44} uri={avatarUri} />
+            <Avatar size={44} uri={avatarUri} name={profileName} />
           </Pressable>
         </View>
 
