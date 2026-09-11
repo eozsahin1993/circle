@@ -68,75 +68,27 @@ jobs:
             exit 1
           fi
 
-  # Every package test except the black-box suite — most of these are
-  # LocalStack-backed adapter tests, hence the container.
-  unit:
-    name: Unit Tests
+  # One job body, two matrix legs — each leg is its own runner with its
+  # own LocalStack, so the two never share tables. Unit is the computed
+  # complement of integration, so a new package always lands in exactly
+  # one leg.
+  test:
+    name: ${{ matrix.name }}
     needs: build
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: server
 
-    services:
-      localstack:
-        image: localstack/localstack:4.4.0
-        ports:
-          - 4566:4566
-        env:
-          SERVICES: dynamodb,s3
-        options: >-
-          --health-cmd "curl -f http://localhost:4566/_localstack/health"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
-
-      # The container's health check only says the gateway is up; the
-      # individual services come available after it.
-      - name: Wait for DynamoDB and S3
-        run: |
-          for _ in $(seq 1 30); do
-            health=$(curl -sf http://localhost:4566/_localstack/health || true)
-            if printf '%s' "$health" | grep -Eq '"dynamodb": *"(available|running)"' &&
-               printf '%s' "$health" | grep -Eq '"s3": *"(available|running)"'; then
-              echo "ready"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::LocalStack never reported dynamodb and s3 as ready"
-          echo "last health response: $health"
-          exit 1
-
-      # The complement of integration's Test step, computed rather than
-      # listed, so a new package always lands in exactly one job.
-      # REQUIRE_LOCALSTACK turns a dead container into a failure instead
-      # of a quiet, all-green skip.
-      - name: Test
-        run: |
-          go test -race $(go list ./... | grep -Ev '^circle-relay/integration(/|$)')
-        env:
-          REQUIRE_LOCALSTACK: '1'
-
-  # The black-box suite alone: the relay driven over real HTTP the way a
-  # client drives it.
-  integration:
-    name: Integration Tests
-    needs: build
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: server
+    strategy:
+      # One leg failing shouldn't cancel the other's signal.
+      fail-fast: false
+      matrix:
+        include:
+          - name: Unit Tests
+            test: go test -race $(go list ./... | grep -Ev '^circle-relay/integration(/|$)')
+          - name: Integration Tests
+            test: go test -race ./integration/...
 
     services:
       localstack:
@@ -181,6 +133,6 @@ jobs:
       # REQUIRE_LOCALSTACK turns a dead container into a failure instead
       # of a quiet, all-green skip.
       - name: Test
-        run: go test -race ./integration/...
+        run: ${{ matrix.test }}
         env:
           REQUIRE_LOCALSTACK: '1'
