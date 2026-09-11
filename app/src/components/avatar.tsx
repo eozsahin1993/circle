@@ -21,14 +21,6 @@ export type AvatarProps = {
    * to the anonymous hatch.
    */
   name?: string;
-  /**
-   * What the initials' colour is derived from — the member's identity
-   * public key. Falls back to `name`, which is all a screen showing your
-   * own unsaved profile has. See avatarTintFor: never random, because a
-   * colour that changed between devices would stop telling members apart,
-   * which is the only reason the fallback is coloured at all.
-   */
-  seed?: string;
   /** Corner radius, defaulting to a circle. Square it off for a thumbnail of a photograph, which isn't a face. */
   radius?: number;
 };
@@ -37,11 +29,11 @@ export type AvatarProps = {
  * A member's picture, or what stands in for it: their initials on a colour
  * derived from who they are, and failing that a neutral hatch.
  *
- * Three layers rather than three branches, and that's not a style choice —
- * see the note inside. The hatch is the bottom one throughout, so it's
- * also what shows through if either layer above has nothing to draw.
+ * Strictly in that order. A picture always wins — the initials are a
+ * backup, so they aren't built behind one, and the hatch is the backup to
+ * *them*, for a member whose name hasn't arrived yet.
  */
-export function Avatar({ size = 44, ringColor, uri, name, seed, radius }: AvatarProps) {
+export function Avatar({ size = 44, ringColor, uri, name, radius }: AvatarProps) {
   const { scheme } = useAppSettings();
   const theme = useTheme();
   const tints = useTints();
@@ -49,7 +41,10 @@ export function Avatar({ size = 44, ringColor, uri, name, seed, radius }: Avatar
   // Dark mode's hatch sits on `surface`; light mode has no surface dim
   // enough to read as a slot, hence the dedicated PhotoSlotLight.
   const hatchFill = scheme === 'dark' ? theme.surface : PhotoSlotLight;
-  const initials = initialsOf(name);
+  // Not built at all behind a picture, rather than built and covered.
+  // Conditional where the hatch below can't be: that Fabric constraint is
+  // specific to SvgView, not to a plain View.
+  const initials = uri ? '' : initialsOf(name);
 
   return (
     <View
@@ -71,7 +66,7 @@ export function Avatar({ size = 44, ringColor, uri, name, seed, radius }: Avatar
         sign-in profile photo), which used to swap the SvgView out for an
         Image at the same slot and crash with "already has a parent". Now
         the Image just layers on top as an extra sibling instead of
-        replacing anything. The initials layer obeys the same rule.
+        replacing anything.
       */}
       <View style={StyleSheet.absoluteFill}>
         <Svg width="100%" height="100%">
@@ -90,7 +85,7 @@ export function Avatar({ size = 44, ringColor, uri, name, seed, radius }: Avatar
         </Svg>
       </View>
       {initials ? (
-        <View style={[StyleSheet.absoluteFill, styles.initials, { backgroundColor: avatarTintFor(seed || name) }]}>
+        <View style={[StyleSheet.absoluteFill, styles.initials, { backgroundColor: avatarTintFor(name) }]}>
           {/*
             AvatarInk rather than `theme.text`, and unlike the hatch above
             this layer takes no scheme at all: the disc under it is one

@@ -319,7 +319,6 @@ export default function PostDetailsScreen() {
                     size={36}
                     uri={comment.authorPicture ? bytesToDataUri(comment.authorPicture) : undefined}
                     name={comment.authorName || profileName}
-                    seed={comment.authorPublicKey}
                   />
                   <View style={styles.commentBody}>
                     <View style={styles.commentByline}>

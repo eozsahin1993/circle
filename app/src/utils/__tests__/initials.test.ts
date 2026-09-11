@@ -39,33 +39,47 @@ describe('initialsOf', () => {
 
 describe('avatarTintFor', () => {
   it('always lands on a tint from the palette', () => {
-    for (const seed of ['', 'a', 'deadbeef', 'Ada Lovelace', '0'.repeat(64)]) {
-      expect(AvatarTints).toContain(avatarTintFor(seed));
+    for (const name of ['', 'A', 'Ada Lovelace', '雪 山', 'x'.repeat(200)]) {
+      expect(AvatarTints).toContain(avatarTintFor(name));
     }
     expect(AvatarTints).toContain(avatarTintFor(undefined));
   });
 
-  it('gives one seed the same tint every time', () => {
+  it('gives one name the same tint every time', () => {
     // The whole reason this isn't random: two devices, and the same device
     // after a reload, have to agree without being told.
-    const key = 'a3f1c95e2b7d4806a3f1c95e2b7d4806';
-    expect(avatarTintFor(key)).toBe(avatarTintFor(key));
+    expect(avatarTintFor('Ada Lovelace')).toBe(avatarTintFor('Ada Lovelace'));
   });
 
-  it('spreads hex keys across the whole palette', () => {
-    // Identity keys share an alphabet, so a weak hash piles them onto a
-    // couple of tints and the colour stops distinguishing anyone. 200 keys
-    // differing only in their last characters should reach every tint.
+  it('spreads a realistic set of names across the whole palette', () => {
     const tints = new Set(
-      Array.from({ length: 200 }, (_, i) => avatarTintFor(`a3f1c95e2b7d4806${i.toString(16).padStart(4, '0')}`))
+      Array.from({ length: 200 }, (_, i) => avatarTintFor(`Member ${i}`))
     );
     expect(tints.size).toBe(AvatarTints.length);
   });
 
-  it('separates keys that differ only in one character', () => {
-    // Prefix-sharing is the common case for hex ids, and a hash that only
-    // sums characters would put several of these together.
-    const near = ['deadbeef0', 'deadbeef1', 'deadbeef2', 'deadbeef3'].map(avatarTintFor);
+  it('separates names differing in one letter', () => {
+    // A circle of relatives is full of near-identical names, and summing
+    // char codes would put all of these on one tint.
+    const near = ['Ali', 'Alo', 'Ala', 'Alu'].map(avatarTintFor);
     expect(new Set(near).size).toBeGreaterThan(1);
+  });
+
+  it('does not put every case-flipped final letter on one tint', () => {
+    // The collision class `mix` exists to remove: raw FNV-1a put all four of
+    // these pairs on the same tint, because a 0x20 difference in the last
+    // byte lands as zero in the three bits `% 8` reads.
+    //
+    // Asserted as "not all of them" rather than "none": with eight tints an
+    // individual pair collides one time in eight whatever the hash does, so
+    // a per-pair assertion would be testing chance, not mixing.
+    const flipped = [
+      ['Ada', 'AdA'],
+      ['Ali', 'AlI'],
+      ['Emre', 'EmrE'],
+      ['Olga', 'OlgA'],
+    ];
+    const differing = flipped.filter(([one, other]) => avatarTintFor(one) !== avatarTintFor(other));
+    expect(differing.length).toBeGreaterThan(0);
   });
 });

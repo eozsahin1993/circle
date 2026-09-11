@@ -470,7 +470,7 @@ export default function CircleDetailsScreen() {
   function renderMember(member: Member) {
     return (
       <View key={member.identityPublicKey} style={[styles.memberRow, { borderBottomColor: tints.chipIdleBorder }]}>
-        <Avatar size={44} uri={avatarUris.get(member.identityPublicKey)} name={member.name} seed={member.identityPublicKey} />
+        <Avatar size={44} uri={avatarUris.get(member.identityPublicKey)} name={member.name} />
 
         <View style={styles.memberInfo}>
           <View style={styles.memberNameRow}>
@@ -559,7 +559,6 @@ export default function CircleDetailsScreen() {
         title={memberMenu?.name || 'This member'}
         avatarUri={memberMenu ? avatarUris.get(memberMenu.identityPublicKey) : undefined}
         avatarName={memberMenu?.name}
-        avatarSeed={memberMenu?.identityPublicKey}
         options={memberMenuOptions}
       />
     </ThemedView>

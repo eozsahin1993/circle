@@ -12,8 +12,6 @@ export type CommentItem = {
   authorName: string;
   /** Data URI of the author's picture, when known — otherwise their initials show. */
   authorPhotoUri?: string;
-  /** The author's identity key, which fixes the colour their initials sit on — see Avatar's `seed`. */
-  authorKey?: string;
   body: string;
   /** Relative and short — "3d", "6h" — since the post's own timestamp already gives the absolute anchor. */
   timestamp: string;
@@ -31,9 +29,8 @@ export type PostCommentsProps = {
   onPressShowAll?: () => void;
   /** The reader's own picture — shown beside the composer and the empty-state invitation, both of which are addressed to them. */
   selfPhotoUri?: string;
-  /** The reader's own name and key, for the composer avatar's initials before they've set a picture. */
+  /** The reader's own name, for the composer avatar's initials before they've set a picture. */
   selfName?: string;
-  selfKey?: string;
 };
 
 const AVATAR_SIZE = 30;
@@ -64,7 +61,6 @@ export function PostComments({
   onPressShowAll,
   selfPhotoUri,
   selfName,
-  selfKey,
 }: PostCommentsProps) {
   const theme = useTheme();
   const tints = useTints();
@@ -80,7 +76,7 @@ export function PostComments({
     <View style={styles.container}>
       {latest ? (
         <View style={styles.commentRow}>
-          <Avatar size={AVATAR_SIZE} uri={latest.authorPhotoUri} name={latest.authorName} seed={latest.authorKey} />
+          <Avatar size={AVATAR_SIZE} uri={latest.authorPhotoUri} name={latest.authorName} />
           <View style={styles.commentBody}>
             <ThemedText type="comment" themeColor="secondary">
               <ThemedText type="postAuthor">{latest.authorName}</ThemedText>
@@ -108,7 +104,7 @@ export function PostComments({
               avatar — here it's one of three controls on a line, and a
               short circle beside a tall box reads as misaligned however
               it's centred. */}
-          <Avatar size={COMPOSER_HEIGHT} uri={selfPhotoUri} name={selfName} seed={selfKey} />
+          <Avatar size={COMPOSER_HEIGHT} uri={selfPhotoUri} name={selfName} />
           <TextInput
             value={text}
             onChangeText={setText}

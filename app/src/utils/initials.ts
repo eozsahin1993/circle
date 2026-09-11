@@ -33,31 +33,30 @@ function firstCodePoint(word: string): string {
 }
 
 /**
- * Which tint a member's initials sit on — derived from `seed`, never
+ * Which tint a member's initials sit on — derived from their name, never
  * chosen at random.
  *
  * The point of the placeholder is telling members apart and recognising
  * the same person across screens, and a colour drawn at random would
  * differ between two devices and across a reload, which defeats exactly
- * that. Pass the member's identity public key: it's stable forever and
- * identical everywhere, so every device agrees without anything being
- * synced to make them. Not their name: names resolve live from the roster
- * precisely so a rename updates everywhere, and a colour that moved
- * because someone fixed their spelling would be worse than no colour.
+ * that. The name is what every device already agrees on, so nothing has
+ * to be synced to make them agree on a colour either.
  *
- * Identity keys are per-circle, so your own avatar is a different colour
- * in each of your circles, and a screen showing only the device profile —
- * which has no key — seeds from the name instead. Deliberate: the
- * consistency worth having is looking the same to yourself as you do to
- * everyone else *within* a circle, which is the only place both are on
- * screen together.
+ * The name rather than the identity key, though the key is the more
+ * stable value, because it's what the initials already come from: one
+ * input for the whole placeholder means no second field to thread through
+ * every view model, and your own avatar is one colour app-wide instead of
+ * a different one per circle (identity keys are per-circle). The price is
+ * that a rename recolours that member's history, and that two people
+ * sharing a name share a colour — but they share initials too, and the
+ * byline beside them is already identical.
  *
- * FNV-1a rather than a sum of char codes, because identity keys are hex
- * and share an alphabet — a weak mix puts visibly many of them on the
- * same tint.
+ * FNV-1a rather than a sum of char codes: summing makes anagrams collide
+ * and barely separates names differing in one letter, which in a circle of
+ * relatives is the common case.
  */
-export function avatarTintFor(seed: string | undefined | null): string {
-  return AvatarTints[fnv1a(seed ?? '') % AvatarTints.length];
+export function avatarTintFor(name: string | undefined | null): string {
+  return AvatarTints[mix(fnv1a(name ?? '')) % AvatarTints.length];
 }
 
 function fnv1a(value: string): number {
@@ -69,4 +68,26 @@ function fnv1a(value: string): number {
     hash = (hash + (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24)) >>> 0;
   }
   return hash;
+}
+
+/**
+ * Murmur3's finalizer, because a palette of eight means the bucket is
+ * chosen by three bits and FNV's lowest three carry structure. The last
+ * character enters the hash and is multiplied by the prime exactly once, so
+ * a difference of 0x20 there — an ASCII case flip — becomes 0x3260, whose
+ * bottom three bits are zero: without this, any two names differing only in
+ * their final letter's case are guaranteed the same tint.
+ *
+ * It doesn't measurably change the spread over ordinary distinct names,
+ * which was already even. It removes a collision class, which matters more
+ * for whatever this helper gets pointed at next.
+ */
+function mix(hash: number): number {
+  let h = hash;
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return h >>> 0;
 }

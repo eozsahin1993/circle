@@ -36,7 +36,6 @@ export type ActionSheetProps = {
    * face, which wants the neutral placeholder instead.
    */
   avatarName?: string;
-  avatarSeed?: string;
   /** Squares off that image, for a sheet about a photograph rather than a person. */
   avatarRadius?: number;
   options: ActionSheetOption[];
@@ -63,7 +62,6 @@ export function ActionSheet({
   subtitle,
   avatarUri,
   avatarName,
-  avatarSeed,
   avatarRadius,
   options,
 }: ActionSheetProps) {
@@ -109,7 +107,7 @@ export function ActionSheet({
 
             {title ? (
               <View style={styles.header}>
-                <Avatar size={44} uri={avatarUri} name={avatarName} seed={avatarSeed} radius={avatarRadius} />
+                <Avatar size={44} uri={avatarUri} name={avatarName} radius={avatarRadius} />
                 <View style={styles.headerTitle}>
                   <ThemedText type="cardTitle" numberOfLines={1}>
                     {title}
