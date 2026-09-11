@@ -18,27 +18,16 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Static checks plus every package test except the black-box suite —
-  # most of these are LocalStack-backed adapter tests, hence the container.
-  unit:
-    name: Unit Tests
+  # Compile and static checks alone — the cheap, container-free failure
+  # mode. Both test jobs gate on it and then run in parallel, so a broken
+  # build is reported once instead of twice, and never costs a container
+  # boot.
+  build:
+    name: Build
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: server
-
-    services:
-      localstack:
-        image: localstack/localstack:4.4.0
-        ports:
-          - 4566:4566
-        env:
-          SERVICES: dynamodb,s3
-        options: >-
-          --health-cmd "curl -f http://localhost:4566/_localstack/health"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
 
     steps:
       # No later step needs to push or fetch as this token, so it isn't
@@ -79,6 +68,39 @@ jobs:
             exit 1
           fi
 
+  # Every package test except the black-box suite — most of these are
+  # LocalStack-backed adapter tests, hence the container.
+  unit:
+    name: Unit Tests
+    needs: build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+
+    services:
+      localstack:
+        image: localstack/localstack:4.4.0
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: dynamodb,s3
+        options: >-
+          --health-cmd "curl -f http://localhost:4566/_localstack/health"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
       # The container's health check only says the gateway is up; the
       # individual services come available after it.
       - name: Wait for DynamoDB and S3
@@ -107,11 +129,10 @@ jobs:
           REQUIRE_LOCALSTACK: '1'
 
   # The black-box suite alone: the relay driven over real HTTP the way a
-  # client drives it. Gated on unit, so a broken build doesn't spend a
-  # second container's boot time finding that out again.
+  # client drives it.
   integration:
     name: Integration Tests
-    needs: unit
+    needs: build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -131,8 +152,6 @@ jobs:
           --health-retries 10
 
     steps:
-      # No later step needs to push or fetch as this token, so it isn't
-      # left sitting in the git config for anything that runs after.
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
