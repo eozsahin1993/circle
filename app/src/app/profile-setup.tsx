@@ -89,7 +89,7 @@ export default function ProfileSetupScreen() {
             </ThemedText>
 
             <Pressable style={styles.pictureRow} onPress={handleAddPicture}>
-              <Avatar size={64} uri={picture?.uri} />
+              <Avatar size={64} uri={picture?.uri} name={name} />
               <View style={styles.pictureText}>
                 <ThemedText type="cardTitle">Add a picture</ThemedText>
                 <ThemedText type="meta" themeColor="muted">

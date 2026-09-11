@@ -15,6 +15,8 @@ export type AvatarStackProps = {
  * separate them. Past `max`, the last slot becomes a "+N" chip instead of
  * silently dropping members — otherwise a circle of 5 and a circle of 50
  * render identically.
+ *
+ * Anonymous rather than initialled: this takes a count, not a roster.
  */
 export function AvatarStack({ count, size = 34, max = 5 }: AvatarStackProps) {
   const theme = useTheme();
