@@ -1,7 +1,41 @@
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { bytesToHex, hexToBytes, randomBytes } from '@noble/curves/utils.js';
 
+import { APP_GROUP } from '@/services/app-group';
 import type { Keypair } from '@/services/crypto';
+
+/**
+ * iOS secrets live in the shared App Group keychain so the notification
+ * extension can read them — AFTER_FIRST_UNLOCK, because it runs while the
+ * phone is locked and the default WHEN_UNLOCKED is unreadable exactly then.
+ */
+const sharedOptions: SecureStore.SecureStoreOptions | undefined =
+  Platform.OS === 'ios' ? { accessGroup: APP_GROUP, keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK } : undefined;
+
+async function getSecret(key: string): Promise<string | null> {
+  if (!sharedOptions) return SecureStore.getItemAsync(key);
+
+  const shared = await SecureStore.getItemAsync(key, sharedOptions);
+  if (shared !== null) return shared;
+
+  // Pre-App-Group installs hold their secrets in the app's own keychain
+  // group; copy forward on first read. The old item is deliberately left
+  // behind: a delete query without an accessGroup matches every group —
+  // including the copy just written.
+  const legacy = await SecureStore.getItemAsync(key);
+  if (legacy !== null) await SecureStore.setItemAsync(key, legacy, sharedOptions);
+  return legacy;
+}
+
+function setSecret(key: string, value: string): Promise<void> {
+  return SecureStore.setItemAsync(key, value, sharedOptions);
+}
+
+/** No accessGroup on purpose: the query then matches the shared group and any pre-migration copy alike. */
+function deleteSecret(key: string): Promise<void> {
+  return SecureStore.deleteItemAsync(key);
+}
 
 /**
  * A device's full local identity for one circle: the Ed25519 keypair, plus
@@ -30,12 +64,12 @@ export async function saveCircleIdentity(circleId: string, identity: CircleIdent
     secretKey: bytesToHex(identity.secretKey),
     memberId: identity.memberId,
   });
-  await SecureStore.setItemAsync(identityStorageKey(circleId), value);
+  await setSecret(identityStorageKey(circleId), value);
 }
 
 /** Reads this circle's identity back, or null if none is stored. */
 export async function getCircleIdentity(circleId: string): Promise<CircleIdentity | null> {
-  const raw = await SecureStore.getItemAsync(identityStorageKey(circleId));
+  const raw = await getSecret(identityStorageKey(circleId));
   if (!raw) return null;
   const parsed = JSON.parse(raw) as { publicKey: string; secretKey: string; memberId: string };
   return {
@@ -48,12 +82,12 @@ export async function getCircleIdentity(circleId: string): Promise<CircleIdentit
 /** Persists this circle's full content-key map, replacing whatever was stored before. */
 export async function saveCircleKeyMap(circleId: string, keyMap: ContentKeyMap): Promise<void> {
   const value = JSON.stringify(Object.fromEntries(Object.entries(keyMap).map(([version, key]) => [version, bytesToHex(key)])));
-  await SecureStore.setItemAsync(keyMapStorageKey(circleId), value);
+  await setSecret(keyMapStorageKey(circleId), value);
 }
 
 /** Reads this circle's full content-key map back, or null if none is stored. */
 export async function getCircleKeyMap(circleId: string): Promise<ContentKeyMap | null> {
-  const raw = await SecureStore.getItemAsync(keyMapStorageKey(circleId));
+  const raw = await getSecret(keyMapStorageKey(circleId));
   if (!raw) return null;
   const parsed = JSON.parse(raw) as Record<string, string>;
   return Object.fromEntries(Object.entries(parsed).map(([version, hex]) => [Number(version), hexToBytes(hex)]));
@@ -87,8 +121,8 @@ export async function addCircleKeyVersion(circleId: string, version: number, key
 
 /** Removes both the identity keypair and the content-key map for a circle (e.g. on leave). */
 export async function deleteCircleKeys(circleId: string): Promise<void> {
-  await SecureStore.deleteItemAsync(identityStorageKey(circleId));
-  await SecureStore.deleteItemAsync(keyMapStorageKey(circleId));
+  await deleteSecret(identityStorageKey(circleId));
+  await deleteSecret(keyMapStorageKey(circleId));
 }
 
 const MASTER_SEED_KEY = 'master_seed';
@@ -100,18 +134,18 @@ const MASTER_SEED_KEY = 'master_seed';
  * protection as any individual circle's key, arguably more.
  */
 export async function saveMasterSeed(seed: Uint8Array): Promise<void> {
-  await SecureStore.setItemAsync(MASTER_SEED_KEY, bytesToHex(seed));
+  await setSecret(MASTER_SEED_KEY, bytesToHex(seed));
 }
 
 /** Reads the master seed back, or null before onboarding has generated one. */
 export async function getMasterSeed(): Promise<Uint8Array | null> {
-  const raw = await SecureStore.getItemAsync(MASTER_SEED_KEY);
+  const raw = await getSecret(MASTER_SEED_KEY);
   return raw ? hexToBytes(raw) : null;
 }
 
 /** Removes the master seed — used only by the __DEV__-only local reset tool, see domain/usecases/dev-reset.ts. */
 export async function deleteMasterSeed(): Promise<void> {
-  await SecureStore.deleteItemAsync(MASTER_SEED_KEY);
+  await deleteSecret(MASTER_SEED_KEY);
 }
 
 // TODO(erase-device): a deleteMasterSeed() belongs here once the separate
@@ -134,12 +168,12 @@ export async function savePendingJoinKeypair(requestId: string, keypair: Keypair
     publicKey: bytesToHex(keypair.publicKey),
     secretKey: bytesToHex(keypair.secretKey),
   });
-  await SecureStore.setItemAsync(pendingJoinKeypairStorageKey(requestId), value);
+  await setSecret(pendingJoinKeypairStorageKey(requestId), value);
 }
 
 /** Reads a pending join request's ephemeral keypair back, or null if none is stored. */
 export async function getPendingJoinKeypair(requestId: string): Promise<Keypair | null> {
-  const raw = await SecureStore.getItemAsync(pendingJoinKeypairStorageKey(requestId));
+  const raw = await getSecret(pendingJoinKeypairStorageKey(requestId));
   if (!raw) return null;
   const parsed = JSON.parse(raw) as { publicKey: string; secretKey: string };
   return { publicKey: hexToBytes(parsed.publicKey), secretKey: hexToBytes(parsed.secretKey) };
@@ -147,7 +181,7 @@ export async function getPendingJoinKeypair(requestId: string): Promise<Keypair 
 
 /** Removes a pending join request's ephemeral keypair — once the request completes or is abandoned. */
 export async function deletePendingJoinKeypair(requestId: string): Promise<void> {
-  await SecureStore.deleteItemAsync(pendingJoinKeypairStorageKey(requestId));
+  await deleteSecret(pendingJoinKeypairStorageKey(requestId));
 }
 
 const AUTH_TOKEN_KEY = 'auth_token';
@@ -160,17 +194,17 @@ const AUTH_TOKEN_KEY = 'auth_token';
  * this device has a name/picture set up locally.
  */
 export async function saveAuthToken(token: string): Promise<void> {
-  await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+  await setSecret(AUTH_TOKEN_KEY, token);
 }
 
 /** Reads the bearer session token back, or null before any provider sign-in has completed. */
 export async function getAuthToken(): Promise<string | null> {
-  return SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+  return getSecret(AUTH_TOKEN_KEY);
 }
 
 /** Removes the stored session token — logout, or before signing in again with a different account. */
 export async function deleteAuthToken(): Promise<void> {
-  await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+  await deleteSecret(AUTH_TOKEN_KEY);
 }
 
 const PUSH_DEVICE_SECRET_KEY = 'push_device_secret';
@@ -183,10 +217,10 @@ const PUSH_DEVICE_SECRET_KEY = 'push_device_secret';
  * them.
  */
 export async function getPushDeviceSecret(): Promise<Uint8Array> {
-  const stored = await SecureStore.getItemAsync(PUSH_DEVICE_SECRET_KEY);
+  const stored = await getSecret(PUSH_DEVICE_SECRET_KEY);
   if (stored) return hexToBytes(stored);
 
   const secret = randomBytes(32);
-  await SecureStore.setItemAsync(PUSH_DEVICE_SECRET_KEY, bytesToHex(secret));
+  await setSecret(PUSH_DEVICE_SECRET_KEY, bytesToHex(secret));
   return secret;
 }

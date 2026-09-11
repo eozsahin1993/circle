@@ -10,10 +10,17 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.eozsahin.circle",
+      "appleTeamId": "N323492Q8L",
       "usesAppleSignIn": true,
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
+        ]
+      },
+      "entitlements": {
+        "aps-environment": "development",
+        "com.apple.security.application-groups": [
+          "group.com.eozsahin.circle"
         ]
       }
     },
@@ -33,6 +40,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "@bacons/apple-targets",
       "expo-router",
       [
         "expo-splash-screen",

@@ -1,10 +1,12 @@
 # Mobile push design
 
-Status: **Android is built** — FCM data messages, real notification text
-composed by the on-device handler. **iOS is phase one** (see "What
-building this needs" below): the relay dispatches real APNs alert pushes
-(`internal/push/apns`), but with no Notification Service Extension yet, so
-a device shows only the placeholder, never the real content.
+Status: **built on both platforms.** Android: FCM data messages composed
+by the on-device JS handler. iOS: real APNs alert pushes
+(`internal/push/apns`) rewritten by a native Notification Service
+Extension (`app/targets/notification-service`) that reads the shared App
+Group keychain and a circle/member-name snapshot
+(`app/src/domain/usecases/push/push-snapshot.ts`). Not yet verified on a
+physical device.
 
 Supersedes `DESIGN.md` section 2, which reached the same broad shape
 (routing IDs, device-side composition) but left the decisive question —
@@ -338,25 +340,25 @@ For the policy half to be real, source IPs must actually not be logged —
 API Gateway access logs, CloudFront, and ALB logs all capture them by
 default. Retention on whatever remains should be short.
 
-## What building this needs
+## How it was built (all landed)
 
-Substantially more native work than anything else in the app:
-
-- An iOS Notification Service Extension: a separate Swift target, added
-  via a config plugin, with the decryption reimplemented natively
-- The extension needs the circle key map, which means an App Group and a
-  shared Keychain access group. Every `SecureStore` write currently passes
-  no options; these would need `accessGroup`, and `keychainAccessible:
-  AFTER_FIRST_UNLOCK` — the default `WHEN_UNLOCKED` is unreadable from an
-  extension on a locked phone, which is exactly when notifications matter
-- Android: an FCM data-message path into `onMessageReceived` (built)
+- iOS Notification Service Extension: `app/targets/notification-service`,
+  a Swift target injected by the `@bacons/apple-targets` config plugin.
+  The crypto port (XChaCha20-Poly1305 via swift-sodium; HKDF and Ed25519
+  via CryptoKit) is pinned against the JS side by
+  `app/src/services/__tests__/push-crypto-vectors.test.ts`.
+- The App Group `group.com.eozsahin.circle` doubles as the shared
+  Keychain access group and the shared container. `keystore.ts` writes
+  every secret there with `keychainAccessible: AFTER_FIRST_UNLOCK` — the
+  default `WHEN_UNLOCKED` is unreadable from an extension on a locked
+  phone — and migrates pre-App-Group items on first read.
+- The extension can't open the app's SQLite file, so circle and member
+  names reach it through a JSON snapshot in the shared container,
+  refreshed on launch and after every sync pass (`push-snapshot.ts`).
+  Stale is benign: the card says "Someone".
+- Android: an FCM data-message path into the JS background task.
 - APNs auth key and FCM service account credentials on the relay,
-  KMS-encrypted. These are the most dangerous secret the relay will ever
-  hold — anyone with them can put arbitrary text on users' lock screens,
-  bypassing the extension entirely by omitting `mutable-content`.
-  `provision/kms.tf` already reserves the master key for exactly this.
-  (Relay-side dispatch is built; the key itself still needs provisioning.)
-
-Phase one — deliver the placeholder only, no extension, no decryption — is
-done for both platforms. It gets the wake-up behaviour and the whole relay
-side working; the NSE and real notification text are phase two.
+  KMS-encrypted SSM SecureStrings created by hand. These are the most
+  dangerous secret the relay will ever hold — anyone with them can put
+  arbitrary text on users' lock screens, bypassing the extension entirely
+  by omitting `mutable-content`.

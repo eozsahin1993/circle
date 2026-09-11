@@ -1,6 +1,7 @@
 import { getAllCircles, getCircle, getPendingOutboxEntries } from '@/data/db';
 import { finishPendingDepartures } from '@/domain/usecases/circle/leave-circle';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
+import { refreshPushSnapshot } from '@/domain/usecases/push/push-snapshot';
 import { fetchEpochs } from '@/services/relay';
 import { timed } from '@/services/timing';
 import { pullContent, pullMeta } from '@/sync/pull-log';
@@ -26,6 +27,10 @@ export async function syncCircle(circleId: string): Promise<void> {
 
   await timed('sync.push', () => drainOutbox(circleId));
   await timed('sync.content', () => pullContent(circleId));
+
+  // The meta pass may have changed names or the roster; the iOS
+  // notification extension reads them from the snapshot. Never throws.
+  void refreshPushSnapshot();
 }
 
 /**

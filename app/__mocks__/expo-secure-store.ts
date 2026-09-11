@@ -6,6 +6,10 @@
 // Auto-applied by Jest for any test that imports 'expo-secure-store'.
 const store = new Map<string, string>();
 
+// keystore.ts references this in its shared-keychain options; the mock
+// ignores options entirely, this just keeps the value defined.
+export const AFTER_FIRST_UNLOCK = 1;
+
 export async function setItemAsync(key: string, value: string): Promise<void> {
   store.set(key, value);
 }

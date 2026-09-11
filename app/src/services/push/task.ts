@@ -79,10 +79,9 @@ export async function startPushHandling(): Promise<void> {
     }),
   });
 
-  // Android only for now. The relay sends nothing to iOS — those go direct
-  // to APNs, which isn't built — so registering there would fail every
-  // launch on a build without the remote-notification entitlement, for a
-  // task that has nothing to receive. Lift this with the iOS extension.
+  // Android only, permanently: iOS composes in the notification service
+  // extension (targets/notification-service), which runs natively before
+  // display — a JS background task would be too late to rewrite the card.
   if (Platform.OS !== 'android') return;
 
   await registerTaskAsync(PUSH_TASK);
