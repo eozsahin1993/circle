@@ -49,13 +49,10 @@ type PushDeps struct {
 }
 
 // Deps is everything the router wires into its endpoints, named rather
-// than positional. Four of these fields share two types — two
-// ratelimitstore.Store and two *oidcverify.Verifier — so a positional list
-// lets a read budget stand in for a write one, or Apple's verifier for
-// Google's, with nothing to catch it at compile time and every test still
-// passing. `PushDeps` below was already a struct for exactly this reason;
-// this finishes the job, and lets `internal/app` and `testsupport` build
-// the same value instead of two argument lists that can drift apart.
+// than positional — four fields share two types (two ratelimitstore.Store,
+// two *oidcverify.Verifier), so a positional list let a read budget stand
+// in for a write one with nothing to catch it. PushDeps was already a
+// struct for the same reason; this finishes the job.
 type Deps struct {
 	Log      logstore.Store
 	Blob     blobstore.Store

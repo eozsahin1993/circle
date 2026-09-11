@@ -1,12 +1,6 @@
-// Package app builds the relay from configuration — the one place the real
-// AWS adapters are wired to api.Deps.
-//
-// It exists because cmd/server and cmd/lambda had this block byte for byte
-// each, and a wiring bug in one would have been invisible in the other and
-// in every test: testsupport constructs its own api.Deps, so nothing ever
-// exercised what the deployed binaries actually assemble. The entry points
-// now differ only in how they serve the handler, which is the only thing
-// that genuinely differs between them.
+// Package app wires the real AWS adapters into api.Deps — the one place
+// cmd/server and cmd/lambda both build the relay, so a wiring mistake in
+// one can't go unnoticed in the other.
 package app
 
 import (
@@ -55,17 +49,14 @@ func New(ctx context.Context, cfg config.Config) (*http.ServeMux, error) {
 	return api.NewRouter(Deps(cfg, awsCfg)), nil
 }
 
-// Deps builds the real AWS-backed dependencies. Separate from New so a
-// caller that needs a store as well as the handler can have both — see
-// cmd/testrelay, which mints sessions directly — and so a caller with its
-// own aws.Config, pointed at LocalStack say, gets this wiring rather than
-// a copy of it.
+// Deps builds the real AWS-backed dependencies, separate from New so a
+// caller with its own aws.Config — LocalStack, say — gets this wiring
+// rather than a copy of it. See cmd/testrelay, which also needs the
+// stores directly to mint sessions.
 func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 	dynamo := func() *awsdynamodb.Client { return awsdynamodb.NewFromConfig(awsCfg) }
-	// Path style is only ever on for a local S3 stand-in, and config
-	// defaults it off — so applying it here rather than in cmd/server
-	// costs production nothing and stops the flag being silently ignored
-	// on Lambda, which never read it.
+	// Applied here, not per-binary: cmd/lambda never read this flag before,
+	// silently ignoring it.
 	s3Client := awss3.NewFromConfig(awsCfg, func(o *awss3.Options) { o.UsePathStyle = cfg.S3ForcePathStyle })
 
 	limit := func(kind string, max int64) *ratelimitdynamodb.Store {

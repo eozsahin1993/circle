@@ -1,11 +1,7 @@
 // Package localstack names the AWS resources a local LocalStack instance
-// holds, and creates them.
-//
-// Not a test-only package, despite what it's for: internal/testsupport
-// needs these names and schemas for the Go suite, and cmd/testrelay needs
-// the same ones to serve a real relay over HTTP. A second definition of
-// either is a way for tests to pass against a table shape the relay
-// doesn't actually have.
+// holds, and creates them — shared by internal/testsupport and
+// cmd/testrelay so neither can drift onto a table shape the other isn't
+// actually using.
 package localstack
 
 import (
@@ -26,11 +22,10 @@ import (
 	"circle-relay/internal/config"
 )
 
-// DefaultEndpoint is where LocalStack listens, both locally and as a CI
-// service container — see .github/workflows/server-unit-test.yml.
-// EndpointEnv overrides it, for a stack somewhere else, or at nothing:
-// pointing it at a dead port is how Required's fail-rather-than-skip
-// behaviour gets exercised without stopping anyone's container.
+// DefaultEndpoint is where LocalStack listens locally and in CI.
+// EndpointEnv overrides it — including to a dead port, which is how
+// Required's fail-rather-than-skip path gets tested without stopping a
+// real container.
 const (
 	DefaultEndpoint = "http://localhost:4566"
 	EndpointEnv     = "LOCALSTACK_ENDPOINT"
@@ -108,24 +103,17 @@ func Unique(suffix string) Names {
 // of a skip.
 const RequireEnv = "REQUIRE_LOCALSTACK"
 
-// Required reports whether a missing LocalStack should fail the test
-// rather than skip it.
-//
-// Skipping is right on a laptop: not everyone has it running, and a red
-// suite for that is noise. It is wrong in CI, where all but four of this
-// module's test packages need it — a container that failed to start would
-// skip nearly everything and report green, saying nothing is broken
-// because nothing was checked. So the workflow sets this.
+// Required reports whether a missing LocalStack should fail rather than
+// skip — set by CI, where a dead container should turn the run red
+// instead of quietly skipping almost everything.
 func Required() bool {
 	return os.Getenv(RequireEnv) != ""
 }
 
 // Config points the SDK at LocalStack with throwaway credentials.
-//
-// BaseEndpoint is set on the config rather than per client, so every
-// client built from it lands on LocalStack without the constructor having
-// to know — which is what lets app.Deps be handed a LocalStack config and
-// need no knowledge of it.
+// BaseEndpoint lives on the config, not per client, so app.Deps can be
+// handed this config and build ordinary clients with no LocalStack
+// knowledge of its own.
 func Config(ctx context.Context) (aws.Config, error) {
 	cfg, err := awsconfig.LoadDefaultConfig(ctx,
 		awsconfig.WithRegion("us-east-1"),
@@ -139,13 +127,11 @@ func Config(ctx context.Context) (aws.Config, error) {
 }
 
 // RelayConfig is config.Load's shape for a relay served against
-// LocalStack, without the environment: every value is a test value, so a
-// missing variable should be impossible rather than fatal.
-//
-// Rate limits sit at their production defaults deliberately. The Go suite
-// pins them to a million to keep the limiter out of its way, which leaves
-// nothing exercising the real budgets alongside the router — a relay built
-// from this is the only place those two meet.
+// LocalStack, with test values baked in rather than read from the
+// environment. Rate limits stay at their production defaults on
+// purpose — unlike the Go suite, which pins them to a million to stay out
+// of its own way, so this is the only place the real budgets and the
+// router run together.
 func RelayConfig(names Names) config.Config {
 	return config.Config{
 		TableName:                 names.LogTable,
@@ -212,13 +198,9 @@ func ProvisionSet(ctx context.Context, ddb *awsdynamodb.Client, s3 *awss3.Client
 	return nil
 }
 
-// TeardownSet removes a set, so a run of unique sets doesn't leave
-// LocalStack carrying every table any test has ever asked for. Best
-// effort: a resource already gone, or never created because provisioning
-// failed partway, isn't an error.
-//
-// The bucket's objects go first — S3 refuses to delete a bucket that
-// still holds any.
+// TeardownSet removes a set. Best effort — an already-gone resource isn't
+// an error — and empties the bucket first, since S3 refuses to delete one
+// that still holds objects.
 func TeardownSet(ctx context.Context, ddb *awsdynamodb.Client, s3 *awss3.Client, names Names) {
 	for _, table := range names.sorted() {
 		_, _ = ddb.DeleteTable(ctx, &awsdynamodb.DeleteTableInput{TableName: aws.String(table.name)})

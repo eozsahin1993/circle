@@ -41,16 +41,13 @@ func NewRouterWithAuth(t testing.TB) (mux *http.ServeMux, google, apple *FakeOID
 	return mux, google, apple
 }
 
-// NewRouter is NewRouterWithAuth without the provider handles, for tests
-// that just need a working router and don't touch auth endpoints — the one
-// router construction path every other end-to-end test in package api_test
-// should use, so a change to api.Deps only means updating this one place,
-// not every test file.
+// NewRouter is NewRouterWithAuth without the provider handles — the one
+// router construction path every end-to-end test in package api_test
+// should use, so a change to api.Deps means updating this one place.
 //
-// This builds its own api.Deps rather than going through internal/app,
-// which wires the real AWS adapters: the stores here are LocalStack-backed
-// with per-test table names. So what the deployed binaries assemble is
-// still not covered by anything, which is what the integration suite is for.
+// Builds its own api.Deps rather than going through internal/app: these
+// stores are LocalStack-backed with per-test table names, not the real
+// wiring app.Deps assembles — see the integration suite for that.
 func NewRouter(t testing.TB) *http.ServeMux {
 	t.Helper()
 	mux, _, _ := NewRouterWithAuth(t)

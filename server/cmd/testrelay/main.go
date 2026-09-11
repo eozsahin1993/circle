@@ -1,12 +1,7 @@
-// Command testrelay serves the real relay against LocalStack, for tests
-// that drive it over HTTP from outside the process — the integration suite,
-// and the headless peer the app's UI tests will need.
-//
-// Deliberately the same internal/app wiring cmd/server and cmd/lambda use,
-// so what these tests exercise is what ships. The only additions are the
-// LocalStack endpoints and /testonly/ below, and this binary is never
-// deployed: provision/lambda.tf builds cmd/lambda, and nothing builds
-// this.
+// Command testrelay serves the real relay (internal/app's wiring, not a
+// copy) against LocalStack, for tests that drive it over HTTP — the
+// integration suite, and later the app's headless UI-test peer. Never
+// deployed: provision/lambda.tf builds cmd/lambda, not this.
 package main
 
 import (

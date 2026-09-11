@@ -12,11 +12,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Everything that needs no service container: the static checks, and the
-  # handful of packages with no LocalStack dependency at all (see their
-  # list below). No `services:` block, so this starts running the instant
-  # a runner is free rather than waiting on a container to boot — the
-  # cheap, fast-feedback half of the split.
+  # No `services:` block: static checks plus the packages with no
+  # LocalStack dependency (see the Test step), so this starts the instant
+  # a runner is free instead of waiting on a container.
   unit:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -59,14 +57,9 @@ jobs:
             exit 1
           fi
 
-      # Only the packages whose tests touch no storage adapter at all —
-      # everything else constructs a real DynamoDB/S3 client (see
-      # internal/testsupport's package doc) and belongs in the integration
-      # job below. Named explicitly, not discovered, so this job's pass
-      # means what "unit tests" is supposed to mean: nothing here skipped
-      # for want of a service container. The integration job runs the
-      # full `./...` regardless, so a stale entry here undertests this job
-      # without ever leaving a gap in what CI as a whole checks.
+      # Named explicitly rather than discovered, so a green run here means
+      # nothing skipped for want of a container. integration's `./...`
+      # below is the safety net if this list ever goes stale.
       - name: Test
         run: |
           go test -race \
@@ -75,11 +68,8 @@ jobs:
             ./internal/push/fcm/... \
             ./internal/storage/dynamoutil/...
 
-  # Everything that talks to LocalStack: the storage adapters, the routed
-  # API against real adapters, and integration/ — the sequences that drive
-  # a real relay over HTTP (create an invite, request against it, approve,
-  # read it back). Gated on unit passing first, so a broken build doesn't
-  # spend a container's boot time finding that out a second way.
+  # Everything that talks to LocalStack. Gated on unit, so a broken build
+  # doesn't spend a container's boot time finding that out a second way.
   integration:
     name: Integration Tests
     needs: unit
@@ -109,10 +99,8 @@ jobs:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
 
-      # The service container's health check only says the gateway is up;
-      # the individual services come available after it. Waiting here
-      # rather than in the tests keeps a slow start from looking like a
-      # storage bug, and names the problem when it really is one.
+      # The container's health check only says the gateway is up; the
+      # individual services come available after it.
       - name: Wait for DynamoDB and S3
         run: |
           for _ in $(seq 1 30); do
@@ -128,15 +116,9 @@ jobs:
           echo "last health response: $health"
           exit 1
 
-      # ./... rather than the LocalStack-dependent subset by name: this is
-      # the safety net for the unit job's explicit list above, so nothing
-      # this module has is ever missing from CI as a whole. The four pure
-      # packages just run twice, which costs a fraction of a second.
-      #
-      # Fails rather than skips if LocalStack never came up — every
-      # storage-backed test here otherwise treats that as "not my job to
-      # decide", which is right on a laptop and wrong in a pipeline: a
-      # broken container would leave this job green having checked nothing.
+      # ./... rather than a subset, so the four pure packages just run
+      # twice — see unit's Test step. REQUIRE_LOCALSTACK turns a dead
+      # container into a failure instead of a quiet, all-green skip.
       - name: Test
         run: go test ./... -race
         env:
