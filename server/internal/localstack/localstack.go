@@ -233,10 +233,13 @@ func CreateTable(ctx context.Context, client *awsdynamodb.Client, name string, s
 	})
 	if err != nil {
 		var inUse *ddbtypes.ResourceInUseException
-		if errors.As(err, &inUse) {
-			return nil
+		if !errors.As(err, &inUse) {
+			return err
 		}
-		return err
+		// Already exists, created by a concurrent test binary racing this
+		// same shared table — but "exists" isn't "active": fall through
+		// to the waiter rather than return early, so a caller here right
+		// after doesn't hit the table mid-CREATING.
 	}
 
 	waiter := awsdynamodb.NewTableExistsWaiter(client)
