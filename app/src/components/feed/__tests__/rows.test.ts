@@ -1,11 +1,10 @@
 import { justJoinedRow } from '@/components/feed/just-joined-row';
 import { pendingRequestRow } from '@/components/feed/pending-request-row';
 import { privacyRow } from '@/components/feed/privacy-row';
-import { rosterChangeRow } from '@/components/feed/roster-change-row';
+import { rosterChangeRows } from '@/components/feed/roster-change-row';
 import { buildFeedRows, gapBetween, stickyIndices, type FeedRow } from '@/components/feed/rows';
 import { Spacing } from '@/constants/theme';
 import type { MemberEvent } from '@/data/db';
-
 
 function event(id: string, occurredAt: number): MemberEvent {
   return {
@@ -21,6 +20,11 @@ function event(id: string, occurredAt: number): MemberEvent {
   };
 }
 
+/** One event's group row — everything `rosterChangeRows` builds for it besides the day header above it. */
+function eventRow(occurredAt: number): FeedRow {
+  return rosterChangeRows([event('e', occurredAt)], [], null)[1];
+}
+
 const noRequestActions = { busy: false, onApprove: () => {}, onDeny: () => {} };
 
 /** The same mapping `useCircleFeed` performs, with the row kinds it has today. */
@@ -29,25 +33,46 @@ function build(events: MemberEvent[] = [], justJoined = false): FeedRow[] {
     pendingRequestRow({ requesterId: 'a', selfReportedName: 'Marcus', createdAt: 1 }, noRequestActions),
     privacyRow(() => {}),
     ...(justJoined ? [justJoinedRow()] : []),
-    ...events.map((event) => rosterChangeRow(event, null)),
+    ...rosterChangeRows(events, [], null),
   ]);
 }
 
 describe('buildFeedRows', () => {
   test('pins in adapter order, above the timeline', () => {
-    expect(build([event('e1', 1_000)]).map((row) => row.key)).toEqual(['request:a', 'privacy', 'e1']);
+    // A day header, its one group row, then the spacer closing the block — see roster-change-row.tsx.
+    expect(build([event('e1', 1_000)]).map((row) => row.key)).toEqual([
+      'request:a',
+      'privacy',
+      'member-event-day-0-1000',
+      'member-event-0-0',
+      'member-event-block-end-0',
+    ]);
   });
 
   /** Pinned rows are about the circle now, not about a moment, so they never sort. */
   test('sorts only the timeline, newest first', () => {
-    const rows = build([event('old', 1_000), event('new', 3_000), event('mid', 2_000)]);
+    // Three separate days (all at local noon, so no timezone can push one
+    // into another's calendar day), so each is its own block.
+    const day1 = new Date(2026, 0, 1, 12, 0, 0).getTime();
+    const day2 = new Date(2026, 0, 2, 12, 0, 0).getTime();
+    const day3 = new Date(2026, 0, 3, 12, 0, 0).getTime();
+    const rows = build([event('old', day1), event('new', day3), event('mid', day2)]);
 
-    expect(rows.map((row) => row.key)).toEqual(['request:a', 'privacy', 'new', 'mid', 'old']);
+    expect(rows.slice(0, 2).map((row) => row.key)).toEqual(['request:a', 'privacy']);
+    expect(rows.slice(2).map((row) => row.at)).toEqual([
+      day3 + 1, day3, day3 - 1,
+      day2 + 1, day2, day2 - 1,
+      day1 + 1, day1, day1 - 1,
+    ]);
   });
 
   /** Ordering only — it renders exactly the rows it is handed. */
   test('renders exactly the rows it is given', () => {
-    expect(buildFeedRows([rosterChangeRow(event('e1', 1_000), null)]).map((row) => row.key)).toEqual(['e1']);
+    expect(buildFeedRows(rosterChangeRows([event('e1', 1_000)], [], null)).map((row) => row.key)).toEqual([
+      'member-event-day-0-1000',
+      'member-event-0-0',
+      'member-event-block-end-0',
+    ]);
   });
 });
 
@@ -59,37 +84,37 @@ describe('each row decides for itself', () => {
    */
   test('no row asks to stick', () => {
     expect(pendingRequestRow({ requesterId: 'a', selfReportedName: 'M', createdAt: 1 }, noRequestActions).sticky).toBeUndefined();
-    expect(rosterChangeRow(event('e1', 1), null).sticky).toBeUndefined();
+    expect(eventRow(1).sticky).toBeUndefined();
   });
 
   /** Pinned without being sticky — no `at` keeps it above the timeline. */
   test('a join request stays above dated rows', () => {
     const rows = buildFeedRows([
-      rosterChangeRow(event('e1', 9_000), null),
+      ...rosterChangeRows([event('e1', 9_000)], [], null),
       pendingRequestRow({ requesterId: 'a', selfReportedName: 'M', createdAt: 1 }, noRequestActions),
     ]);
     expect(rows[0].key).toBe('request:a');
   });
 
   test('only a timeline row carries a time', () => {
-    expect(rosterChangeRow(event('e1', 5_000), null).at).toBe(5_000);
+    expect(eventRow(5_000).at).toBe(5_000);
     expect(privacyRow(() => {}).at).toBeUndefined();
   });
 
   /** A roster change means nothing by being scrolled past; a post marks its comments seen. */
   test('a roster change has nothing to mark seen', () => {
-    expect(rosterChangeRow(event('e1', 1), null).onSeen).toBeUndefined();
+    expect(eventRow(1).onSeen).toBeUndefined();
   });
 
   test('a roster change asks for a tighter gap than a card', () => {
-    expect(rosterChangeRow(event('e1', 1), null).spacing).toBe(Spacing.gapAroundMemberEvent);
+    expect(eventRow(1).spacing).toBe(Spacing.gapWithinMemberEventBlock);
     expect(privacyRow(() => {}).spacing).toBe(Spacing.gapBetweenPosts);
   });
 });
 
 describe('gapBetween', () => {
   const post: FeedRow = { key: 'p', spacing: Spacing.gapBetweenPosts, render: () => null! };
-  const rosterChange: FeedRow = { key: 'e', spacing: Spacing.gapAroundMemberEvent, render: () => null! };
+  const rosterChange: FeedRow = { key: 'e', spacing: Spacing.gapWithinMemberEventBlock, render: () => null! };
 
   test('two cards take the full gap', () => {
     expect(gapBetween(post, post)).toBe(Spacing.gapBetweenPosts);
@@ -100,11 +125,11 @@ describe('gapBetween', () => {
     ['before', post, rosterChange],
     ['after', rosterChange, post],
   ])('a roster change tightens the gap %s it', (_label, leading, trailing) => {
-    expect(gapBetween(leading, trailing)).toBe(Spacing.gapAroundMemberEvent);
+    expect(gapBetween(leading, trailing)).toBe(Spacing.gapWithinMemberEventBlock);
   });
 
   test('the last row falls back to its own spacing', () => {
-    expect(gapBetween(rosterChange, undefined)).toBe(Spacing.gapAroundMemberEvent);
+    expect(gapBetween(rosterChange, undefined)).toBe(Spacing.gapWithinMemberEventBlock);
   });
 });
 

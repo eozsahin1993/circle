@@ -1,4 +1,10 @@
-import { describeMembershipEvent, type MembershipEventItem } from '@/components/membership-event-row';
+import {
+  describeMembershipEvent,
+  describeMembershipEventGroup,
+  type GroupedSubject,
+  type MembershipEventGroupItem,
+  type MembershipEventItem,
+} from '@/components/membership-event-row';
 
 function event(overrides: Partial<MembershipEventItem> = {}): MembershipEventItem {
   return {
@@ -10,7 +16,6 @@ function event(overrides: Partial<MembershipEventItem> = {}): MembershipEventIte
     subjectIsYou: false,
     actorIsYou: false,
     role: null,
-    timestamp: '2h',
     ...overrides,
   };
 }
@@ -79,5 +84,102 @@ describe('describeMembershipEvent', () => {
     const long = 'María de la Cruz Fernández de Córdoba';
 
     expect(words(event({ subjectName: long }))).toBe(`${long} was added by Nadia`);
+  });
+});
+
+function subject(name: string, isYou = false): GroupedSubject {
+  return { subjectName: name, subjectIsYou: isYou };
+}
+
+function group(overrides: Partial<MembershipEventGroupItem> = {}): MembershipEventGroupItem {
+  return {
+    kind: 'added',
+    role: null,
+    selfInflicted: false,
+    actorName: 'Nadia',
+    actorIsYou: false,
+    subjects: [subject('Tomas'), subject('Priya'), subject('Yaa'), subject('Lin'), subject('Emre'), subject('Rosamund'), subject('Ayo')],
+    ...overrides,
+  };
+}
+
+/** The rendered sentence, with the name/plain/interactive distinction flattened away. */
+const groupWords = (item: MembershipEventGroupItem, expanded = false) =>
+  describeMembershipEventGroup(item, expanded)
+    .map((segment) => segment.text)
+    .join('');
+
+describe('describeMembershipEventGroup', () => {
+  test('collapsed, names the first two and folds the rest into "and N others"', () => {
+    expect(groupWords(group())).toBe('Nadia added Tomas, Priya and 5 others');
+  });
+
+  test('expanded, names everyone with no fold', () => {
+    expect(groupWords(group(), true)).toBe('Nadia added Tomas, Priya, Yaa, Lin, Emre, Rosamund and Ayo');
+  });
+
+  test('exactly two subjects need no fold even collapsed', () => {
+    expect(groupWords(group({ subjects: [subject('Tomas'), subject('Priya')] }))).toBe('Nadia added Tomas and Priya');
+  });
+
+  test('the fold is marked interactive; nothing else is', () => {
+    const segments = describeMembershipEventGroup(group(), false);
+
+    expect(segments.filter((s) => s.interactive).map((s) => s.text)).toEqual(['5 others']);
+  });
+
+  test('unattributed add: subjects lead, "joined" is invariant under pluralization', () => {
+    expect(groupWords(group({ actorName: null }))).toBe('Tomas, Priya and 5 others joined');
+  });
+
+  test('the actor being the reader', () => {
+    expect(groupWords(group({ actorIsYou: true }))).toBe('You added Tomas, Priya and 5 others');
+  });
+
+  test('several people leaving the same day (self-inflicted, no actor to attribute)', () => {
+    const departures = group({ kind: 'removed', selfInflicted: true, actorName: null, subjects: [subject('Tomas'), subject('Priya'), subject('Yaa')] });
+
+    expect(groupWords(departures)).toBe('Tomas, Priya and 1 other left');
+  });
+
+  test('an admin removing several people', () => {
+    const removed = group({ kind: 'removed', subjects: [subject('Tomas'), subject('Priya')] });
+
+    expect(groupWords(removed)).toBe('Nadia removed Tomas and Priya');
+  });
+
+  test('a removal nobody here can attribute', () => {
+    const removed = group({ kind: 'removed', actorName: null, subjects: [subject('Tomas'), subject('Priya')] });
+
+    expect(groupWords(removed)).toBe('Tomas and Priya are no longer in this circle');
+  });
+
+  test('several promotions', () => {
+    const promoted = group({ kind: 'role_changed', role: 'admin', subjects: [subject('Tomas'), subject('Priya')] });
+
+    expect(groupWords(promoted)).toBe('Nadia made Tomas and Priya admins');
+  });
+
+  test('several demotions', () => {
+    const demoted = group({ kind: 'role_changed', role: 'member', subjects: [subject('Tomas'), subject('Priya')] });
+
+    expect(groupWords(demoted)).toBe('Nadia removed Tomas and Priya as admins');
+  });
+
+  test('unattributed promotions/demotions pluralize the verb too', () => {
+    const promoted = group({ kind: 'role_changed', role: 'admin', actorName: null, subjects: [subject('Tomas'), subject('Priya')] });
+    const demoted = group({ kind: 'role_changed', role: 'member', actorName: null, subjects: [subject('Tomas'), subject('Priya')] });
+
+    expect(groupWords(promoted)).toBe('Tomas and Priya are now admins');
+    expect(groupWords(demoted)).toBe('Tomas and Priya are no longer admins');
+  });
+
+  /** Only the very first word of the whole line ever gets capitalized — never a "you" further into the list. */
+  test('capitalizes a leading "you" but not one later in the list', () => {
+    const leading = group({ actorName: null, subjects: [subject('Nana', true), subject('Priya')] });
+    const later = group({ actorName: null, subjects: [subject('Priya'), subject('Nana', true)] });
+
+    expect(groupWords(leading)).toBe('You and Priya joined');
+    expect(groupWords(later)).toBe('Priya and you joined');
   });
 });

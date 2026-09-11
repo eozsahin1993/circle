@@ -100,7 +100,14 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     ownPublicKey: feed?.ownPublicKey ?? null,
     ownIsAdmin: feed?.ownIsAdmin ?? false,
   });
-  const rosterChanges = useRosterChangeRows({ events: feed?.events ?? [], ownPublicKey: feed?.ownPublicKey ?? null });
+  // The only other thing roster changes share a timeline with — see
+  // roster-change-row.tsx for why a post's own timestamp is all it needs.
+  const postTimestamps = useMemo(() => (feed?.posts ?? []).map((view) => view.post.createdAt), [feed?.posts]);
+  const rosterChanges = useRosterChangeRows({
+    events: feed?.events ?? [],
+    postTimestamps,
+    ownPublicKey: feed?.ownPublicKey ?? null,
+  });
 
   /**
    * The mapping, and the only place that knows which kinds a circle feed

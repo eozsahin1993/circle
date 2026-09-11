@@ -255,12 +255,20 @@ export const Spacing = {
   topPadUnderSafeArea: 16,
   gapBetweenPosts: 34,
   /**
-   * Above and below a roster-change row. Tighter than `gapBetweenPosts`
-   * because that row is itself a rule across the feed — it already reads
-   * as the break between two photographs, and a full gap on both sides
-   * would leave it floating in a band of empty ground.
+   * Above and below a day divider — see `DayDivider`. Tighter than
+   * `gapBetweenPosts` because that row is itself a rule across the feed —
+   * it already reads as the break between two photographs, and a full gap
+   * on both sides would leave it floating in a band of empty ground.
    */
   gapAroundMemberEvent: 20,
+  /**
+   * Above and below one roster-change row within a day's block — see
+   * `MembershipEventGroupRow`. Tighter still than `gapAroundMemberEvent`:
+   * these rows carry no rule of their own, so the gap is the only thing
+   * saying they belong to the day divider above them rather than floating
+   * independently.
+   */
+  gapWithinMemberEventBlock: 10,
   pinnedButtonFromBottom: 34,
 } as const;
 
