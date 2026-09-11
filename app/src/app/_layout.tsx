@@ -13,6 +13,7 @@ import { Colors } from '@/constants/theme';
 import { initDatabase } from '@/data/db';
 import { enablePushEverywhere } from '@/domain/usecases/push/enable-push';
 import { startPushHandling } from '@/services/push/task';
+import { startPushTapRouting } from '@/services/push/tap';
 import { AppSettingsProvider, useAppSettings } from '@/hooks/use-app-settings';
 import { useMessages } from '@/hooks/use-messages';
 import { getAppSettings, type AppSettings } from '@/services/settings';
@@ -100,6 +101,7 @@ export default function RootLayout() {
     // Neither should hold up the first screen either, so nothing is awaited.
     startPushHandling().catch((error) => console.error('Failed to register the push task', error));
     enablePushEverywhere().catch((error) => console.error('Failed to register for notifications', error));
+    startPushTapRouting();
     getAppSettings()
       .then(setSettings)
       .catch((error) => console.error('Failed to load app settings', error));

@@ -9,6 +9,7 @@ import {
 import { decrypt, hashBytes } from '@/services/crypto';
 import { getCircleKeyMap } from '@/services/keystore';
 import { writeCoverFile, writePhotoFile } from '@/services/photo-cache';
+import { notifyPhotoFetched } from '@/services/photo-events';
 import { getBlob } from '@/services/relay';
 import { timed, timedSync } from '@/services/timing';
 
@@ -59,11 +60,17 @@ async function fetchOne(attachment: FetchableAttachment): Promise<void> {
     // path string — see services/photo-cache.ts.
     if (attachment.kind === AttachmentKinds.CIRCLE_COVER) {
       // A cover also lands on the circle row, which is what the circle
-      // list and header read; nothing there consults attachments.
+      // list and header read; nothing there consults attachments. Not a
+      // post, so nothing to patch — the circle list re-reads on its own
+      // focus, same as before this event existed.
       await updateCirclePicture(circleId, bytes);
       writeCoverFile(circleId, bytes);
     } else {
-      writePhotoFile(circleId, entryId, bytes);
+      // Whatever screen is showing this post's placeholder patches just
+      // this row rather than reloading — a backlog of many photos landing
+      // one by one must not mean a feed reload apiece.
+      const uri = writePhotoFile(circleId, entryId, bytes);
+      notifyPhotoFetched({ circleId, postId: entryId, uri });
     }
   } catch (err) {
     const attempts = fetchAttempts + 1;

@@ -135,11 +135,45 @@ accepting `syncId` would hand it the circle-to-routing-ID binding this
 design exists to withhold.
 
 **Deliver** — check the category bit, then dispatch to each `enabled`
-token individually rather than as one grouped send.
+token individually rather than as one grouped send. Each delivered push
+carries only that recipient's own `routingId` (plus `keyVersion` and the
+ciphertext) — the full `routingIds[]` list exists only in the send
+request, so no member ever sees another member's routing id, and nothing
+delivered reveals the grouping.
 
 **Receive** — the device maps `routingId` to a circle locally, decrypts at
 `keyVersion`, and composes the text itself. iOS uses a Notification Service
 Extension; Android an FCM data message into `onMessageReceived`.
+
+## What a delivered push contains
+
+One log entry that skipped the line. `payload` is byte-for-byte the
+`encryptedMeta` the sender appended to the sync log — same encryption,
+same signature, the bytes the next sync would deliver anyway — with a
+delivery address stapled on. The iOS shape (Android carries the same
+custom fields in an FCM data message, `keyVersion` as a string):
+
+```
+{
+  "aps": { "alert": "New activity", "mutable-content": 1 },
+  "pushRoutingId": "837256bc0d92…",   ← recipient's own address, resolvable only by their seed
+  "keyVersion": 3,                     ← already plaintext on every append
+  "payload": "KP6zUVZg6cgu…"          ← base64: nonce(24) ‖ XChaCha20-Poly1305 box
+}
+```
+
+Decrypted with the circle key at `keyVersion`, `payload` is the entry
+envelope — where the actual content lives, and everything the device
+needs to compose real text:
+
+```
+{
+  "type": "comment",
+  "payload": { "commentId": "…", "postId": "…", "body": "so cute!!", "createdAt": …, "postAuthorPubkey": "…" },
+  "authorPubkey": "2fe1c922…",
+  "signature": "8a41f3…"
+}
+```
 
 ## Why the send call is unauthenticated
 

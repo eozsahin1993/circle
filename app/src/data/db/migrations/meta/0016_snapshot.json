@@ -357,7 +357,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 11
+          "default": 15
         },
         "push_silenced": {
           "name": "push_silenced",

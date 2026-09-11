@@ -32,14 +32,18 @@ defineTask<NotificationTaskPayload>(PUSH_TASK, async ({ data, error }) => {
     // opened the database yet. Idempotent, and memoized (see run.ts).
     await initDatabase();
 
-    const notification = await handlePush(pushDataFrom(data));
+    const pushData = pushDataFrom(data);
+    const notification = await handlePush(pushData);
     // Null means nothing worth interrupting for — a push we couldn't
     // decrypt, or an entry type that shouldn't raise a card. Showing
     // nothing is the right answer, and on Android we can.
     if (!notification) return;
 
     await scheduleNotificationAsync({
-      content: { title: notification.title, body: notification.body },
+      // The push's fields ride along so a tap can route to the content —
+      // see services/push/tap.ts (iOS taps read them off the APNs payload
+      // instead; the extension can't attach anything for JS).
+      content: { title: notification.title, body: notification.body, data: pushData },
       trigger: { channelId: notification.channelId },
     });
   } catch (err) {

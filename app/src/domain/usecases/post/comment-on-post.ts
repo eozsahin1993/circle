@@ -1,6 +1,6 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { insertCommentAndEnqueue, OutboxStatuses, type Comment, type NewOutboxEntry } from '@/data/db';
+import { getPost, insertCommentAndEnqueue, OutboxStatuses, type Comment, type NewOutboxEntry } from '@/data/db';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
 import { generateUUID } from '@/services/crypto';
@@ -31,9 +31,13 @@ export async function addComment(circleId: string, postId: string, body: string)
 
   const commentId = generateUUID();
   const createdAt = Date.now();
+  // postAuthorPubkey lets a receiving device say "on your photo" without a
+  // post lookup — the iOS extension has no database to ask. Optional on
+  // read: entries written before it existed just get the generic copy.
+  const postAuthorPubkey = (await getPost(postId))?.authorPublicKey;
   const encryptedMeta = buildAndEncryptLogEntry(
     EntryTypes.COMMENT,
-    { commentId, postId, body: trimmed, createdAt },
+    { commentId, postId, body: trimmed, createdAt, postAuthorPubkey },
     identity,
     current.key
   );

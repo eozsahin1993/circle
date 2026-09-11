@@ -19,7 +19,7 @@ export const circles = sqliteTable('circles', {
    * to render. Defaults to everything on; a circle is reachable from the
    * moment you join without anyone opting in.
    */
-  pushCategoryMask: integer('push_category_mask').notNull().default(11),
+  pushCategoryMask: integer('push_category_mask').notNull().default(15),
   /** Silenced outright, independent of the mask, so the categories survive being switched back on. */
   pushSilenced: integer('push_silenced', { mode: 'boolean' }).notNull().default(false),
   /** Set when this device leaves the circle — kept (not deleted) so already-synced posts stay as a local archive. */

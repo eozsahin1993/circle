@@ -76,7 +76,48 @@ test('the author is named from the roster', async () => {
     await pushFor(circleId, EntryTypes.COMMENT, marcus, { postId: 'p1', body: 'hi', createdAt: 1 }),
   );
 
-  expect(notification?.body).toBe('Marcus commented');
+  expect(notification?.body).toBe('Marcus commented: “hi”');
+});
+
+test('a comment on your own post says so', async () => {
+  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const marcus = generateIdentity();
+  await recordMemberAddedLocally({
+    circleId,
+    subjectPublicKey: bytesToHex(marcus.publicKey),
+    joinedAt: 1_000,
+    profile: { encPublicKey: 'cc', memberId: generateUUID(), role: MemberRoles.member, name: 'Marcus', picture: null },
+  });
+  const own = bytesToHex((await getCircleIdentity(circleId))!.publicKey);
+
+  const notification = await handlePush(
+    await pushFor(circleId, EntryTypes.COMMENT, marcus, { postId: 'p1', body: 'hi', createdAt: 1, postAuthorPubkey: own }),
+  );
+
+  expect(notification?.body).toBe('Marcus commented on your photo: “hi”');
+});
+
+/** A comment push only reaches the thread's participants, so "also" holds. */
+test("a comment on someone else's post reads as joining in", async () => {
+  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const marcus = generateIdentity();
+  await recordMemberAddedLocally({
+    circleId,
+    subjectPublicKey: bytesToHex(marcus.publicKey),
+    joinedAt: 1_000,
+    profile: { encPublicKey: 'cc', memberId: generateUUID(), role: MemberRoles.member, name: 'Marcus', picture: null },
+  });
+
+  const notification = await handlePush(
+    await pushFor(circleId, EntryTypes.COMMENT, marcus, {
+      postId: 'p1',
+      body: 'hi',
+      createdAt: 1,
+      postAuthorPubkey: bytesToHex(generateIdentity().publicKey),
+    }),
+  );
+
+  expect(notification?.body).toBe('Marcus also commented: “hi”');
 });
 
 /** Someone without the circle's key cannot make anything render. */

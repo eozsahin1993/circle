@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useJustJoinedRows } from '@/components/feed/just-joined-row';
 import { usePendingRequestRows } from '@/components/feed/pending-request-row';
@@ -7,6 +7,7 @@ import { usePrivacyRows } from '@/components/feed/privacy-row';
 import { useRosterChangeRows } from '@/components/feed/roster-change-row';
 import { buildFeedRows, type FeedRow, type FeedRows } from '@/components/feed/rows';
 import { loadCircleFeed, type CircleFeed, type FeedPostView } from '@/domain/usecases/feed/circle-feed';
+import { onPhotoFetched } from '@/services/photo-events';
 import { showError } from '@/services/messages';
 import { nudgePhotoQueue } from '@/sync/photo-queue';
 import { syncCircle } from '@/sync/sync-circles';
@@ -76,6 +77,17 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     // themselves — this doesn't need to know which those are.
     sourcesRef.current.forEach((source) => source.reload?.());
   }, [circleId]);
+
+  // A photo landing while its placeholder is on screen patches that one
+  // row rather than reloading — a backlog of many photos landing one by
+  // one must not mean a feed reload apiece.
+  useEffect(
+    () =>
+      onPhotoFetched((event) => {
+        if (event.circleId === circleId) patchPost(event.postId, { photoUri: event.uri });
+      }),
+    [circleId, patchPost],
+  );
 
   const requests = usePendingRequestRows({ circleId, onRosterChanged: reload });
   const privacy = usePrivacyRows(options.onPressPrivacy);

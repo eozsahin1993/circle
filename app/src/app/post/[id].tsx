@@ -1,7 +1,7 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -40,6 +40,7 @@ import { showError, showMessage } from '@/services/messages';
 import { bytesToDataUri } from '@/services/image';
 import { getCircleIdentity } from '@/services/keystore';
 import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
+import { onPhotoFetched } from '@/services/photo-events';
 import { formatDay, formatRelative, formatTimestamp } from '@/utils/time';
 
 /** Names shown before the rest become "& N others" — enough to recognise who, not a roster dump. */
@@ -118,6 +119,16 @@ export default function PostDetailsScreen() {
     useCallback(() => {
       load().catch((err) => console.error('Failed to load post details', err));
     }, [load]),
+  );
+
+  // The photo landing while its placeholder is on screen sets it directly
+  // rather than reloading everything else this screen shows.
+  useEffect(
+    () =>
+      onPhotoFetched((event) => {
+        if (event.circleId === circleId && event.postId === postId) setPhotoUri(event.uri);
+      }),
+    [circleId, postId],
   );
 
   async function handleSelectReaction(emoji: string) {

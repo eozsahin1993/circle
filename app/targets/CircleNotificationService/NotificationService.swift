@@ -83,10 +83,25 @@ class NotificationService: UNNotificationServiceExtension {
     case "post", "comment", "reaction":
       let member = push.circle.members.first { $0.identityPublicKey == push.authorPubkey }
       let name = (member?.name.isEmpty == false ? member?.name : nil) ?? "Someone"
+      // Mirrors describeEntry in handle-push.ts — the copy must match
+      // whichever platform composes it.
       switch push.type {
       case "post": body = "\(name) added a photo"
-      case "comment": body = "\(name) commented"
-      default: body = "\(name) reacted to a photo"
+      case "comment":
+        let text = (push.payload?["body"] as? String).flatMap { $0.isEmpty ? nil : ": “\($0)”" } ?? ""
+        if let postAuthor = push.payload?["postAuthorPubkey"] as? String {
+          body = postAuthor == ownIdentityPubkey(circleId: push.circle.id)
+            ? "\(name) commented on your photo\(text)"
+            : "\(name) also commented\(text)"
+        } else {
+          body = "\(name) commented\(text)"
+        }
+      default:
+        if let emoji = push.payload?["emoji"] as? String, !emoji.isEmpty {
+          body = "\(name) reacted \(emoji) to your photo"
+        } else {
+          body = "\(name) reacted to your photo"
+        }
       }
     default:
       return nil
@@ -112,6 +127,15 @@ class NotificationService: UNNotificationServiceExtension {
           let key = Data(hexString: keyHex)
     else { return nil }
     return (circle, key)
+  }
+
+  /// This device's own signing key for a circle, from the same shared
+  /// keychain item keystore.ts writes (circle_identity_<circleId>).
+  private func ownIdentityPubkey(circleId: String) -> String? {
+    guard let json = readKeychain(account: "circle_identity_\(circleId)"),
+          let record = (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [String: Any]
+    else { return nil }
+    return record["publicKey"] as? String
   }
 
   private func keyVersion(from value: Any?) -> Int? {
