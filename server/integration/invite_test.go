@@ -8,10 +8,10 @@ import (
 	"circle-relay/integration/harness"
 )
 
-// The invite mailbox, end to end — see server/INVITE_FLOW.md. Every test
-// here is a sequence, because that's where the flow's real behaviour
-// lives: a request that outlives its approval, an approval readable after
-// a dismissal, a tag that still answers once its rows are gone.
+// The invite mailbox, end to end. Every test here is a sequence, because
+// that's where the flow's real behaviour lives: a request that outlives
+// its approval, an approval readable after a dismissal, a tag that still
+// answers once its rows are gone.
 
 // device wraps harness.Device with this file's own vocabulary — the
 // invite flow's steps — so a sequence still reads as steps taken rather
@@ -76,8 +76,8 @@ func TestInviteIsReadableByWhoeverHoldsTheTag(t *testing.T) {
 	tag := signIn(r).createInvite()
 
 	// A stranger with a session, not the creator: the tag *is* the
-	// capability (INVITE_FLOW.md), so the relay must not care who asks.
-	// It never learns who is inviting whom.
+	// capability, so the relay must not care who asks. It never learns who
+	// is inviting whom.
 	var preview struct{ EncryptedPreview string }
 	signIn(r).readInvite(tag).Expect(http.StatusOK).Decode(&preview)
 

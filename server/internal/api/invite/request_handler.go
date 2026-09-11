@@ -35,8 +35,7 @@ func toRequestResponse(jr invitestore.JoinRequest) requestResponse {
 type putRequestRequest struct {
 	// EncryptedRequest is base64-encoded ciphertext ({ephemeralPub,
 	// selfReportedName}, encrypted client-side with HKDF(invite_code,
-	// "join-request") — see server/INVITE_FLOW.md). This handler never
-	// looks inside it.
+	// "join-request")). This handler never looks inside it.
 	EncryptedRequest string `json:"encryptedRequest"`
 }
 
@@ -125,8 +124,7 @@ func (h *GetRequestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type putApprovalRequest struct {
 	// EncryptedApproval is base64-encoded ciphertext (the sealed-box
 	// {secret, circleName} payload, encrypted to the requester's
-	// ephemeralPub — see server/INVITE_FLOW.md). This handler never looks
-	// inside it.
+	// ephemeralPub). This handler never looks inside it.
 	EncryptedApproval string `json:"encryptedApproval"`
 }
 

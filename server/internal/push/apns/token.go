@@ -1,5 +1,7 @@
 // Package apns sends push notifications through Apple's HTTP/2 provider
-// API — see server/PUSH_DESIGN.md.
+// API. Alert pushes go out for real, but until the client ships a
+// Notification Service Extension, every device shows only the fixed
+// placeholder text, never the real content.
 //
 // iOS only. Android goes through FCM instead — see internal/push/fcm.
 package apns

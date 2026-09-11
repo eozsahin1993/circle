@@ -1,6 +1,5 @@
 // Package s3 implements blobstore.Store against a single S3 bucket, using
-// presigned URLs so ciphertext bytes never pass through Lambda — see
-// server/DESIGN.md.
+// presigned URLs so ciphertext bytes never pass through Lambda.
 package s3
 
 import (
@@ -20,8 +19,8 @@ const (
 	uploadURLTTL   = 15 * time.Minute
 	downloadURLTTL = time.Hour
 
-	// DefaultMaxBlobSize caps a single blob's ciphertext size — see
-	// server/DESIGN.md. The client's own compression pipeline
+	// DefaultMaxBlobSize caps a single blob's ciphertext size. The
+	// client's own compression pipeline
 	// (app/src/services/image.ts: 1080px longest edge, JPEG quality 0.65)
 	// produces photos well under this in practice (typically 150KB-1MB);
 	// the cap leaves real headroom while still bounding worst-case
@@ -201,11 +200,10 @@ func (s *Store) GetDownloadURL(ctx context.Context, syncID, entryID string) (str
 	return req.URL, nil
 }
 
-// blobKey is the deterministic object key both sides compute independently
-// — see server/SYNC_DESIGN.md's "Post" operation: keyed by entryID (known
-// to the client before the entry is ever committed), not epoch, so a blob
-// can be uploaded before the entry that references it exists. Never a
-// separately-issued token.
+// blobKey is the deterministic object key both sides compute independently:
+// keyed by entryID (known to the client before the entry is ever
+// committed), not epoch, so a blob can be uploaded before the entry that
+// references it exists. Never a separately-issued token.
 func blobKey(syncID, entryID string) string {
 	return fmt.Sprintf("%s/%s", syncID, entryID)
 }

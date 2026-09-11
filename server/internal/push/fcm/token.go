@@ -1,5 +1,8 @@
 // Package fcm sends push notifications through Firebase Cloud Messaging's
-// HTTP v1 API — see server/PUSH_DESIGN.md.
+// HTTP v1 API. Data messages only, decrypted and composed into real
+// notification text by the on-device handler — this path is fully built,
+// unlike the APNs one, which still shows only the placeholder pending a
+// client-side Notification Service Extension.
 //
 // Android only. iOS goes direct to APNs rather than through FCM, so that
 // Google isn't in the path of iOS delivery metadata for no benefit.

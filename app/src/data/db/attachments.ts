@@ -27,8 +27,9 @@ export function normalizeAttachment(attachment: Attachment): Attachment {
 
 /**
  * Records an attachment this device now knows about. `onConflictDoNothing`
- * makes re-applying an already-seen log entry a no-op
- * (server/SYNC_DESIGN.md invariant 8) rather than a primary-key error.
+ * makes re-applying an already-seen log entry a no-op rather than a
+ * primary-key error — sync can redeliver the same entry more than once,
+ * and replay has to stay harmless when it does.
  */
 export async function insertAttachment(attachment: NewAttachment): Promise<void> {
   await db.insert(attachments).values(attachment).onConflictDoNothing();

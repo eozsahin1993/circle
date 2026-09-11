@@ -2,10 +2,10 @@
 // append-only per-circle log — implementations live in subpackages, one
 // per backing technology (see logstore/dynamodb).
 //
-// See server/SYNC_DESIGN.md for the design: a permanent, never-mutated
-// log split into two namespaces — meta (identities, keys, roles; rare,
-// always synced in full) and content (posts, comments; voluminous,
-// paged) — gated by two relay-enforced capabilities. A write token
+// The log is permanent and never mutated, split into two namespaces —
+// meta (identities, keys, roles; rare, always synced in full) and
+// content (posts, comments; voluminous, paged) — gated by two
+// relay-enforced capabilities. A write token
 // (derived from the circle's current content key) proves "a current
 // member," required for every append. An authority signature proves "an
 // admin," required on top of it for the two discretionary fields of
@@ -61,8 +61,8 @@ var (
 	// ErrWriteTokenMismatch: the presented write token doesn't hash to
 	// what's on file — either stale (a rotation the caller hasn't synced
 	// past) or never a member. The API can't tell these apart and
-	// shouldn't try to — see server/SYNC_DESIGN.md's "possession, not
-	// identity" principle.
+	// shouldn't try to: the relay enforces possession of a capability,
+	// never identity, so it has no way to distinguish them anyway.
 	ErrWriteTokenMismatch = errors.New("logstore: write token does not match current control state")
 	// ErrAuthorityNotRecognized: authorityPublicKey isn't in the circle's current authority set.
 	ErrAuthorityNotRecognized = errors.New("logstore: authority key not recognized for this circle")
@@ -94,7 +94,7 @@ var (
 // inside it (not even for its entry type — see the package doc).
 // KeyVersion is plaintext, not opaque: a reader needs it to pick the
 // right content key by direct lookup instead of trial-decrypting with
-// every version it holds — see server/SYNC_DESIGN.md's entry shape.
+// every version it holds.
 type LogEntry struct {
 	Epoch         int64
 	KeyVersion    int64
@@ -175,8 +175,9 @@ func (d CircleDeletion) Message() []byte {
 }
 
 // Store is storage for the append-only per-circle log, plus the small
-// piece of relay-visible control state (see server/SYNC_DESIGN.md's
-// "#control") that authorizes writes to it. Bootstrap, Append, Rotate and
+// piece of relay-visible control state — the authority set, write-token
+// hash, and per-namespace counters, held in one `#control` item per
+// circle — that authorizes writes to it. Bootstrap, Append, Rotate and
 // ChangeAuthority are each expected to use the backend's real transaction
 // primitive for atomicity (DynamoDB: TransactWriteItems + a
 // compare-and-swap read) rather than composing smaller calls and hoping

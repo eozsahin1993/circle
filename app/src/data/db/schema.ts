@@ -8,8 +8,7 @@ export const circles = sqliteTable('circles', {
   picture: blob('picture').$type<Uint8Array>(),
   /**
    * The relay-facing address for this circle's log — random, independent
-   * of key material so rotation never repoints it. Stored, never derived
-   * — see server/SYNC_DESIGN.md's "Identifiers... stay decoupled" invariant.
+   * of key material so rotation never repoints it. Stored, never derived.
    */
   syncId: text('sync_id').notNull().default(''),
   createdAt: integer('created_at').notNull(),
@@ -25,7 +24,12 @@ export const circles = sqliteTable('circles', {
   pushSilenced: integer('push_silenced', { mode: 'boolean' }).notNull().default(false),
   /** Set when this device leaves the circle — kept (not deleted) so already-synced posts stay as a local archive. */
   leftAt: integer('left_at'),
-  /** How far this device has synced each namespace — see server/SYNC_DESIGN.md's "Read / sync". 0 means never synced. */
+  /**
+   * How far this device has synced each namespace. Tracked separately
+   * because meta and content sync differently — meta is synced eagerly
+   * and in full, content is paged backward lazily — so one cursor can't
+   * serve both. 0 means never synced.
+   */
   metaCursor: integer('meta_cursor').notNull().default(0),
   contentCursor: integer('content_cursor').notNull().default(0),
   /**
@@ -54,9 +58,11 @@ export const circleMembers = sqliteTable(
      */
     encPublicKey: text('enc_public_key').notNull().default(''),
     /**
-     * This member's push routing id (hex) — see server/PUSH_DESIGN.md.
-     * Empty until they publish one, which is also how a member who has
-     * never opted into notifications stays untargetable.
+     * This member's push routing id (hex) — derived client-side from
+     * their own seed and this circle, not a random per-install value, so
+     * it's stable across their devices without ever needing to be
+     * re-registered. Empty until they publish one, which is also how a
+     * member who has never opted into notifications stays untargetable.
      */
     pushRoutingId: text('push_routing_id').notNull().default(''),
     /**
@@ -107,8 +113,8 @@ export const circleMembers = sqliteTable(
  *
  * Names are never stored here — `subjectPublicKey`/`actorPublicKey`
  * resolve against `circle_members` at read time, so a member renaming
- * themselves updates every line they appear in. Same reasoning
- * server/SYNC_DESIGN.md gives for posts carrying only `authorPubkey`.
+ * themselves updates every line they appear in. Same principle as posts:
+ * never snapshot a name, so there's nothing here to go stale.
  */
 export const memberEvents = sqliteTable(
   'member_events',
@@ -203,8 +209,9 @@ export const posts = sqliteTable(
      * value a pulled entry's envelope is signed with, and the
      * `circleMembers` row key. Deliberately *not* a denormalized name or
      * avatar: both resolve live from `circleMembers` at render time, so a
-     * member renaming themselves updates every post they ever made (see
-     * server/SYNC_DESIGN.md's "One identifier, four jobs").
+     * member renaming themselves updates every post they ever made —
+     * nothing about identity is copied here, only the pubkey that
+     * resolves it.
      */
     authorPublicKey: text('author_public_key').notNull(),
     createdAt: integer('created_at').notNull(),
@@ -341,7 +348,7 @@ export const postReactions = sqliteTable(
 
 /**
  * Strict local ordering for locally-created content awaiting push to the
- * relay — see server/DESIGN.md. `sequenceNum` (not `createdAt`) is what
+ * relay. `sequenceNum` (not `createdAt`) is what
  * `drainOutbox` pushes in order: a DB-assigned autoincrement is gap-free
  * and unambiguous by construction, where comparing timestamps across
  * (eventually several) locally-originated entry types would not be.
@@ -442,7 +449,7 @@ export const outbox = sqliteTable(
 /**
  * One row per outstanding join request this device has submitted — lets a
  * "pending for Family Circle" screen survive the app being closed and
- * reopened before approval ever lands (see server/INVITE_FLOW.md, step 4).
+ * reopened before approval ever lands.
  * `id` is the requester-chosen id used both as the mailbox row's sort key
  * suffix and as the Keychain key for the matching ephemeral secret key
  * (see `keystore.ts`'s `savePendingJoinKeypair`) — the secret key itself

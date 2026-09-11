@@ -11,8 +11,8 @@ import (
 type putInviteRequest struct {
 	// EncryptedPreview is base64-encoded ciphertext (the circle's current
 	// name and a small cover-picture thumbnail, encrypted client-side with
-	// HKDF(invite_code, "invite-preview") — see server/INVITE_FLOW.md).
-	// This handler never looks inside it.
+	// HKDF(invite_code, "invite-preview")). This handler never looks
+	// inside it.
 	EncryptedPreview string `json:"encryptedPreview"`
 }
 

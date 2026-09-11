@@ -14,11 +14,10 @@ import (
 
 // Claims is what a verified token yields. Sub is the provider's own
 // permanent per-user identifier — required by the OIDC spec on every
-// token. There's no Email here: identity is keyed on Sub alone (see
-// server/DESIGN.md's "Account recovery" section for why), and the email
-// claim isn't required by the OIDC spec — Apple in particular can omit it
-// on a given authorization, so gating sign-in on its presence rejected
-// otherwise-valid tokens for no functional reason.
+// token. There's no Email here: identity is keyed on Sub alone, and the
+// email claim isn't required by the OIDC spec — Apple in particular can
+// omit it on a given authorization, so gating sign-in on its presence
+// rejected otherwise-valid tokens for no functional reason.
 type Claims struct {
 	Sub string
 }

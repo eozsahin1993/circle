@@ -20,8 +20,8 @@ export async function insertComment(comment: Comment): Promise<void> {
 
 /**
  * Inserts a comment only if that id isn't already stored — how the sync
- * engine applies a `comment` entry, which it may see more than once (see
- * server/SYNC_DESIGN.md invariant 8).
+ * engine applies a `comment` entry, which it may see more than once and
+ * must apply idempotently.
  */
 export async function insertCommentIfAbsent(comment: Comment): Promise<void> {
   await db.insert(postComments).values(comment).onConflictDoNothing();

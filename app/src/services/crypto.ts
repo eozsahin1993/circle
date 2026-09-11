@@ -116,8 +116,7 @@ export function deriveCircleSealingKeypair(masterSeed: Uint8Array, circleId: str
 }
 
 /**
- * Derives an admin's authority keypair (Ed25519) — see
- * server/SYNC_DESIGN.md's "token-authority key". Signs control-plane
+ * Derives an admin's authority keypair (Ed25519). Signs control-plane
  * operations (rotating the write token, changing the authority set) that
  * the relay itself verifies, unlike the circle identity above, which only
  * clients verify. Cheap to derive for a non-admin too — it's just never
@@ -131,8 +130,10 @@ export function deriveAuthorityKeypair(masterSeed: Uint8Array, circleId: string)
 /**
  * Derives the symmetric key that encrypts the account-recovery manifest
  * (the list of circleIds this account belongs to) before it's sent to the
- * relay — see server/DESIGN.md's "Account recovery" section. The relay
- * only ever stores the resulting ciphertext.
+ * relay. Only this seed can decrypt it, so a stolen backup or database
+ * dump doesn't hand over which circles the account is in — though the
+ * relay still learns the same membership in real time from ordinary
+ * authenticated circle-log requests, which this encryption doesn't hide.
  */
 export function deriveManifestKey(masterSeed: Uint8Array): Uint8Array {
   return hkdf(sha256, masterSeed, undefined, MANIFEST_KEY_DOMAIN, 32);
@@ -142,8 +143,7 @@ export function deriveManifestKey(masterSeed: Uint8Array): Uint8Array {
  * Generates a fresh, versioned content key: 32 random bytes. Shared by
  * every member holding this version (sealed to each individually — see
  * `sealToPublicKey`); a removed member's exclusion from the *next*
- * version's wraps is what revokes their access — see
- * server/SYNC_DESIGN.md's "Content encryption" section.
+ * version's wraps is what revokes their access.
  */
 export function generateContentKey(): Uint8Array {
   return randomBytes(32);
@@ -157,7 +157,7 @@ const WRITE_TOKEN_DOMAIN = new TextEncoder().encode('relay-write-token');
  * version computes the identical token; the relay only ever sees its hash
  * (see `hashWriteToken`), never this value or the key it came from. This
  * is what proves "a current member" to the relay without the relay
- * learning who — see server/SYNC_DESIGN.md's "Authorization" section.
+ * learning who.
  */
 export function deriveWriteToken(contentKey: Uint8Array): Uint8Array {
   return hkdf(sha256, contentKey, undefined, WRITE_TOKEN_DOMAIN, 32);
@@ -275,10 +275,11 @@ export function encrypt(plaintext: Uint8Array, secret: Uint8Array): Uint8Array {
 }
 
 /**
- * Encrypts a JSON-serializable value under the circle's shared secret —
- * the shape every relay log entry's envelope takes (see
- * server/DESIGN.md). A thin convenience over `encrypt` for structured
- * data instead of raw bytes.
+ * Encrypts a JSON-serializable value under any of this file's derived
+ * secrets — an invite preview, a join request, the account manifest, a
+ * device-transfer payload. A thin convenience over `encrypt` for
+ * structured data instead of raw bytes; log entries go through
+ * `buildAndEncryptLogEntry` instead, since those need a signature too.
  */
 export function encryptJSON(value: unknown, secret: Uint8Array): Uint8Array {
   return encrypt(new TextEncoder().encode(JSON.stringify(value)), secret);
@@ -343,8 +344,9 @@ export function deriveInviteTag(inviteCode: string): string {
 /**
  * `HKDF(invite_code, "invite-preview")` — the symmetric key that
  * encrypts/decrypts an invite's preview row (circle name + cover
- * thumbnail). Computable by both the creator and anyone holding the code;
- * see server/INVITE_FLOW.md's "two encryption schemes" section.
+ * thumbnail). Computable by both the creator and anyone holding the code,
+ * with no exchange needed — the invite code itself has enough entropy to
+ * double as shared key material.
  */
 export function deriveInvitePreviewKey(inviteCode: string): Uint8Array {
   return hkdf(sha256, new TextEncoder().encode(inviteCode), undefined, INVITE_PREVIEW_KEY_DOMAIN, 32);
@@ -365,8 +367,7 @@ const PUSH_DEVICE_DOMAIN = new TextEncoder().encode('push-device');
 const PUSH_FANOUT_DOMAIN = new TextEncoder().encode('push-fanout');
 
 /**
- * This account's push routing id for one circle, hex — see
- * server/PUSH_DESIGN.md.
+ * This account's push routing id for one circle, hex.
  *
  * Derived from the seed, so every device you own computes the same one and
  * notification preferences need no syncing. Never from `accountId`: the
@@ -454,8 +455,8 @@ function sealedBoxKey(sharedSecret: Uint8Array, senderPublicKey: Uint8Array, rec
 
 /**
  * Seals `plaintext` to `recipientPublicKey` (X25519) — the asymmetric half
- * of the invite flow, used only for the approval response (see
- * server/INVITE_FLOW.md's "two encryption schemes" section). Generates a
+ * of the invite flow, used only for the approval response, the one
+ * payload that must be readable by exactly one person. Generates a
  * fresh one-time keypair for this message alone, ECDHs it against the
  * recipient, derives an AEAD key from the shared secret via
  * `sealedBoxKey`, then encrypts with the same `encrypt()` every other

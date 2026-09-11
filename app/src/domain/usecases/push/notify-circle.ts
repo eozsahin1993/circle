@@ -8,7 +8,7 @@ import { sendPush } from '@/services/push/relay';
 
 /**
  * Asks the relay to notify a circle about an entry that was just
- * appended — see server/PUSH_DESIGN.md.
+ * appended.
  *
  * `payload` is the entry's own ciphertext, forwarded untouched: the relay
  * cannot read it, and the receiving device decrypts and writes the

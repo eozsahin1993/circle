@@ -3,7 +3,7 @@ import { Buffer } from 'buffer';
 import { authorizedFetch, baseUrl } from '@/services/relay';
 
 /**
- * The relay's push routing endpoints — see server/PUSH_DESIGN.md.
+ * The relay's push routing endpoints.
  *
  * Registration is session-gated like everything else. `sendPush` is not,
  * and deliberately: an authenticated send would arrive beside an

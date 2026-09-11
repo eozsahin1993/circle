@@ -102,8 +102,7 @@ export async function getLeftCircles(): Promise<Circle[]> {
  * Records how far this device has replayed one namespace of a circle's
  * log. Always set to the epoch of the last entry actually *processed*,
  * never blindly to the relay's reported latest — a short page would
- * otherwise skip everything it didn't return (server/SYNC_DESIGN.md's
- * "Read / sync").
+ * otherwise skip everything it didn't return.
  */
 export async function advanceCircleCursor(id: string, namespace: 'meta' | 'content', epoch: number): Promise<void> {
   const column = namespace === 'meta' ? { metaCursor: epoch } : { contentCursor: epoch };

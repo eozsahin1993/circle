@@ -29,7 +29,8 @@ export default function JoinPendingScreen() {
   // lost. Approval arrived and the screen kept saying "waiting" until you
   // navigated away and back.
   //
-  // Never dependent on push (see server/INVITE_FLOW.md's goals). Also
+  // Never dependent on push arriving — approval must complete even if
+  // notifications are disabled or the platform never delivers one. Also
   // survives the app being closed and reopened entirely:
   // `pendingJoinRequests` is the local source for `circleName` below, not
   // component state carried from the previous screen.

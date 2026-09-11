@@ -9,25 +9,25 @@
 // the app itself. It deliberately never writes decrypted content back to
 // DynamoDB (or anywhere but local disk/stdout) — persisting plaintext of
 // real photo captions/names in the cloud would recreate exactly what
-// end-to-end encryption here exists to avoid. See server/SYNC_DESIGN.md
-// and internal/storage/logstore/dynamodb/log_store.go for the log's real
-// shape and encryption scheme.
+// end-to-end encryption here exists to avoid. Entries live one partition
+// per syncId, sk-ordered "meta#"/"content#", each ciphertext holding
+// {type, payload, authorPubkey, signature} — see
+// internal/storage/logstore/dynamodb/log_store.go for the concrete shape.
 //
 // Usage:
 //
 //	go run ./cmd/decryptlog --table <log-table> --sync-id <syncId> --content-key <hex> [--out entries.json]
 //
-// syncId is random and relay-facing (see server/SYNC_DESIGN.md's
-// "Identifiers") — not derived from any key, so unlike the pre-redesign
-// circleLogId it can't be recomputed here and must be passed in directly
-// (read it off the device's local `circles.sync_id` column, or a
-// bootstrapCircle/appendEntry call log).
+// syncId is random and relay-facing — not derived from any key, so unlike
+// the pre-redesign circleLogId it can't be recomputed here and must be
+// passed in directly (read it off the device's local `circles.sync_id`
+// column, or a bootstrapCircle/appendEntry call log).
 //
-// Content keys are versioned (rotation mints a new one per
-// server/SYNC_DESIGN.md's "Content encryption") — pass one --content-key
-// per version this circle has ever used, as "<version>=<hex>" (bare hex
-// with no "=" is treated as version 1). An entry whose keyVersion has no
-// matching key is reported with an error instead of decrypted.
+// Content keys are versioned — removing a member rotates in a fresh key
+// for the survivors, so older entries stay under older versions — pass one
+// --content-key per version this circle has ever used, as "<version>=<hex>"
+// (bare hex with no "=" is treated as version 1). An entry whose keyVersion
+// has no matching key is reported with an error instead of decrypted.
 package main
 
 import (

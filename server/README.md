@@ -3,9 +3,9 @@
 The relay server for the Circle app — a blind relay for encrypted circle
 content, plus account auth/recovery plumbing. It never sees plaintext
 content and is designed to infer as little as possible about circle
-membership or social structure. See [DESIGN.md](DESIGN.md) for the full
-architecture writeup and the reasoning behind each decision; this file is
-just a map to find your way around the code.
+membership or social structure. See [DESIGN.md](../docs/DESIGN.md) for the
+full architecture writeup and the reasoning behind each decision; this
+file is just a map to find your way around the code.
 
 ## Layout
 

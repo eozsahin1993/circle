@@ -14,7 +14,7 @@ master seed exists and is already framed in the UI as the way back into
 your circles, but nothing today actually makes that true yet). Invites
 are the one exception to "local-only": the full invite/join handshake
 (request, discover, approve, complete) now syncs through the relay's own
-mailbox-style table — see `server/INVITE_FLOW.md`, status **built**. A
+mailbox-style table — see `INVITE_FLOW.md`, status **built**. A
 fresh joiner still sees no history until `pullCircle` exists, since
 getting the secret and pulling content are different problems (see that
 doc's "what this flow depends on" section).

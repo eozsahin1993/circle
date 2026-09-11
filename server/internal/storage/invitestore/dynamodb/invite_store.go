@@ -19,9 +19,9 @@ import (
 )
 
 // DefaultInviteRetentionDays matches the client's existing INVITE_TTL_MS
-// (7 days) — see server/INVITE_FLOW.md. Eviction itself is DynamoDB's
-// native TTL feature, not application code — this value only controls
-// what `expiresAt` gets written as at write time.
+// (7 days). Eviction itself is DynamoDB's native TTL feature, not
+// application code — this value only controls what `expiresAt` gets
+// written as at write time.
 const DefaultInviteRetentionDays = 7
 
 const (
@@ -48,10 +48,9 @@ func New(client *dynamodb.Client, tableName string, retentionDays int64) *Store 
 
 var _ invitestore.Store = (*Store)(nil)
 
-// CreateInvite is the one proactive server write in the whole invite flow
-// (see server/INVITE_FLOW.md) — a plain overwrite, not conditional: it's
-// only ever called once, at invite-creation time, by the invite's own
-// creator.
+// CreateInvite is the one proactive server write in the whole invite
+// flow — a plain overwrite, not conditional: it's only ever called once,
+// at invite-creation time, by the invite's own creator.
 func (s *Store) CreateInvite(ctx context.Context, inviteTag string, encryptedPreview []byte) error {
 	expiresAt := dynamoutil.NowMillis()/1000 + s.retentionSeconds
 	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
@@ -168,8 +167,10 @@ func (s *Store) GetJoinRequest(ctx context.Context, inviteTag, requesterID strin
 // ApproveJoinRequest sets the sealed-box-encrypted approval payload on an
 // existing request row — attribute_exists(pk) so approving a nonexistent
 // (or already-expired-and-evicted) row returns a clear error rather than
-// silently creating a new one. Deliberately does not touch expiresAt: per
-// server/INVITE_FLOW.md, approving a request does not extend its TTL.
+// silently creating a new one. Deliberately does not touch expiresAt: the
+// row's retention clock started when the request was submitted, and
+// approving it shouldn't extend how long an already-answered request
+// lingers server-side.
 func (s *Store) ApproveJoinRequest(ctx context.Context, inviteTag, requesterID string, encryptedApproval []byte) error {
 	_, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(s.tableName),

@@ -30,12 +30,14 @@ import { hexToBytes } from '@noble/curves/utils.js';
 import { getAttachment } from '@/data/db/attachments';
 
 /**
- * Which relay namespace an entry type belongs in — see
- * server/SYNC_DESIGN.md's "meta"/"content" split. Must agree with which
- * handler map in sync/entry-handlers reads it; a mismatch means the
- * entry is fetched by the wrong pull and silently discarded as an
- * unknown type, on every device including the author's. See the registry
- * test that enforces the agreement.
+ * Which relay namespace an entry type belongs in. Meta is everything a
+ * client needs before it can interpret content at all — identities, keys,
+ * roles, circle metadata — so it's rare and synced eagerly in full;
+ * content (posts, comments, reactions, tombstones) is voluminous and
+ * paged lazily. Must agree with which handler map in sync/entry-handlers
+ * reads it; a mismatch means the entry is fetched by the wrong pull and
+ * silently discarded as an unknown type, on every device including the
+ * author's. See the registry test that enforces the agreement.
  */
 const META_ENTRY_TYPES: OutboxEntry['entryType'][] = [
   EntryTypes.MEMBER_ADDED,
@@ -73,10 +75,10 @@ export function namespaceFor(entryType: OutboxEntry['entryType']): Namespace {
  * `appendEntry` is idempotent per entryId, and an entry is only marked
  * synced once its blob (if any) and its append both succeed.
  *
- * For a 'post', the blob is uploaded *before* the entry is appended (see
- * server/SYNC_DESIGN.md's "Post" operation) — a crash in between leaves a
- * harmless orphaned blob rather than a permanent entry pointing at
- * nothing, which an immutable log could never fix. `BlobAlreadyExistsError`
+ * For a 'post', the blob is uploaded *before* the entry is appended — a
+ * crash in between leaves a harmless orphaned blob rather than a
+ * permanent entry pointing at nothing, which an immutable log could
+ * never fix. `BlobAlreadyExistsError`
  * on retry means the previous attempt's upload actually succeeded; treat
  * it as done, not as a failure.
  *

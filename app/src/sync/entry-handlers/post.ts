@@ -36,11 +36,13 @@ export const postHandler: EntryHandler = {
    * before any content entry is looked at.
    *
    * Membership here is deliberately "has ever been a member", not "is a
-   * member now": removing someone doesn't retract their old posts
-   * (server/SYNC_DESIGN.md's ever-member set). Today those two sets are
-   * the same table, because nothing removes a roster row yet; when
-   * removal lands it must mark rows rather than delete them, or this
-   * check starts rejecting history.
+   * member now": removing someone doesn't retract their old posts, so
+   * validation checks the ever-member set, never the current roster —
+   * checking the current roster would erase attributed history the
+   * moment someone left or got kicked. Today those two sets are the same
+   * table, because nothing removes a roster row yet; when removal lands
+   * it must mark rows rather than delete them, or this check starts
+   * rejecting history.
    */
   async predicate(circleId, envelope) {
     if (!parse(envelope.payload)) return false;

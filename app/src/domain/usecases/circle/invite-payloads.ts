@@ -1,10 +1,9 @@
 /**
- * The JSON shapes carried inside the invite flow's encrypted mailbox rows
- * (see server/INVITE_FLOW.md). Shared between invite-to-circle.ts (creator
- * side) and join-circle.ts (requester side) — kept in their own file
- * rather than either usecase, since both sides need to encode one of these
- * and decode another, and neither side should import the other's module
- * just for a type.
+ * The JSON shapes carried inside the invite flow's encrypted mailbox rows.
+ * Shared between invite-to-circle.ts (creator side) and join-circle.ts
+ * (requester side) — kept in their own file rather than either usecase,
+ * since both sides need to encode one of these and decode another, and
+ * neither side should import the other's module just for a type.
  */
 
 /**
@@ -48,8 +47,10 @@ export type InvitePreviewPayload = {
  * What a join request row's `encryptedRequest` decrypts to — written by
  * the requester, read by the invite's creator, encrypted under
  * `deriveJoinRequestKey`. The self-reported name (and picture) are
- * explicitly not verified identity — see server/DESIGN.md's "Invites"
- * section.
+ * explicitly not verified identity — exactly as spoofable as typing any
+ * name at profile setup — so the approval screen should be framed around
+ * what the approver actually knows ("someone used the invite"), not
+ * presented as a confirmed identity.
  */
 export type JoinRequestPayload = {
   /** Hex-encoded X25519 public key — the requester's one-time ephemeral keypair for this handshake. */
@@ -58,10 +59,10 @@ export type JoinRequestPayload = {
    * Hex-encoded Ed25519 public key — the requester's *durable* circle
    * identity (see `deriveCircleIdentity`), not the ephemeral key above.
    * Carried so the approver can name this member in the `member_added`
-   * entry it writes: per server/SYNC_DESIGN.md's predicate table that
-   * entry may only be written by an admin, so the joiner cannot announce
-   * itself — nobody would have vouched for it. Every other device uses
-   * this key to verify that member's future post signatures.
+   * entry it writes: that entry may only be written by an admin, so the
+   * joiner cannot announce itself — nobody would have vouched for it.
+   * Every other device uses this key to verify that member's future post
+   * signatures.
    */
   identityPublicKey: string;
   /**
@@ -73,9 +74,10 @@ export type JoinRequestPayload = {
    */
   encPublicKey: string;
   /**
-   * Hex push routing id (see server/PUSH_DESIGN.md), carried so the
-   * approver can put it on `member_added` and this member is reachable
-   * from the moment they join. Always sent, whether or not notifications
+   * Hex push routing id, derived client-side from the requester's own
+   * seed for this circle, carried so the approver can put it on
+   * `member_added` and this member is reachable from the moment they
+   * join. Always sent, whether or not notifications
    * are on yet: it only names where to deliver, and the relay drops a
    * target with no registration behind it.
    */
@@ -114,10 +116,9 @@ export type JoinRequestPayload = {
 export type JoinApprovalPayload = {
   /**
    * The approver's *entire* version→content-key map (each value hex-
-   * encoded), not just the current version — see server/SYNC_DESIGN.md's
-   * "Add a member" operation: a joiner needs every version to decrypt
-   * history predating their join, not only new content going forward.
-   * Today this only ever has one entry (`{1: ...}`), since key rotation
+   * encoded), not just the current version: a joiner needs every version
+   * to decrypt history predating their join, not only new content going
+   * forward. Today this only ever has one entry (`{1: ...}`), since key rotation
    * itself isn't built yet — but the shape doesn't need to change when it
    * is; there's simply nothing beyond version 1 to include yet.
    */
@@ -126,8 +127,7 @@ export type JoinApprovalPayload = {
    * The circle's relay-facing address — without this, a joiner has
    * nothing that can actually reach the relay (the pre-redesign version
    * of this payload didn't carry it at all, and could only complete
-   * "locally," the same structural gap the old account-manifest had —
-   * see server/SYNC_DESIGN.md's "Discovery" section).
+   * "locally," the same structural gap the old account-manifest had).
    */
   syncId: string;
   circleName: string;

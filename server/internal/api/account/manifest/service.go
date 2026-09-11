@@ -1,10 +1,12 @@
 // Package manifest is the vertical slice for GET/PUT /account/manifest —
-// the account's encrypted circle-membership index, see server/DESIGN.md's
-// "Account recovery" section. The relay only ever stores and returns
-// ciphertext; nothing here looks inside it.
+// the account's encrypted circle-membership index, so a device recovering
+// from just the seed phrase knows which circles to reconstruct. The relay
+// only ever stores and returns ciphertext; nothing here looks inside it.
 //
-// See manifeststore's package doc: server/SYNC_DESIGN.md's "Discovery"
-// section supersedes this endpoint's storage shape (not yet migrated).
+// See manifeststore's package doc: this endpoint's one-blob-per-account
+// storage shape is being replaced by a row-per-membership scheme under a
+// seed-derived partition, which avoids the read-modify-write race two of
+// the same account's devices can hit today (not yet migrated).
 package manifest
 
 import (

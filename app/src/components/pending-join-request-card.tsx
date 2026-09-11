@@ -30,9 +30,11 @@ export type PendingJoinRequestCardProps = {
  * One pending join request, with its own approve/deny actions, rendered
  * as a feed row (see `feed/pending-request-row.tsx`). Only ever rendered
  * for the invite's actual creator (see that function's creator-only
- * gate) — "Tapped your link" is never anyone else's, per
- * server/DESIGN.md's "Invites" section (approval is always the specific
- * creator, never any admin).
+ * gate) — "Tapped your link" is never anyone else's: approval is always
+ * the invite's specific creator, never any admin, since an admin who
+ * didn't create this invite has no real context to judge the request
+ * against — just an unverified, self-reported name, no stronger a signal
+ * than the creator already has.
  */
 export function PendingJoinRequestCard({ request, busy, onApprove, onDeny }: PendingJoinRequestCardProps) {
   return (

@@ -24,8 +24,9 @@ type Config struct {
 	// (today: the encrypted recovery manifest) — see
 	// server/provision/accounts_table.tf.
 	AccountsTableName string
-	// InviteTableName is the standalone invite/join-request table — see
-	// server/INVITE_FLOW.md and
+	// InviteTableName is the standalone invite/join-request table: pk =
+	// hash(invite code), with one row for the invite itself and one row
+	// per pending join request under it — see
 	// server/provision/modules/storage/dynamodb.tf's invites resource.
 	InviteTableName string
 	// RateLimitTableName is the standalone per-account request-budget
@@ -86,13 +87,13 @@ type Config struct {
 	// ID tokens — the app's iOS bundle ID. A Services ID would join this
 	// as a second named field if a web/Android Apple flow is ever added.
 	AppleClientIDIOS string
-	// MaxBlobSize is passed straight to s3.NewBlobStore — see
-	// server/DESIGN.md and provision/variables.tf's max_blob_size_bytes. 0
-	// means "use the adapter's own default".
+	// MaxBlobSize is passed straight to s3.NewBlobStore, overriding its
+	// DefaultMaxBlobSize — see provision/variables.tf's
+	// max_blob_size_bytes. 0 means "use the adapter's own default".
 	MaxBlobSize int64
 	// InviteRetentionDays is passed straight to invitedynamodb.New — see
-	// server/INVITE_FLOW.md and provision/variables.tf's
-	// invite_retention_days. 0 means "use the adapter's own default".
+	// provision/variables.tf's invite_retention_days. 0 means "use the
+	// adapter's own default".
 	// Eviction itself is DynamoDB's native TTL
 	// (see provision/modules/storage/dynamodb.tf), not this process — this
 	// only controls what expiresAt gets written as.

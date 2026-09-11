@@ -19,11 +19,10 @@ export type { EntryHandler } from '@/sync/entry-handlers/types';
 
 /**
  * Meta entry types this build understands. An entry naming anything else
- * is discarded, which is the correct behaviour rather than a gap:
- * server/SYNC_DESIGN.md's invariant 5 is default-deny, and invariant 7
- * makes it recoverable — local state is a disposable projection, so a
- * later build that understands the type rebuilds it by replaying from
- * epoch 0.
+ * is discarded, which is the correct behaviour rather than a gap: unknown
+ * types must default-deny rather than be guessed at, and it's recoverable
+ * because local state is a disposable projection, so a later build that
+ * understands the type rebuilds it by replaying from epoch 0.
  *
  * Not yet here, because nothing writes it yet: `circle_renamed`. The
  * registry test enforces that everything which *is* written has an entry.

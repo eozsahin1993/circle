@@ -2,7 +2,7 @@
 
 Expo/React Native client in `app/`, Go relay in `server/`. Each has its own
 `AGENTS.md` with rules specific to it — read the one for the directory
-you're working in.
+you're working in. Architecture and design decisions live in `docs/`.
 
 # Comments
 
@@ -11,7 +11,7 @@ something hard to follow or reason about:
 
 - why a non-obvious choice was made, especially one that looks wrong
 - a constraint from outside the file (an upstream bug, a relay contract,
-  an invariant in `server/SYNC_DESIGN.md`)
+  an invariant in `docs/SYNC_DESIGN.md`)
 - a trap the next person would otherwise reintroduce
 
 Never restate what the code says, narrate a function step by step, or

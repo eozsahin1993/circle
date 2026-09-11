@@ -54,8 +54,9 @@ function parse(payload: unknown): MemberAddedPayload | null {
     picture: parsePictureThumbnail(record.picture) ?? undefined,
     createdAt: numberField(record, 'createdAt') ?? undefined,
     // Degrades rather than rejecting: entries written before push existed
-    // have none, and a check here would drop them forever on replay
-    // (server/SYNC_DESIGN.md invariant 1). A later push_enabled fills it in.
+    // have none, and a log entry can never be rewritten to add it
+    // afterward, so rejecting here would drop the entry forever on every
+    // future replay too. A later push_enabled fills it in.
     pushRoutingId: hexField(record, 'pushRoutingId', 32) ?? '',
     authorityPublicKey: provenAuthorityKey(record, identityPublicKey),
   };
@@ -102,8 +103,9 @@ export const memberAddedHandler: EntryHandler = {
    * on the wire at all, so two devices hold different ones for the same
    * person. Nothing cross-device reads it today (comments and reactions
    * key off it locally but don't sync yet); when they do, they'll need
-   * the public key instead — see server/SYNC_DESIGN.md's "One identifier,
-   * four jobs".
+   * the public key instead — it's already what every signature verifies
+   * against and what every post carries, so it's the one identifier that
+   * already resolves consistently across devices.
    */
   async apply(circleId, envelope, epoch) {
     const payload = parse(envelope.payload);

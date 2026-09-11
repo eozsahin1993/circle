@@ -11,8 +11,7 @@ import { handlePush } from '@/domain/usecases/push/handle-push';
 import { initDatabase } from '@/data/db';
 
 /**
- * The background handler that turns a delivered push into a notification —
- * see server/PUSH_DESIGN.md.
+ * The background handler that turns a delivered push into a notification.
  *
  * Must be defined at module scope in a module loaded early: the task
  * manager loads the JS bundle on its own to run this, with no screen

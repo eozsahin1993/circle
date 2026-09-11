@@ -66,10 +66,10 @@ export async function requireAdminPublicKey(circleId: string, message = "Only an
 }
 
 /**
- * Writes the server-side `sk = "invite"` row (see server/INVITE_FLOW.md) —
- * the circle's current name, encrypted under a key derived from the
- * invite code alone, so anyone who taps the link can preview what they're
- * about to join before requesting to. Not best-effort: an invite whose
+ * Writes the server-side `sk = "invite"` row — the circle's current name,
+ * encrypted under a key derived from the invite code alone, so anyone who
+ * taps the link can preview what they're about to join before requesting
+ * to. Not best-effort: an invite whose
  * preview never lands is unjoinable, so a failure here should surface the
  * same way any other invite-creation failure does.
  */
@@ -140,9 +140,9 @@ export async function replaceInvite(circleId: string): Promise<Invite> {
 
 /**
  * Confirms this device is specifically the invite's *creator*, not just
- * any admin (server/DESIGN.md's "Invites": an admin who didn't create
- * this invite has no more context to judge a request than a stranger
- * would). Client-side only — the relay is blind and can't enforce it.
+ * any admin — an admin who didn't create this invite has no more context
+ * to judge a request than a stranger would. Client-side only — the relay
+ * is blind and can't enforce it.
  */
 async function requireInviteCreatorPublicKey(circleId: string): Promise<{ publicKey: string; invite: Invite }> {
   const own = await getOwnMember(circleId);
@@ -163,9 +163,11 @@ export type PendingRequest = {
 
 /**
  * Lists join requests still awaiting this device's decision — self-
- * reported name and picture only, not verified identity (server/DESIGN.md).
- * Skips rows that fail to decrypt (e.g. stale, from a previous invite)
- * rather than failing the whole list, and rows already carrying an
+ * reported name and picture only, not verified identity: as spoofable as
+ * anything typed at profile setup, so this is "someone used the invite,"
+ * never a confirmed identity. Skips rows that fail to decrypt (e.g.
+ * stale, from a previous invite) rather than failing the whole list, and
+ * rows already carrying an
  * `encryptedApproval` (approved in place, not deleted, so they'd
  * otherwise keep reappearing here with nothing left to do).
  */
@@ -243,9 +245,9 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   const picture = parsePictureThumbnail(pictureThumbnail);
   const picturePayload = picture ? Buffer.from(picture).toString('base64') : undefined;
 
-  // Catch up on meta before sealing (server/SYNC_DESIGN.md "Add a member"):
-  // a stale approver would otherwise hand over an incomplete key map, and
-  // the joiner would be unable to read history it should have.
+  // Catch up on meta before sealing: a stale approver would otherwise hand
+  // over an incomplete key map, and the joiner would be unable to read
+  // history it should have.
   await pullMeta(circleId);
 
   const keyMap = await getCircleKeyMap(circleId);
@@ -261,9 +263,9 @@ export async function approveJoinRequest(circleId: string, requesterId: string):
   const sealed = sealToPublicKey(new TextEncoder().encode(JSON.stringify(envelope)), hexToBytes(ephemeralPublicKey));
   await putJoinApproval(inviteTag, requesterId, sealed);
 
-  // Only an admin may write `member_added` (server/SYNC_DESIGN.md's
-  // predicate table), so it is written here, by the approver, rather than
-  // self-announced by the joiner — an entry signed by someone no device
+  // Only an admin may write `member_added`, so it is written here, by
+  // the approver, rather than self-announced by the joiner — an entry
+  // signed by someone no device
   // has yet heard of is discarded by every honest client. This is what
   // makes the new member visible to everyone else: the joiner supplied
   // the public halves, and this signature is the circle vouching for them.

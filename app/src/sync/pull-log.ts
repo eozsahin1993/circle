@@ -82,7 +82,7 @@ async function pull(circleId: string, namespace: Namespace, handlers: Record<str
  * Replays every meta entry — identities, roster, roles. Must complete
  * before content is touched: a content entry can't be decrypted without
  * the key version meta introduces, and can't be attributed without the
- * author meta announces (server/SYNC_DESIGN.md's "Read / sync").
+ * author meta announces.
  */
 export function pullMeta(circleId: string): Promise<void> {
   return pull(circleId, 'meta', metaHandlers);

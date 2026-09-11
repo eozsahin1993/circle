@@ -136,10 +136,12 @@ export async function signInWithApple(): Promise<SignInResult> {
  * through the recovery-phrase reveal (account/recovery.tsx) and confirm
  * they've saved it *before* proceeding — and even then, recovery only
  * restores access on *this* device if the phrase was actually written
- * down somewhere durable; there's no server-side backup of it (see
- * DESIGN.md discussion on why a naive password-protected server backup
- * is a real security regression, and what Signal-style attested-hardware
- * rate-limiting would take to do this properly).
+ * down somewhere durable; there's no server-side backup of it. A naive
+ * password-protected backup was considered and rejected: a memorable
+ * secret is too low-entropy for encryption alone to protect, and doing it
+ * safely needs an attempt counter enforced somewhere even the operator
+ * can't bypass — real hardware attestation, the way Signal does it —
+ * which nothing here provides.
  */
 export async function signOut(): Promise<void> {
   const token = await getAuthToken();
