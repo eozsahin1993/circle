@@ -14,6 +14,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Icons, Radius, Spacing, Tints } from '@/constants/theme';
 import { getProfile, listCircles, type Profile } from '@/data/db';
 import { resetEverythingForTesting } from '@/domain/usecases/dev-reset';
+import { logTestPushPayload } from '@/domain/usecases/dev-test-push';
 import { signOut } from '@/domain/usecases/account/sign-in';
 import { PushLevels, type PushLevelId } from '@/domain/usecases/push/push-preferences';
 import { useAppSettings } from '@/hooks/use-app-settings';
@@ -111,6 +112,12 @@ export default function AccountScreen() {
           destructive: true,
           disabled: resettingDevData,
           onPress: handleDevReset,
+        },
+        __DEV__ && {
+          label: 'Log a test push payload',
+          description: '__DEV__ only. Logs a simctl push payload this device can decrypt, for testing the iOS notification extension.',
+          control: { kind: 'navigate' as const },
+          onPress: () => void logTestPushPayload(),
         },
       ],
     },

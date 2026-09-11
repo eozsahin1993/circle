@@ -3,6 +3,7 @@ import { getPermissionsAsync } from 'expo-notifications';
 import { getAllCircles } from '@/data/db';
 import { circlePushPreferences } from '@/domain/usecases/push/push-preferences';
 import { registerPushForCircle } from '@/domain/usecases/push/push-registration';
+import { refreshPushSnapshot } from '@/domain/usecases/push/push-snapshot';
 import { getDevicePushToken } from '@/services/push/tokens';
 
 /**
@@ -18,6 +19,10 @@ import { getDevicePushToken } from '@/services/push/tokens';
  * ever surface as an error to whoever just opened the app.
  */
 export async function enablePushEverywhere(): Promise<void> {
+  // Even without permission (or a token), the iOS extension's snapshot
+  // should reflect this launch's circles.
+  await refreshPushSnapshot();
+
   // Never prompts: this runs on every launch, and the OS spends its one
   // prompt on whatever asks first.
   const device = await getDevicePushToken();

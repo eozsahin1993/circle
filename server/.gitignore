@@ -25,3 +25,8 @@ provision/**/*.tfvars
 *firebase-adminsdk*.json
 *fcm*service*account*.json
 *service-account*.json
+
+# The APNs auth key, for local runs (see APNS_AUTH_KEY_FILE) — same risk
+# as the FCM key above. Apple names these AuthKey_<KeyID>.p8; .p8 is used
+# for nothing else in this repo.
+*.p8
