@@ -14,7 +14,7 @@ import (
 // call with an advanced cursor returns, and what a retry does to a log
 // that is never allowed to hold the same entry twice.
 //
-// The steps are in circle_test.go.
+// The steps are in circle_steps_test.go.
 
 func TestAnEntryComesBackTheWayItWentIn(t *testing.T) {
 	r := harness.Start(t)

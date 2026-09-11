@@ -9,11 +9,12 @@ import (
 	"circle-relay/internal/storage/logstore"
 )
 
-// The vocabulary the sync-log sequences in log_test.go and
-// authority_test.go are written in — a circle, the two capabilities that
-// write to it, and one step per relay operation. Same idea as the device
-// helpers at the top of invite_test.go, in a file of its own because two
-// test files share it.
+// No tests here — this is the vocabulary the sync-log sequences in
+// log_test.go and authority_test.go are written in: a circle, the two
+// capabilities that write to it, and one step per relay operation. Same
+// idea as the device helpers at the top of invite_test.go, in a file of
+// its own because two test files share it, and named _test.go only
+// because that's the one way Go compiles it into the test binary.
 //
 // Signatures here are real ed25519 over the message logstore itself
 // builds. Reproducing the construction by hand would let a test pass by

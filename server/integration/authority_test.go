@@ -15,7 +15,7 @@ import (
 // proves "a current member", an authority signature on top of it proves
 // "an admin", and these paths need both.
 //
-// The steps are in circle_test.go.
+// The steps are in circle_steps_test.go.
 
 func TestRotatingReplacesTheWriteToken(t *testing.T) {
 	r := harness.Start(t)
