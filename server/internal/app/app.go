@@ -6,19 +6,15 @@ package app
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
-	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
 	"circle-relay/internal/api"
 	"circle-relay/internal/api/auth/oidcverify"
-	"circle-relay/internal/api/push"
 	"circle-relay/internal/config"
 	"circle-relay/internal/push/fcm"
 
@@ -76,7 +72,7 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 		Push: api.PushDeps{
 			Store:          pushdynamodb.New(dynamo(), cfg.PushTableName),
 			RecipientLimit: limit("push", cfg.RateLimitPushMaxRequests),
-			Dispatch:       pushDispatcher(awsCfg, cfg.FCMCredentialParameter, cfg.FCMCredentialFile),
+			Dispatch:       fcm.NewDispatcher(awsCfg, cfg.FCMCredentialParameter, cfg.FCMCredentialFile),
 		},
 	}
 }
@@ -92,46 +88,4 @@ func nonEmpty(values ...string) []string {
 		}
 	}
 	return out
-}
-
-// pushDispatcher delivers resolved pushes. The credential is fetched on the
-// first send rather than at boot, so a relay without one still serves every
-// other route — push is the only thing that needs it.
-//
-// Fire-and-forget by design: a push is best-effort, and a failed one must
-// not fail the append that triggered it.
-func pushDispatcher(awsCfg aws.Config, parameterName, filePath string) func(push.Delivery, int64, []byte) {
-	loader := &fcm.Loader{
-		Client:        ssm.NewFromConfig(awsCfg),
-		ParameterName: parameterName,
-		FilePath:      filePath,
-	}
-	var (
-		once   sync.Once
-		sender *fcm.Sender
-	)
-
-	return func(delivery push.Delivery, keyVersion int64, payload []byte) {
-		// iOS goes direct to APNs, which isn't built yet.
-		if delivery.Platform != "android" {
-			return
-		}
-
-		ctx := context.Background()
-		once.Do(func() {
-			account, err := loader.Load(ctx)
-			if err != nil {
-				log.Printf("push disabled: %v", err)
-				return
-			}
-			sender = fcm.New(account)
-		})
-		if sender == nil {
-			return
-		}
-
-		if err := sender.Send(ctx, string(delivery.PushToken), delivery.PushRoutingID, keyVersion, payload); err != nil {
-			log.Printf("failed to deliver a push: %v", err)
-		}
-	}
 }
