@@ -141,9 +141,12 @@ func (r *Relay) Anon() *Device {
 }
 
 // Body is a JSON object to send. A named type because almost every request
-// here carries one field, and map[string]string at each call site buries
-// what's actually being sent.
-type Body map[string]string
+// here carries one field, and a bare map literal at each call site buries
+// what's actually being sent. Values are `any` rather than string because
+// the relay's own fields aren't all strings — keyVersion is an integer,
+// and sending it quoted fails the whole decode as "invalid request body"
+// rather than as the wrong type.
+type Body map[string]any
 
 func (d *Device) Get(path string) Response          { return d.send(http.MethodGet, path, nil) }
 func (d *Device) Put(path string, b Body) Response  { return d.send(http.MethodPut, path, b) }
