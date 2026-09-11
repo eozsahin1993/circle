@@ -156,7 +156,14 @@ func (d *Device) Put(path string, b Body) Response  { return d.send(http.MethodP
 func (d *Device) Post(path string, b Body) Response { return d.send(http.MethodPost, path, b) }
 func (d *Device) Delete(path string) Response       { return d.send(http.MethodDelete, path, nil) }
 
-func (d *Device) send(method, path string, b Body) Response {
+// PostRequest sends a struct rather than a Body — for the endpoints this
+// package models field for field (see circle.go), where a map would drop
+// the names the handler actually decodes and the types it needs them in.
+func (d *Device) PostRequest(path string, request any) Response {
+	return d.send(http.MethodPost, path, request)
+}
+
+func (d *Device) send(method, path string, b any) Response {
 	t := d.relay.t
 	t.Helper()
 
