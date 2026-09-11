@@ -1,5 +1,5 @@
 // Command server is the "dedicated, always-on" alternative to cmd/lambda —
-// same api.NewRouter, same adapters, just served with http.ListenAndServe
+// the same handler from internal/app, served with http.ListenAndServe
 // instead of through Lambda/API Gateway. Exists to prove the port/adapter
 // split actually buys the portability it's meant to: nothing below
 // internal/api changes to support this, only this file exists.
@@ -9,70 +9,23 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-
-	"circle-relay/internal/api"
-	"circle-relay/internal/api/auth/oidcverify"
-	"circle-relay/internal/api/push"
+	"circle-relay/internal/app"
 	"circle-relay/internal/config"
-	"circle-relay/internal/push/fcm"
-
-	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
-	blobs3 "circle-relay/internal/storage/blobstore/s3"
-	invitedynamodb "circle-relay/internal/storage/invitestore/dynamodb"
-	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
-	manifestdynamodb "circle-relay/internal/storage/manifeststore/dynamodb"
-	pushdynamodb "circle-relay/internal/storage/pushstore/dynamodb"
-	ratelimitdynamodb "circle-relay/internal/storage/ratelimitstore/dynamodb"
-)
-
-const (
-	googleIssuer  = "https://accounts.google.com"
-	googleJWKSURL = "https://www.googleapis.com/oauth2/v3/certs"
-	appleIssuer   = "https://appleid.apple.com"
-	appleJWKSURL  = "https://appleid.apple.com/auth/keys"
 )
 
 func main() {
-	ctx := context.Background()
 	cfg := config.Load()
 
-	awsCfg, err := awsconfig.LoadDefaultConfig(ctx)
+	handler, err := app.New(context.Background(), cfg)
 	if err != nil {
-		log.Fatalf("failed to load AWS config: %v", err)
+		log.Fatalf("failed to build the relay: %v", err)
 	}
-
-	logStore := logdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.TableName)
-	s3Client := awss3.NewFromConfig(awsCfg, func(o *awss3.Options) { o.UsePathStyle = cfg.S3ForcePathStyle })
-	blobStore := blobs3.New(s3Client, cfg.BucketName, cfg.MaxBlobSize)
-
-	authStore := authdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.SessionsTableName)
-	manifestStore := manifestdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.AccountsTableName)
-	inviteStore := invitedynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.InviteTableName, cfg.InviteRetentionDays)
-	writeRateLimitStore := ratelimitdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.RateLimitTableName, "write", int(cfg.RateLimitWriteMaxRequests), cfg.RateLimitWindow())
-	readRateLimitStore := ratelimitdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.RateLimitTableName, "read", int(cfg.RateLimitReadMaxRequests), cfg.RateLimitWindow())
-	googleVerifier := oidcverify.New(googleIssuer, googleJWKSURL, nonEmpty(cfg.GoogleClientIDIOS, cfg.GoogleClientIDAndroid, cfg.GoogleClientIDWeb))
-	appleVerifier := oidcverify.New(appleIssuer, appleJWKSURL, nonEmpty(cfg.AppleClientIDIOS))
-
-	pushStore := pushdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.PushTableName)
-	pushDeps := api.PushDeps{
-		Store:          pushStore,
-		RecipientLimit: ratelimitdynamodb.New(awsdynamodb.NewFromConfig(awsCfg), cfg.RateLimitTableName, "push", int(cfg.RateLimitPushMaxRequests), cfg.RateLimitWindow()),
-		Dispatch:       pushDispatcher(awsCfg, cfg.FCMCredentialParameter, cfg.FCMCredentialFile),
-	}
-
-	mux := api.NewRouter(logStore, blobStore, authStore, manifestStore, inviteStore, writeRateLimitStore, readRateLimitStore, googleVerifier, appleVerifier, pushDeps)
 
 	addr := ":" + cfg.Port
 	log.Printf("listening on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, logRequests(mux)))
+	log.Fatal(http.ListenAndServe(addr, logRequests(handler)))
 }
 
 // logRequests is local-dev-only — cmd/lambda gets this for free from
@@ -94,59 +47,4 @@ type statusRecorder struct {
 func (r *statusRecorder) WriteHeader(status int) {
 	r.status = status
 	r.ResponseWriter.WriteHeader(status)
-}
-
-// nonEmpty drops any not-yet-configured platform client ID (config.go
-// leaves these as "" rather than requiring every platform up front) before
-// they reach oidcverify.New's accepted-audience set.
-func nonEmpty(values ...string) []string {
-	out := make([]string, 0, len(values))
-	for _, v := range values {
-		if v != "" {
-			out = append(out, v)
-		}
-	}
-	return out
-}
-
-// pushDispatcher delivers resolved pushes. The credential is fetched on the
-// first send rather than at boot, so a relay without one still serves every
-// other route — push is the only thing that needs it.
-//
-// Fire-and-forget by design: a push is best-effort, and a failed one must
-// not fail the append that triggered it.
-func pushDispatcher(awsCfg aws.Config, parameterName, filePath string) func(push.Delivery, int64, []byte) {
-	loader := &fcm.Loader{
-		Client:        ssm.NewFromConfig(awsCfg),
-		ParameterName: parameterName,
-		FilePath:      filePath,
-	}
-	var (
-		once   sync.Once
-		sender *fcm.Sender
-	)
-
-	return func(delivery push.Delivery, keyVersion int64, payload []byte) {
-		// iOS goes direct to APNs, which isn't built yet.
-		if delivery.Platform != "android" {
-			return
-		}
-
-		ctx := context.Background()
-		once.Do(func() {
-			account, err := loader.Load(ctx)
-			if err != nil {
-				log.Printf("push disabled: %v", err)
-				return
-			}
-			sender = fcm.New(account)
-		})
-		if sender == nil {
-			return
-		}
-
-		if err := sender.Send(ctx, string(delivery.PushToken), delivery.PushRoutingID, keyVersion, payload); err != nil {
-			log.Printf("failed to deliver a push: %v", err)
-		}
-	}
 }

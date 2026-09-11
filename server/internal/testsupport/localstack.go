@@ -1,7 +1,12 @@
 // Package testsupport wires the real adapters (not fakes) to a LocalStack
-// instance at localhost:4566, so tests exercise actual DynamoDB/S3/KMS wire
-// behavior. Not a _test.go file — a regular package imported by other
-// packages' tests, per Go convention for shared test helpers. Google/Apple
+// instance at localhost:4566, so tests exercise actual DynamoDB and S3 wire
+// behavior. Those two services are all LocalStack needs to run (see the
+// workflow's SERVICES list): KMS appears in the Terraform as the tables'
+// encryption-at-rest key, but no Go code here holds a KMS client, and the
+// tables these helpers create programmatically have no SSE to configure.
+//
+// Not a _test.go file — a regular package imported by other packages'
+// tests, per Go convention for shared test helpers. Google/Apple
 // sign-in verification isn't exercised against LocalStack at all — there's
 // nothing to emulate (no AWS service involved), so internal/oidcverify's
 // own tests use a locally-generated key pair instead.
