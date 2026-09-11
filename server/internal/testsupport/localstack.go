@@ -52,7 +52,6 @@ import (
 // cmd/testrelay uses too — one definition, so a table this suite creates
 // can't differ in shape from the one the relay is served against.
 const (
-	localstackEndpoint = localstack.Endpoint
 	tableName          = localstack.LogTable
 	bucketName         = localstack.BlobBucket
 	sessionsTableName  = localstack.SessionsTable
@@ -123,6 +122,17 @@ func UniqueInviteTag(t testing.TB) string {
 	return fmt.Sprintf("invite-%s-%d-%d", t.Name(), time.Now().UnixNano(), uniqueTagCounter.Add(1))
 }
 
+// unreachable is what every store constructor here does when LocalStack
+// isn't there — skip, or fail when the environment says a missing one is
+// a broken pipeline rather than a missing tool. See localstack.Required.
+func unreachable(t testing.TB, service string, err error) {
+	t.Helper()
+	if localstack.Required() {
+		t.Fatalf("%s is set but LocalStack %s is unreachable: %v", localstack.RequireEnv, service, err)
+	}
+	t.Skipf("LocalStack %s not reachable, skipping: %v", service, err)
+}
+
 func loadConfig(t testing.TB) aws.Config {
 	t.Helper()
 	cfg, err := awsconfig.LoadDefaultConfig(context.Background(),
@@ -142,14 +152,14 @@ func loadConfig(t testing.TB) aws.Config {
 func NewLogStore(t testing.TB) logstore.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstackEndpoint)
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
 	})
 
 	tableOnce.Do(func() {
 		tableErr = localstack.CreateTable(context.Background(), client, tableName, localstack.WithSortKey)
 	})
 	if tableErr != nil {
-		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", tableErr)
+		unreachable(t, "DynamoDB", tableErr)
 	}
 
 	return logdynamodb.New(client, tableName)
@@ -163,14 +173,14 @@ func NewLogStore(t testing.TB) logstore.Store {
 func RawDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstackEndpoint)
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
 	})
 
 	tableOnce.Do(func() {
 		tableErr = localstack.CreateTable(context.Background(), client, tableName, localstack.WithSortKey)
 	})
 	if tableErr != nil {
-		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", tableErr)
+		unreachable(t, "DynamoDB", tableErr)
 	}
 
 	return client, tableName
@@ -181,13 +191,13 @@ func RawDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 func NewBlobStore(t testing.TB) blobstore.Store {
 	t.Helper()
 	client := awss3.NewFromConfig(loadConfig(t), func(o *awss3.Options) {
-		o.BaseEndpoint = aws.String(localstackEndpoint)
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
 		o.UsePathStyle = true
 	})
 
 	bucketOnce.Do(func() { bucketErr = localstack.CreateBucket(context.Background(), client, bucketName) })
 	if bucketErr != nil {
-		t.Skipf("LocalStack S3 not reachable, skipping: %v", bucketErr)
+		unreachable(t, "S3", bucketErr)
 	}
 
 	return blobs3.New(client, bucketName, 0)
@@ -201,14 +211,14 @@ func NewBlobStore(t testing.TB) blobstore.Store {
 func NewAuthStore(t testing.TB) authstore.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstackEndpoint)
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
 	})
 
 	sessionsTableOnce.Do(func() {
 		sessionsTableErr = localstack.CreateTable(context.Background(), client, sessionsTableName, localstack.HashOnly)
 	})
 	if sessionsTableErr != nil {
-		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", sessionsTableErr)
+		unreachable(t, "DynamoDB", sessionsTableErr)
 	}
 
 	return authdynamodb.New(client, sessionsTableName)
@@ -221,14 +231,14 @@ func NewAuthStore(t testing.TB) authstore.Store {
 func NewManifestStore(t testing.TB) manifeststore.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstackEndpoint)
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
 	})
 
 	accountsTableOnce.Do(func() {
 		accountsTableErr = localstack.CreateTable(context.Background(), client, accountsTableName, localstack.HashOnly)
 	})
 	if accountsTableErr != nil {
-		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", accountsTableErr)
+		unreachable(t, "DynamoDB", accountsTableErr)
 	}
 
 	return manifestdynamodb.New(client, accountsTableName)
@@ -244,14 +254,14 @@ func NewManifestStore(t testing.TB) manifeststore.Store {
 func NewInviteStore(t testing.TB, retentionDays int64) invitestore.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstackEndpoint)
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
 	})
 
 	inviteTableOnce.Do(func() {
 		inviteTableErr = localstack.CreateTable(context.Background(), client, inviteTableName, localstack.WithSortKey)
 	})
 	if inviteTableErr != nil {
-		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", inviteTableErr)
+		unreachable(t, "DynamoDB", inviteTableErr)
 	}
 
 	return invitedynamodb.New(client, inviteTableName, retentionDays)
@@ -264,14 +274,14 @@ func NewInviteStore(t testing.TB, retentionDays int64) invitestore.Store {
 func RawInviteDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstackEndpoint)
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
 	})
 
 	inviteTableOnce.Do(func() {
 		inviteTableErr = localstack.CreateTable(context.Background(), client, inviteTableName, localstack.WithSortKey)
 	})
 	if inviteTableErr != nil {
-		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", inviteTableErr)
+		unreachable(t, "DynamoDB", inviteTableErr)
 	}
 
 	return client, inviteTableName
@@ -283,14 +293,14 @@ func RawInviteDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 func NewPushStore(t testing.TB) pushstore.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstackEndpoint)
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
 	})
 
 	pushTableOnce.Do(func() {
 		pushTableErr = localstack.CreateTable(context.Background(), client, pushTableName, localstack.WithSortKey)
 	})
 	if pushTableErr != nil {
-		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", pushTableErr)
+		unreachable(t, "DynamoDB", pushTableErr)
 	}
 
 	return pushdynamodb.New(client, pushTableName)
@@ -304,14 +314,14 @@ func NewPushStore(t testing.TB) pushstore.Store {
 func NewRateLimitStore(t testing.TB, keyPrefix string, maxRequests int, window time.Duration) ratelimitstore.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstackEndpoint)
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
 	})
 
 	rateLimitTableOnce.Do(func() {
 		rateLimitTableErr = localstack.CreateTable(context.Background(), client, rateLimitTableName, localstack.HashOnly)
 	})
 	if rateLimitTableErr != nil {
-		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", rateLimitTableErr)
+		unreachable(t, "DynamoDB", rateLimitTableErr)
 	}
 
 	return ratelimitdynamodb.New(client, rateLimitTableName, keyPrefix, maxRequests, window)
@@ -368,7 +378,7 @@ func UploadBlob(t testing.TB, target blobstore.UploadTarget, payload []byte) {
 func RawItem(t testing.TB, pk, sk string) (map[string]ddbtypes.AttributeValue, error) {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
-		o.BaseEndpoint = aws.String(localstackEndpoint)
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
 	})
 	out, err := client.GetItem(context.Background(), &awsdynamodb.GetItemInput{
 		TableName: aws.String(tableName),

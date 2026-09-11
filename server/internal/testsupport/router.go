@@ -50,7 +50,7 @@ func NewRouterWithAuth(t testing.TB) (mux *http.ServeMux, google, apple *FakeOID
 // This builds its own api.Deps rather than going through internal/app,
 // which wires the real AWS adapters: the stores here are LocalStack-backed
 // with per-test table names. So what the deployed binaries assemble is
-// still not covered by anything, which is what the black-box suite is for.
+// still not covered by anything, which is what the integration suite is for.
 func NewRouter(t testing.TB) *http.ServeMux {
 	t.Helper()
 	mux, _, _ := NewRouterWithAuth(t)

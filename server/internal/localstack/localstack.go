@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -21,11 +22,30 @@ import (
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+
+	"circle-relay/internal/config"
 )
 
-// Endpoint is where LocalStack listens, both locally and as a CI service
-// container — see .github/workflows/server-unit-test.yml.
-const Endpoint = "http://localhost:4566"
+// DefaultEndpoint is where LocalStack listens, both locally and as a CI
+// service container — see .github/workflows/server-unit-test.yml.
+// EndpointEnv overrides it, for a stack somewhere else, or at nothing:
+// pointing it at a dead port is how Required's fail-rather-than-skip
+// behaviour gets exercised without stopping anyone's container.
+const (
+	DefaultEndpoint = "http://localhost:4566"
+	EndpointEnv     = "LOCALSTACK_ENDPOINT"
+)
+
+// Endpoint is where to find LocalStack. A function rather than a constant
+// so every client in the module resolves it the same way — testsupport
+// used to hold its own copy, which meant an override reached the
+// integration suite and not the rest.
+func Endpoint() string {
+	if override := os.Getenv(EndpointEnv); override != "" {
+		return override
+	}
+	return DefaultEndpoint
+}
 
 // The shared resources — see Shared.
 const (
@@ -84,6 +104,22 @@ func Unique(suffix string) Names {
 	}
 }
 
+// RequireEnv, when set, makes an unreachable LocalStack a failure instead
+// of a skip.
+const RequireEnv = "REQUIRE_LOCALSTACK"
+
+// Required reports whether a missing LocalStack should fail the test
+// rather than skip it.
+//
+// Skipping is right on a laptop: not everyone has it running, and a red
+// suite for that is noise. It is wrong in CI, where all but four of this
+// module's test packages need it — a container that failed to start would
+// skip nearly everything and report green, saying nothing is broken
+// because nothing was checked. So the workflow sets this.
+func Required() bool {
+	return os.Getenv(RequireEnv) != ""
+}
+
 // Config points the SDK at LocalStack with throwaway credentials.
 //
 // BaseEndpoint is set on the config rather than per client, so every
@@ -98,8 +134,35 @@ func Config(ctx context.Context) (aws.Config, error) {
 	if err != nil {
 		return aws.Config{}, fmt.Errorf("load AWS config: %w", err)
 	}
-	cfg.BaseEndpoint = aws.String(Endpoint)
+	cfg.BaseEndpoint = aws.String(Endpoint())
 	return cfg, nil
+}
+
+// RelayConfig is config.Load's shape for a relay served against
+// LocalStack, without the environment: every value is a test value, so a
+// missing variable should be impossible rather than fatal.
+//
+// Rate limits sit at their production defaults deliberately. The Go suite
+// pins them to a million to keep the limiter out of its way, which leaves
+// nothing exercising the real budgets alongside the router — a relay built
+// from this is the only place those two meet.
+func RelayConfig(names Names) config.Config {
+	return config.Config{
+		TableName:                 names.LogTable,
+		BucketName:                names.BlobBucket,
+		SessionsTableName:         names.SessionsTable,
+		AccountsTableName:         names.AccountsTable,
+		InviteTableName:           names.InviteTable,
+		RateLimitTableName:        names.RateLimitTable,
+		PushTableName:             names.PushTable,
+		RateLimitWriteMaxRequests: 500,
+		RateLimitReadMaxRequests:  2000,
+		RateLimitPushMaxRequests:  500,
+		RateLimitWindowMinutes:    10,
+		// LocalStack doesn't resolve virtual-hosted-style bucket
+		// subdomains, so presigned URLs have to be path style.
+		S3ForcePathStyle: true,
+	}
 }
 
 // Sorted is whether a table needs a range key as well as a hash key. By

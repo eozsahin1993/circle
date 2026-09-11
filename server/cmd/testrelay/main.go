@@ -1,5 +1,5 @@
 // Command testrelay serves the real relay against LocalStack, for tests
-// that drive it over HTTP from outside the process — the black-box suite,
+// that drive it over HTTP from outside the process — the integration suite,
 // and the headless peer the app's UI tests will need.
 //
 // Deliberately the same internal/app wiring cmd/server and cmd/lambda use,
@@ -22,7 +22,6 @@ import (
 
 	"circle-relay/internal/api"
 	"circle-relay/internal/app"
-	"circle-relay/internal/config"
 	"circle-relay/internal/localstack"
 	"circle-relay/internal/storage/authstore"
 )
@@ -45,37 +44,16 @@ func main() {
 		log.Fatalf("failed to provision LocalStack: %v", err)
 	}
 
-	deps := app.Deps(relayConfig(), awsCfg)
+	// Shared() rather than Unique(): this process lives for the run, not
+	// one test, so there's nothing to isolate it from — and its tables are
+	// the ones internal/testsupport already expects to find.
+	deps := app.Deps(localstack.RelayConfig(localstack.Shared()), awsCfg)
 	mux := api.NewRouter(deps)
 	registerTestOnly(mux, deps.Auth)
 
 	addr := ":" + port()
-	log.Printf("testrelay listening on %s against LocalStack at %s", addr, localstack.Endpoint)
+	log.Printf("testrelay listening on %s against LocalStack at %s", addr, localstack.Endpoint())
 	log.Fatal(http.ListenAndServe(addr, logRequests(mux)))
-}
-
-// relayConfig is config.Load's shape without the environment: every value
-// is a test value, so a missing variable should be impossible rather than
-// fatal. Rate limits stay at their production defaults on purpose — the
-// Go suite pins them to a million to keep them out of the way, which
-// means nothing exercises the real budgets alongside the router.
-func relayConfig() config.Config {
-	return config.Config{
-		TableName:                 localstack.LogTable,
-		BucketName:                localstack.BlobBucket,
-		SessionsTableName:         localstack.SessionsTable,
-		AccountsTableName:         localstack.AccountsTable,
-		InviteTableName:           localstack.InviteTable,
-		RateLimitTableName:        localstack.RateLimitTable,
-		PushTableName:             localstack.PushTable,
-		RateLimitWriteMaxRequests: 500,
-		RateLimitReadMaxRequests:  2000,
-		RateLimitPushMaxRequests:  500,
-		RateLimitWindowMinutes:    10,
-		// LocalStack doesn't resolve virtual-hosted-style bucket
-		// subdomains, so presigned URLs have to be path style.
-		S3ForcePathStyle: true,
-	}
 }
 
 // Not 8090: that's the port the app's dev relay uses, and a test run
@@ -92,7 +70,7 @@ func port() string {
 // relay: a session for an account, without a Google or Apple ID token.
 //
 // A bypass rather than a fake issuer because the alternative is worse —
-// standing up a fake OIDC provider here would mean the black-box suite
+// standing up a fake OIDC provider here would mean the integration suite
 // testing the fake's JWKS round-trip rather than the relay. Real provider
 // verification is covered where it belongs, by internal/api's own tests
 // against testsupport.FakeOIDCProvider.
@@ -116,7 +94,7 @@ func registerTestOnly(mux *http.ServeMux, sessions authstore.Store) {
 	})
 }
 
-// logRequests makes a failing black-box test readable from the relay's
+// logRequests makes a failing integration test readable from the relay's
 // side without attaching a debugger to it.
 func logRequests(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
