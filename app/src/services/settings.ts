@@ -12,10 +12,11 @@ const STORAGE_KEY = 'app_settings';
 
 const DEFAULT_SETTINGS: AppSettings = {
   themePreference: 'system',
-  // Reactions are where the volume jumps: one photo can draw five, and
-  // none of them say anything a comment doesn't. Easier to turn up than to
-  // win back someone who switched notifications off entirely.
-  defaultPushLevel: 'comments',
+  // Reactions used to be where the volume jumped — one photo could draw
+  // five pushes, none saying anything a comment didn't. notify-circle.ts
+  // now scopes a reaction push to the post's own author, and only on their
+  // first reaction to it, so that volume concern is gone.
+  defaultPushLevel: 'reactions',
 };
 
 /**

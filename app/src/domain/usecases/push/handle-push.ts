@@ -84,8 +84,12 @@ async function describeEntry(circleId: string, envelope: LogEntryEnvelope): Prom
       return `${name} added a photo`;
     case EntryTypes.COMMENT:
       return `${name} commented`;
-    case EntryTypes.REACTION:
-      return `${name} reacted to a photo`;
+    case EntryTypes.REACTION: {
+      // Every reaction push is already scoped to the post's own author (see
+      // notify-circle.ts), so "your photo" is always literally true here.
+      const emoji = (envelope.payload as { emoji?: unknown })?.emoji;
+      return typeof emoji === 'string' && emoji ? `${name} reacted ${emoji} to your photo` : `${name} reacted to your photo`;
+    }
     default:
       return null;
   }
