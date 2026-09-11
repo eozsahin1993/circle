@@ -145,7 +145,9 @@ func NewLogStore(t testing.TB) logstore.Store {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	tableOnce.Do(func() { tableErr = localstack.CreateTable(context.Background(), client, tableName) })
+	tableOnce.Do(func() {
+		tableErr = localstack.CreateTable(context.Background(), client, tableName, localstack.WithSortKey)
+	})
 	if tableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", tableErr)
 	}
@@ -164,7 +166,9 @@ func RawDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	tableOnce.Do(func() { tableErr = localstack.CreateTable(context.Background(), client, tableName) })
+	tableOnce.Do(func() {
+		tableErr = localstack.CreateTable(context.Background(), client, tableName, localstack.WithSortKey)
+	})
 	if tableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", tableErr)
 	}
@@ -181,7 +185,7 @@ func NewBlobStore(t testing.TB) blobstore.Store {
 		o.UsePathStyle = true
 	})
 
-	bucketOnce.Do(func() { bucketErr = localstack.CreateBucket(context.Background(), client) })
+	bucketOnce.Do(func() { bucketErr = localstack.CreateBucket(context.Background(), client, bucketName) })
 	if bucketErr != nil {
 		t.Skipf("LocalStack S3 not reachable, skipping: %v", bucketErr)
 	}
@@ -200,7 +204,9 @@ func NewAuthStore(t testing.TB) authstore.Store {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	sessionsTableOnce.Do(func() { sessionsTableErr = localstack.CreateTable(context.Background(), client, sessionsTableName) })
+	sessionsTableOnce.Do(func() {
+		sessionsTableErr = localstack.CreateTable(context.Background(), client, sessionsTableName, localstack.HashOnly)
+	})
 	if sessionsTableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", sessionsTableErr)
 	}
@@ -218,7 +224,9 @@ func NewManifestStore(t testing.TB) manifeststore.Store {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	accountsTableOnce.Do(func() { accountsTableErr = localstack.CreateTable(context.Background(), client, accountsTableName) })
+	accountsTableOnce.Do(func() {
+		accountsTableErr = localstack.CreateTable(context.Background(), client, accountsTableName, localstack.HashOnly)
+	})
 	if accountsTableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", accountsTableErr)
 	}
@@ -239,7 +247,9 @@ func NewInviteStore(t testing.TB, retentionDays int64) invitestore.Store {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	inviteTableOnce.Do(func() { inviteTableErr = localstack.CreateTable(context.Background(), client, inviteTableName) })
+	inviteTableOnce.Do(func() {
+		inviteTableErr = localstack.CreateTable(context.Background(), client, inviteTableName, localstack.WithSortKey)
+	})
 	if inviteTableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", inviteTableErr)
 	}
@@ -257,7 +267,9 @@ func RawInviteDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	inviteTableOnce.Do(func() { inviteTableErr = localstack.CreateTable(context.Background(), client, inviteTableName) })
+	inviteTableOnce.Do(func() {
+		inviteTableErr = localstack.CreateTable(context.Background(), client, inviteTableName, localstack.WithSortKey)
+	})
 	if inviteTableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", inviteTableErr)
 	}
@@ -274,7 +286,9 @@ func NewPushStore(t testing.TB) pushstore.Store {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	pushTableOnce.Do(func() { pushTableErr = localstack.CreateTable(context.Background(), client, pushTableName) })
+	pushTableOnce.Do(func() {
+		pushTableErr = localstack.CreateTable(context.Background(), client, pushTableName, localstack.WithSortKey)
+	})
 	if pushTableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", pushTableErr)
 	}
@@ -293,7 +307,9 @@ func NewRateLimitStore(t testing.TB, keyPrefix string, maxRequests int, window t
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	rateLimitTableOnce.Do(func() { rateLimitTableErr = localstack.CreateTable(context.Background(), client, rateLimitTableName) })
+	rateLimitTableOnce.Do(func() {
+		rateLimitTableErr = localstack.CreateTable(context.Background(), client, rateLimitTableName, localstack.HashOnly)
+	})
 	if rateLimitTableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", rateLimitTableErr)
 	}

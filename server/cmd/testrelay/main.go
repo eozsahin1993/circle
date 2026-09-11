@@ -40,9 +40,8 @@ func main() {
 
 	// Idempotent, so restarting this between runs is free and CI needs no
 	// separate provisioning step.
-	if err := localstack.Provision(ctx, awsdynamodb.NewFromConfig(awsCfg), awss3.NewFromConfig(awsCfg, func(o *awss3.Options) {
-		o.UsePathStyle = true
-	})); err != nil {
+	s3Client := awss3.NewFromConfig(awsCfg, func(o *awss3.Options) { o.UsePathStyle = true })
+	if err := localstack.Provision(ctx, awsdynamodb.NewFromConfig(awsCfg), s3Client); err != nil {
 		log.Fatalf("failed to provision LocalStack: %v", err)
 	}
 

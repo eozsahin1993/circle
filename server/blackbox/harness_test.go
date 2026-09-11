@@ -8,12 +8,15 @@
 // readable when it shouldn't be. Nothing in the suite today carries state
 // from one call to the next.
 //
-// Two properties make that safe to write. The relay is blind (SYNC_DESIGN
-// invariant 3), so an entry body can be any bytes at all — no client
-// crypto to reproduce here, and nothing to drift out of step with the app.
-// And rows are isolated by unique ids rather than by teardown, the same
-// way testsupport does it, so tests share one LocalStack without ordering
-// between them.
+// The relay is blind (SYNC_DESIGN invariant 3), so an entry body can be
+// any bytes at all — no client crypto to reproduce here, and nothing to
+// drift out of step with the app.
+//
+// Each test gets its own relay over its own tables, torn down afterwards.
+// The Go suite isolates by unique ids instead, which is sound and free,
+// but it forces every assertion to filter to the caller's own rows — and
+// "the list holds exactly one request" is a stronger claim than "the list
+// holds mine". A private set costs about 200ms, which buys that.
 package blackbox_test
 
 import (
@@ -28,7 +31,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -55,71 +57,74 @@ type relay struct {
 	sessions authstore.Store
 }
 
-var (
-	shared    *relay
-	sharedErr error
-	sharedOne sync.Once
-)
-
-// start returns the relay every test in this package shares.
+// start builds a relay of this test's own, on tables nobody else holds,
+// and registers their removal.
 //
 // httptest.NewServer, not the mux directly: that gives a real listener on
 // a real port, so these requests cross an actual socket and go through
 // net/http's own parsing rather than being handed to a handler. Set
 // RELAY_URL to aim the same tests at a running cmd/testrelay, or at a
-// deployed stack.
+// deployed stack — in which case the tables are whatever that relay was
+// started with, and isolation is its business rather than this one's.
 func start(t *testing.T) *relay {
 	t.Helper()
-	sharedOne.Do(func() { shared, sharedErr = buildRelay() })
-	if sharedErr != nil {
-		t.Skipf("LocalStack not reachable, skipping: %v", sharedErr)
-	}
-	return shared
-}
-
-func buildRelay() (*relay, error) {
 	ctx := context.Background()
 
 	awsCfg, err := localstack.Config(ctx)
 	if err != nil {
-		return nil, err
+		t.Skipf("cannot configure AWS for LocalStack, skipping: %v", err)
 	}
 
+	ddb := awsdynamodb.NewFromConfig(awsCfg)
 	s3Client := awss3.NewFromConfig(awsCfg, func(o *awss3.Options) { o.UsePathStyle = true })
-	if err := localstack.Provision(ctx, awsdynamodb.NewFromConfig(awsCfg), s3Client); err != nil {
-		return nil, err
-	}
 
-	deps := app.Deps(relayConfig(), awsCfg)
+	names := localstack.Unique(suffix(t))
+	if err := localstack.ProvisionSet(ctx, ddb, s3Client, names); err != nil {
+		t.Skipf("LocalStack not reachable, skipping: %v", err)
+	}
+	t.Cleanup(func() { localstack.TeardownSet(context.Background(), ddb, s3Client, names) })
+
+	deps := app.Deps(relayConfig(names), awsCfg)
 
 	baseURL := os.Getenv("RELAY_URL")
 	if baseURL == "" {
 		server := httptest.NewServer(api.NewRouter(deps))
+		t.Cleanup(server.Close)
 		baseURL = server.URL
 	}
 
-	return &relay{baseURL: baseURL, sessions: deps.Auth}, nil
+	return &relay{baseURL: baseURL, sessions: deps.Auth}
 }
 
 // relayConfig mirrors config.Load's shape without the environment. Rate
-// limits stay at their production defaults, unlike testsupport's million —
-// each test signs in as its own account, so they each get a whole budget
-// and nothing here has to dodge the limiter.
-func relayConfig() config.Config {
+// limits stay at their production defaults, unlike testsupport's million,
+// so this is the one place the real budgets and the router run together.
+func relayConfig(names localstack.Names) config.Config {
 	return config.Config{
-		TableName:                 localstack.LogTable,
-		BucketName:                localstack.BlobBucket,
-		SessionsTableName:         localstack.SessionsTable,
-		AccountsTableName:         localstack.AccountsTable,
-		InviteTableName:           localstack.InviteTable,
-		RateLimitTableName:        localstack.RateLimitTable,
-		PushTableName:             localstack.PushTable,
+		TableName:                 names.LogTable,
+		BucketName:                names.BlobBucket,
+		SessionsTableName:         names.SessionsTable,
+		AccountsTableName:         names.AccountsTable,
+		InviteTableName:           names.InviteTable,
+		RateLimitTableName:        names.RateLimitTable,
+		PushTableName:             names.PushTable,
 		RateLimitWriteMaxRequests: 500,
 		RateLimitReadMaxRequests:  2000,
 		RateLimitPushMaxRequests:  500,
 		RateLimitWindowMinutes:    10,
 		S3ForcePathStyle:          true,
 	}
+}
+
+// suffix is a resource-name-safe id for one test: lowercase, no
+// underscores, short enough for S3's 63-character bucket limit.
+func suffix(t *testing.T) string {
+	t.Helper()
+	buf := make([]byte, 8)
+	if _, err := rand.Read(buf); err != nil {
+		t.Fatalf("failed to read random bytes: %v", err)
+	}
+	return hex.EncodeToString(buf)
 }
 
 // device is one signed-in caller. Named for what it is on the relay's
