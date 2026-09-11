@@ -1,10 +1,10 @@
 # Mobile push design
 
-Status: **design only, not built.** Zero implementation exists — no
-`expo-notifications` dependency, no native extension, no relay endpoint.
-The three toggles in the app's account screen (`notifyNewPhotos`,
-`notifyCommentsReactions`, `notifyMemberJoined`) currently write
-preferences nothing reads.
+Status: **Android is built** — FCM data messages, real notification text
+composed by the on-device handler. **iOS is phase one** (see "What
+building this needs" below): the relay dispatches real APNs alert pushes
+(`internal/push/apns`), but with no Notification Service Extension yet, so
+a device shows only the placeholder, never the real content.
 
 Supersedes `DESIGN.md` section 2, which reached the same broad shape
 (routing IDs, device-side composition) but left the decisive question —
@@ -349,13 +349,14 @@ Substantially more native work than anything else in the app:
   no options; these would need `accessGroup`, and `keychainAccessible:
   AFTER_FIRST_UNLOCK` — the default `WHEN_UNLOCKED` is unreadable from an
   extension on a locked phone, which is exactly when notifications matter
-- Android: an FCM data-message path into `onMessageReceived`
+- Android: an FCM data-message path into `onMessageReceived` (built)
 - APNs auth key and FCM service account credentials on the relay,
   KMS-encrypted. These are the most dangerous secret the relay will ever
   hold — anyone with them can put arbitrary text on users' lock screens,
   bypassing the extension entirely by omitting `mutable-content`.
   `provision/kms.tf` already reserves the master key for exactly this.
+  (Relay-side dispatch is built; the key itself still needs provisioning.)
 
-A cheaper first phase: deliver the placeholder only, with no extension and
-no decryption. That gets the wake-up behaviour and the whole relay side
-working, and leaves real notification text as phase two.
+Phase one — deliver the placeholder only, no extension, no decryption — is
+done for both platforms. It gets the wake-up behaviour and the whole relay
+side working; the NSE and real notification text are phase two.

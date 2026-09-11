@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"circle-relay/internal/api/push"
 )
 
 // A real key, generated per run — the assertion is genuinely signed, so
@@ -94,7 +96,7 @@ func TestSendPostsADataOnlyMessage(t *testing.T) {
 	if data["keyVersion"] != "3" {
 		t.Fatalf("the device needs the key version, got %v", data["keyVersion"])
 	}
-	if data["placeholder"] != Placeholder {
+	if data["placeholder"] != push.Placeholder {
 		t.Fatalf("expected the fixed placeholder, got %v", data["placeholder"])
 	}
 	// Or Doze defers a data-only message indefinitely.
