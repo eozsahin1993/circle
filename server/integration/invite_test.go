@@ -41,7 +41,7 @@ func (d *device) approve(tag, requester, approval string) response {
 }
 
 func (d *device) dismiss(tag, requester string) response {
-	return d.remove(requestPath(tag, requester))
+	return d.delete(requestPath(tag, requester))
 }
 
 func (d *device) readRequest(tag, requester string) response {

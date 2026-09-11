@@ -140,7 +140,7 @@ type body map[string]string
 
 func (d *device) get(path string) response         { return d.send(http.MethodGet, path, nil) }
 func (d *device) put(path string, b body) response { return d.send(http.MethodPut, path, b) }
-func (d *device) remove(path string) response      { return d.send(http.MethodDelete, path, nil) }
+func (d *device) delete(path string) response      { return d.send(http.MethodDelete, path, nil) }
 
 func (d *device) send(method, path string, b body) response {
 	t := d.relay.t
