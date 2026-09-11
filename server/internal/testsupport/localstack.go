@@ -15,7 +15,6 @@ package testsupport
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -31,8 +30,8 @@ import (
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
+	"circle-relay/internal/localstack"
 	"circle-relay/internal/storage/authstore"
 	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
 	"circle-relay/internal/storage/blobstore"
@@ -49,15 +48,18 @@ import (
 	ratelimitdynamodb "circle-relay/internal/storage/ratelimitstore/dynamodb"
 )
 
+// Resource names and schemas come from internal/localstack, which
+// cmd/testrelay uses too — one definition, so a table this suite creates
+// can't differ in shape from the one the relay is served against.
 const (
-	localstackEndpoint = "http://localhost:4566"
-	tableName          = "test-sync-log"
-	bucketName         = "test-circle-blobs"
-	sessionsTableName  = "test-sessions"
-	accountsTableName  = "test-accounts"
-	inviteTableName    = "test-invites"
-	rateLimitTableName = "test-rate-limit"
-	pushTableName      = "test-push"
+	localstackEndpoint = localstack.Endpoint
+	tableName          = localstack.LogTable
+	bucketName         = localstack.BlobBucket
+	sessionsTableName  = localstack.SessionsTable
+	accountsTableName  = localstack.AccountsTable
+	inviteTableName    = localstack.InviteTable
+	rateLimitTableName = localstack.RateLimitTable
+	pushTableName      = localstack.PushTable
 )
 
 var (
@@ -143,7 +145,7 @@ func NewLogStore(t testing.TB) logstore.Store {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	tableOnce.Do(func() { tableErr = createTable(client) })
+	tableOnce.Do(func() { tableErr = localstack.CreateTable(context.Background(), client, tableName) })
 	if tableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", tableErr)
 	}
@@ -162,7 +164,7 @@ func RawDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	tableOnce.Do(func() { tableErr = createTable(client) })
+	tableOnce.Do(func() { tableErr = localstack.CreateTable(context.Background(), client, tableName) })
 	if tableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", tableErr)
 	}
@@ -179,7 +181,7 @@ func NewBlobStore(t testing.TB) blobstore.Store {
 		o.UsePathStyle = true
 	})
 
-	bucketOnce.Do(func() { bucketErr = createBucket(client) })
+	bucketOnce.Do(func() { bucketErr = localstack.CreateBucket(context.Background(), client) })
 	if bucketErr != nil {
 		t.Skipf("LocalStack S3 not reachable, skipping: %v", bucketErr)
 	}
@@ -198,7 +200,7 @@ func NewAuthStore(t testing.TB) authstore.Store {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	sessionsTableOnce.Do(func() { sessionsTableErr = createSessionsTable(client) })
+	sessionsTableOnce.Do(func() { sessionsTableErr = localstack.CreateTable(context.Background(), client, sessionsTableName) })
 	if sessionsTableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", sessionsTableErr)
 	}
@@ -216,7 +218,7 @@ func NewManifestStore(t testing.TB) manifeststore.Store {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	accountsTableOnce.Do(func() { accountsTableErr = createAccountsTable(client) })
+	accountsTableOnce.Do(func() { accountsTableErr = localstack.CreateTable(context.Background(), client, accountsTableName) })
 	if accountsTableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", accountsTableErr)
 	}
@@ -237,7 +239,7 @@ func NewInviteStore(t testing.TB, retentionDays int64) invitestore.Store {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	inviteTableOnce.Do(func() { inviteTableErr = createInviteTable(client) })
+	inviteTableOnce.Do(func() { inviteTableErr = localstack.CreateTable(context.Background(), client, inviteTableName) })
 	if inviteTableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", inviteTableErr)
 	}
@@ -255,7 +257,7 @@ func RawInviteDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	inviteTableOnce.Do(func() { inviteTableErr = createInviteTable(client) })
+	inviteTableOnce.Do(func() { inviteTableErr = localstack.CreateTable(context.Background(), client, inviteTableName) })
 	if inviteTableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", inviteTableErr)
 	}
@@ -272,7 +274,7 @@ func NewPushStore(t testing.TB) pushstore.Store {
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	pushTableOnce.Do(func() { pushTableErr = createPushTable(client) })
+	pushTableOnce.Do(func() { pushTableErr = localstack.CreateTable(context.Background(), client, pushTableName) })
 	if pushTableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", pushTableErr)
 	}
@@ -291,168 +293,12 @@ func NewRateLimitStore(t testing.TB, keyPrefix string, maxRequests int, window t
 		o.BaseEndpoint = aws.String(localstackEndpoint)
 	})
 
-	rateLimitTableOnce.Do(func() { rateLimitTableErr = createRateLimitTable(client) })
+	rateLimitTableOnce.Do(func() { rateLimitTableErr = localstack.CreateTable(context.Background(), client, rateLimitTableName) })
 	if rateLimitTableErr != nil {
 		t.Skipf("LocalStack DynamoDB not reachable, skipping: %v", rateLimitTableErr)
 	}
 
 	return ratelimitdynamodb.New(client, rateLimitTableName, keyPrefix, maxRequests, window)
-}
-
-func createSessionsTable(client *awsdynamodb.Client) error {
-	ctx := context.Background()
-	_, err := client.CreateTable(ctx, &awsdynamodb.CreateTableInput{
-		TableName:   aws.String(sessionsTableName),
-		BillingMode: ddbtypes.BillingModePayPerRequest,
-		KeySchema: []ddbtypes.KeySchemaElement{
-			{AttributeName: aws.String("pk"), KeyType: ddbtypes.KeyTypeHash},
-		},
-		AttributeDefinitions: []ddbtypes.AttributeDefinition{
-			{AttributeName: aws.String("pk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
-		},
-	})
-	if err != nil {
-		var inUse *ddbtypes.ResourceInUseException
-		if errors.As(err, &inUse) {
-			return nil // already created by an earlier test package's run
-		}
-		return err
-	}
-	waiter := awsdynamodb.NewTableExistsWaiter(client)
-	return waiter.Wait(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(sessionsTableName)}, 30*time.Second)
-}
-
-func createAccountsTable(client *awsdynamodb.Client) error {
-	ctx := context.Background()
-	_, err := client.CreateTable(ctx, &awsdynamodb.CreateTableInput{
-		TableName:   aws.String(accountsTableName),
-		BillingMode: ddbtypes.BillingModePayPerRequest,
-		KeySchema: []ddbtypes.KeySchemaElement{
-			{AttributeName: aws.String("pk"), KeyType: ddbtypes.KeyTypeHash},
-		},
-		AttributeDefinitions: []ddbtypes.AttributeDefinition{
-			{AttributeName: aws.String("pk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
-		},
-	})
-	if err != nil {
-		var inUse *ddbtypes.ResourceInUseException
-		if errors.As(err, &inUse) {
-			return nil // already created by an earlier test package's run
-		}
-		return err
-	}
-	waiter := awsdynamodb.NewTableExistsWaiter(client)
-	return waiter.Wait(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(accountsTableName)}, 30*time.Second)
-}
-
-func createInviteTable(client *awsdynamodb.Client) error {
-	ctx := context.Background()
-	_, err := client.CreateTable(ctx, &awsdynamodb.CreateTableInput{
-		TableName:   aws.String(inviteTableName),
-		BillingMode: ddbtypes.BillingModePayPerRequest,
-		KeySchema: []ddbtypes.KeySchemaElement{
-			{AttributeName: aws.String("pk"), KeyType: ddbtypes.KeyTypeHash},
-			{AttributeName: aws.String("sk"), KeyType: ddbtypes.KeyTypeRange},
-		},
-		AttributeDefinitions: []ddbtypes.AttributeDefinition{
-			{AttributeName: aws.String("pk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
-			{AttributeName: aws.String("sk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
-		},
-	})
-	if err != nil {
-		var inUse *ddbtypes.ResourceInUseException
-		if errors.As(err, &inUse) {
-			return nil // already created by an earlier test package's run
-		}
-		return err
-	}
-	waiter := awsdynamodb.NewTableExistsWaiter(client)
-	return waiter.Wait(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(inviteTableName)}, 30*time.Second)
-}
-
-func createPushTable(client *awsdynamodb.Client) error {
-	ctx := context.Background()
-	_, err := client.CreateTable(ctx, &awsdynamodb.CreateTableInput{
-		TableName:   aws.String(pushTableName),
-		BillingMode: ddbtypes.BillingModePayPerRequest,
-		KeySchema: []ddbtypes.KeySchemaElement{
-			{AttributeName: aws.String("pk"), KeyType: ddbtypes.KeyTypeHash},
-			{AttributeName: aws.String("sk"), KeyType: ddbtypes.KeyTypeRange},
-		},
-		AttributeDefinitions: []ddbtypes.AttributeDefinition{
-			{AttributeName: aws.String("pk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
-			{AttributeName: aws.String("sk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
-		},
-	})
-	if err != nil {
-		var inUse *ddbtypes.ResourceInUseException
-		if errors.As(err, &inUse) {
-			return nil // already created by an earlier test package's run
-		}
-		return err
-	}
-	waiter := awsdynamodb.NewTableExistsWaiter(client)
-	return waiter.Wait(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(pushTableName)}, 30*time.Second)
-}
-
-func createRateLimitTable(client *awsdynamodb.Client) error {
-	ctx := context.Background()
-	_, err := client.CreateTable(ctx, &awsdynamodb.CreateTableInput{
-		TableName:   aws.String(rateLimitTableName),
-		BillingMode: ddbtypes.BillingModePayPerRequest,
-		KeySchema: []ddbtypes.KeySchemaElement{
-			{AttributeName: aws.String("pk"), KeyType: ddbtypes.KeyTypeHash},
-		},
-		AttributeDefinitions: []ddbtypes.AttributeDefinition{
-			{AttributeName: aws.String("pk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
-		},
-	})
-	if err != nil {
-		var inUse *ddbtypes.ResourceInUseException
-		if errors.As(err, &inUse) {
-			return nil // already created by an earlier test package's run
-		}
-		return err
-	}
-	waiter := awsdynamodb.NewTableExistsWaiter(client)
-	return waiter.Wait(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(rateLimitTableName)}, 30*time.Second)
-}
-
-func createTable(client *awsdynamodb.Client) error {
-	ctx := context.Background()
-	_, err := client.CreateTable(ctx, &awsdynamodb.CreateTableInput{
-		TableName:   aws.String(tableName),
-		BillingMode: ddbtypes.BillingModePayPerRequest,
-		KeySchema: []ddbtypes.KeySchemaElement{
-			{AttributeName: aws.String("pk"), KeyType: ddbtypes.KeyTypeHash},
-			{AttributeName: aws.String("sk"), KeyType: ddbtypes.KeyTypeRange},
-		},
-		AttributeDefinitions: []ddbtypes.AttributeDefinition{
-			{AttributeName: aws.String("pk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
-			{AttributeName: aws.String("sk"), AttributeType: ddbtypes.ScalarAttributeTypeS},
-		},
-	})
-	if err != nil {
-		var inUse *ddbtypes.ResourceInUseException
-		if errors.As(err, &inUse) {
-			return nil // already created by an earlier test package's run
-		}
-		return err
-	}
-	waiter := awsdynamodb.NewTableExistsWaiter(client)
-	return waiter.Wait(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(tableName)}, 30*time.Second)
-}
-
-func createBucket(client *awss3.Client) error {
-	_, err := client.CreateBucket(context.Background(), &awss3.CreateBucketInput{Bucket: aws.String(bucketName)})
-	if err != nil {
-		var owned *s3types.BucketAlreadyOwnedByYou
-		if errors.As(err, &owned) {
-			return nil // already created by an earlier test package's run
-		}
-		return err
-	}
-	return nil
 }
 
 // UploadBlob puts payload at a presigned POST target, the way a client

@@ -52,12 +52,15 @@ func New(ctx context.Context, cfg config.Config) (*http.ServeMux, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load AWS config: %w", err)
 	}
-	return NewWithAWS(cfg, awsCfg), nil
+	return api.NewRouter(Deps(cfg, awsCfg)), nil
 }
 
-// NewWithAWS is New for a caller that has already built its own
-// aws.Config — pointing at LocalStack, for instance.
-func NewWithAWS(cfg config.Config, awsCfg aws.Config) *http.ServeMux {
+// Deps builds the real AWS-backed dependencies. Separate from New so a
+// caller that needs a store as well as the handler can have both — see
+// cmd/testrelay, which mints sessions directly — and so a caller with its
+// own aws.Config, pointed at LocalStack say, gets this wiring rather than
+// a copy of it.
+func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 	dynamo := func() *awsdynamodb.Client { return awsdynamodb.NewFromConfig(awsCfg) }
 	// Path style is only ever on for a local S3 stand-in, and config
 	// defaults it off — so applying it here rather than in cmd/server
@@ -69,7 +72,7 @@ func NewWithAWS(cfg config.Config, awsCfg aws.Config) *http.ServeMux {
 		return ratelimitdynamodb.New(dynamo(), cfg.RateLimitTableName, kind, int(max), cfg.RateLimitWindow())
 	}
 
-	return api.NewRouter(api.Deps{
+	return api.Deps{
 		Log:        logdynamodb.New(dynamo(), cfg.TableName),
 		Blob:       blobs3.New(s3Client, cfg.BucketName, cfg.MaxBlobSize),
 		Auth:       authdynamodb.New(dynamo(), cfg.SessionsTableName),
@@ -84,7 +87,7 @@ func NewWithAWS(cfg config.Config, awsCfg aws.Config) *http.ServeMux {
 			RecipientLimit: limit("push", cfg.RateLimitPushMaxRequests),
 			Dispatch:       pushDispatcher(awsCfg, cfg.FCMCredentialParameter, cfg.FCMCredentialFile),
 		},
-	})
+	}
 }
 
 // nonEmpty drops any not-yet-configured platform client ID (config.go
