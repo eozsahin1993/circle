@@ -11,13 +11,14 @@ import { ScreenHeader } from '@/components/navbar/screen-header';
 import { SettingsGroups, type SettingsGroup } from '@/components/settings-group';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Icons, Radius, Spacing, Tints } from '@/constants/theme';
+import { Icons, Radius, Spacing } from '@/constants/theme';
 import { getProfile, listCircles, type Profile } from '@/data/db';
 import { resetEverythingForTesting } from '@/domain/usecases/dev-reset';
 import { logTestPushPayload } from '@/domain/usecases/dev-test-push';
 import { signOut } from '@/domain/usecases/account/sign-in';
 import { PushLevels, type PushLevelId } from '@/domain/usecases/push/push-preferences';
 import { useAppSettings } from '@/hooks/use-app-settings';
+import { useTints } from '@/hooks/use-theme';
 import { bytesToDataUri } from '@/services/image';
 import type { ThemePreference } from '@/services/settings';
 
@@ -33,6 +34,7 @@ const APPEARANCE_OPTIONS: { value: ThemePreference; label: string }[] = [
 
 export default function AccountScreen() {
   const { settings, updateSettings } = useAppSettings();
+  const tints = useTints();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -180,7 +182,9 @@ export default function AccountScreen() {
                 Visible only inside your circles
               </ThemedText>
             </View>
-            <Pressable style={styles.editButton} onPress={() => router.push('/profile-setup')}>
+            <Pressable
+              style={[styles.editButton, { borderColor: tints.secondaryButtonBorder }]}
+              onPress={() => router.push('/profile-setup')}>
               <ThemedText type="buttonLabel">Edit</ThemedText>
             </Pressable>
           </View>
@@ -256,7 +260,6 @@ const styles = StyleSheet.create({
   editButton: {
     borderRadius: Radius.pill,
     borderWidth: 1,
-    borderColor: Tints.secondaryButtonBorder,
     paddingHorizontal: 18,
     paddingVertical: 10,
   },

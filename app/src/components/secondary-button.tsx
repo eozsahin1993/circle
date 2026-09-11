@@ -1,17 +1,25 @@
 import { Pressable, StyleSheet, View, type PressableProps } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { ButtonHeight, Colors, Radius, Tints } from '@/constants/theme';
+import { ButtonHeight, Radius } from '@/constants/theme';
+import { useTheme, useTints } from '@/hooks/use-theme';
 
 export type SecondaryButtonProps = PressableProps & {
   label: string;
 };
 
 export function SecondaryButton({ label, style, ...rest }: SecondaryButtonProps) {
+  const theme = useTheme();
+  const tints = useTints();
+
   return (
     <Pressable style={style} {...rest}>
       {({ pressed }) => (
-        <View style={[styles.button, pressed && { borderColor: Colors.dark.accent }]}>
+        <View
+          style={[
+            styles.button,
+            { borderColor: pressed ? theme.accent : tints.secondaryButtonBorder },
+          ]}>
           <ThemedText type="buttonLabel">{label}</ThemedText>
         </View>
       )}
@@ -24,7 +32,6 @@ const styles = StyleSheet.create({
     height: ButtonHeight.primary,
     borderRadius: Radius.pill,
     borderWidth: 1,
-    borderColor: Tints.secondaryButtonBorder,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,

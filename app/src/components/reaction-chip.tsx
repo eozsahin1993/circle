@@ -2,8 +2,8 @@ import { Pressable, StyleSheet, Text, type PressableProps, type StyleProp, type 
 
 import { Icon, type IconGlyph } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Tints } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Radius } from '@/constants/theme';
+import { useTheme, useTints } from '@/hooks/use-theme';
 
 export type ReactionChipProps = Omit<PressableProps, 'style'> & {
   /**
@@ -23,12 +23,14 @@ export type ReactionChipProps = Omit<PressableProps, 'style'> & {
 /** A reaction chip (emoji + count), the React chip, or the Comment button — all one tone, so the row reads as one set of controls. */
 export function ReactionChip({ emoji, icon, label, reacted, style, ...rest }: ReactionChipProps) {
   const theme = useTheme();
+  const tints = useTints();
   const contentColor = reacted ? 'text' : 'secondary';
+  const tone = reacted
+    ? { backgroundColor: tints.chipReactedBg, borderColor: tints.chipReactedBorder }
+    : { backgroundColor: tints.chipIdleBg, borderColor: tints.chipIdleBorder };
 
   return (
-    <Pressable
-      style={[styles.chip, reacted ? styles.reacted : styles.idle, style]}
-      {...rest}>
+    <Pressable style={[styles.chip, tone, style]} {...rest}>
       {icon ? <Icon icon={icon} size={15} color={theme[contentColor]} /> : null}
       {emoji ? <Text style={styles.emoji}>{emoji}</Text> : null}
       {label ? (
@@ -52,14 +54,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: Radius.pill,
     borderWidth: 1,
-  },
-  idle: {
-    backgroundColor: Tints.chipIdleBg,
-    borderColor: Tints.chipIdleBorder,
-  },
-  reacted: {
-    backgroundColor: Tints.chipReactedBg,
-    borderColor: Tints.chipReactedBorder,
   },
   label: {
     flexShrink: 1,

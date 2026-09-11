@@ -7,11 +7,12 @@ import { PrimaryButton } from '@/components/primary-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Tints } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import {
   approveDeviceTransfer,
   inspectDeviceTransfer,
 } from '@/domain/usecases/account/device-transfer';
+import { useTheme, useTints } from '@/hooks/use-theme';
 import { showDone, showError } from '@/services/messages';
 
 /**
@@ -24,6 +25,8 @@ import { showDone, showError } from '@/services/messages';
  * the barcode callback and replacing the placeholder below.
  */
 export default function ScanDeviceScreen() {
+  const theme = useTheme();
+  const tints = useTints();
   const [busy, setBusy] = useState(false);
 
   /**
@@ -82,7 +85,7 @@ export default function ScanDeviceScreen() {
             camera at the code it shows.
           </ThemedText>
 
-          <View style={styles.viewfinder}>
+          <View style={[styles.viewfinder, { backgroundColor: theme.surface, borderColor: tints.chipIdleBorder }]}>
             <ThemedText type="meta" themeColor="faint" style={styles.placeholder}>
               The camera needs a new build of the app before this can scan.
             </ThemedText>
@@ -119,8 +122,6 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: Radius.panel,
     borderWidth: 1,
-    borderColor: Tints.chipIdleBorder,
-    backgroundColor: Colors.dark.surface,
     padding: Spacing.screenPadding,
   },
   placeholder: {

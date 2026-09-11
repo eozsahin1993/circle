@@ -1,8 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import { Icons, Radius, Tints } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Icons, Radius } from '@/constants/theme';
+import { useTheme, useTints } from '@/hooks/use-theme';
 
 export type EmojiPickerProps = {
   onSelect: (emoji: string) => void;
@@ -40,9 +40,10 @@ const QUICK_REACTIONS = ['❤️', '🥂', '😂', '😭', '👏', '🙏', '✨'
  */
 export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
   const theme = useTheme();
+  const tints = useTints();
 
   return (
-    <View style={styles.panel}>
+    <View style={[styles.panel, { borderColor: tints.chipIdleBorder, backgroundColor: tints.chipIdleBg }]}>
       {QUICK_REACTIONS.map((emoji) => (
         <Pressable key={emoji} style={styles.slot} onPress={() => onSelect(emoji)}>
           <Text style={styles.emoji}>{emoji}</Text>
@@ -64,8 +65,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: Radius.panel,
     borderWidth: 1,
-    borderColor: Tints.chipIdleBorder,
-    backgroundColor: Tints.chipIdleBg,
     paddingHorizontal: 4,
   },
   /**

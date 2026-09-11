@@ -92,21 +92,42 @@ export const AlternateAccents = {
   moss: '#4E6B54',
 } as const;
 
-/** Non-solid fills — always composited over `surface` or `background`, dark mode only. */
+/**
+ * Non-solid fills, one set per scheme via `useTints()` — never the bare
+ * export, or a component stops reacting to a scheme switch. Each base rgb
+ * is that scheme's own `text`/`accent`/`danger`, so a fill always matches
+ * that scheme's solid uses of the same color.
+ */
 export const Tints = {
-  chipIdleBg: 'rgba(245,239,230,0.06)',
-  chipIdleBorder: 'rgba(245,239,230,0.10)',
-  chipReactedBg: 'rgba(192,138,46,0.18)',
-  chipReactedBorder: 'rgba(192,138,46,0.45)',
-  privacyWashBg: 'rgba(192,138,46,0.09)',
-  privacyWashBorder: 'rgba(192,138,46,0.22)',
-  dangerWashBorder: 'rgba(217,122,110,0.35)',
-  dangerWashBg: 'rgba(217,122,110,0.12)',
-  secondaryButtonBorder: 'rgba(245,239,230,0.2)',
-  /** The three edges a `raised` surface can carry — quiet by default, tinted when the message has an outcome. */
-  raisedBorder: 'rgba(245,239,230,0.08)',
-  raisedAccentBorder: 'rgba(192,138,46,0.30)',
-  raisedDangerBorder: 'rgba(217,122,110,0.30)',
+  dark: {
+    chipIdleBg: 'rgba(245,239,230,0.06)',
+    chipIdleBorder: 'rgba(245,239,230,0.10)',
+    chipReactedBg: 'rgba(192,138,46,0.18)',
+    chipReactedBorder: 'rgba(192,138,46,0.45)',
+    privacyWashBg: 'rgba(192,138,46,0.09)',
+    privacyWashBorder: 'rgba(192,138,46,0.22)',
+    dangerWashBorder: 'rgba(217,122,110,0.35)',
+    dangerWashBg: 'rgba(217,122,110,0.12)',
+    secondaryButtonBorder: 'rgba(245,239,230,0.2)',
+    /** The three edges a `raised` surface can carry — quiet by default, tinted when the message has an outcome. */
+    raisedBorder: 'rgba(245,239,230,0.08)',
+    raisedAccentBorder: 'rgba(192,138,46,0.30)',
+    raisedDangerBorder: 'rgba(217,122,110,0.30)',
+  },
+  light: {
+    chipIdleBg: 'rgba(35,26,17,0.06)',
+    chipIdleBorder: 'rgba(35,26,17,0.10)',
+    chipReactedBg: 'rgba(166,85,47,0.18)',
+    chipReactedBorder: 'rgba(166,85,47,0.45)',
+    privacyWashBg: 'rgba(166,85,47,0.09)',
+    privacyWashBorder: 'rgba(166,85,47,0.22)',
+    dangerWashBorder: 'rgba(184,80,63,0.35)',
+    dangerWashBg: 'rgba(184,80,63,0.12)',
+    secondaryButtonBorder: 'rgba(35,26,17,0.2)',
+    raisedBorder: 'rgba(35,26,17,0.08)',
+    raisedAccentBorder: 'rgba(166,85,47,0.30)',
+    raisedDangerBorder: 'rgba(184,80,63,0.30)',
+  },
 } as const;
 
 export const Fonts = {

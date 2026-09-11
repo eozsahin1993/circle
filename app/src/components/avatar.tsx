@@ -2,7 +2,9 @@ import { Image } from 'expo-image';
 import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
 import { StyleSheet, View } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { PhotoSlotLight } from '@/constants/theme';
+import { useAppSettings } from '@/hooks/use-app-settings';
+import { useTheme, useTints } from '@/hooks/use-theme';
 
 export type AvatarProps = {
   size?: number;
@@ -16,7 +18,13 @@ export type AvatarProps = {
 
 /** Shows `uri` if given, otherwise the diagonal-hatch placeholder — both clipped to a circle. */
 export function Avatar({ size = 44, ringColor, uri, radius }: AvatarProps) {
+  const { scheme } = useAppSettings();
+  const theme = useTheme();
+  const tints = useTints();
   const stripe = Math.max(6, Math.round(size / 4));
+  // Dark mode's hatch sits on `surface`; light mode has no surface dim
+  // enough to read as a slot, hence the dedicated PhotoSlotLight.
+  const hatchFill = scheme === 'dark' ? theme.surface : PhotoSlotLight;
 
   return (
     <View
@@ -49,8 +57,8 @@ export function Avatar({ size = 44, ringColor, uri, radius }: AvatarProps) {
               height={stripe}
               patternUnits="userSpaceOnUse"
               patternTransform="rotate(45)">
-              <Rect width={stripe} height={stripe} fill={Colors.dark.surface} />
-              <Line x1={0} y1={0} x2={0} y2={stripe} stroke="rgba(245,239,230,0.10)" strokeWidth={1} />
+              <Rect width={stripe} height={stripe} fill={hatchFill} />
+              <Line x1={0} y1={0} x2={0} y2={stripe} stroke={tints.chipIdleBorder} strokeWidth={1} />
             </Pattern>
           </Defs>
           <Rect width="100%" height="100%" fill={`url(#avatarHatch-${size})`} />

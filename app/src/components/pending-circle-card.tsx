@@ -2,8 +2,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
-import { Icons, Radius, Tints } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Icons, Radius } from '@/constants/theme';
+import { useTheme, useTints } from '@/hooks/use-theme';
 import { formatRelativeTime } from '@/services/relative-time';
 
 export type PendingCircleCardProps = {
@@ -27,9 +27,12 @@ export type PendingCircleCardProps = {
  */
 export function PendingCircleCard({ circleName, createdByName, submittedAt, onPress, onCancel }: PendingCircleCardProps) {
   const theme = useTheme();
+  const tints = useTints();
 
   return (
-    <Pressable style={[styles.card, { borderColor: Tints.raisedBorder }]} onPress={onPress}>
+    <Pressable
+      style={[styles.card, { borderColor: tints.raisedBorder, backgroundColor: tints.chipIdleBg }]}
+      onPress={onPress}>
       <Icon icon={Icons.waiting} size={22} color={theme.muted} />
 
       <View style={styles.body}>
@@ -62,7 +65,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.panel,
     borderWidth: 1,
     borderStyle: 'dashed',
-    backgroundColor: Tints.chipIdleBg,
   },
   body: {
     flex: 1,

@@ -5,7 +5,7 @@ import { BottomSheet } from '@/components/bottom-sheet';
 import { PrimaryButton } from '@/components/primary-button';
 import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type PromptSheetProps = {
@@ -66,7 +66,7 @@ export function PromptSheet({
           autoFocus
           returnKeyType="done"
           onSubmitEditing={() => value.trim() && onConfirm(value)}
-          style={[styles.input, { color: theme.text, borderColor: theme.faint }]}
+          style={[styles.input, { color: theme.text, borderColor: theme.faint, backgroundColor: theme.background }]}
         />
 
         <View style={styles.actions}>
@@ -93,7 +93,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: Radius.input,
     borderWidth: 1,
-    backgroundColor: Colors.dark.background,
     fontSize: 16,
   },
   actions: {

@@ -10,13 +10,14 @@ import { PrimaryButton } from '@/components/primary-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Fonts, PhotoAspect, Radius, Spacing, Tints } from '@/constants/theme';
+import { Fonts, PhotoAspect, Radius, Spacing } from '@/constants/theme';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useTints } from '@/hooks/use-theme';
 import { pickAndCompressImage, type CompressedImage } from '@/services/image';
 
 export default function NewCircleScreen() {
   const theme = useTheme();
+  const tints = useTints();
   const [name, setName] = useState('');
   const [cover, setCover] = useState<CompressedImage | null>(null);
   const [creating, setCreating] = useState(false);
@@ -53,7 +54,7 @@ export default function NewCircleScreen() {
             onChangeText={setName}
             placeholder="e.g. The Andersons"
             placeholderTextColor={theme.faint}
-            style={[styles.input, { color: theme.text }]}
+            style={[styles.input, { color: theme.text, borderColor: tints.secondaryButtonBorder }]}
           />
 
           <View>
@@ -73,7 +74,8 @@ export default function NewCircleScreen() {
             </Pressable>
           </View>
 
-          <ThemedView style={styles.notice}>
+          <ThemedView
+            style={[styles.notice, { backgroundColor: tints.privacyWashBg, borderColor: tints.privacyWashBorder }]}>
             <ThemedText type="captionFeed" themeColor="accent">
               Only the people you invite can see this circle. Everyone in it sees the same feed,
               in the same order. Nothing is ranked, and nothing is ever auto-deleted.
@@ -122,7 +124,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: Radius.input,
     borderWidth: 1,
-    borderColor: Tints.secondaryButtonBorder,
     fontFamily: Fonts.serif,
     fontSize: 18,
   },
@@ -138,8 +139,6 @@ const styles = StyleSheet.create({
     padding: Spacing.screenPadding,
   },
   notice: {
-    backgroundColor: Tints.privacyWashBg,
-    borderColor: Tints.privacyWashBorder,
     borderWidth: 1,
     borderRadius: Radius.notice,
     padding: Spacing.screenPadding,

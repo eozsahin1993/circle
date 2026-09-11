@@ -1,15 +1,18 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, type PressableProps } from 'react-native';
 
-import { ButtonHeight, Colors, Radius } from '@/constants/theme';
+import { ButtonHeight, Radius } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useTheme } from '@/hooks/use-theme';
 
 export type PrimaryButtonProps = PressableProps & {
   label: string;
 };
 
 export function PrimaryButton({ label, style, disabled, ...rest }: PrimaryButtonProps) {
+  const theme = useTheme();
+
   return (
     <Pressable style={style} disabled={disabled} {...rest}>
       {({ pressed }) =>
@@ -21,7 +24,7 @@ export function PrimaryButton({ label, style, disabled, ...rest }: PrimaryButton
           </ThemedView>
         ) : (
           <LinearGradient
-            colors={[Colors.dark.accent, Colors.dark.accentBright]}
+            colors={[theme.accent, theme.accentBright]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={[styles.button, pressed && styles.pressed]}>

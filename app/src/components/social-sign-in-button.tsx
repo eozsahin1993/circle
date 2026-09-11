@@ -3,8 +3,8 @@ import { Pressable, View, StyleSheet, type PressableProps } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
-import { ButtonHeight, Radius, Tints } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { ButtonHeight, Radius } from '@/constants/theme';
+import { useTheme, useTints } from '@/hooks/use-theme';
 
 export type SocialSignInButtonProps = Omit<PressableProps, 'style'> & {
   provider: 'apple' | 'google';
@@ -43,6 +43,7 @@ function GoogleLogo() {
  */
 export function SocialSignInButton({ provider, disabled, ...rest }: SocialSignInButtonProps) {
   const theme = useTheme();
+  const tints = useTints();
   const isApple = provider === 'apple';
 
   return (
@@ -51,7 +52,7 @@ export function SocialSignInButton({ provider, disabled, ...rest }: SocialSignIn
         <View
           style={[
             styles.button,
-            isApple ? styles.apple : styles.google,
+            isApple ? styles.apple : [styles.google, { borderColor: tints.secondaryButtonBorder }],
             pressed && styles.pressed,
             disabled && styles.disabled,
           ]}>
@@ -97,7 +98,6 @@ const styles = StyleSheet.create({
   },
   google: {
     borderWidth: 1,
-    borderColor: Tints.secondaryButtonBorder,
   },
   pressed: {
     opacity: 0.85,

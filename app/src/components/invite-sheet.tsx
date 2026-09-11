@@ -4,7 +4,8 @@ import QRCode from 'react-native-qrcode-svg';
 import { BottomSheet } from '@/components/bottom-sheet';
 import { PrimaryButton } from '@/components/primary-button';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Radius, Spacing, Tints } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
+import { useTints } from '@/hooks/use-theme';
 
 export type InviteSheetProps = {
   visible: boolean;
@@ -29,6 +30,7 @@ const QR_SIZE = 176;
  * than a list of actions, so it doesn't fold into that component.
  */
 export function InviteSheet({ visible, onClose, link, code, expiry }: InviteSheetProps) {
+  const tints = useTints();
   return (
     <BottomSheet visible={visible} onClose={onClose}>
       <ScrollView
@@ -45,7 +47,7 @@ export function InviteSheet({ visible, onClose, link, code, expiry }: InviteShee
                   itself stays dark-on-light: plenty of scanners still
                   refuse an inverted QR, and this one has to work on
                   whatever phone is being held up to it. */}
-        <View style={styles.qrFrame}>
+        <View style={[styles.qrFrame, { borderColor: tints.secondaryButtonBorder }]}>
           <View style={styles.qrPlate}>
             <QRCode
               value={link}
@@ -84,7 +86,6 @@ const styles = StyleSheet.create({
   },
   qrFrame: {
     borderWidth: 1,
-    borderColor: Tints.secondaryButtonBorder,
     borderRadius: Radius.panel,
     alignSelf: 'center',
     padding: 14,

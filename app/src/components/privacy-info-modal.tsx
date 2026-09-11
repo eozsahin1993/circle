@@ -5,7 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export type PrivacyInfoModalProps = {
   visible: boolean;
@@ -40,6 +41,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const SLIDE_DISTANCE = Dimensions.get('window').height;
 
 export function PrivacyInfoModal({ visible, onClose }: PrivacyInfoModalProps) {
+  const theme = useTheme();
   // Modal unmounts the instant `visible` goes false, which would cut off
   // any exit animation — so mounting is tracked separately, and only
   // dropped once the closing animation actually finishes.
@@ -81,7 +83,7 @@ export function PrivacyInfoModal({ visible, onClose }: PrivacyInfoModalProps) {
         ]}>
         <ThemedView type="surface" style={styles.sheetInner}>
           <SafeAreaView edges={['bottom']}>
-            <View style={styles.grabber} />
+            <View style={[styles.grabber, { backgroundColor: theme.faintest }]} />
 
             <ScrollView contentContainerStyle={styles.content}>
               <ThemedText type="screenTitle" style={styles.title}>
@@ -136,7 +138,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.dark.faintest,
     marginTop: 10,
     marginBottom: 8,
   },

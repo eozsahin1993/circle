@@ -3,8 +3,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { BottomSheet } from '@/components/bottom-sheet';
 import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
-import { Icons, Spacing, Tints } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Icons, Spacing } from '@/constants/theme';
+import { useTheme, useTints } from '@/hooks/use-theme';
 
 export type SheetOption<Id extends string> = {
   id: Id;
@@ -31,6 +31,7 @@ export function OptionSheet<Id extends string>({
   onSelect,
 }: OptionSheetProps<Id>) {
   const theme = useTheme();
+  const tints = useTints();
 
   return (
     <BottomSheet visible={visible} onClose={onClose}>
@@ -40,7 +41,10 @@ export function OptionSheet<Id extends string>({
         </ThemedText>
 
         {options.map((option) => (
-          <Pressable key={option.id} style={styles.row} onPress={() => onSelect(option.id)}>
+          <Pressable
+            key={option.id}
+            style={[styles.row, { borderBottomColor: tints.chipIdleBorder }]}
+            onPress={() => onSelect(option.id)}>
             <View style={styles.text}>
               <ThemedText type="postAuthor">{option.label}</ThemedText>
               {option.description ? (
@@ -70,7 +74,6 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: Tints.chipIdleBorder,
   },
   text: {
     flex: 1,
