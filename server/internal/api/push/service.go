@@ -49,6 +49,12 @@ func (s *Service) DeleteRouting(ctx context.Context, pushRoutingID string) error
 	return s.PushStore.DeleteRouting(ctx, pushRoutingID)
 }
 
+// Placeholder is what a device shows when it cannot decrypt a payload — the
+// extension/handler failed, or the push was forged by someone without the
+// circle's key. Both dispatchers (fcm, apns) send it fixed alongside the
+// ciphertext; a device that can decrypt substitutes its own copy.
+const Placeholder = "New activity"
+
 // Delivery is one resolved target.
 type Delivery struct {
 	PushToken []byte

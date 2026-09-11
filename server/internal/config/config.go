@@ -45,6 +45,21 @@ type Config struct {
 	// FCMCredentialFile is a local path read instead of SSM — for running
 	// the relay against LocalStack. Empty in Lambda.
 	FCMCredentialFile string
+	// APNSAuthKeyParameter is the SSM SecureString holding the APNs .p8
+	// auth key. Same reasoning as FCMCredentialParameter: created by hand,
+	// never by Terraform.
+	APNSAuthKeyParameter string
+	// APNSAuthKeyFile is a local path read instead of SSM — for LocalStack.
+	APNSAuthKeyFile string
+	// APNSKeyID/APNSTeamID identify the key at Apple. Unlike FCM's JSON
+	// blob, the .p8 file carries neither, so they're configured separately.
+	APNSKeyID  string
+	APNSTeamID string
+	// APNSTopic is the apns-topic header value — the app's iOS bundle id.
+	APNSTopic string
+	// APNSProduction selects api.push.apple.com over the sandbox host.
+	// False by default: a debug-signed build only works against sandbox.
+	APNSProduction bool
 	// RateLimitWriteMaxRequests/RateLimitReadMaxRequests are starting
 	// guesses, not measurements — env-tunable so they can be adjusted from
 	// real traffic without a redeploy.
@@ -106,6 +121,12 @@ func Load() Config {
 		PushTableName:             mustEnv("PUSH_TABLE_NAME"),
 		FCMCredentialParameter:    strEnv("FCM_CREDENTIAL_PARAMETER", "/circle/fcm-service-account"),
 		FCMCredentialFile:         os.Getenv("FCM_CREDENTIAL_FILE"),
+		APNSAuthKeyParameter:      strEnv("APNS_AUTH_KEY_PARAMETER", "/circle/apns-auth-key"),
+		APNSAuthKeyFile:           os.Getenv("APNS_AUTH_KEY_FILE"),
+		APNSKeyID:                 envOr("APNS_KEY_ID", ""),
+		APNSTeamID:                envOr("APNS_TEAM_ID", ""),
+		APNSTopic:                 envOr("APNS_TOPIC", ""),
+		APNSProduction:            envOr("APNS_PRODUCTION", "false") == "true",
 		RateLimitWriteMaxRequests: intEnv("RATE_LIMIT_WRITE_MAX_REQUESTS", 500),
 		RateLimitReadMaxRequests:  intEnv("RATE_LIMIT_READ_MAX_REQUESTS", 2000),
 		RateLimitPushMaxRequests:  intEnv("RATE_LIMIT_PUSH_MAX_REQUESTS", 500),

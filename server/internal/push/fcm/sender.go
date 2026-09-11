@@ -9,17 +9,9 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-)
 
-// Placeholder is what a device shows when it cannot decrypt the payload —
-// the extension failed, or the push was forged by someone without the
-// circle's key. Deliberately says nothing: it names no circle, no person,
-// and no activity.
-//
-// Devices hold their own copy and prefer it; this one only covers the case
-// where the handler never runs at all and the platform renders the payload
-// as it arrived.
-const Placeholder = "New activity"
+	"circle-relay/internal/api/push"
+)
 
 // Sender posts to FCM's HTTP v1 API.
 type Sender struct {
@@ -68,7 +60,7 @@ func (s *Sender) Send(ctx context.Context, deviceToken, pushRoutingID string, ke
 				// trial-decrypting against every version it holds.
 				"keyVersion":  strconv.FormatInt(keyVersion, 10),
 				"payload":     base64.StdEncoding.EncodeToString(payload),
-				"placeholder": Placeholder,
+				"placeholder": push.Placeholder,
 			},
 			"android": map[string]any{
 				// High priority, or Doze defers a data-only message

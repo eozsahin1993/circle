@@ -145,10 +145,10 @@ func (r *Relay) Anon() *Device {
 
 // Body is a JSON object to send. A named type because almost every request
 // here carries one field, and a bare map literal at each call site buries
-// what's actually being sent. Values are `any` rather than string because
-// the relay's own fields aren't all strings — keyVersion is an integer,
-// and sending it quoted fails the whole decode as "invalid request body"
-// rather than as the wrong type.
+// what's actually being sent. any, not string, because not every endpoint's
+// fields are strings — keyVersion is a number wherever it appears, and
+// quoting it doesn't decode as the wrong type, it fails the whole body as
+// "invalid request body".
 type Body map[string]any
 
 func (d *Device) Get(path string) Response          { return d.send(http.MethodGet, path, nil) }
@@ -229,4 +229,10 @@ func (res Response) Decode(target any) Response {
 		res.t.Fatalf("%s %s: failed to decode %q: %v", res.method, res.path, res.body, err)
 	}
 	return res
+}
+
+// Bytes returns the raw response body — for a response that isn't JSON,
+// like the ciphertext getblob's redirect ultimately resolves to.
+func (res Response) Bytes() []byte {
+	return res.body
 }

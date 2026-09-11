@@ -15,7 +15,9 @@ import (
 
 	"circle-relay/internal/api"
 	"circle-relay/internal/api/auth/oidcverify"
+	"circle-relay/internal/api/push"
 	"circle-relay/internal/config"
+	"circle-relay/internal/push/apns"
 	"circle-relay/internal/push/fcm"
 
 	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
@@ -59,6 +61,9 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 		return ratelimitdynamodb.New(dynamo(), cfg.RateLimitTableName, kind, int(max), cfg.RateLimitWindow())
 	}
 
+	fcmDispatch := fcm.NewDispatcher(awsCfg, cfg.FCMCredentialParameter, cfg.FCMCredentialFile)
+	apnsDispatch := apns.NewDispatcher(awsCfg, cfg.APNSAuthKeyParameter, cfg.APNSAuthKeyFile, cfg.APNSKeyID, cfg.APNSTeamID, cfg.APNSTopic, cfg.APNSProduction)
+
 	return api.Deps{
 		Log:        logdynamodb.New(dynamo(), cfg.TableName),
 		Blob:       blobs3.New(s3Client, cfg.BucketName, cfg.MaxBlobSize),
@@ -72,7 +77,13 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 		Push: api.PushDeps{
 			Store:          pushdynamodb.New(dynamo(), cfg.PushTableName),
 			RecipientLimit: limit("push", cfg.RateLimitPushMaxRequests),
-			Dispatch:       fcm.NewDispatcher(awsCfg, cfg.FCMCredentialParameter, cfg.FCMCredentialFile),
+			// Each dispatcher gates on its own platform internally (see
+			// fcm.NewDispatcher/apns.NewDispatcher), so calling both is a
+			// no-op for whichever one a delivery isn't for.
+			Dispatch: func(delivery push.Delivery, keyVersion int64, payload []byte) {
+				fcmDispatch(delivery, keyVersion, payload)
+				apnsDispatch(delivery, keyVersion, payload)
+			},
 		},
 	}
 }
