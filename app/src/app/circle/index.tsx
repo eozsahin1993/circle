@@ -60,8 +60,7 @@ async function resolveLatestActivity(circleId: string): Promise<string | undefin
 
 export default function CircleListScreen() {
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
-  // Only for the header avatar's initials until a picture is set — the
-  // name itself isn't shown on this screen.
+  // Only for the header avatar's initials — the name isn't shown here.
   const [profileName, setProfileName] = useState<string | undefined>();
   const [circles, setCircles] = useState<CircleListItem[]>([]);
   // Avoids flashing the empty state before the first load resolves.

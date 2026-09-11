@@ -93,21 +93,16 @@ export const AlternateAccents = {
 } as const;
 
 /**
- * The fills an initials avatar can land on — see utils/initials.ts, which
- * picks one by hashing the member's identity key rather than at random.
+ * The fills an initials avatar can land on — see `avatarTintFor`.
  *
- * One fixed set rather than a per-scheme pair like `Tints`, and for the
- * opposite reason: a tint here is a solid disc, not an overlay composited
- * onto the page, so it supplies the contrast for its own label and doesn't
- * care what's behind it. `AvatarInk` is fixed for the same reason.
+ * One fixed set rather than a per-scheme pair like `Tints`: a tint here is
+ * a solid disc, not an overlay, so it carries the contrast for its own
+ * label and doesn't care what's behind it. Hence a fixed `AvatarInk` too.
  *
- * All eight sit at the same measured luminance, differing only in hue. That
- * band is narrow — holding AvatarInk above 4.5:1 while each fill still
- * clears 3:1 against the darker `background` leaves L in [0.116, 0.151] —
- * which is why these are solved for rather than the accents darkened by
- * eye. Equal luminance also means colour alone won't separate every pair
- * for everyone; fine, since the initials carry who it is and the colour
- * only helps you scan.
+ * Solved for, not darkened by eye. Holding AvatarInk above 4.5:1 while each
+ * fill still clears 3:1 against `background` leaves L in [0.116, 0.151], so
+ * all eight sit at one luminance and differ only in hue — add a colour by
+ * eye and it will miss that band.
  */
 export const AvatarTints = [
   '#7B6332', // ochre

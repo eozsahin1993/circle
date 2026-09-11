@@ -14,11 +14,8 @@ export type AvatarProps = {
   /** A real picture to show instead of the fallback — e.g. a freshly-picked profile photo. */
   uri?: string;
   /**
-   * Who this is, for the initials shown when there's no picture. Pass the
-   * name you display beside the avatar, so the two always agree — a
-   * byline reading "Unknown member" wants those initials, not a monogram
-   * implying we know whose face is missing. Absent or blank falls through
-   * to the anonymous hatch.
+   * Who this is, for the initials shown when there's no picture — pass the
+   * name displayed beside it, so the two agree. Blank falls to the hatch.
    */
   name?: string;
   /** Corner radius, defaulting to a circle. Square it off for a thumbnail of a photograph, which isn't a face. */
@@ -26,12 +23,8 @@ export type AvatarProps = {
 };
 
 /**
- * A member's picture, or what stands in for it: their initials on a colour
- * derived from who they are, and failing that a neutral hatch.
- *
- * Strictly in that order. A picture always wins — the initials are a
- * backup, so they aren't built behind one, and the hatch is the backup to
- * *them*, for a member whose name hasn't arrived yet.
+ * A member's picture, else their initials on a colour derived from their
+ * name, else a neutral hatch — strictly in that order.
  */
 export function Avatar({ size = 44, ringColor, uri, name, radius }: AvatarProps) {
   const { scheme } = useAppSettings();
@@ -41,9 +34,8 @@ export function Avatar({ size = 44, ringColor, uri, name, radius }: AvatarProps)
   // Dark mode's hatch sits on `surface`; light mode has no surface dim
   // enough to read as a slot, hence the dedicated PhotoSlotLight.
   const hatchFill = scheme === 'dark' ? theme.surface : PhotoSlotLight;
-  // Not built at all behind a picture, rather than built and covered.
-  // Conditional where the hatch below can't be: that Fabric constraint is
-  // specific to SvgView, not to a plain View.
+  // Not built behind a picture. Conditional where the hatch below can't be:
+  // that Fabric constraint is specific to SvgView, not a plain View.
   const initials = uri ? '' : initialsOf(name);
 
   return (
@@ -86,14 +78,8 @@ export function Avatar({ size = 44, ringColor, uri, name, radius }: AvatarProps)
       </View>
       {initials ? (
         <View style={[StyleSheet.absoluteFill, styles.initials, { backgroundColor: avatarTintFor(name) }]}>
-          {/*
-            AvatarInk rather than `theme.text`, and unlike the hatch above
-            this layer takes no scheme at all: the disc under it is one
-            fixed set of tints, so a scheme-following label would go dark
-            on a mid-tone fill in light mode. See AvatarTints.
-            allowFontScaling off because the disc can't grow with it, and
-            at 200% the letters would simply be clipped by it.
-          */}
+          {/* No scheme here, unlike the hatch: see AvatarTints. Font
+              scaling off because the disc can't grow with it. */}
           <Text
             allowFontScaling={false}
             numberOfLines={1}
@@ -118,7 +104,7 @@ const styles = StyleSheet.create({
   initialsText: {
     color: AvatarInk,
     fontFamily: Fonts.sansSemiBold,
-    // Tracking, because two capitals set tight read as one glyph at 34px.
+    // Two capitals set tight read as one glyph at 34px.
     letterSpacing: 0.5,
   },
 });

@@ -30,11 +30,7 @@ export type ActionSheetProps = {
   subtitle?: string;
   /** Shown next to `title`, e.g. the member's avatar — omit for a plain text-only header. */
   avatarUri?: string;
-  /**
-   * Who the avatar is, for its initials when there's no picture — see
-   * Avatar. Left unset where the avatar is a photograph rather than a
-   * face, which wants the neutral placeholder instead.
-   */
+  /** Who the avatar is, for its initials. Unset where it's a photograph rather than a face. */
   avatarName?: string;
   /** Squares off that image, for a sheet about a photograph rather than a person. */
   avatarRadius?: number;

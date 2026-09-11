@@ -16,8 +16,7 @@ export type AvatarStackProps = {
  * silently dropping members — otherwise a circle of 5 and a circle of 50
  * render identically.
  *
- * Deliberately the anonymous placeholder rather than initials: this takes a
- * count, not a roster, so there's nobody in particular in any given slot.
+ * Anonymous rather than initialled: this takes a count, not a roster.
  */
 export function AvatarStack({ count, size = 34, max = 5 }: AvatarStackProps) {
   const theme = useTheme();

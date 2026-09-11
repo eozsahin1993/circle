@@ -53,7 +53,7 @@ export type PostCardProps = {
   onExpandComments?: () => void;
   /** The reader's own picture, for the composer — the same on every card, so it rides on the card rather than each post. */
   selfPhotoUri?: string;
-  /** The reader's own name, for the composer avatar's initials — same reasoning as `selfPhotoUri`: one per card, not per post. */
+  /** Pairs with `selfPhotoUri` — the composer avatar's initials before a picture is set. */
   selfName?: string;
   /** Adds or removes the photo from the circle's album. */
   onToggleAlbum?: () => void;

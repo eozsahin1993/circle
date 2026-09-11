@@ -89,8 +89,6 @@ export default function ProfileSetupScreen() {
             </ThemedText>
 
             <Pressable style={styles.pictureRow} onPress={handleAddPicture}>
-              {/* Seeded from the name as it's being typed, so the initials
-                  appear the moment there's something to make them from. */}
               <Avatar size={64} uri={picture?.uri} name={name} />
               <View style={styles.pictureText}>
                 <ThemedText type="cardTitle">Add a picture</ThemedText>

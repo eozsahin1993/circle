@@ -29,7 +29,7 @@ export type PostCommentsProps = {
   onPressShowAll?: () => void;
   /** The reader's own picture — shown beside the composer and the empty-state invitation, both of which are addressed to them. */
   selfPhotoUri?: string;
-  /** The reader's own name, for the composer avatar's initials before they've set a picture. */
+  /** Pairs with `selfPhotoUri` — the composer avatar's initials before a picture is set. */
   selfName?: string;
 };
 
