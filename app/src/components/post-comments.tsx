@@ -4,8 +4,8 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
-import { Icons, Radius, Tints, Type } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Icons, Radius, Type } from '@/constants/theme';
+import { useTheme, useTints } from '@/hooks/use-theme';
 
 export type CommentItem = {
   id: string;
@@ -67,6 +67,7 @@ export function PostComments({
   selfKey,
 }: PostCommentsProps) {
   const theme = useTheme();
+  const tints = useTints();
   const [text, setText] = useState('');
 
   function handleSubmit() {
@@ -117,7 +118,10 @@ export function PostComments({
             returnKeyType="send"
             autoFocus
             multiline
-            style={[styles.input, { color: theme.text }]}
+            style={[
+              styles.input,
+              { color: theme.text, borderColor: tints.chipIdleBorder, backgroundColor: tints.chipIdleBg },
+            ]}
           />
           {/* Appears only once there's something to send, so an untouched
               composer is just the field. */}
@@ -171,8 +175,6 @@ const styles = StyleSheet.create({
     paddingBottom: 11,
     borderRadius: Radius.pill,
     borderWidth: 1,
-    borderColor: Tints.chipIdleBorder,
-    backgroundColor: Tints.chipIdleBg,
     // Matches the comment rows above it — what you type should look like
     // what it becomes. `lineHeight` is left off deliberately: on a
     // multiline TextInput it throws the vertical centring out on Android.

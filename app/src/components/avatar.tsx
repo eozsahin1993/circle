@@ -2,7 +2,9 @@ import { Image } from 'expo-image';
 import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Fonts } from '@/constants/theme';
+import { AvatarInk, Fonts, PhotoSlotLight } from '@/constants/theme';
+import { useAppSettings } from '@/hooks/use-app-settings';
+import { useTheme, useTints } from '@/hooks/use-theme';
 import { avatarTintFor, initialsOf } from '@/utils/initials';
 
 export type AvatarProps = {
@@ -40,7 +42,13 @@ export type AvatarProps = {
  * also what shows through if either layer above has nothing to draw.
  */
 export function Avatar({ size = 44, ringColor, uri, name, seed, radius }: AvatarProps) {
+  const { scheme } = useAppSettings();
+  const theme = useTheme();
+  const tints = useTints();
   const stripe = Math.max(6, Math.round(size / 4));
+  // Dark mode's hatch sits on `surface`; light mode has no surface dim
+  // enough to read as a slot, hence the dedicated PhotoSlotLight.
+  const hatchFill = scheme === 'dark' ? theme.surface : PhotoSlotLight;
   const initials = initialsOf(name);
 
   return (
@@ -74,8 +82,8 @@ export function Avatar({ size = 44, ringColor, uri, name, seed, radius }: Avatar
               height={stripe}
               patternUnits="userSpaceOnUse"
               patternTransform="rotate(45)">
-              <Rect width={stripe} height={stripe} fill={Colors.dark.surface} />
-              <Line x1={0} y1={0} x2={0} y2={stripe} stroke="rgba(245,239,230,0.10)" strokeWidth={1} />
+              <Rect width={stripe} height={stripe} fill={hatchFill} />
+              <Line x1={0} y1={0} x2={0} y2={stripe} stroke={tints.chipIdleBorder} strokeWidth={1} />
             </Pattern>
           </Defs>
           <Rect width="100%" height="100%" fill={`url(#avatarHatch-${size})`} />
@@ -84,9 +92,10 @@ export function Avatar({ size = 44, ringColor, uri, name, seed, radius }: Avatar
       {initials ? (
         <View style={[StyleSheet.absoluteFill, styles.initials, { backgroundColor: avatarTintFor(seed || name) }]}>
           {/*
-            Plain Text, not ThemedText: the tint under it is the same in
-            both schemes (see AvatarTints), so the label has to be too —
-            a theme-coloured one would go dark-on-dark in light mode.
+            AvatarInk rather than `theme.text`, and unlike the hatch above
+            this layer takes no scheme at all: the disc under it is one
+            fixed set of tints, so a scheme-following label would go dark
+            on a mid-tone fill in light mode. See AvatarTints.
             allowFontScaling off because the disc can't grow with it, and
             at 200% the letters would simply be clipped by it.
           */}
@@ -112,7 +121,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   initialsText: {
-    color: Colors.dark.text,
+    color: AvatarInk,
     fontFamily: Fonts.sansSemiBold,
     // Tracking, because two capitals set tight read as one glyph at 34px.
     letterSpacing: 0.5,

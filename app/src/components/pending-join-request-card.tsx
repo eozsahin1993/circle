@@ -5,7 +5,8 @@ import { PrimaryButton } from '@/components/primary-button';
 import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Radius, Tints } from '@/constants/theme';
+import { Radius } from '@/constants/theme';
+import { useTints } from '@/hooks/use-theme';
 import type { PendingRequest } from '@/domain/usecases/circle/invite-to-circle';
 
 function formatRelativeTime(ms: number): string {
@@ -37,8 +38,9 @@ export type PendingJoinRequestCardProps = {
  * than the creator already has.
  */
 export function PendingJoinRequestCard({ request, busy, onApprove, onDeny }: PendingJoinRequestCardProps) {
+  const tints = useTints();
   return (
-    <ThemedView type="surface" style={styles.card}>
+    <ThemedView type="surface" style={[styles.card, { borderColor: tints.chipReactedBorder }]}>
       <View style={styles.header}>
         {/* The name is self-reported and unverified — the initials are
             no more of a claim than the name beside them, which is the
@@ -63,7 +65,6 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: Radius.panel,
     borderWidth: 1,
-    borderColor: Tints.chipReactedBorder,
     padding: 16,
     gap: 14,
   },

@@ -5,8 +5,8 @@ import { Icon, type IconGlyph } from '@/components/icon';
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Icons, Radius, Spacing, Tints } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Icons, Radius, Spacing } from '@/constants/theme';
+import { useTheme, useTints } from '@/hooks/use-theme';
 
 /**
  * What sits at the end of a row, by kind rather than by markup — the same
@@ -38,6 +38,7 @@ export type SettingsRowProps = {
 
 function SettingsAccessory({ control, disabled }: { control: SettingsControl; disabled?: boolean }) {
   const theme = useTheme();
+  const tints = useTints();
 
   switch (control.kind) {
     case 'navigate':
@@ -48,8 +49,8 @@ function SettingsAccessory({ control, disabled }: { control: SettingsControl; di
           value={control.value}
           onValueChange={control.onValueChange}
           disabled={disabled}
-          trackColor={{ false: Tints.chipIdleBg, true: Colors.dark.accent }}
-          thumbColor={Colors.dark.text}
+          trackColor={{ false: tints.chipIdleBg, true: theme.accent }}
+          thumbColor={theme.text}
         />
       );
     case 'value':
@@ -63,9 +64,15 @@ function SettingsAccessory({ control, disabled }: { control: SettingsControl; di
       // as the card it sits in, so without an edge an unset image reads as
       // nothing at all rather than as an empty slot.
       return control.uri ? (
-        <Image source={{ uri: control.uri }} style={styles.image} contentFit="cover" />
+        <Image
+          source={{ uri: control.uri }}
+          style={[styles.image, { borderColor: tints.secondaryButtonBorder, backgroundColor: theme.background }]}
+          contentFit="cover"
+        />
       ) : (
-        <PhotoPlaceholder style={styles.image} />
+        <PhotoPlaceholder
+          style={[styles.image, { borderColor: tints.secondaryButtonBorder, backgroundColor: theme.background }]}
+        />
       );
   }
 }
@@ -136,6 +143,8 @@ export type SettingsGroup = {
  * section on `admin` needs no wrapper.
  */
 export function SettingsGroups({ groups }: { groups: SettingsGroup[] }) {
+  const tints = useTints();
+
   return (
     <>
       {groups.map((group) => {
@@ -148,9 +157,11 @@ export function SettingsGroups({ groups }: { groups: SettingsGroup[] }) {
               {group.title}
             </ThemedText>
 
-            <ThemedView type="surface" style={styles.card}>
+            <ThemedView type="surface" style={[styles.card, { borderColor: tints.chipIdleBorder }]}>
               {rows.map((row, index) => (
-                <View key={row.label} style={index === rows.length - 1 ? undefined : styles.divided}>
+                <View
+                  key={row.label}
+                  style={index === rows.length - 1 ? undefined : [styles.divided, { borderBottomColor: tints.chipIdleBorder }]}>
                   <SettingsRow {...row} />
                 </View>
               ))}
@@ -174,14 +185,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   card: {
-    borderColor: Tints.chipIdleBorder,
     borderWidth: 1,
     borderRadius: Radius.notice,
     paddingHorizontal: Spacing.screenPadding,
   },
   divided: {
     borderBottomWidth: 1,
-    borderBottomColor: Tints.chipIdleBorder,
   },
   footnote: {
     paddingHorizontal: 4,
@@ -209,7 +218,5 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: Radius.notice,
     borderWidth: 1,
-    borderColor: Tints.secondaryButtonBorder,
-    backgroundColor: Colors.dark.background,
   },
 });

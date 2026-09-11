@@ -5,17 +5,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconGlyph } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Icons, Radius, Spacing, Tints, type ThemeColor } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Icons, Radius, Spacing, type ThemeColor } from '@/constants/theme';
+import { useTheme, useTints } from '@/hooks/use-theme';
 import type { MessageController } from '@/hooks/use-messages';
 import type { Message } from '@/services/messages';
 
-/** How each tone is drawn. The glyph carries the state, never the fill. */
-const TONES = {
-  done: { icon: Icons.done, color: 'accentBright', border: Tints.raisedAccentBorder },
-  neutral: { icon: Icons.notice, color: 'muted', border: Tints.raisedBorder },
-  error: { icon: Icons.failed, color: 'danger', border: Tints.raisedDangerBorder },
-} as const satisfies Record<Message['tone'], { icon: IconGlyph; color: ThemeColor; border: string }>;
+/** How each tone is drawn, given this scheme's tints. The glyph carries the state, never the fill. */
+function tonesFor(tints: ReturnType<typeof useTints>) {
+  return {
+    done: { icon: Icons.done, color: 'accentBright', border: tints.raisedAccentBorder },
+    neutral: { icon: Icons.notice, color: 'muted', border: tints.raisedBorder },
+    error: { icon: Icons.failed, color: 'danger', border: tints.raisedDangerBorder },
+  } as const satisfies Record<Message['tone'], { icon: IconGlyph; color: ThemeColor; border: string }>;
+}
 
 const LIFT = 12;
 const FADE_MS = 180;
@@ -52,6 +54,7 @@ export type SnackbarProps = Omit<MessageController, 'settle'> & {
  */
 export function Snackbar({ message, visible, dismiss, onHidden }: SnackbarProps) {
   const theme = useTheme();
+  const tints = useTints();
   const insets = useSafeAreaInsets();
   const [opacity] = useState(() => new Animated.Value(0));
   const [lift] = useState(() => new Animated.Value(0));
@@ -91,7 +94,7 @@ export function Snackbar({ message, visible, dismiss, onHidden }: SnackbarProps)
 
   if (!message) return null;
 
-  const tone = TONES[message.tone];
+  const tone = tonesFor(tints)[message.tone];
 
   return (
     // box-none, not none: the bar itself takes taps while the screen

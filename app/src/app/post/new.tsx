@@ -10,14 +10,15 @@ import { PrimaryButton } from '@/components/primary-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Fonts, PhotoAspect, Radius, Spacing, Tints } from '@/constants/theme';
+import { Fonts, PhotoAspect, Radius, Spacing } from '@/constants/theme';
 import { getCircleSummary, getCircleMembers } from '@/data/db';
 import { createPost } from '@/domain/usecases/post/create-post';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useTints } from '@/hooks/use-theme';
 import { pickAndCompressImage, type CompressedImage } from '@/services/image';
 
 export default function NewPostScreen() {
   const theme = useTheme();
+  const tints = useTints();
   const { circleId } = useLocalSearchParams<{ circleId: string }>();
   const [circleName, setCircleName] = useState('');
   const [memberCount, setMemberCount] = useState(0);
@@ -92,7 +93,7 @@ export default function NewPostScreen() {
               style={[styles.captionInput, { color: theme.text }]}
             />
 
-            <View style={styles.albumRow}>
+            <View style={[styles.albumRow, { backgroundColor: tints.chipIdleBg, borderColor: tints.chipIdleBorder }]}>
               <View style={styles.albumText}>
                 <ThemedText type="postAuthor">Add to the album</ThemedText>
                 <ThemedText type="meta" themeColor="muted">
@@ -102,8 +103,8 @@ export default function NewPostScreen() {
               <Switch
                 value={addToAlbum}
                 onValueChange={setAddToAlbum}
-                trackColor={{ false: Tints.chipIdleBg, true: Colors.dark.accent }}
-                thumbColor={Colors.dark.text}
+                trackColor={{ false: tints.chipIdleBg, true: theme.accent }}
+                thumbColor={theme.text}
               />
             </View>
           </ScrollView>
@@ -167,8 +168,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
-    backgroundColor: Tints.chipIdleBg,
-    borderColor: Tints.chipIdleBorder,
     borderWidth: 1,
     borderRadius: Radius.notice,
     padding: Spacing.screenPadding,

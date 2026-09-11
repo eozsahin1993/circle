@@ -3,7 +3,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
 import { ThemedText } from '@/components/themed-text';
-import { Radius, Tints } from '@/constants/theme';
+import { Radius } from '@/constants/theme';
+import { useTints } from '@/hooks/use-theme';
 
 export type CircleCardProps = {
   name: string;
@@ -22,6 +23,7 @@ export type CircleCardProps = {
 const THUMB_SIZE = 84;
 
 export function CircleCard({ name, memberCount, photoUri, photoLabel, newCount, latestActivity, onPress }: CircleCardProps) {
+  const tints = useTints();
   return (
     <Pressable style={styles.row} onPress={onPress}>
       <View style={styles.thumbWrap}>
@@ -47,7 +49,7 @@ export function CircleCard({ name, memberCount, photoUri, photoLabel, newCount, 
       </View>
 
       {newCount ? (
-        <View style={styles.badge}>
+        <View style={[styles.badge, { backgroundColor: tints.chipReactedBg }]}>
           <ThemedText type="meta" themeColor="accentBright">
             {newCount}
           </ThemedText>
@@ -92,6 +94,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 5,
     borderRadius: Radius.pill,
-    backgroundColor: Tints.chipReactedBg,
   },
 });

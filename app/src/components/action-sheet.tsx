@@ -7,8 +7,8 @@ import { Icon, type IconGlyph } from '@/components/icon';
 import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Tints } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Radius, Spacing } from '@/constants/theme';
+import { useTheme, useTints } from '@/hooks/use-theme';
 
 export type ActionSheetOption = {
   label: string;
@@ -68,6 +68,7 @@ export function ActionSheet({
   options,
 }: ActionSheetProps) {
   const theme = useTheme();
+  const tints = useTints();
   // Same not-yet-visible-but-still-mounted trick as PrivacyInfoModal —
   // needed so the closing slide-down animation has something to animate.
   const [mounted, setMounted] = useState(visible);
@@ -104,7 +105,7 @@ export function ActionSheet({
         ]}>
         <ThemedView style={styles.sheetOuter}>
           <SafeAreaView edges={['bottom']} style={styles.sheetInner}>
-            <View style={styles.grabber} />
+            <View style={[styles.grabber, { backgroundColor: theme.faintest }]} />
 
             {title ? (
               <View style={styles.header}>
@@ -128,11 +129,16 @@ export function ActionSheet({
                   key={option.label}
                   style={({ pressed }) => [
                     styles.row,
+                    { borderBottomColor: tints.chipIdleBorder },
                     index === options.length - 1 && styles.rowLast,
-                    pressed && styles.rowPressed,
+                    pressed && { backgroundColor: tints.chipIdleBg },
                   ]}
                   onPress={() => select(option.onPress)}>
-                  <View style={[styles.rowIcon, option.destructive ? styles.rowIconDestructive : null]}>
+                  <View
+                    style={[
+                      styles.rowIcon,
+                      { backgroundColor: option.destructive ? tints.dangerWashBg : tints.chipIdleBg },
+                    ]}>
                     <Icon
                       icon={option.icon}
                       size={18}
@@ -191,7 +197,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.dark.faintest,
     marginBottom: 14,
   },
   header: {
@@ -215,13 +220,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.screenPadding,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Tints.chipIdleBorder,
   },
   rowLast: {
     borderBottomWidth: 0,
-  },
-  rowPressed: {
-    backgroundColor: Tints.chipIdleBg,
   },
   rowIcon: {
     width: 38,
@@ -229,10 +230,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Tints.chipIdleBg,
-  },
-  rowIconDestructive: {
-    backgroundColor: Tints.dangerWashBg,
   },
   rowText: {
     flex: 1,

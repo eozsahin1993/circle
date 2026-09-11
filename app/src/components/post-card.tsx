@@ -10,7 +10,7 @@ import { ReactionChip } from '@/components/reaction-chip';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
+import { Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type Reaction = {
@@ -191,7 +191,9 @@ export function PostCard({
 
         <View style={styles.commentsChipWrap}>
           <ReactionChip icon={Icons.comment} label="Comment" reacted={composerOpen} onPress={handleToggleComposer} />
-          {post.hasUnseenComments ? <View style={styles.unseenDot} /> : null}
+          {post.hasUnseenComments ? (
+            <View style={[styles.unseenDot, { backgroundColor: theme.accentBright }]} />
+          ) : null}
         </View>
 
         {onToggleAlbum ? (
@@ -272,7 +274,6 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.dark.accentBright,
   },
   reactionsRow: {
     flexDirection: 'row',

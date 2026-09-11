@@ -2,7 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, type PressableProps } from 'react-native';
 
 import { Icon, type IconGlyph } from '@/components/icon';
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export type FabButtonProps = PressableProps & {
   icon: IconGlyph;
@@ -11,11 +11,13 @@ export type FabButtonProps = PressableProps & {
 
 /** A circular, floating primary action — same accent gradient as PrimaryButton. */
 export function FabButton({ icon, size = 60, style, ...rest }: FabButtonProps) {
+  const theme = useTheme();
+
   return (
     <Pressable style={style} {...rest}>
       {({ pressed }) => (
         <LinearGradient
-          colors={[Colors.dark.accent, Colors.dark.accentBright]}
+          colors={[theme.accent, theme.accentBright]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[
@@ -23,7 +25,7 @@ export function FabButton({ icon, size = 60, style, ...rest }: FabButtonProps) {
             { width: size, height: size, borderRadius: size / 2 },
             pressed && styles.pressed,
           ]}>
-          <Icon icon={icon} size={size * 0.42} color={Colors.dark.accentLabel} />
+          <Icon icon={icon} size={size * 0.42} color={theme.accentLabel} />
         </LinearGradient>
       )}
     </Pressable>

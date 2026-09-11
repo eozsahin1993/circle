@@ -8,7 +8,7 @@ import { PrimaryButton } from '@/components/primary-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { restoreFromPhrase } from '@/domain/usecases/account/restore-from-phrase';
 import { useTheme } from '@/hooks/use-theme';
 import { showDone } from '@/services/messages';
@@ -74,7 +74,10 @@ export default function RestoreScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
-            style={[styles.input, { color: theme.text, borderColor: error ? theme.danger : theme.faint }]}
+            style={[
+              styles.input,
+              { color: theme.text, borderColor: error ? theme.danger : theme.faint, backgroundColor: theme.background },
+            ]}
           />
 
           <ThemedText type="meta" themeColor={words === WORD_COUNT ? 'accentBright' : 'muted'}>
@@ -125,7 +128,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: Radius.input,
     borderWidth: 1,
-    backgroundColor: Colors.dark.background,
     fontSize: 16,
     textAlignVertical: 'top',
   },

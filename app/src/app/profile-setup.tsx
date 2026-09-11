@@ -9,15 +9,16 @@ import { PrimaryButton } from '@/components/primary-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Fonts, Radius, Spacing, Tints } from '@/constants/theme';
+import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { getProfile } from '@/data/db';
 import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/services/image';
 import { completeProfileSetup } from '@/domain/usecases/account/onboarding';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useTints } from '@/hooks/use-theme';
 import { goPostAuth } from '@/services/pending-deep-link';
 
 export default function ProfileSetupScreen() {
   const theme = useTheme();
+  const tints = useTints();
   // Only ever set by index.tsx, right after a first-time sign-in — see
   // sign-in.ts's SignInResult. Used purely as initial state below, not
   // re-read after that: this screen's own local edits always win once the
@@ -107,7 +108,7 @@ export default function ProfileSetupScreen() {
               onChangeText={setName}
               placeholder="e.g. Marcus Adeyemi"
               placeholderTextColor={theme.faint}
-              style={[styles.input, { color: theme.text }]}
+              style={[styles.input, { color: theme.text, borderColor: tints.secondaryButtonBorder }]}
             />
           </ScrollView>
 
@@ -182,7 +183,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: Radius.input,
     borderWidth: 1,
-    borderColor: Tints.secondaryButtonBorder,
     fontFamily: Fonts.serif,
     fontSize: 18,
   },

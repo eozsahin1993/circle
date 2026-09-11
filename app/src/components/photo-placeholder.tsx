@@ -3,7 +3,9 @@ import { StyleSheet, View, type ViewProps } from 'react-native';
 
 import { Icon, type IconGlyph } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
-import { Colors, Icons } from '@/constants/theme';
+import { Icons, PhotoSlotLight } from '@/constants/theme';
+import { useAppSettings } from '@/hooks/use-app-settings';
+import { useTheme, useTints } from '@/hooks/use-theme';
 
 /**
  * Why a photo isn't here. 'arriving' is the ordinary case — the entry
@@ -36,8 +38,15 @@ export type PhotoPlaceholderProps = ViewProps & {
  * in the app is a placeholder until media upload/decrypt lands.
  */
 export function PhotoPlaceholder({ style, children, missing, compact, ...rest }: PhotoPlaceholderProps) {
+  const { scheme } = useAppSettings();
+  const theme = useTheme();
+  const tints = useTints();
+  // Dark mode's hatch sits on `surface`; light mode has no surface dim
+  // enough to read as a slot, hence the dedicated PhotoSlotLight.
+  const hatchFill = scheme === 'dark' ? theme.surface : PhotoSlotLight;
+
   return (
-    <View style={[styles.container, style]} {...rest}>
+    <View style={[styles.container, { backgroundColor: hatchFill }, style]} {...rest}>
       {/*
         The Svg is wrapped rather than sitting directly beside `children`.
         Under Fabric, changing siblings makes the mounting layer *move* an
@@ -56,8 +65,8 @@ export function PhotoPlaceholder({ style, children, missing, compact, ...rest }:
               height={22}
               patternUnits="userSpaceOnUse"
               patternTransform="rotate(45)">
-              <Rect width={22} height={22} fill={Colors.dark.surface} />
-              <Line x1={0} y1={0} x2={0} y2={22} stroke="rgba(245,239,230,0.08)" strokeWidth={1} />
+              <Rect width={22} height={22} fill={hatchFill} />
+              <Line x1={0} y1={0} x2={0} y2={22} stroke={tints.raisedBorder} strokeWidth={1} />
             </Pattern>
           </Defs>
           <Rect width="100%" height="100%" fill="url(#hatch)" />
@@ -65,7 +74,7 @@ export function PhotoPlaceholder({ style, children, missing, compact, ...rest }:
       </View>
       {missing ? (
         <View style={styles.note} pointerEvents="none">
-          <Icon icon={NOTES[missing].icon} size={compact ? 15 : 18} color={Colors.dark.muted} />
+          <Icon icon={NOTES[missing].icon} size={compact ? 15 : 18} color={theme.muted} />
           {compact ? null : (
             <ThemedText type="meta" themeColor="muted">
               {NOTES[missing].label}
@@ -81,7 +90,6 @@ export function PhotoPlaceholder({ style, children, missing, compact, ...rest }:
 const styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
-    backgroundColor: Colors.dark.surface,
   },
   // Centred over the hatch rather than in the flow, so it sits right
   // whatever shape the slot is — a 4:5 card, a square grid cell.

@@ -10,10 +10,12 @@ import { SecondaryButton } from '@/components/secondary-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Radius, Spacing, Tints } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
+import { useTints } from '@/hooks/use-theme';
 import { getMasterSeed } from '@/services/keystore';
 
 export default function RecoveryPhraseScreen() {
+  const tints = useTints();
   const [words, setWords] = useState<string[] | null>(null);
   const [revealed, setRevealed] = useState(false);
 
@@ -48,7 +50,7 @@ export default function RecoveryPhraseScreen() {
             so keep them somewhere only you can get to.
           </ThemedText>
 
-          <ThemedView type="surface" style={styles.card}>
+          <ThemedView type="surface" style={[styles.card, { borderColor: tints.chipIdleBorder }]}>
             {revealed && words ? (
               <View style={styles.grid}>
                 {words.map((word, index) => (
@@ -99,7 +101,6 @@ const styles = StyleSheet.create({
     gap: Spacing.cardListGap,
   },
   card: {
-    borderColor: Tints.chipIdleBorder,
     borderWidth: 1,
     borderRadius: Radius.panel,
     padding: Spacing.screenPadding,

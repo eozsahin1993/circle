@@ -4,7 +4,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export type BottomSheetProps = {
   visible: boolean;
@@ -26,6 +27,7 @@ const SLIDE_DISTANCE = Dimensions.get('window').height;
  * text field in it would sit under the keyboard on Android.
  */
 export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
+  const theme = useTheme();
   const insets = useSafeAreaInsets();
   // Mounted but not visible, so the closing slide-down has something left
   // to animate.
@@ -60,7 +62,7 @@ export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
           }}>
           <ThemedView style={[styles.sheet, { maxHeight: SLIDE_DISTANCE - insets.top }]}>
             <SafeAreaView edges={['bottom']} style={styles.inner}>
-              <View style={styles.grabber} />
+              <View style={[styles.grabber, { backgroundColor: theme.faintest }]} />
               {children}
             </SafeAreaView>
           </ThemedView>
@@ -97,7 +99,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.dark.faintest,
     marginBottom: 14,
   },
 });

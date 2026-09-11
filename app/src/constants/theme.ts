@@ -96,15 +96,18 @@ export const AlternateAccents = {
  * The fills an initials avatar can land on — see utils/initials.ts, which
  * picks one by hashing the member's identity key rather than at random.
  *
- * All eight are the same measured luminance, differing only in hue: that
- * keeps `text` above 4.5:1 on every one of them while each still clears
- * 3:1 against `background`, which is a narrow band to sit in and the
- * reason these aren't just the accents darkened by eye. Equal luminance
- * also means colour alone doesn't distinguish them for everyone — fine,
- * because the initials carry who it is and the colour only helps you scan.
+ * One fixed set rather than a per-scheme pair like `Tints`, and for the
+ * opposite reason: a tint here is a solid disc, not an overlay composited
+ * onto the page, so it supplies the contrast for its own label and doesn't
+ * care what's behind it. `AvatarInk` is fixed for the same reason.
  *
- * Scheme-independent on purpose: a filled disc supplies the contrast for
- * its own label, so the same eight work over a light page as a dark one.
+ * All eight sit at the same measured luminance, differing only in hue. That
+ * band is narrow — holding AvatarInk above 4.5:1 while each fill still
+ * clears 3:1 against the darker `background` leaves L in [0.116, 0.151] —
+ * which is why these are solved for rather than the accents darkened by
+ * eye. Equal luminance also means colour alone won't separate every pair
+ * for everyone; fine, since the initials carry who it is and the colour
+ * only helps you scan.
  */
 export const AvatarTints = [
   '#7B6332', // ochre
@@ -117,21 +120,45 @@ export const AvatarTints = [
   '#3D7244', // moss
 ] as const;
 
-/** Non-solid fills — always composited over `surface` or `background`, dark mode only. */
+/** The ink on an `AvatarTints` disc — fixed in both schemes, since the disc under it is. */
+export const AvatarInk = '#F4EDE2';
+
+/**
+ * Non-solid fills, one set per scheme via `useTints()` — never the bare
+ * export, or a component stops reacting to a scheme switch. Each base rgb
+ * is that scheme's own `text`/`accent`/`danger`, so a fill always matches
+ * that scheme's solid uses of the same color.
+ */
 export const Tints = {
-  chipIdleBg: 'rgba(245,239,230,0.06)',
-  chipIdleBorder: 'rgba(245,239,230,0.10)',
-  chipReactedBg: 'rgba(192,138,46,0.18)',
-  chipReactedBorder: 'rgba(192,138,46,0.45)',
-  privacyWashBg: 'rgba(192,138,46,0.09)',
-  privacyWashBorder: 'rgba(192,138,46,0.22)',
-  dangerWashBorder: 'rgba(217,122,110,0.35)',
-  dangerWashBg: 'rgba(217,122,110,0.12)',
-  secondaryButtonBorder: 'rgba(245,239,230,0.2)',
-  /** The three edges a `raised` surface can carry — quiet by default, tinted when the message has an outcome. */
-  raisedBorder: 'rgba(245,239,230,0.08)',
-  raisedAccentBorder: 'rgba(192,138,46,0.30)',
-  raisedDangerBorder: 'rgba(217,122,110,0.30)',
+  dark: {
+    chipIdleBg: 'rgba(245,239,230,0.06)',
+    chipIdleBorder: 'rgba(245,239,230,0.10)',
+    chipReactedBg: 'rgba(192,138,46,0.18)',
+    chipReactedBorder: 'rgba(192,138,46,0.45)',
+    privacyWashBg: 'rgba(192,138,46,0.09)',
+    privacyWashBorder: 'rgba(192,138,46,0.22)',
+    dangerWashBorder: 'rgba(217,122,110,0.35)',
+    dangerWashBg: 'rgba(217,122,110,0.12)',
+    secondaryButtonBorder: 'rgba(245,239,230,0.2)',
+    /** The three edges a `raised` surface can carry — quiet by default, tinted when the message has an outcome. */
+    raisedBorder: 'rgba(245,239,230,0.08)',
+    raisedAccentBorder: 'rgba(192,138,46,0.30)',
+    raisedDangerBorder: 'rgba(217,122,110,0.30)',
+  },
+  light: {
+    chipIdleBg: 'rgba(35,26,17,0.06)',
+    chipIdleBorder: 'rgba(35,26,17,0.10)',
+    chipReactedBg: 'rgba(166,85,47,0.18)',
+    chipReactedBorder: 'rgba(166,85,47,0.45)',
+    privacyWashBg: 'rgba(166,85,47,0.09)',
+    privacyWashBorder: 'rgba(166,85,47,0.22)',
+    dangerWashBorder: 'rgba(184,80,63,0.35)',
+    dangerWashBg: 'rgba(184,80,63,0.12)',
+    secondaryButtonBorder: 'rgba(35,26,17,0.2)',
+    raisedBorder: 'rgba(35,26,17,0.08)',
+    raisedAccentBorder: 'rgba(166,85,47,0.30)',
+    raisedDangerBorder: 'rgba(184,80,63,0.30)',
+  },
 } as const;
 
 export const Fonts = {

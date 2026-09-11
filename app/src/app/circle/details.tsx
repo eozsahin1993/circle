@@ -15,7 +15,7 @@ import { SecondaryButton } from '@/components/secondary-button';
 import { SettingsGroups, type SettingsGroup } from '@/components/settings-group';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Icons, Radius, Spacing, Tints } from '@/constants/theme';
+import { Icons, Radius, Spacing } from '@/constants/theme';
 import { MemberRoles, type Member, type MemberRole } from '@/data/db';
 import { setMemberRole } from '@/domain/usecases/circle/change-member-role';
 import { resolveCircleCoverUri } from '@/domain/usecases/circle/circle-cover';
@@ -34,7 +34,7 @@ import {
   type CirclePushPreferences,
   type PushLevelId,
 } from '@/domain/usecases/push/push-preferences';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useTints } from '@/hooks/use-theme';
 import { showDone, showError } from '@/services/messages';
 import { bytesToDataUri, pickAndCompressImage } from '@/services/image';
 
@@ -66,6 +66,7 @@ const NO_PUSH_PREFERENCES: CirclePushPreferences = { silenced: false, level: 'co
 
 export default function CircleDetailsScreen() {
   const theme = useTheme();
+  const tints = useTints();
   const { circleId } = useLocalSearchParams<{ circleId: string }>();
   const [details, setDetails] = useState<CircleDetails | null>(null);
   const [sharing, setSharing] = useState(false);
@@ -468,14 +469,14 @@ export default function CircleDetailsScreen() {
   /** One roster row. The menu is offered on everyone but the reader — nobody demotes or removes themselves here. */
   function renderMember(member: Member) {
     return (
-      <View key={member.identityPublicKey} style={styles.memberRow}>
+      <View key={member.identityPublicKey} style={[styles.memberRow, { borderBottomColor: tints.chipIdleBorder }]}>
         <Avatar size={44} uri={avatarUris.get(member.identityPublicKey)} name={member.name} seed={member.identityPublicKey} />
 
         <View style={styles.memberInfo}>
           <View style={styles.memberNameRow}>
             <ThemedText type="postAuthor">{member.name || 'Unnamed member'}</ThemedText>
             {member.role === MemberRoles.admin ? (
-              <View style={styles.adminBadge}>
+              <View style={[styles.adminBadge, { backgroundColor: theme.accent }]}>
                 <ThemedText type="meta" themeColor="accentLabel" style={styles.adminBadgeText}>
                   Admin
                 </ThemedText>
@@ -595,7 +596,6 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Tints.chipIdleBorder,
   },
   memberInfo: {
     flex: 1,
@@ -610,7 +610,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   adminBadge: {
-    backgroundColor: Colors.dark.accent,
     borderRadius: Radius.pill,
     paddingHorizontal: 8,
     paddingVertical: 2,

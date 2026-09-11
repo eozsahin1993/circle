@@ -9,12 +9,13 @@ import { PrimaryButton } from '@/components/primary-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Radius, Spacing, Tints } from '@/constants/theme';
+import { Colors, Radius, Spacing } from '@/constants/theme';
 import {
   checkDeviceTransfer,
   startDeviceTransfer,
   type PendingDeviceTransfer,
 } from '@/domain/usecases/account/device-transfer';
+import { useTints } from '@/hooks/use-theme';
 import { showDone, showError } from '@/services/messages';
 
 const POLL_INTERVAL_MS = 2_000;
@@ -30,6 +31,7 @@ const QR_SIZE = 220;
  * who photographs it.
  */
 export default function DeviceTransferScreen() {
+  const tints = useTints();
   const [pending, setPending] = useState<PendingDeviceTransfer | null>(null);
   const [failed, setFailed] = useState(false);
   // Refs, not state: the interval closes over its first render, and a
@@ -90,17 +92,24 @@ export default function DeviceTransferScreen() {
             On your old phone, open Account and tap Add another device, then point it at this code.
           </ThemedText>
 
-          <View style={styles.qrFrame}>
-            {pending ? (
-              <QRCode
-                value={JSON.stringify(pending.qr)}
-                size={QR_SIZE}
-                backgroundColor="transparent"
-                color={Colors.dark.text}
-              />
-            ) : (
-              <ActivityIndicator color={Colors.dark.accent} />
-            )}
+          <View style={[styles.qrFrame, { borderColor: tints.chipIdleBorder }]}>
+            {/*
+              Fixed dark-ink-on-light-plate regardless of scheme, not theme-reactive
+              — the same reasoning as invite-sheet.tsx's QR: plenty of scanners
+              still refuse an inverted (light-on-dark) code.
+            */}
+            <View style={styles.qrPlate}>
+              {pending ? (
+                <QRCode
+                  value={JSON.stringify(pending.qr)}
+                  size={QR_SIZE}
+                  backgroundColor={Colors.dark.accentBright}
+                  color={Colors.dark.background}
+                />
+              ) : (
+                <ActivityIndicator color={Colors.dark.background} />
+              )}
+            </View>
           </View>
 
           {failed ? (
@@ -153,8 +162,11 @@ const styles = StyleSheet.create({
     height: QR_SIZE + 40,
     borderRadius: Radius.panel,
     borderWidth: 1,
-    borderColor: Tints.chipIdleBorder,
-    backgroundColor: Colors.dark.surface,
+  },
+  qrPlate: {
+    padding: 14,
+    borderRadius: Radius.notice,
+    backgroundColor: Colors.dark.accentBright,
   },
   status: {
     textAlign: 'center',

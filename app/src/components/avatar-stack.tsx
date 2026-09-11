@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export type AvatarStackProps = {
   count: number;
@@ -20,6 +20,7 @@ export type AvatarStackProps = {
  * count, not a roster, so there's nobody in particular in any given slot.
  */
 export function AvatarStack({ count, size = 34, max = 5 }: AvatarStackProps) {
+  const theme = useTheme();
   const overflow = count > max;
   const avatarCount = overflow ? max - 1 : count;
   const hiddenCount = count - avatarCount;
@@ -29,7 +30,7 @@ export function AvatarStack({ count, size = 34, max = 5 }: AvatarStackProps) {
     <View style={styles.row}>
       {Array.from({ length: avatarCount }).map((_, index) => (
         <View key={index} style={index > 0 && { marginLeft: overlap }}>
-          <Avatar size={size} ringColor={Colors.dark.background} />
+          <Avatar size={size} ringColor={theme.background} />
         </View>
       ))}
       {overflow && (
@@ -41,7 +42,8 @@ export function AvatarStack({ count, size = 34, max = 5 }: AvatarStackProps) {
               height: size,
               borderRadius: size / 2,
               marginLeft: avatarCount > 0 ? overlap : 0,
-              borderColor: Colors.dark.background,
+              borderColor: theme.background,
+              backgroundColor: theme.surface,
             },
           ]}>
           <ThemedText type="meta" themeColor="text">
@@ -60,7 +62,6 @@ const styles = StyleSheet.create({
   overflow: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.dark.surface,
     borderWidth: 2,
   },
 });
