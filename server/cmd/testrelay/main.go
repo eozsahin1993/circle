@@ -46,9 +46,9 @@ func main() {
 	mux := api.NewRouter(deps)
 	registerTestOnly(mux, deps.Auth)
 
-	addr := ":" + port()
-	log.Printf("testrelay listening on %s against LocalStack at %s", addr, localstack.Endpoint())
-	log.Fatal(http.ListenAndServe(addr, logRequests(mux)))
+	address := addr()
+	log.Printf("testrelay listening on %s against LocalStack at %s", address, localstack.Endpoint())
+	log.Fatal(http.ListenAndServe(address, logRequests(mux)))
 }
 
 // Not 8090: that's the port the app's dev relay uses, and a test run
@@ -59,6 +59,20 @@ func port() string {
 		return p
 	}
 	return "8099"
+}
+
+// addr binds loopback by default. /testonly/session mints a session for
+// any accountId a caller sends, with no auth of its own — fine on
+// loopback, where "any caller" means this machine, but not once this
+// starts listening on every interface. TESTRELAY_LISTEN_ALL opts in
+// explicitly, for the one case that needs it: an Android emulator, which
+// reaches the host over its own virtual network, not loopback.
+func addr() string {
+	host := "127.0.0.1"
+	if os.Getenv("TESTRELAY_LISTEN_ALL") != "" {
+		host = ""
+	}
+	return host + ":" + port()
 }
 
 // registerTestOnly mounts the one route that doesn't exist in a real

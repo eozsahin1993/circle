@@ -38,24 +38,38 @@ import (
 // sessionTTL only has to outlast one test.
 const sessionTTL = time.Hour
 
+// requestTimeout bounds every request this package sends. Generous enough
+// for a real handler plus its own DynamoDB/S3 calls; short enough that a
+// hung relay fails the one request that hung, not the whole test binary.
+const requestTimeout = 30 * time.Second
+
 // Relay is a running relay and the means to talk to it. It carries the
 // test, so nothing downstream has to be handed one again.
 type Relay struct {
 	t       *testing.T
 	baseURL string
-	// sessions is how a caller gets a bearer token. Written directly
-	// rather than through a test-only HTTP route: this package holds the
-	// store, and a route that mints sessions is something cmd/testrelay
-	// needs only because the app can't reach into the relay's process.
+	// sessions is how SignIn gets a bearer token in without a round trip,
+	// when this package also owns the store: nil when RELAY_URL points
+	// at somebody else's relay, since minting a session there through a
+	// store this process can't reach would be minting it in the wrong
+	// place. SignIn falls back to /testonly/session in that case — see
+	// registerTestOnly in cmd/testrelay, which every RELAY_URL target is
+	// expected to expose.
 	sessions authstore.Store
 }
 
 // Start builds a relay of this test's own and registers its teardown.
 // httptest.NewServer, not the mux directly, so requests cross a real
-// socket. Set RELAY_URL to aim at a running cmd/testrelay or a deployed
-// stack instead — its tables, its isolation.
+// socket. Set RELAY_URL to aim at a running cmd/testrelay instead — no
+// local LocalStack access needed, since SignIn mints sessions through
+// that relay's own /testonly/session rather than writing to a store here.
 func Start(t *testing.T) *Relay {
 	t.Helper()
+
+	if baseURL := os.Getenv("RELAY_URL"); baseURL != "" {
+		return &Relay{t: t, baseURL: baseURL}
+	}
+
 	ctx := context.Background()
 
 	awsCfg, err := localstack.Config(ctx)
@@ -73,15 +87,10 @@ func Start(t *testing.T) *Relay {
 	t.Cleanup(func() { localstack.TeardownSet(context.Background(), ddb, s3Client, names) })
 
 	deps := app.Deps(localstack.RelayConfig(names), awsCfg)
+	server := httptest.NewServer(api.NewRouter(deps))
+	t.Cleanup(server.Close)
 
-	baseURL := os.Getenv("RELAY_URL")
-	if baseURL == "" {
-		server := httptest.NewServer(api.NewRouter(deps))
-		t.Cleanup(server.Close)
-		baseURL = server.URL
-	}
-
-	return &Relay{t: t, baseURL: baseURL, sessions: deps.Auth}
+	return &Relay{t: t, baseURL: server.URL, sessions: deps.Auth}
 }
 
 // unreachable skips, or fails when the environment says a missing
@@ -109,10 +118,20 @@ func (r *Relay) SignIn() *Device {
 	r.t.Helper()
 	accountID := "test:" + Suffix()
 	d := &Device{relay: r, token: Suffix()}
-	session := authstore.Session{AccountID: accountID, ExpiresAt: time.Now().Add(sessionTTL)}
-	if err := r.sessions.SaveSession(context.Background(), d.token, session); err != nil {
-		r.t.Fatalf("failed to mint a session: %v", err)
+
+	if r.sessions != nil {
+		session := authstore.Session{AccountID: accountID, ExpiresAt: time.Now().Add(sessionTTL)}
+		if err := r.sessions.SaveSession(context.Background(), d.token, session); err != nil {
+			r.t.Fatalf("failed to mint a session: %v", err)
+		}
+		return d
 	}
+
+	// RELAY_URL mode: this process holds no store the target relay reads
+	// from, so the session has to be minted on its side — see
+	// registerTestOnly in cmd/testrelay, which is POST, not PUT.
+	r.Anon().Post("/testonly/session", Body{"accountId": accountID, "token": d.token}).
+		Expect(http.StatusNoContent)
 	return d
 }
 
@@ -126,9 +145,10 @@ func (r *Relay) Anon() *Device {
 // what's actually being sent.
 type Body map[string]string
 
-func (d *Device) Get(path string) Response         { return d.send(http.MethodGet, path, nil) }
-func (d *Device) Put(path string, b Body) Response { return d.send(http.MethodPut, path, b) }
-func (d *Device) Delete(path string) Response      { return d.send(http.MethodDelete, path, nil) }
+func (d *Device) Get(path string) Response          { return d.send(http.MethodGet, path, nil) }
+func (d *Device) Put(path string, b Body) Response  { return d.send(http.MethodPut, path, b) }
+func (d *Device) Post(path string, b Body) Response { return d.send(http.MethodPost, path, b) }
+func (d *Device) Delete(path string) Response       { return d.send(http.MethodDelete, path, nil) }
 
 func (d *Device) send(method, path string, b Body) Response {
 	t := d.relay.t
@@ -143,7 +163,14 @@ func (d *Device) send(method, path string, b Body) Response {
 		payload = bytes.NewReader(encoded)
 	}
 
-	req, err := http.NewRequest(method, d.relay.baseURL+path, payload)
+	// Bounded rather than context.Background(): a hung relay or LocalStack
+	// call otherwise blocks until the whole test binary's own -timeout
+	// gives up, which reads as the suite stalling rather than naming which
+	// request never returned.
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, method, d.relay.baseURL+path, payload)
 	if err != nil {
 		t.Fatalf("failed to build the request: %v", err)
 	}
