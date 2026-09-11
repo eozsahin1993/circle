@@ -1,30 +1,20 @@
-// Package integration_test drives the relay the way a client does: over HTTP,
-// with no access to anything inside it.
+// Package integration_test drives the relay the way a client does: over
+// HTTP, with no access to anything inside it. Not for handler coverage —
+// internal/api's own tests already have that — but for the sequences
+// between calls, where a client's real problems live: create an invite,
+// request against it, approve, then find the approval readable when it
+// shouldn't be.
 //
-// The point isn't coverage the in-process tests lack — internal/api's own
-// tests already exercise every handler against real storage. It's that
-// these are *sequences*. A client's real problems live between calls:
-// create an invite, request against it, approve, then find the approval is
-// readable when it shouldn't be. Nothing in the suite today carries state
-// from one call to the next.
-//
-// The relay is blind (SYNC_DESIGN invariant 3), so an entry body can be
-// any bytes at all — no client crypto to reproduce here, and nothing to
-// drift out of step with the app.
-//
-// Each test gets its own relay over its own tables, torn down afterwards.
-// The Go suite isolates by unique ids instead, which is sound and free,
-// but it forces every assertion to filter to the caller's own rows — and
-// "the list holds exactly one request" is a stronger claim than "the list
-// holds mine". A private set costs about 200ms, which buys that.
+// The relay is blind (SYNC_DESIGN invariant 3), so an entry body is any
+// bytes at all — no client crypto to reproduce, nothing to drift out of
+// step with the app. Each test gets its own relay over its own tables
+// (see localstack.Unique), so an assertion can claim a list holds exactly
+// one row rather than merely holding its own.
 package integration_test
 
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -57,15 +47,10 @@ type relay struct {
 	sessions authstore.Store
 }
 
-// start builds a relay of this test's own, on tables nobody else holds,
-// and registers their removal.
-//
-// httptest.NewServer, not the mux directly: that gives a real listener on
-// a real port, so these requests cross an actual socket and go through
-// net/http's own parsing rather than being handed to a handler. Set
-// RELAY_URL to aim the same tests at a running cmd/testrelay, or at a
-// deployed stack — in which case the tables are whatever that relay was
-// started with, and isolation is its business rather than this one's.
+// start builds a relay of this test's own and registers its teardown.
+// httptest.NewServer, not the mux directly, so requests cross a real
+// socket. Set RELAY_URL to aim at a running cmd/testrelay or a deployed
+// stack instead — its tables, its isolation.
 func start(t *testing.T) *relay {
 	t.Helper()
 	ctx := context.Background()
@@ -180,8 +165,9 @@ func (d *device) send(method, path string, b body) response {
 }
 
 // response is one HTTP reply, kept whole so a test can assert on the
-// status and the body without re-reading either. Go's stdlib has no
-// assertion library, so expect and decode below are the whole of it.
+// status and the body without re-reading either — see assertEqual and
+// assertTrue in assert_test.go for comparisons that aren't about a
+// response specifically.
 type response struct {
 	t      *testing.T
 	method string
@@ -191,8 +177,8 @@ type response struct {
 }
 
 // expect fails unless the status matches, naming the request and quoting
-// the body — which is where the relay says why, and the first thing
-// anyone wants when a integration test goes red.
+// the body — where the relay says why, and the first thing anyone wants
+// when this goes red.
 func (res response) expect(status int) response {
 	res.t.Helper()
 	if res.status != status {
@@ -208,43 +194,4 @@ func (res response) decode(target any) response {
 		res.t.Fatalf("%s %s: failed to decode %q: %v", res.method, res.path, res.body, err)
 	}
 	return res
-}
-
-// assertEqual fails unless got matches want, naming what was compared. Go
-// has no assertion library in std, and `if got != want { t.Fatalf(...) }`
-// at every call site buries the claim under the plumbing. Named to match
-// JUnit's assertEqual/assertTrue rather than invent a new vocabulary.
-func assertEqual[T comparable](t *testing.T, what string, got, want T) {
-	t.Helper()
-	if got != want {
-		t.Fatalf("%s: got %v, want %v", what, got, want)
-	}
-}
-
-// assertTrue fails when cond is false, saying what should have held. For
-// the claims that aren't a comparison.
-func assertTrue(t *testing.T, cond bool, format string, args ...any) {
-	t.Helper()
-	if !cond {
-		t.Fatalf(format, args...)
-	}
-}
-
-// suffix is an id nothing else will use — for an account, a token, an
-// invite tag, or a set of table names. Resource-name safe: lowercase hex,
-// short enough for S3's 63-character bucket limit.
-func suffix() string {
-	buf := make([]byte, 8)
-	// crypto/rand.Read is documented never to return an error.
-	_, _ = rand.Read(buf)
-	return hex.EncodeToString(buf)
-}
-
-// ciphertext stands in for whatever a client would have encrypted. Random
-// because the relay is blind: it never reads these bytes, and a test that
-// pretended otherwise would be asserting something the design forbids.
-func ciphertext() string {
-	buf := make([]byte, 64)
-	_, _ = rand.Read(buf)
-	return base64.StdEncoding.EncodeToString(buf)
 }

@@ -103,8 +103,8 @@ func TestRequestThenApproveThenRead(t *testing.T) {
 	joiner.askToJoin(tag, requester).expect(http.StatusOK)
 
 	pending := creator.pendingRequests(tag)
-	assertEqual(t, "pending requests", len(pending), 1)
-	assertEqual(t, "the pending requester", pending[0].RequesterID, requester)
+	assertEqual(t, len(pending), 1, "pending requests")
+	assertEqual(t, pending[0].RequesterID, requester, "the pending requester")
 	assertTrue(t, pending[0].EncryptedApproval == nil, "a request nobody approved came back with an approval")
 
 	approval := ciphertext()
@@ -116,7 +116,7 @@ func TestRequestThenApproveThenRead(t *testing.T) {
 	joiner.readRequest(tag, requester).expect(http.StatusOK).decode(&collected)
 
 	assertTrue(t, collected.EncryptedApproval != nil, "the approval never reached the joiner")
-	assertEqual(t, "the collected approval", *collected.EncryptedApproval, approval)
+	assertEqual(t, *collected.EncryptedApproval, approval, "the collected approval")
 }
 
 func TestApprovingSomethingNobodyAskedForIsNotFound(t *testing.T) {
@@ -140,7 +140,7 @@ func TestDismissingARequestRemovesIt(t *testing.T) {
 	creator.dismiss(tag, requester).expect(http.StatusOK)
 
 	creator.readRequest(tag, requester).expect(http.StatusNotFound)
-	assertEqual(t, "requests left after a dismissal", len(creator.pendingRequests(tag)), 0)
+	assertEqual(t, len(creator.pendingRequests(tag)), 0, "requests left after a dismissal")
 }
 
 func TestADismissedRequestCannotBeApproved(t *testing.T) {
@@ -189,12 +189,12 @@ func TestARepeatedRequestIsAnIdempotentRetry(t *testing.T) {
 	joiner.askToJoin(tag, requester).expect(http.StatusOK)
 
 	after := creator.pendingRequests(tag)
-	assertEqual(t, "rows after a retry", len(after), 1)
+	assertEqual(t, len(after), 1, "rows after a retry")
 	// The first payload wins, deliberately: the creator may already have
 	// sealed an approval to the ephemeral key in it, and letting a later
 	// PUT swap the payload would strand that approval against a key the
 	// joiner no longer holds.
-	assertEqual(t, "the surviving request", after[0].EncryptedRequest, first)
+	assertEqual(t, after[0].EncryptedRequest, first, "the surviving request")
 }
 
 func TestRequestsAreScopedToTheirInvite(t *testing.T) {
@@ -210,7 +210,7 @@ func TestRequestsAreScopedToTheirInvite(t *testing.T) {
 	// so this is the boundary stopping one invite's mailbox leaking into
 	// the next.
 	creator.readRequest(theirs, requester).expect(http.StatusNotFound)
-	assertEqual(t, "requests under the other invite", len(creator.pendingRequests(theirs)), 0)
+	assertEqual(t, len(creator.pendingRequests(theirs)), 0, "requests under the other invite")
 }
 
 func TestARequestNeedsNoInviteToExist(t *testing.T) {
