@@ -141,9 +141,12 @@ func (r *Relay) Anon() *Device {
 }
 
 // Body is a JSON object to send. A named type because almost every request
-// here carries one field, and map[string]string at each call site buries
-// what's actually being sent.
-type Body map[string]string
+// here carries one field, and map[string]any at each call site buries
+// what's actually being sent. any, not string, because not every endpoint's
+// fields are strings — deletecircle's keyVersion is a number, and encoding
+// it as a JSON string would fail to decode into the int64 the handler
+// expects.
+type Body map[string]any
 
 func (d *Device) Get(path string) Response          { return d.send(http.MethodGet, path, nil) }
 func (d *Device) Put(path string, b Body) Response  { return d.send(http.MethodPut, path, b) }
@@ -223,4 +226,10 @@ func (res Response) Decode(target any) Response {
 		res.t.Fatalf("%s %s: failed to decode %q: %v", res.method, res.path, res.body, err)
 	}
 	return res
+}
+
+// Bytes returns the raw response body — for a response that isn't JSON,
+// like the ciphertext getblob's redirect ultimately resolves to.
+func (res Response) Bytes() []byte {
+	return res.body
 }
