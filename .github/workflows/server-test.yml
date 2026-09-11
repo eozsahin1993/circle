@@ -77,6 +77,7 @@ jobs:
           go test -race \
             ./internal/api/auth/oidcverify/... \
             ./internal/api/push/... \
+            ./internal/push/apns/... \
             ./internal/push/fcm/... \
             ./internal/storage/dynamoutil/...
 
@@ -142,6 +143,7 @@ jobs:
           go test -race $(go list ./... | grep -vFx \
             -e circle-relay/internal/api/auth/oidcverify \
             -e circle-relay/internal/api/push \
+            -e circle-relay/internal/push/apns \
             -e circle-relay/internal/push/fcm \
             -e circle-relay/internal/storage/dynamoutil)
         env:
