@@ -173,6 +173,41 @@ test('a join with no name still says something', async () => {
   expect(notification?.body).toBe('Someone joined');
 });
 
+test('a reaction names the emoji, since it always went to the post\'s own owner', async () => {
+  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const marcus = generateIdentity();
+  await recordMemberAddedLocally({
+    circleId,
+    subjectPublicKey: bytesToHex(marcus.publicKey),
+    joinedAt: 1_000,
+    profile: { encPublicKey: 'cc', memberId: generateUUID(), role: MemberRoles.member, name: 'Marcus', picture: null },
+  });
+
+  const notification = await handlePush(
+    await pushFor(circleId, EntryTypes.REACTION, marcus, { postId: 'p1', emoji: '❤️', reacted: true, createdAt: 1 }),
+  );
+
+  expect(notification?.body).toBe('Marcus reacted ❤️ to your photo');
+});
+
+/** A malformed or missing emoji still says something, rather than nothing. */
+test('a reaction with no usable emoji falls back to generic text', async () => {
+  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const marcus = generateIdentity();
+  await recordMemberAddedLocally({
+    circleId,
+    subjectPublicKey: bytesToHex(marcus.publicKey),
+    joinedAt: 1_000,
+    profile: { encPublicKey: 'cc', memberId: generateUUID(), role: MemberRoles.member, name: 'Marcus', picture: null },
+  });
+
+  const notification = await handlePush(
+    await pushFor(circleId, EntryTypes.REACTION, marcus, { postId: 'p1', reacted: true, createdAt: 1 }),
+  );
+
+  expect(notification?.body).toBe('Marcus reacted to your photo');
+});
+
 /** Reactions and posts interrupt; a rename or a key rotation must not. */
 test('an entry type that should not interrupt shows nothing', async () => {
   const { id: circleId } = await createCircle({ name: 'Family Circle' });

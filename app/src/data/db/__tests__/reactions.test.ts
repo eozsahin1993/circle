@@ -10,6 +10,7 @@ import {
   getPostReactionSummaries,
   getPostReactionSummary,
   getPostReactors,
+  hasOtherReaction,
   initDatabase,
   insertPost,
   MemberRoles,
@@ -137,6 +138,50 @@ test('the chip summary is ordered by when each emoji was first used', async () =
   const summary = await getPostReactionSummary(postId, a);
 
   expect(summary.map((row) => row.emoji)).toEqual(['❤️', '😭', '🙏']);
+});
+
+describe('hasOtherReaction', () => {
+  test('is false for a reactor with no reactions on the post at all', async () => {
+    const { circleId, postId } = await circleWithPost();
+    const someone = await member(circleId, 'Someone');
+
+    expect(await hasOtherReaction(postId, someone, '❤️')).toBe(false);
+  });
+
+  /** Their only reaction is the one being excluded — not "some other" one. */
+  test('is false when their only reaction is the one being asked about', async () => {
+    const { circleId, postId } = await circleWithPost();
+    const dad = await member(circleId, 'Dad');
+    await addReaction({ postId, authorPublicKey: dad, emoji: '❤️', createdAt: 1_000 });
+
+    expect(await hasOtherReaction(postId, dad, '❤️')).toBe(false);
+  });
+
+  test('is true once they hold a different emoji on the same post', async () => {
+    const { circleId, postId } = await circleWithPost();
+    const dad = await member(circleId, 'Dad');
+    await addReaction({ postId, authorPublicKey: dad, emoji: '❤️', createdAt: 1_000 });
+
+    expect(await hasOtherReaction(postId, dad, '🙏')).toBe(true);
+  });
+
+  test("ignores another member's reactions on the same post", async () => {
+    const { circleId, postId } = await circleWithPost();
+    const dad = await member(circleId, 'Dad');
+    const nana = await member(circleId, 'Nana');
+    await addReaction({ postId, authorPublicKey: nana, emoji: '❤️', createdAt: 1_000 });
+
+    expect(await hasOtherReaction(postId, dad, '🙏')).toBe(false);
+  });
+
+  test('ignores a reaction on a different post', async () => {
+    const { circleId, postId } = await circleWithPost();
+    const { postId: otherPost } = await circleWithPost();
+    const dad = await member(circleId, 'Dad');
+    await addReaction({ postId: otherPost, authorPublicKey: dad, emoji: '❤️', createdAt: 1_000 });
+
+    expect(await hasOtherReaction(postId, dad, '🙏')).toBe(false);
+  });
 });
 
 describe('getPostReactionSummaries', () => {
