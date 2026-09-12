@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Dimensions, Modal, Pressable, StyleSheet, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KeyboardAvoider } from '@/components/keyboard-avoider';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 import { ThemedView } from '@/components/themed-view';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -61,10 +62,10 @@ export function BottomSheet({ visible, onClose, children }: BottomSheetProps) {
             ],
           }}>
           <ThemedView style={[styles.sheet, { maxHeight: SLIDE_DISTANCE - insets.top }]}>
-            <SafeAreaView edges={['bottom']} style={styles.inner}>
+            <ThemedSafeAreaView edges={['bottom']} style={styles.inner}>
               <View style={[styles.grabber, { backgroundColor: theme.faintest }]} />
               {children}
-            </SafeAreaView>
+            </ThemedSafeAreaView>
           </ThemedView>
         </Animated.View>
       </KeyboardAvoider>

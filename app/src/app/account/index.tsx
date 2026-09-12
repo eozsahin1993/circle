@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { Avatar } from '@/components/avatar';
 import { OptionSheet } from '@/components/option-sheet';
@@ -168,7 +168,7 @@ export default function AccountScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
+      <ThemedSafeAreaView style={styles.safeArea}>
         <ScreenHeader title="Your account" />
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -217,7 +217,7 @@ export default function AccountScreen() {
           </Pressable>
 
         </ScrollView>
-      </SafeAreaView>
+      </ThemedSafeAreaView>
 
       <OptionSheet
         visible={levelPicker}

@@ -45,11 +45,16 @@ export type MembershipEventBlock = {
  * label this way; that's deliberate, not a bug, since a post is real news
  * that shouldn't read as continuous with what came before it.
  *
- * `events` must already be sorted newest-first (what `getCircleMemberEvents`
- * returns) — this never re-sorts, so a caller with a different order gets
- * nonsense blocks silently rather than a clear failure.
+ * Both `events` and `postTimestamps` must already be sorted newest-first
+ * (what `getCircleMemberEvents` and `getCircleFeed` both return) — this
+ * never re-sorts either, so a caller with a different order gets nonsense
+ * blocks silently rather than a clear failure.
  */
 export function groupMemberEvents(events: MemberEvent[], postTimestamps: number[]): MembershipEventBlock[] {
+  // A single forward pointer into `postTimestamps`, walked alongside
+  // `events` — O(events + posts) instead of rescanning every post per event.
+  let postIndex = 0;
+
   const blocks: MembershipEventBlock[] = [];
   let current: MemberEvent[] = [];
 
@@ -60,19 +65,19 @@ export function groupMemberEvents(events: MemberEvent[], postTimestamps: number[
 
   for (const event of events) {
     const previous = current[current.length - 1];
-    if (previous !== undefined && (formatDay(event.occurredAt) !== formatDay(previous.occurredAt) || postBetween(event.occurredAt, previous.occurredAt, postTimestamps))) {
-      flush();
+    if (previous !== undefined) {
+      // Posts at or after `previous` were already ruled out (by this
+      // check or an earlier one) and can never matter again — every
+      // event from here on is older still.
+      while (postIndex < postTimestamps.length && postTimestamps[postIndex] >= previous.occurredAt) postIndex++;
+      const postBetween = postIndex < postTimestamps.length && postTimestamps[postIndex] > event.occurredAt;
+      if (formatDay(event.occurredAt) !== formatDay(previous.occurredAt) || postBetween) flush();
     }
     current.push(event);
   }
   flush();
 
   return blocks;
-}
-
-/** Whether some post landed strictly between two events that are otherwise adjacent in the feed. */
-function postBetween(older: number, newer: number, postTimestamps: number[]): boolean {
-  return postTimestamps.some((at) => at > older && at < newer);
 }
 
 function buildBlock(events: MemberEvent[]): MembershipEventBlock {

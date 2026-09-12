@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Animated, Dimensions, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { SecondaryButton } from '@/components/secondary-button';
 import { ThemedText } from '@/components/themed-text';
@@ -82,7 +82,7 @@ export function PrivacyInfoModal({ visible, onClose }: PrivacyInfoModalProps) {
           },
         ]}>
         <ThemedView type="surface" style={styles.sheetInner}>
-          <SafeAreaView edges={['bottom']}>
+          <ThemedSafeAreaView edges={['bottom']}>
             <View style={[styles.grabber, { backgroundColor: theme.faintest }]} />
 
             <ScrollView contentContainerStyle={styles.content}>
@@ -105,7 +105,7 @@ export function PrivacyInfoModal({ visible, onClose }: PrivacyInfoModalProps) {
             <View style={styles.footer}>
               <SecondaryButton label="Close" onPress={onClose} />
             </View>
-          </SafeAreaView>
+          </ThemedSafeAreaView>
         </ThemedView>
       </Animated.View>
     </Modal>

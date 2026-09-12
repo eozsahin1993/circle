@@ -2,7 +2,7 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { Avatar } from '@/components/avatar';
 import { CircleCard } from '@/components/circle-card';
@@ -193,7 +193,7 @@ export default function CircleListScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
+      <ThemedSafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <View>
             <ThemedText type="eyebrow" style={styles.eyebrow}>
@@ -266,7 +266,7 @@ export default function CircleListScreen() {
           onPress={() => router.push('/circle/new')}
           style={styles.fab}
         />
-      </SafeAreaView>
+      </ThemedSafeAreaView>
 
       <JoinSheet
         code={joinCode}

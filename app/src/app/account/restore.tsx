@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { PrimaryButton } from '@/components/primary-button';
@@ -56,7 +56,7 @@ export default function RestoreScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
+      <ThemedSafeAreaView style={styles.safeArea}>
         <ScreenHeader title="Recovery phrase" />
 
         <KeyboardAvoider style={styles.body}>
@@ -106,7 +106,7 @@ export default function RestoreScreen() {
             onPress={handleRestore}
           />
         </KeyboardAvoider>
-      </SafeAreaView>
+      </ThemedSafeAreaView>
     </ThemedView>
   );
 }

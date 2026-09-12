@@ -3,7 +3,7 @@ import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Share, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { PrimaryButton } from '@/components/primary-button';
 import { SecondaryButton } from '@/components/secondary-button';
@@ -41,7 +41,7 @@ export default function RecoveryPhraseScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
+      <ThemedSafeAreaView style={styles.safeArea}>
         <ScreenHeader title="Recovery phrase" />
 
         <View style={styles.content}>
@@ -83,7 +83,7 @@ export default function RecoveryPhraseScreen() {
             onPress={() => (revealed ? router.back() : setRevealed(true))}
           />
         </View>
-      </SafeAreaView>
+      </ThemedSafeAreaView>
     </ThemedView>
   );
 }

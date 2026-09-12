@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { PrimaryButton } from '@/components/primary-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
@@ -84,7 +84,7 @@ export default function DeviceTransferScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
+      <ThemedSafeAreaView style={styles.safeArea}>
         <ScreenHeader title="Bring over an account" />
 
         <View style={styles.content}>
@@ -137,7 +137,7 @@ export default function DeviceTransferScreen() {
 
           <PrimaryButton label="Cancel" onPress={() => router.back()} />
         </View>
-      </SafeAreaView>
+      </ThemedSafeAreaView>
     </ThemedView>
   );
 }

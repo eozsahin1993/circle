@@ -2,7 +2,7 @@ import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { ActionSheet, type ActionSheetOption } from '@/components/action-sheet';
 import { Avatar } from '@/components/avatar';
@@ -499,7 +499,7 @@ export default function CircleDetailsScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
+      <ThemedSafeAreaView style={styles.safeArea}>
         <ScreenHeader title="Circle details" />
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
@@ -523,7 +523,7 @@ export default function CircleDetailsScreen() {
             </View>
           ) : null}
         </ScrollView>
-      </SafeAreaView>
+      </ThemedSafeAreaView>
 
       <PromptSheet
         visible={renaming}

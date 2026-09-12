@@ -71,7 +71,14 @@ function AppShell() {
 
   return (
     <ThemeProvider value={scheme === 'dark' ? HearthDarkTheme : HearthLightTheme}>
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          // iOS 26's scroll-edge material follows the trait collection, not
+          // the app's theme — it can render light over a dark screen.
+          scrollEdgeEffects: { bottom: 'hidden', top: 'hidden', left: 'hidden', right: 'hidden' },
+        }}
+      />
       {/* Outside the stack, so a message survives the screen that caused
           it — including one that navigates away as it reports. */}
       <Snackbar message={message} visible={visible} dismiss={dismiss} onHidden={settle} />

@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { missingPhotoFor, PhotoPlaceholder } from '@/components/photo-placeholder';
 import { ScreenHeader } from '@/components/navbar/screen-header';
@@ -119,7 +119,7 @@ export default function AlbumScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
+      <ThemedSafeAreaView style={styles.safeArea}>
         {/* The header keeps the screen's usual inset; the grid below runs
             edge to edge, so nothing competes with the photos. */}
         <View style={styles.headerInset}>
@@ -171,7 +171,7 @@ export default function AlbumScreen() {
             ) : null
           }
         />
-      </SafeAreaView>
+      </ThemedSafeAreaView>
     </ThemedView>
   );
 }

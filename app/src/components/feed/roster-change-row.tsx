@@ -29,7 +29,16 @@ export type RosterChangeRowsInput = {
 
 /** Takes no actions — there is nothing to do to a roster change. */
 export function useRosterChangeRows({ events, postTimestamps, ownPublicKey }: RosterChangeRowsInput): FeedRows {
-  return useMemo(() => ({ rows: rosterChangeRows(events, postTimestamps, ownPublicKey) }), [events, postTimestamps, ownPublicKey]);
+  // Keyed on content, not `postTimestamps`'s own array identity: patching a
+  // post (a reaction, a comment, a photo landing) rebuilds `posts` wholesale,
+  // giving this a new reference on every bit of activity even when nothing
+  // about the grouping actually changed.
+  const postTimestampsKey = postTimestamps.join(',');
+  return useMemo(
+    () => ({ rows: rosterChangeRows(events, postTimestamps, ownPublicKey) }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- postTimestampsKey stands in for postTimestamps deliberately.
+    [events, postTimestampsKey, ownPublicKey],
+  );
 }
 
 export function rosterChangeRows(events: MemberEvent[], postTimestamps: number[], ownPublicKey: string | null): FeedRow[] {

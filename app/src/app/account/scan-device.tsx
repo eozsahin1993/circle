@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { PrimaryButton } from '@/components/primary-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
@@ -76,7 +76,7 @@ export default function ScanDeviceScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
+      <ThemedSafeAreaView style={styles.safeArea}>
         <ScreenHeader title="Add another device" />
 
         <View style={styles.content}>
@@ -99,7 +99,7 @@ export default function ScanDeviceScreen() {
 
           <PrimaryButton label="Back" disabled={busy} onPress={() => router.back()} />
         </View>
-      </SafeAreaView>
+      </ThemedSafeAreaView>
     </ThemedView>
   );
 }

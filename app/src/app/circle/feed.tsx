@@ -8,11 +8,15 @@ import { gapBetween, stickyIndices, type FeedRow } from '@/components/feed/rows'
 import { HeaderIconButton } from '@/components/navbar/header-icon-button';
 import { PrivacyInfoModal } from '@/components/privacy-info-modal';
 import { ScreenHeader } from '@/components/navbar/screen-header';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 import { ThemedView } from '@/components/themed-view';
 import { Icons, Spacing } from '@/constants/theme';
 import { markCircleViewed } from '@/data/db';
 import { askForPushOnCircle } from '@/domain/usecases/push/enable-push';
 import { useCircleFeed } from '@/hooks/use-circle-feed';
+
+/** Scroll clearance above the FAB. The safe-area inset itself is separate — see `ListFooterComponent`. */
+const LIST_BOTTOM_PADDING = 100;
 
 /**
  * One circle's feed. `useCircleFeed` owns the data and the actions on it,
@@ -32,7 +36,6 @@ export default function FeedScreen() {
     justJoined: justJoined === '1',
     onPressPrivacy,
   });
-
   useFocusEffect(
     useCallback(() => {
       reload().catch((err) => console.error('Failed to load the feed', err));
@@ -67,7 +70,9 @@ export default function FeedScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
+      {/* No bottom edge: the list runs to the true bottom of the screen so
+          its last card's photo can bleed under the home indicator. */}
+      <ThemedSafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         {/* Outside the list, like every other screen's header — so it
             stays put rather than scrolling, and the refresh spinner comes
             down from under it instead of over it. */}
@@ -104,16 +109,23 @@ export default function FeedScreen() {
             const index = rows.indexOf(leadingItem);
             return <ThemedView style={{ height: gapBetween(leadingItem, rows[index + 1]) }} />;
           }}
+          // Native padding, not `useSafeAreaInsets` — see the FAB's comment below.
+          ListFooterComponent={<SafeAreaView edges={['bottom']} />}
           contentContainerStyle={styles.list}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
         />
-        <FabButton
-          icon={Icons.composePost}
-          onPress={() => router.push({ pathname: '/post/new', params: { circleId } })}
-          style={styles.fab}
-        />
-      </SafeAreaView>
+        {/* Native `SafeAreaView`, not `useSafeAreaInsets`: that hook's value
+            can arrive a render late right after navigating, which would
+            show as the FAB visibly snapping to its final position. */}
+        <SafeAreaView edges={['bottom']} style={styles.fabAnchor} pointerEvents="box-none">
+          <FabButton
+            icon={Icons.composePost}
+            onPress={() => router.push({ pathname: '/post/new', params: { circleId } })}
+            style={styles.fab}
+          />
+        </SafeAreaView>
+      </ThemedSafeAreaView>
 
       <PrivacyInfoModal visible={showPrivacyInfo} onClose={() => setShowPrivacyInfo(false)} />
     </ThemedView>
@@ -134,7 +146,15 @@ const styles = StyleSheet.create({
     // On top of the header's own bottom margin: the first row is feed
     // content arriving under fixed chrome, not the next line of it.
     paddingTop: Spacing.cardListGap,
-    paddingBottom: 100,
+    paddingBottom: LIST_BOTTOM_PADDING,
+  },
+  // Full width so the FAB still anchors bottom-right, without intercepting
+  // touches over the rest of that width (see `pointerEvents` on the JSX).
+  fabAnchor: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   fab: {
     position: 'absolute',

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Animated, PanResponder, Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Animated, PanResponder, Pressable, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon, type IconGlyph } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
@@ -55,7 +55,6 @@ export type SnackbarProps = Omit<MessageController, 'settle'> & {
 export function Snackbar({ message, visible, dismiss, onHidden }: SnackbarProps) {
   const theme = useTheme();
   const tints = useTints();
-  const insets = useSafeAreaInsets();
   const [opacity] = useState(() => new Animated.Value(0));
   const [lift] = useState(() => new Animated.Value(0));
   const [drag] = useState(() => new Animated.Value(0));
@@ -98,9 +97,12 @@ export function Snackbar({ message, visible, dismiss, onHidden }: SnackbarProps)
 
   return (
     // box-none, not none: the bar itself takes taps while the screen
-    // underneath keeps every one that lands outside it.
-    <View
-      style={[styles.host, { paddingBottom: insets.bottom + Spacing.pinnedButtonFromBottom }]}
+    // underneath keeps every one that lands outside it. Native
+    // `SafeAreaView`, not `useSafeAreaInsets`, whose value can arrive a
+    // render late and show as a visible snap into position.
+    <SafeAreaView
+      edges={['bottom']}
+      style={[styles.host, { paddingBottom: Spacing.pinnedButtonFromBottom }]}
       pointerEvents="box-none">
       <Animated.View
         {...pan.panHandlers}
@@ -135,7 +137,7 @@ export function Snackbar({ message, visible, dismiss, onHidden }: SnackbarProps)
           ) : null}
         </ThemedView>
       </Animated.View>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
@@ -43,7 +43,7 @@ export default function NewCircleScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
+      <ThemedSafeAreaView style={styles.safeArea}>
         <ScreenHeader title="New circle" />
 
         <KeyboardAvoider style={styles.form}>
@@ -102,7 +102,7 @@ export default function NewCircleScreen() {
             settings later.
           </ThemedText>
         </KeyboardAvoider>
-      </SafeAreaView>
+      </ThemedSafeAreaView>
     </ThemedView>
   );
 }

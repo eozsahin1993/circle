@@ -2,10 +2,11 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
 import { SocialSignInButton } from '@/components/social-sign-in-button';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -121,7 +122,7 @@ export default function WelcomeScreen() {
         </ThemedText>
       </PhotoPlaceholder>
 
-      <SafeAreaView edges={['bottom']} style={styles.content}>
+      <ThemedSafeAreaView edges={['bottom']} style={styles.content}>
         <ThemedText type="eyebrow" themeColor="accentBright">
           Hearth
         </ThemedText>
@@ -151,7 +152,7 @@ export default function WelcomeScreen() {
             How the privacy works
           </ThemedText>
         </Pressable>
-      </SafeAreaView>
+      </ThemedSafeAreaView>
     </ThemedView>
   );
 }

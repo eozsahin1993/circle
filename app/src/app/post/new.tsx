@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Switch, TextInput, View, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
@@ -57,7 +57,7 @@ export default function NewPostScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
+      <ThemedSafeAreaView style={styles.safeArea}>
         <ScreenHeader variant="close" />
 
         <ThemedText type="screenTitle">Create a post</ThemedText>
@@ -122,7 +122,7 @@ export default function NewPostScreen() {
             style={styles.postButton}
           />
         </KeyboardAvoider>
-      </SafeAreaView>
+      </ThemedSafeAreaView>
     </ThemedView>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Animated, Dimensions, Modal, Pressable, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { Avatar } from '@/components/avatar';
 import { Icon, type IconGlyph } from '@/components/icon';
@@ -98,7 +98,7 @@ export function ActionSheet({
           { transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [SLIDE_DISTANCE, 0] }) }] },
         ]}>
         <ThemedView style={styles.sheetOuter}>
-          <SafeAreaView edges={['bottom']} style={styles.sheetInner}>
+          <ThemedSafeAreaView edges={['bottom']} style={styles.sheetInner}>
             <View style={[styles.grabber, { backgroundColor: theme.faintest }]} />
 
             {title ? (
@@ -154,7 +154,7 @@ export function ActionSheet({
             </ThemedView>
 
             <SecondaryButton label="Cancel" style={styles.cancelButton} onPress={onClose} />
-          </SafeAreaView>
+          </ThemedSafeAreaView>
         </ThemedView>
       </Animated.View>
     </Modal>

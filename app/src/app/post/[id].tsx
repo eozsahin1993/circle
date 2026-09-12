@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { ActionSheet } from '@/components/action-sheet';
 import { Avatar } from '@/components/avatar';
@@ -200,7 +200,7 @@ export default function PostDetailsScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
+      <ThemedSafeAreaView style={styles.safeArea}>
         <View style={styles.headerInset}>
           <ScreenHeader
             title={circleName}
@@ -355,7 +355,7 @@ export default function PostDetailsScreen() {
             />
           </View>
         </KeyboardAvoider>
-      </SafeAreaView>
+      </ThemedSafeAreaView>
 
       {/* Says which photo it's about, since it covers the one behind it,
           and why the reader is allowed to delete it at all — the rule is

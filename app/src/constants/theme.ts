@@ -295,7 +295,7 @@ export const Spacing = {
    * independently.
    */
   gapWithinMemberEventBlock: 10,
-  pinnedButtonFromBottom: 34,
+  pinnedButtonFromBottom: 28,
 } as const;
 
 export const ButtonHeight = { primary: 52 } as const;

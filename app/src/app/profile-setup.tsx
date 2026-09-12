@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { Avatar } from '@/components/avatar';
 import { KeyboardAvoider } from '@/components/keyboard-avoider';
@@ -77,7 +77,7 @@ export default function ProfileSetupScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
+      <ThemedSafeAreaView style={styles.safeArea}>
         <ScreenHeader title="Your profile" />
 
         <KeyboardAvoider style={styles.form}>
@@ -134,7 +134,7 @@ export default function ProfileSetupScreen() {
             </ThemedText>
           </Pressable>
         </KeyboardAvoider>
-      </SafeAreaView>
+      </ThemedSafeAreaView>
     </ThemedView>
   );
 }
