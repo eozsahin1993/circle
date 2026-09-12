@@ -2,6 +2,7 @@ import { initDatabase } from '@/data/db';
 import { insertCircle } from '@/data/db/circles';
 import {
   getCircleMemberEvents,
+  getCircleMemberEventsSince,
   recordMemberAdded,
   recordMemberAddedLocally,
   recordMemberRemoved,
@@ -274,5 +275,47 @@ describe('getCircleMemberEvents', () => {
     });
 
     expect(await getCircleMemberEvents(circle.id)).toHaveLength(0);
+  });
+});
+
+describe('getCircleMemberEventsSince', () => {
+  test('excludes an event older than the floor', async () => {
+    const circle = await makeCircle();
+    await recordMemberAdded({
+      circleId: circle.id, epoch: 1, subjectPublicKey: key(), actorPublicKey: key(), occurredAt: 1_000,
+      profile: profile({ name: 'Old' }),
+    });
+    await recordMemberAdded({
+      circleId: circle.id, epoch: 2, subjectPublicKey: key(), actorPublicKey: key(), occurredAt: 5_000,
+      profile: profile({ name: 'New' }),
+    });
+
+    const events = await getCircleMemberEventsSince(circle.id, 2_000);
+    expect(events.map((event) => event.subjectName)).toEqual(['New']);
+  });
+
+  test('the floor is inclusive', async () => {
+    const circle = await makeCircle();
+    await recordMemberAdded({
+      circleId: circle.id, epoch: 1, subjectPublicKey: key(), actorPublicKey: key(), occurredAt: 2_000,
+      profile: profile({ name: 'RightOnTheFloor' }),
+    });
+
+    expect((await getCircleMemberEventsSince(circle.id, 2_000)).map((event) => event.subjectName)).toEqual(['RightOnTheFloor']);
+  });
+
+  test('an explicit upper bound is exclusive, for fetching just a later page’s new slice', async () => {
+    const circle = await makeCircle();
+    await recordMemberAdded({
+      circleId: circle.id, epoch: 1, subjectPublicKey: key(), actorPublicKey: key(), occurredAt: 1_000,
+      profile: profile({ name: 'InRange' }),
+    });
+    await recordMemberAdded({
+      circleId: circle.id, epoch: 2, subjectPublicKey: key(), actorPublicKey: key(), occurredAt: 3_000,
+      profile: profile({ name: 'AlreadyFetched' }),
+    });
+
+    const events = await getCircleMemberEventsSince(circle.id, 0, 3_000);
+    expect(events.map((event) => event.subjectName)).toEqual(['InRange']);
   });
 });

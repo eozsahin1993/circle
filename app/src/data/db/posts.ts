@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, ne, or } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, ne, or } from 'drizzle-orm';
 
 import { type Attachment, type NewAttachment } from '@/data/db/attachments';
 import { normalizeBlob } from '@/data/db/blob';
@@ -72,7 +72,7 @@ export type FeedPost = {
  * each log entry's order at append time, so ordering should come from
  * that server-assigned sequence instead.
  */
-/** Shared by `getCircleFeed` and `getFeedPost` — see the column-collision warning above. */
+/** Shared by `getCircleFeed`, `getCircleFeedPage` and `getFeedPost` — see the column-collision warning above. */
 function feedPostQuery() {
   return db
     .select({
@@ -99,26 +99,42 @@ function toFeedPost<T extends { authorPicture: Uint8Array | Buffer | null; photo
   return { ...row, authorPicture: normalizeBlob(row.authorPicture), hasPhoto: row.photoStatus === 'fetched' };
 }
 
+/** Every post in a circle, newest first, with no limit — mainly a test helper now that the feed screen itself pages through `getCircleFeedPage`. */
 export async function getCircleFeed(circleId: string): Promise<FeedPost[]> {
   const rows = await feedPostQuery().where(eq(posts.circleId, circleId)).orderBy(desc(posts.createdAt));
   return rows.map(toFeedPost);
 }
 
-/** A single feed row, for the post details screen — same shape `getCircleFeed` renders, just one post. */
+/** Identifies a post's position in the newest-first feed order — `id` only breaks a tie on `createdAt`, which alone isn't unique. */
+export type FeedCursor = { createdAt: number; id: string };
+
+export type FeedPage = { posts: FeedPost[]; hasMore: boolean };
+
+/**
+ * One page of the feed, newest first: everything strictly older than
+ * `cursor` (or the newest page, given `null`), up to `limit` posts, plus
+ * whether any older posts remain.
+ */
+export async function getCircleFeedPage(circleId: string, cursor: FeedCursor | null, limit: number): Promise<FeedPage> {
+  const rows = await feedPostQuery()
+    .where(
+      and(
+        eq(posts.circleId, circleId),
+        cursor ? or(lt(posts.createdAt, cursor.createdAt), and(eq(posts.createdAt, cursor.createdAt), lt(posts.id, cursor.id))) : undefined
+      )
+    )
+    .orderBy(desc(posts.createdAt), desc(posts.id))
+    .limit(limit + 1);
+
+  return { posts: rows.slice(0, limit).map(toFeedPost), hasMore: rows.length > limit };
+}
+
+/** A single feed row, for the post details screen — same shape `getCircleFeedPage` renders, just one post. */
 export async function getFeedPost(circleId: string, postId: string): Promise<FeedPost | null> {
   const rows = await feedPostQuery().where(and(eq(posts.circleId, circleId), eq(posts.id, postId)));
   return rows[0] ? toFeedPost(rows[0]) : null;
 }
 
-/**
- * The newest post's photo in a circle, or null — the circle list's cover
- * fallback, and nothing more.
- *
- * Exists because that list used to call `getCircleFeed` per circle, which
- * returns every post with its full photo bytes, to read exactly one
- * thumbnail. On a device with a few circles that dragged megabytes out of
- * SQLite and across the bridge on every visit to the list.
- */
 /**
  * The newest post that actually has its photo — id only, no bytes. The
  * circle list uses this as a cover fallback and resolves it through the
@@ -173,7 +189,7 @@ export type AlbumPhoto = {
 /**
  * Every photo in this circle's album, newest first.
  *
- * Ids and timestamps only, never `attachments.bytes` — see getCircleFeed's
+ * Ids and timestamps only, never `attachments.bytes` — see `FeedPost.hasPhoto`'s
  * doc comment on what pulling blobs through this driver costs. The grid
  * resolves each one through the photo cache instead, same as the feed.
  *

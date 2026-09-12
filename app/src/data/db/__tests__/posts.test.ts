@@ -7,11 +7,13 @@ import { deleteCircle, insertCircle } from '@/data/db/circles';
 import {
   getAlbumPhotos,
   getCircleFeed,
+  getCircleFeedPage,
   getPost,
   getUnseenCommentPostIds,
   insertPost,
   markPostViewed,
   setPostInAlbum,
+  type FeedCursor,
 } from '@/data/db/posts';
 
 const OWN_KEY = 'aa'.repeat(32);
@@ -127,6 +129,70 @@ describe('posts CRUD', () => {
     await deleteCircle(circle.id);
 
     await expect(getCircleFeed(circle.id)).resolves.toEqual([]);
+  });
+});
+
+describe('getCircleFeedPage', () => {
+  test('the first page is the newest `limit` posts, with no cursor', async () => {
+    const circle = await makeCircle();
+    const oldest = makePost(circle.id, { createdAt: 1000 });
+    const middle = makePost(circle.id, { createdAt: 2000 });
+    const newest = makePost(circle.id, { createdAt: 3000 });
+    await insertPost(oldest);
+    await insertPost(middle);
+    await insertPost(newest);
+
+    const page = await getCircleFeedPage(circle.id, null, 2);
+    expect(page.posts.map((p) => p.id)).toEqual([newest.id, middle.id]);
+    expect(page.hasMore).toBe(true);
+  });
+
+  test('hasMore is false once the last post is included', async () => {
+    const circle = await makeCircle();
+    await insertPost(makePost(circle.id, { createdAt: 1000 }));
+    await insertPost(makePost(circle.id, { createdAt: 2000 }));
+
+    const page = await getCircleFeedPage(circle.id, null, 2);
+    expect(page.hasMore).toBe(false);
+  });
+
+  test('a cursor continues strictly before the last post it named', async () => {
+    const circle = await makeCircle();
+    const oldest = makePost(circle.id, { createdAt: 1000 });
+    const middle = makePost(circle.id, { createdAt: 2000 });
+    const newest = makePost(circle.id, { createdAt: 3000 });
+    await insertPost(oldest);
+    await insertPost(middle);
+    await insertPost(newest);
+
+    const first = await getCircleFeedPage(circle.id, null, 2);
+    const cursor: FeedCursor = { createdAt: middle.createdAt, id: middle.id };
+    const second = await getCircleFeedPage(circle.id, cursor, 2);
+
+    expect(first.posts.map((p) => p.id)).toEqual([newest.id, middle.id]);
+    expect(second.posts.map((p) => p.id)).toEqual([oldest.id]);
+    expect(second.hasMore).toBe(false);
+  });
+
+  /** `createdAt` alone isn't unique — two posts sharing it still need a deterministic, gap-free split across pages. */
+  test('posts sharing a createdAt still split across pages without a gap or a repeat', async () => {
+    const circle = await makeCircle();
+    const a = makePost(circle.id, { createdAt: 1000, caption: 'a' });
+    const b = makePost(circle.id, { createdAt: 1000, caption: 'b' });
+    const c = makePost(circle.id, { createdAt: 1000, caption: 'c' });
+    await insertPost(a);
+    await insertPost(b);
+    await insertPost(c);
+
+    const first = await getCircleFeedPage(circle.id, null, 2);
+    expect(first.hasMore).toBe(true);
+    const cursor: FeedCursor = { createdAt: first.posts[1].createdAt, id: first.posts[1].id };
+    const second = await getCircleFeedPage(circle.id, cursor, 2);
+
+    const seenIds = [...first.posts, ...second.posts].map((p) => p.id);
+    expect(new Set(seenIds).size).toBe(3);
+    expect(seenIds.sort()).toEqual([a.id, b.id, c.id].sort());
+    expect(second.hasMore).toBe(false);
   });
 });
 

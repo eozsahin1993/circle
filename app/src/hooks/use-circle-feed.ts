@@ -6,7 +6,14 @@ import { usePostRows } from '@/components/feed/post-row';
 import { usePrivacyRows } from '@/components/feed/privacy-row';
 import { useRosterChangeRows } from '@/components/feed/roster-change-row';
 import { buildFeedRows, type FeedRow, type FeedRows } from '@/components/feed/rows';
-import { loadCircleFeed, type CircleFeed, type FeedPostView } from '@/domain/usecases/feed/circle-feed';
+import {
+  loadCircleFeedMeta,
+  loadCircleFeedPage,
+  type CircleFeedMeta,
+  type FeedCursor,
+  type FeedPostView,
+} from '@/domain/usecases/feed/circle-feed';
+import type { MemberEvent } from '@/data/db';
 import { onPhotoFetched } from '@/services/photo-events';
 import { showError } from '@/services/messages';
 import { nudgePhotoQueue } from '@/sync/photo-queue';
@@ -25,10 +32,24 @@ export type CircleFeedController = {
   circleName: string;
   memberCount: number;
   refreshing: boolean;
-  /** Re-read from disk — for the focus effect. */
+  /** Whether an older page exists to fetch — see `loadMore`. */
+  hasMore: boolean;
+  /** A page fetch is already in flight, for the footer spinner. */
+  loadingMore: boolean;
+  /** Fetches the next page and appends it — for the list's `onEndReached`. No-ops without a next page or while one's already in flight. */
+  loadMore: () => Promise<void>;
+  /** Re-read from disk — for the focus effect. Starts back over at the first page. */
   reload: () => Promise<void>;
   /** Sync, then re-read — for pull-to-refresh. */
   refresh: () => Promise<void>;
+};
+
+/** Everything paginated so far, accumulated across `loadMore` calls. */
+type LoadedFeed = {
+  meta: CircleFeedMeta;
+  posts: FeedPostView[];
+  events: MemberEvent[];
+  cursor: FeedCursor | null;
 };
 
 /**
@@ -44,8 +65,9 @@ export type CircleFeedController = {
  * else in the feed changes, and nothing here grows a branch.
  */
 export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): CircleFeedController {
-  const [feed, setFeed] = useState<CircleFeed | null>(null);
+  const [feed, setFeed] = useState<LoadedFeed | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   /** The one thing a post row can't do for itself — it doesn't hold the feed. */
   const patchPost = useCallback((postId: string, change: Partial<FeedPostView>) => {
@@ -72,11 +94,37 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
 
   const reload = useCallback(async () => {
     if (!circleId) return;
-    setFeed(await loadCircleFeed(circleId));
+    const meta = await loadCircleFeedMeta(circleId);
+    const page = await loadCircleFeedPage(circleId, meta, null);
+    setFeed({ meta, posts: page.posts, events: page.events, cursor: page.nextCursor });
     // Whichever kinds own state the feed's read doesn't cover refresh it
     // themselves — this doesn't need to know which those are.
     sourcesRef.current.forEach((source) => source.reload?.());
   }, [circleId]);
+
+  /**
+   * Appends the next page rather than replacing the feed — unlike
+   * `reload`, which always starts back over at the first page. No-ops
+   * quietly rather than throwing: `onEndReached` can fire more than once
+   * before state catches up, and there's nothing to show for a failure
+   * beyond what's already on screen.
+   */
+  const loadMore = useCallback(async () => {
+    if (!circleId || !feed || feed.cursor === null || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await loadCircleFeedPage(circleId, feed.meta, feed.cursor);
+      setFeed((current) =>
+        current
+          ? { ...current, posts: [...current.posts, ...page.posts], events: [...current.events, ...page.events], cursor: page.nextCursor }
+          : current,
+      );
+    } catch (err) {
+      console.error('Failed to load more of the feed', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [circleId, feed, loadingMore]);
 
   // A photo landing while its placeholder is on screen patches that one
   // row rather than reloading — a backlog of many photos landing one by
@@ -96,9 +144,9 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     circleId,
     patchPost,
     posts: feed?.posts ?? [],
-    profile: feed?.profile ?? null,
-    ownPublicKey: feed?.ownPublicKey ?? null,
-    ownIsAdmin: feed?.ownIsAdmin ?? false,
+    profile: feed?.meta.profile ?? null,
+    ownPublicKey: feed?.meta.ownPublicKey ?? null,
+    ownIsAdmin: feed?.meta.ownIsAdmin ?? false,
   });
   // The only other thing roster changes share a timeline with — see
   // roster-change-row.tsx for why a post's own timestamp is all it needs.
@@ -106,7 +154,7 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
   const rosterChanges = useRosterChangeRows({
     events: feed?.events ?? [],
     postTimestamps,
-    ownPublicKey: feed?.ownPublicKey ?? null,
+    ownPublicKey: feed?.meta.ownPublicKey ?? null,
   });
 
   /**
@@ -148,9 +196,12 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
 
   return {
     rows,
-    circleName: feed?.circleName ?? '',
-    memberCount: feed?.memberCount ?? 0,
+    circleName: feed?.meta.circleName ?? '',
+    memberCount: feed?.meta.memberCount ?? 0,
     refreshing,
+    hasMore: feed !== null && feed.cursor !== null,
+    loadingMore,
+    loadMore,
     reload,
     refresh,
   };

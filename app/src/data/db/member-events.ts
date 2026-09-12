@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, gte, isNull, lt } from 'drizzle-orm';
 
 import { db } from '@/data/db/connection';
 import { circleMembers, memberEvents } from '@/data/db/schema';
@@ -281,11 +281,48 @@ export type MemberEvent = {
  * reading it whole costs nothing.
  */
 export async function getCircleMemberEvents(circleId: string): Promise<MemberEvent[]> {
+  return queryCircleMemberEvents(circleId);
+}
+
+/**
+ * Every roster change in `[sinceOccurredAt, untilOccurredAt)` — the window
+ * one page of the feed needs. Either bound can be omitted for "no floor"
+ * or "no ceiling" rather than an in-range sentinel, since a real
+ * `occurredAt` could in principle be any value.
+ *
+ * `untilOccurredAt` only matters for a page after the first: a caller
+ * already holding everything from an earlier page's own `sinceOccurredAt`
+ * passes that value here, so this returns just the new slice instead of
+ * re-fetching what it already has. Omit it for the newest page, where
+ * there is no earlier boundary.
+ *
+ * `sinceOccurredAt` is what keeps a page's events groupable at all —
+ * `groupMemberEvents` needs to see every post that could split two events
+ * up, and that's only guaranteed once this window's floor matches the
+ * oldest post loaded alongside it (see loadCircleFeedPage). Omit it only
+ * for the very last page (no more posts left to load, so nothing can ever
+ * split an event again).
+ */
+export async function getCircleMemberEventsSince(
+  circleId: string,
+  sinceOccurredAt?: number,
+  untilOccurredAt?: number
+): Promise<MemberEvent[]> {
+  return queryCircleMemberEvents(circleId, sinceOccurredAt, untilOccurredAt);
+}
+
+async function queryCircleMemberEvents(circleId: string, sinceOccurredAt?: number, untilOccurredAt?: number): Promise<MemberEvent[]> {
   const [rows, roster] = await Promise.all([
     db
       .select()
       .from(memberEvents)
-      .where(eq(memberEvents.circleId, circleId))
+      .where(
+        and(
+          eq(memberEvents.circleId, circleId),
+          sinceOccurredAt !== undefined ? gte(memberEvents.occurredAt, sinceOccurredAt) : undefined,
+          untilOccurredAt !== undefined ? lt(memberEvents.occurredAt, untilOccurredAt) : undefined
+        )
+      )
       .orderBy(asc(memberEvents.epoch)),
     db
       .select({ identityPublicKey: circleMembers.identityPublicKey, name: circleMembers.name })

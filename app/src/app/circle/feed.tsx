@@ -1,6 +1,6 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View, type ViewToken } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View, type ViewToken } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FabButton } from '@/components/fab-button';
@@ -14,6 +14,7 @@ import { Icons, Spacing } from '@/constants/theme';
 import { markCircleViewed } from '@/data/db';
 import { askForPushOnCircle } from '@/domain/usecases/push/enable-push';
 import { useCircleFeed } from '@/hooks/use-circle-feed';
+import { useTheme } from '@/hooks/use-theme';
 
 /** Scroll clearance above the FAB. The safe-area inset itself is separate — see `ListFooterComponent`. */
 const LIST_BOTTOM_PADDING = 100;
@@ -32,7 +33,8 @@ export default function FeedScreen() {
     () => router.push({ pathname: '/circle/details', params: { circleId } }),
     [circleId],
   );
-  const { rows, circleName, memberCount, refreshing, reload, refresh } = useCircleFeed(circleId, {
+  const theme = useTheme();
+  const { rows, circleName, memberCount, refreshing, hasMore, loadingMore, loadMore, reload, refresh } = useCircleFeed(circleId, {
     justJoined: justJoined === '1',
     onPressPrivacy,
   });
@@ -109,8 +111,15 @@ export default function FeedScreen() {
             const index = rows.indexOf(leadingItem);
             return <ThemedView style={{ height: gapBetween(leadingItem, rows[index + 1]) }} />;
           }}
+          onEndReached={hasMore ? loadMore : undefined}
+          onEndReachedThreshold={2}
           // Native padding, not `useSafeAreaInsets` — see the FAB's comment below.
-          ListFooterComponent={<SafeAreaView edges={['bottom']} />}
+          ListFooterComponent={
+            <>
+              {loadingMore ? <ActivityIndicator color={theme.muted} style={styles.loadingMore} /> : null}
+              <SafeAreaView edges={['bottom']} />
+            </>
+          }
           contentContainerStyle={styles.list}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
@@ -147,6 +156,9 @@ const styles = StyleSheet.create({
     // content arriving under fixed chrome, not the next line of it.
     paddingTop: Spacing.cardListGap,
     paddingBottom: LIST_BOTTOM_PADDING,
+  },
+  loadingMore: {
+    paddingVertical: Spacing.cardListGap,
   },
   // Full width so the FAB still anchors bottom-right, without intercepting
   // touches over the rest of that width (see `pointerEvents` on the JSX).
