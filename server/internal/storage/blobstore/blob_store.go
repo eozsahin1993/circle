@@ -45,10 +45,13 @@ type Store interface {
 	// entryID they didn't create and overwrite it with a replacement that
 	// still decrypts successfully — a write token proves "a current
 	// member," never "the original author," so it can't close this alone.
-	// uploaderAccountID is recorded on the object for Delete to gate on
-	// later — the closest the relay can get to the clients' author rule,
-	// since the author's circle identity key is inside the ciphertext.
-	GetUploadTarget(ctx context.Context, syncID, entryID, uploaderAccountID string) (UploadTarget, error)
+	// uploaderPublicKey is recorded on the object, hex-encoded, for Delete
+	// to verify a signature against later — the uploader's own per-circle
+	// identity public key (see getCircleIdentity client-side), not the
+	// relay account, so it differs per circle and can't correlate one
+	// person across circles. See deleteblob/service.go for why Delete
+	// verifies a signature rather than comparing this value directly.
+	GetUploadTarget(ctx context.Context, syncID, entryID, uploaderPublicKey string) (UploadTarget, error)
 
 	// GetCoverPhotoUploadTarget returns a short-lived presigned POST for a
 	// circle's cover photo — always the same key (entryID "cover"; see
@@ -67,10 +70,10 @@ type Store interface {
 	// there — that's expected, not an error here.
 	GetDownloadURL(ctx context.Context, syncID, entryID string) (string, error)
 
-	// UploaderAccountID returns the account GetUploadTarget recorded, or
+	// UploaderPublicKey returns the key GetUploadTarget recorded, or
 	// ErrBlobNotFound if nothing is stored. Empty for a blob predating
 	// uploader recording: unknown, never a match.
-	UploaderAccountID(ctx context.Context, syncID, entryID string) (string, error)
+	UploaderPublicKey(ctx context.Context, syncID, entryID string) (string, error)
 
 	// Delete removes a blob's bytes — the one thing the relay ever
 	// removes. Idempotent, so the client can retry it. The entries naming

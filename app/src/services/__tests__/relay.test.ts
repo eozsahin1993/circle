@@ -216,37 +216,45 @@ describe('fetchEntries', () => {
 });
 
 describe('getUploadTarget', () => {
-  test('POSTs the hex-encoded write token in the body', async () => {
+  test('POSTs the hex-encoded write token and uploader public key in the body', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ url: 'https://s3/bucket', fields: { key: 'sync-a/post-1' } }));
     const writeToken = new Uint8Array([9, 9]);
+    const uploaderPublicKey = new Uint8Array([1, 2, 3]);
 
-    const result = await getUploadTarget('sync-a', 'post-1', writeToken);
+    const result = await getUploadTarget('sync-a', 'post-1', writeToken, uploaderPublicKey);
 
     expect(result).toEqual({ url: 'https://s3/bucket', fields: { key: 'sync-a/post-1' } });
     const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
     expect(url).toBe(`${RELAY_URL}/v1/circles/sync-a/entries/post-1/upload`);
     expect(init.method).toBe('POST');
-    expect(JSON.parse(init.body)).toEqual({ writeToken: bytesToHex(writeToken) });
+    expect(JSON.parse(init.body)).toEqual({
+      writeToken: bytesToHex(writeToken),
+      uploaderPublicKey: bytesToHex(uploaderPublicKey),
+    });
     expect(init.headers.Authorization).toBe(`Bearer ${AUTH_TOKEN}`);
   });
 
   test('throws BlobAlreadyExistsError specifically on a 409, distinct from other error statuses', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 409));
 
-    await expect(getUploadTarget('sync-a', 'post-1', new Uint8Array([1]))).rejects.toBeInstanceOf(BlobAlreadyExistsError);
+    await expect(getUploadTarget('sync-a', 'post-1', new Uint8Array([1]), new Uint8Array([1]))).rejects.toBeInstanceOf(
+      BlobAlreadyExistsError
+    );
   });
 
   test('throws a plain error on a non-409 error status', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 403));
 
-    const err = await getUploadTarget('sync-a', 'post-1', new Uint8Array([1])).catch((e) => e);
+    const err = await getUploadTarget('sync-a', 'post-1', new Uint8Array([1]), new Uint8Array([1])).catch((e) => e);
     expect(err).not.toBeInstanceOf(BlobAlreadyExistsError);
   });
 
   test('throws RateLimitedError specifically on a 429', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
 
-    await expect(getUploadTarget('sync-a', 'post-1', new Uint8Array([1]))).rejects.toBeInstanceOf(RateLimitedError);
+    await expect(getUploadTarget('sync-a', 'post-1', new Uint8Array([1]), new Uint8Array([1]))).rejects.toBeInstanceOf(
+      RateLimitedError
+    );
   });
 });
 

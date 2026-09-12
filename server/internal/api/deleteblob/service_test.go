@@ -15,11 +15,7 @@ import (
 	"circle-relay/internal/testsupport"
 )
 
-const (
-	uploaderAccount = "google:uploader"
-	otherAccount    = "google:someone-else"
-	entryID         = "entry-1"
-)
+const entryID = "entry-1"
 
 func newToken(t *testing.T) string {
 	t.Helper()
@@ -37,22 +33,28 @@ func hashToken(tokenHex string) string {
 }
 
 type circle struct {
-	syncID      string
-	writeToken  string
-	founderPub  ed25519.PublicKey
-	founderPriv ed25519.PrivateKey
-	service     *deleteblob.Service
-	blobStore   blobstore.Store
+	syncID       string
+	writeToken   string
+	founderPub   ed25519.PublicKey
+	founderPriv  ed25519.PrivateKey
+	uploaderPub  ed25519.PublicKey
+	uploaderPriv ed25519.PrivateKey
+	service      *deleteblob.Service
+	blobStore    blobstore.Store
 }
 
-// newCircle bootstraps a circle and uploads one blob as `uploaderAccount`,
-// so every test below starts from a blob that genuinely exists and carries
-// a known uploader.
+// newCircle bootstraps a circle and uploads one blob under a fresh
+// uploader keypair, so every test below starts from a blob that
+// genuinely exists and carries a known uploader public key.
 func newCircle(t *testing.T) circle {
 	t.Helper()
 	ctx := context.Background()
 
 	founderPub, founderPriv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uploaderPub, uploaderPriv, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,32 +66,40 @@ func newCircle(t *testing.T) circle {
 	}
 
 	blobStore := testsupport.NewBlobStore(t)
-	target, err := blobStore.GetUploadTarget(ctx, syncID, entryID, uploaderAccount)
+	target, err := blobStore.GetUploadTarget(ctx, syncID, entryID, hex.EncodeToString(uploaderPub))
 	if err != nil {
 		t.Fatal(err)
 	}
 	testsupport.UploadBlob(t, target, []byte("ciphertext"))
 
 	return circle{
-		syncID:      syncID,
-		writeToken:  writeToken,
-		founderPub:  founderPub,
-		founderPriv: founderPriv,
-		service:     &deleteblob.Service{BlobStore: blobStore, LogStore: logStore},
-		blobStore:   blobStore,
+		syncID:       syncID,
+		writeToken:   writeToken,
+		founderPub:   founderPub,
+		founderPriv:  founderPriv,
+		uploaderPub:  uploaderPub,
+		uploaderPriv: uploaderPriv,
+		service:      &deleteblob.Service{BlobStore: blobStore, LogStore: logStore},
+		blobStore:    blobStore,
 	}
+}
+
+// uploaderSignature signs the delete-blob message as the true uploader —
+// what a legitimate self-delete sends as UploaderSignature.
+func (c circle) uploaderSignature() string {
+	return hex.EncodeToString(ed25519.Sign(c.uploaderPriv, logstore.DeleteBlobMessage(c.syncID, entryID)))
 }
 
 func (c circle) gone(t *testing.T) bool {
 	t.Helper()
-	_, err := c.blobStore.UploaderAccountID(context.Background(), c.syncID, entryID)
+	_, err := c.blobStore.UploaderPublicKey(context.Background(), c.syncID, entryID)
 	return errors.Is(err, blobstore.ErrBlobNotFound)
 }
 
-func TestService_Delete_AllowsTheAccountThatUploaded(t *testing.T) {
+func TestService_Delete_AllowsTheUploaderWhoSigns(t *testing.T) {
 	c := newCircle(t)
 
-	if err := c.service.Delete(context.Background(), c.syncID, entryID, c.writeToken, uploaderAccount, "", nil); err != nil {
+	if err := c.service.Delete(context.Background(), c.syncID, entryID, c.writeToken, c.uploaderSignature(), "", nil); err != nil {
 		t.Fatal(err)
 	}
 	if !c.gone(t) {
@@ -106,7 +116,30 @@ func TestService_Delete_AllowsTheAccountThatUploaded(t *testing.T) {
 func TestService_Delete_RefusesAnotherMemberWithNoSignature(t *testing.T) {
 	c := newCircle(t)
 
-	err := c.service.Delete(context.Background(), c.syncID, entryID, c.writeToken, otherAccount, "", nil)
+	err := c.service.Delete(context.Background(), c.syncID, entryID, c.writeToken, "", "", nil)
+	if !errors.Is(err, deleteblob.ErrNotUploader) {
+		t.Fatalf("expected ErrNotUploader, got %v", err)
+	}
+	if c.gone(t) {
+		t.Fatal("expected the blob to survive a refused delete")
+	}
+}
+
+/**
+ * The whole point of verifying a signature rather than comparing a bare
+ * value: the recorded public key is exactly what every member already
+ * sees for attribution, so merely knowing it proves nothing — only the
+ * matching private key does.
+ */
+func TestService_Delete_RefusesASignatureFromAnyOtherKey(t *testing.T) {
+	c := newCircle(t)
+	_, strangerPriv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	forged := hex.EncodeToString(ed25519.Sign(strangerPriv, logstore.DeleteBlobMessage(c.syncID, entryID)))
+
+	err = c.service.Delete(context.Background(), c.syncID, entryID, c.writeToken, forged, "", nil)
 	if !errors.Is(err, deleteblob.ErrNotUploader) {
 		t.Fatalf("expected ErrNotUploader, got %v", err)
 	}
@@ -120,7 +153,7 @@ func TestService_Delete_AllowsAnAdminWhoDidNotUpload(t *testing.T) {
 	signature := ed25519.Sign(c.founderPriv, logstore.DeleteBlobMessage(c.syncID, entryID))
 
 	err := c.service.Delete(
-		context.Background(), c.syncID, entryID, c.writeToken, otherAccount, hex.EncodeToString(c.founderPub), signature,
+		context.Background(), c.syncID, entryID, c.writeToken, "", hex.EncodeToString(c.founderPub), signature,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -139,7 +172,7 @@ func TestService_Delete_RejectsAnAuthorityKeyNotInTheAuthoritySet(t *testing.T) 
 	signature := ed25519.Sign(strangerPriv, logstore.DeleteBlobMessage(c.syncID, entryID))
 
 	err = c.service.Delete(
-		context.Background(), c.syncID, entryID, c.writeToken, otherAccount, hex.EncodeToString(strangerPub), signature,
+		context.Background(), c.syncID, entryID, c.writeToken, "", hex.EncodeToString(strangerPub), signature,
 	)
 	if !errors.Is(err, logstore.ErrAuthorityNotRecognized) {
 		t.Fatalf("expected ErrAuthorityNotRecognized, got %v", err)
@@ -152,7 +185,7 @@ func TestService_Delete_RejectsASignatureOverAnotherEntry(t *testing.T) {
 	signature := ed25519.Sign(c.founderPriv, logstore.DeleteBlobMessage(c.syncID, "some-other-entry"))
 
 	err := c.service.Delete(
-		context.Background(), c.syncID, entryID, c.writeToken, otherAccount, hex.EncodeToString(c.founderPub), signature,
+		context.Background(), c.syncID, entryID, c.writeToken, "", hex.EncodeToString(c.founderPub), signature,
 	)
 	if !errors.Is(err, logstore.ErrInvalidSignature) {
 		t.Fatalf("expected ErrInvalidSignature, got %v", err)
@@ -162,7 +195,7 @@ func TestService_Delete_RejectsASignatureOverAnotherEntry(t *testing.T) {
 func TestService_Delete_RejectsAWrongWriteToken(t *testing.T) {
 	c := newCircle(t)
 
-	err := c.service.Delete(context.Background(), c.syncID, entryID, newToken(t), uploaderAccount, "", nil)
+	err := c.service.Delete(context.Background(), c.syncID, entryID, newToken(t), c.uploaderSignature(), "", nil)
 	if !errors.Is(err, logstore.ErrWriteTokenMismatch) {
 		t.Fatalf("expected ErrWriteTokenMismatch, got %v", err)
 	}
@@ -173,10 +206,10 @@ func TestService_Delete_IsIdempotent(t *testing.T) {
 	c := newCircle(t)
 	ctx := context.Background()
 
-	if err := c.service.Delete(ctx, c.syncID, entryID, c.writeToken, uploaderAccount, "", nil); err != nil {
+	if err := c.service.Delete(ctx, c.syncID, entryID, c.writeToken, c.uploaderSignature(), "", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.service.Delete(ctx, c.syncID, entryID, c.writeToken, uploaderAccount, "", nil); err != nil {
+	if err := c.service.Delete(ctx, c.syncID, entryID, c.writeToken, c.uploaderSignature(), "", nil); err != nil {
 		t.Fatalf("expected deleting an already-deleted blob to succeed, got %v", err)
 	}
 }

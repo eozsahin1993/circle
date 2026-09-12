@@ -36,9 +36,9 @@ const (
 	blobContentType = "application/octet-stream"
 
 	// Two spellings of one thing: S3 owns the `x-amz-meta-` prefix and
-	// strips it on the way back out, so writing and reading differ. Holds
-	// the relay account, not the circle identity that authored the post.
-	uploaderMetadataKey = "uploader-account-id"
+	// strips it on the way back out, so writing and reading differ. See
+	// blobstore.Store.GetUploadTarget for what this value actually is.
+	uploaderMetadataKey = "uploader-public-key"
 	uploaderField       = "x-amz-meta-" + uploaderMetadataKey
 )
 
@@ -60,7 +60,7 @@ var _ blobstore.Store = (*Store)(nil)
 
 // GetUploadTarget checks for an existing object first (see the interface
 // doc for why), then hands off to presignUpload.
-func (s *Store) GetUploadTarget(ctx context.Context, syncID, entryID, uploaderAccountID string) (blobstore.UploadTarget, error) {
+func (s *Store) GetUploadTarget(ctx context.Context, syncID, entryID, uploaderPublicKey string) (blobstore.UploadTarget, error) {
 	key := blobKey(syncID, entryID)
 	_, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(s.bucketName), Key: aws.String(key)})
 	if err == nil {
@@ -70,7 +70,7 @@ func (s *Store) GetUploadTarget(ctx context.Context, syncID, entryID, uploaderAc
 	if !errors.As(err, &notFound) {
 		return blobstore.UploadTarget{}, err
 	}
-	return s.presignUpload(ctx, key, uploaderAccountID)
+	return s.presignUpload(ctx, key, uploaderPublicKey)
 }
 
 // coverPhotoEntryID is the fixed "entryID" a circle's cover photo always
@@ -93,15 +93,15 @@ func (s *Store) GetCoverPhotoUploadTarget(ctx context.Context, syncID string) (b
 // and a pinned Content-Type, so S3 itself rejects an oversized or
 // mistyped upload. Unlike Key, ContentType on PutObjectInput isn't picked
 // up by PresignPostObject on its own — both need adding explicitly.
-// The uploader rides in under a *signed* policy condition, so the client
-// must send back exactly the account the relay put there.
-func (s *Store) presignUpload(ctx context.Context, key, uploaderAccountID string) (blobstore.UploadTarget, error) {
+// The public key rides in under a *signed* policy condition, so the
+// client must send back exactly the value the relay put there.
+func (s *Store) presignUpload(ctx context.Context, key, uploaderPublicKey string) (blobstore.UploadTarget, error) {
 	conditions := []any{
 		[]any{"content-length-range", 1, s.maxBlobSize},
 		map[string]any{"Content-Type": blobContentType},
 	}
-	if uploaderAccountID != "" {
-		conditions = append(conditions, map[string]any{uploaderField: uploaderAccountID})
+	if uploaderPublicKey != "" {
+		conditions = append(conditions, map[string]any{uploaderField: uploaderPublicKey})
 	}
 
 	req, err := s.presignClient.PresignPostObject(ctx, &s3.PutObjectInput{
@@ -115,14 +115,14 @@ func (s *Store) presignUpload(ctx context.Context, key, uploaderAccountID string
 		return blobstore.UploadTarget{}, err
 	}
 	req.Values["Content-Type"] = blobContentType
-	if uploaderAccountID != "" {
-		req.Values[uploaderField] = uploaderAccountID
+	if uploaderPublicKey != "" {
+		req.Values[uploaderField] = uploaderPublicKey
 	}
 	return blobstore.UploadTarget{URL: req.URL, Fields: req.Values}, nil
 }
 
-// UploaderAccountID reads back what presignUpload recorded.
-func (s *Store) UploaderAccountID(ctx context.Context, syncID, entryID string) (string, error) {
+// UploaderPublicKey reads back what presignUpload recorded.
+func (s *Store) UploaderPublicKey(ctx context.Context, syncID, entryID string) (string, error) {
 	head, err := s.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(s.bucketName),
 		Key:    aws.String(blobKey(syncID, entryID)),

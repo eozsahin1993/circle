@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"circle-relay/integration/harness"
+	"circle-relay/internal/storage/logstore"
 )
 
 // getuploadtarget, getblob, deleteblob and getcoverphotouploadtarget, end
@@ -128,7 +129,7 @@ func TestDeleteBlob_TheUploaderCanDeleteTheirOwnBlob(t *testing.T) {
 
 	putBlob(t, c, entryID, []byte("mine to remove"))
 
-	c.DeleteBlob(entryID, c.NewDeleteBlob()).Expect(http.StatusNoContent)
+	c.DeleteBlob(entryID, c.NewDeleteBlob(entryID)).Expect(http.StatusNoContent)
 
 	c.GetBlob(entryID).Expect(http.StatusNotFound)
 }
@@ -144,10 +145,81 @@ func TestDeleteBlob_AnotherMemberWithNoSignatureIsRefused(t *testing.T) {
 	// in the same circle. This is the gap the endpoint exists to close: a
 	// member who didn't upload it can't destroy it just by being a member.
 	other := c.As(r.SignIn())
-	other.DeleteBlob(entryID, other.NewDeleteBlob()).Expect(http.StatusForbidden)
+	other.DeleteBlob(entryID, other.NewDeleteBlob(entryID)).Expect(http.StatusForbidden)
 
 	got := c.GetBlob(entryID).Expect(http.StatusOK)
 	harness.AssertTrue(t, len(got.Bytes()) > 0, "expected the blob to survive a refused delete")
+}
+
+/**
+ * The property the signature scheme exists to guarantee: the uploader's
+ * public key is never secret (attribution already shows it to every
+ * member, and it's recorded in plain S3 metadata besides) — so an
+ * attacker who knows it exactly, byte for byte, still can't forge a
+ * delete without the matching private key. Knowing the padlock doesn't
+ * open it; only the key does.
+ */
+func TestDeleteBlob_KnowingTheUploaderPublicKeyDoesNotLetAnotherMemberForgeTheSignature(t *testing.T) {
+	r := harness.Start(t)
+	c := harness.NewCircle(t, r)
+	entryID := harness.Suffix()
+
+	// Uploaded under an explicit identity (rather than c's own default)
+	// so the test can hold onto its exact public key — standing in for
+	// an attacker who read it straight off the blob's own metadata.
+	uploader := harness.NewAuthority(t)
+	var target harness.UploadTarget
+	c.GetUploadTarget(entryID, harness.UploadRequest{
+		WriteToken:        c.Token.Raw,
+		UploaderPublicKey: uploader.PublicKey(),
+	}).Expect(http.StatusOK).Decode(&target)
+	uploadBytes(t, target, []byte("mine, not yours"))
+
+	// A different member, with their own genuine identity key, can see
+	// exactly which public key to target but has no way to sign for it.
+	impostor := harness.NewAuthority(t)
+	forgedSignature := impostor.Sign(logstore.DeleteBlobMessage(c.SyncID, entryID))
+	c.DeleteBlob(entryID, harness.DeleteBlobRequest{
+		WriteToken:        c.Token.Raw,
+		UploaderSignature: forgedSignature,
+	}).Expect(http.StatusForbidden)
+
+	got := c.GetBlob(entryID).Expect(http.StatusOK)
+	harness.AssertTrue(t, len(got.Bytes()) > 0, "expected the blob to survive a refused delete")
+}
+
+/** Binds a signature to the one entry it names — the same uploader's key can't authorize deleting a different photo. */
+func TestDeleteBlob_ASignatureForOneEntryDoesNotAuthorizeAnother(t *testing.T) {
+	r := harness.Start(t)
+	c := harness.NewCircle(t, r)
+	entryA := harness.Suffix()
+	entryB := harness.Suffix()
+
+	putBlob(t, c, entryA, []byte("first"))
+	putBlob(t, c, entryB, []byte("second"))
+
+	// Genuinely valid, but only for entryA.
+	signedForA := c.NewDeleteBlob(entryA)
+	c.DeleteBlob(entryB, signedForA).Expect(http.StatusForbidden)
+
+	c.GetBlob(entryA).Expect(http.StatusOK)
+	c.GetBlob(entryB).Expect(http.StatusOK)
+}
+
+/** Garbage input is a clean refusal, not a crash — ed25519.Verify panics on a wrong-length key, so length has to be checked before it's ever called. */
+func TestDeleteBlob_MalformedUploaderSignatureIsRefusedCleanly(t *testing.T) {
+	r := harness.Start(t)
+	c := harness.NewCircle(t, r)
+	entryID := harness.Suffix()
+
+	putBlob(t, c, entryID, []byte("mine to remove"))
+
+	c.DeleteBlob(entryID, harness.DeleteBlobRequest{
+		WriteToken:        c.Token.Raw,
+		UploaderSignature: "not even hex",
+	}).Expect(http.StatusForbidden)
+
+	c.GetBlob(entryID).Expect(http.StatusOK)
 }
 
 func TestDeleteBlob_AnAdminSignatureDeletesSomeoneElsesUpload(t *testing.T) {

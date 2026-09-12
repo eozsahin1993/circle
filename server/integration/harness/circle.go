@@ -333,11 +333,12 @@ type UploadTarget struct {
 // internal/api/getuploadtarget. Membership alone, since an entry's blob
 // is first-upload-wins and can't be overwritten.
 type UploadRequest struct {
-	WriteToken string `json:"writeToken"`
+	WriteToken        string `json:"writeToken"`
+	UploaderPublicKey string `json:"uploaderPublicKey"`
 }
 
 func (c *Circle) NewUpload() UploadRequest {
-	return UploadRequest{WriteToken: c.Token.Raw}
+	return UploadRequest{WriteToken: c.Token.Raw, UploaderPublicKey: c.Device.identity.PublicKey()}
 }
 
 func (c *Circle) GetUploadTarget(entryID string, req UploadRequest) Response {
@@ -353,20 +354,24 @@ func (c *Circle) GetBlob(entryID string) Response {
 
 // DeleteBlobRequest is POST
 // /circles/{syncId}/entries/{entryId}/delete-blob — see
-// internal/api/deleteblob. The authority fields are optional: the
-// uploading account needs neither, since the session already says who
-// that is. Anyone else needs an admin signature over
-// logstore.DeleteBlobMessage.
+// internal/api/deleteblob. UploaderSignature and the authority fields are
+// each independently optional: the uploader sends only UploaderSignature,
+// anyone else needs AuthorityPublicKey + AuthoritySignature over
+// logstore.DeleteBlobMessage instead.
 type DeleteBlobRequest struct {
 	WriteToken         string `json:"writeToken"`
+	UploaderSignature  string `json:"uploaderSignature"`
 	AuthorityPublicKey string `json:"authorityPublicKey"`
-	Signature          string `json:"signature"`
+	AuthoritySignature string `json:"authoritySignature"`
 }
 
-// NewDeleteBlob deletes as the uploader — no signature, which is the
-// whole point of that path.
-func (c *Circle) NewDeleteBlob() DeleteBlobRequest {
-	return DeleteBlobRequest{WriteToken: c.Token.Raw}
+// NewDeleteBlob deletes as the uploader, signing entryID's delete message
+// with this device's own identity key — the same key its upload recorded.
+func (c *Circle) NewDeleteBlob(entryID string) DeleteBlobRequest {
+	return DeleteBlobRequest{
+		WriteToken:        c.Token.Raw,
+		UploaderSignature: c.Device.identity.Sign(logstore.DeleteBlobMessage(c.SyncID, entryID)),
+	}
 }
 
 // NewAdminDeleteBlob deletes somebody else's upload, signed by signer.
@@ -374,7 +379,7 @@ func (c *Circle) NewAdminDeleteBlob(entryID string, signer Authority) DeleteBlob
 	return DeleteBlobRequest{
 		WriteToken:         c.Token.Raw,
 		AuthorityPublicKey: signer.PublicKey(),
-		Signature:          signer.Sign(logstore.DeleteBlobMessage(c.SyncID, entryID)),
+		AuthoritySignature: signer.Sign(logstore.DeleteBlobMessage(c.SyncID, entryID)),
 	}
 }
 

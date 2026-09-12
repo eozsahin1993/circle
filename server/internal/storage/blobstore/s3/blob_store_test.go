@@ -22,7 +22,7 @@ func TestGetUploadTarget_RefusesOnceABlobExists(t *testing.T) {
 	ctx := t.Context()
 	syncID := testsupport.UniqueSyncID(t)
 
-	retryTarget, err := store.GetUploadTarget(ctx, syncID, "entry-1", "google:uploader")
+	retryTarget, err := store.GetUploadTarget(ctx, syncID, "entry-1", "circle-scoped-public-key-uploader")
 	if err != nil {
 		t.Fatalf("expected a retry before any upload has succeeded to still work: %v", err)
 	}
@@ -30,7 +30,7 @@ func TestGetUploadTarget_RefusesOnceABlobExists(t *testing.T) {
 		t.Fatalf("upload failed: %d %s", status, body)
 	}
 
-	if _, err := store.GetUploadTarget(ctx, syncID, "entry-1", "google:uploader"); !errors.Is(err, blobstore.ErrBlobAlreadyExists) {
+	if _, err := store.GetUploadTarget(ctx, syncID, "entry-1", "circle-scoped-public-key-uploader"); !errors.Is(err, blobstore.ErrBlobAlreadyExists) {
 		t.Fatalf("expected ErrBlobAlreadyExists once a blob has actually landed, got %v", err)
 	}
 }
@@ -49,7 +49,7 @@ func TestGetUploadTarget_RoundTrip(t *testing.T) {
 	store := testsupport.NewBlobStore(t)
 	ctx := t.Context()
 
-	target, err := store.GetUploadTarget(ctx, testsupport.UniqueSyncID(t), "entry-1", "google:uploader")
+	target, err := store.GetUploadTarget(ctx, testsupport.UniqueSyncID(t), "entry-1", "circle-scoped-public-key-uploader")
 	if err != nil {
 		t.Fatalf("GetUploadTarget: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestGetUploadTarget_RejectsOversizedBlob(t *testing.T) {
 	store := testsupport.NewBlobStore(t)
 	ctx := t.Context()
 
-	target, err := store.GetUploadTarget(ctx, testsupport.UniqueSyncID(t), "entry-1", "google:uploader")
+	target, err := store.GetUploadTarget(ctx, testsupport.UniqueSyncID(t), "entry-1", "circle-scoped-public-key-uploader")
 	if err != nil {
 		t.Fatalf("GetUploadTarget: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestDeleteCircle_RemovesEveryBlobUnderThePrefixAndNothingElse(t *testing.T)
 		{syncID, "entry-2"},
 		{neighbour, "entry-1"},
 	} {
-		target, err := store.GetUploadTarget(ctx, blob.sync, blob.entry, "google:uploader")
+		target, err := store.GetUploadTarget(ctx, blob.sync, blob.entry, "circle-scoped-public-key-uploader")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -151,11 +151,11 @@ func TestDeleteCircle_RemovesEveryBlobUnderThePrefixAndNothingElse(t *testing.T)
 	}
 
 	for _, entryID := range []string{"entry-1", "entry-2", "cover"} {
-		if _, err := store.UploaderAccountID(ctx, syncID, entryID); !errors.Is(err, blobstore.ErrBlobNotFound) {
+		if _, err := store.UploaderPublicKey(ctx, syncID, entryID); !errors.Is(err, blobstore.ErrBlobNotFound) {
 			t.Fatalf("expected %s swept, got %v", entryID, err)
 		}
 	}
-	if _, err := store.UploaderAccountID(ctx, neighbour, "entry-1"); err != nil {
+	if _, err := store.UploaderPublicKey(ctx, neighbour, "entry-1"); err != nil {
 		t.Fatalf("a circle whose syncID merely extends the deleted one must be untouched: %v", err)
 	}
 }

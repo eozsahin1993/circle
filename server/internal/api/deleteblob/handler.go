@@ -6,18 +6,19 @@ import (
 	"errors"
 	"net/http"
 
-	"circle-relay/internal/api/auth"
 	"circle-relay/internal/api/circleerrors"
 	"circle-relay/internal/httputil"
 )
 
 // Credentials in the body — see getuploadtarget's handler.go for why.
-// authorityPublicKey and signature are optional: the uploading account
-// needs neither, and the session already says who that is.
+// Both signatures are optional and independent: the original uploader
+// sends uploaderSignature and needs nothing else; anyone deleting someone
+// else's blob needs authorityPublicKey + authoritySignature instead.
 type request struct {
 	WriteToken         string `json:"writeToken"`
+	UploaderSignature  string `json:"uploaderSignature"`
 	AuthorityPublicKey string `json:"authorityPublicKey"`
-	Signature          string `json:"signature"`
+	AuthoritySignature string `json:"authoritySignature"`
 }
 
 type Handler struct {
@@ -42,14 +43,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var signature []byte
-	if req.Signature != "" {
-		decoded, err := hex.DecodeString(req.Signature)
+	var authoritySignature []byte
+	if req.AuthoritySignature != "" {
+		decoded, err := hex.DecodeString(req.AuthoritySignature)
 		if err != nil {
-			httputil.WriteError(w, http.StatusBadRequest, "signature must be hex")
+			httputil.WriteError(w, http.StatusBadRequest, "authoritySignature must be hex")
 			return
 		}
-		signature = decoded
+		authoritySignature = decoded
 	}
 
 	err := h.Service.Delete(
@@ -57,9 +58,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		syncID,
 		entryID,
 		req.WriteToken,
-		auth.AccountID(r.Context()),
+		req.UploaderSignature,
 		req.AuthorityPublicKey,
-		signature,
+		authoritySignature,
 	)
 	if errors.Is(err, ErrNotUploader) {
 		httputil.WriteError(w, http.StatusForbidden, "only the uploader or an admin can delete this blob")

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"circle-relay/internal/api/auth"
 	"circle-relay/internal/api/circleerrors"
 	"circle-relay/internal/httputil"
 )
@@ -16,7 +15,8 @@ import (
 // request-body capture. Same reasoning as appendlog/rotatelog already
 // putting their sensitive fields in the body.
 type request struct {
-	WriteToken string `json:"writeToken"`
+	WriteToken        string `json:"writeToken"`
+	UploaderPublicKey string `json:"uploaderPublicKey"`
 }
 
 type response struct {
@@ -45,8 +45,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusBadRequest, "writeToken is required")
 		return
 	}
+	if req.UploaderPublicKey == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "uploaderPublicKey is required")
+		return
+	}
 
-	target, err := h.Service.UploadTarget(r.Context(), syncID, entryID, req.WriteToken, auth.AccountID(r.Context()))
+	target, err := h.Service.UploadTarget(r.Context(), syncID, entryID, req.WriteToken, req.UploaderPublicKey)
 	if err != nil {
 		status, message := circleerrors.Status(err) // covers both a logstore write-token rejection and blobstore.ErrBlobAlreadyExists
 		httputil.WriteError(w, status, message)

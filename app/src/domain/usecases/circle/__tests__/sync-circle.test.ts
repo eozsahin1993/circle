@@ -98,7 +98,7 @@ test('drainOutbox obtains an upload target, uploads the blob, appends the entry,
 
   await drainOutbox(circleId);
 
-  expect(getUploadTarget).toHaveBeenCalledWith(expect.any(String), post.id, expect.any(Uint8Array));
+  expect(getUploadTarget).toHaveBeenCalledWith(expect.any(String), post.id, expect.any(Uint8Array), expect.any(Uint8Array));
   const [uploadTarget, uploadedBytes] = (uploadBlob as jest.Mock).mock.calls[0];
   expect(uploadTarget).toEqual({ url: 'https://s3', fields: {} });
   expect(uploadedBytes).not.toEqual(photo);

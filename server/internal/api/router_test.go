@@ -225,7 +225,8 @@ func TestEndToEnd_BootstrapAppendFetchRotateAndDownload(t *testing.T) {
 	// 6. Upload target — gated by the (post-rotation, still current)
 	// write token, keyed by entryId rather than epoch. POST with the
 	// token in the body, same reasoning as the cover-photo target above.
-	uploadResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/entries/post-1/upload", authToken, `{"writeToken":"`+writeToken+`"}`)
+	uploadResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/entries/post-1/upload", authToken,
+		`{"writeToken":"`+writeToken+`","uploaderPublicKey":"`+hex.EncodeToString(strangerPub)+`"}`)
 	defer uploadResp.Body.Close()
 	if uploadResp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403 for an upload target requested with the pre-rotation write token, got %d", uploadResp.StatusCode)

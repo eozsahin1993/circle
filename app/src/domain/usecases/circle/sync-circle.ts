@@ -3,7 +3,7 @@ import { notifyCircleBestEffort } from '@/domain/usecases/push/notify-circle';
 import { PushCategories, type PushCategory } from '@/domain/usecases/push/push-categories';
 import { EntryTypes } from '@/domain/usecases/circle/log-entry';
 import { timed, timedSync } from '@/services/timing';
-import { getCurrentContentKey, getMasterSeed } from '@/services/keystore';
+import { getCircleIdentity, getCurrentContentKey, getMasterSeed } from '@/services/keystore';
 import {
   deriveAuthorityChangeMessage,
   deriveAuthorityKeypair,
@@ -128,12 +128,12 @@ export function drainOutbox(circleId: string): Promise<void> {
 }
 
 /**
- * Deletes a blob whose entry has just landed, signing as an authority
- * when this device has that key — the relay lets the uploading account
- * through without one, and needs one from anybody else (see
- * `deleteBlob`). Signing unconditionally costs nothing and saves knowing,
- * at drain time, whether this device wrote the photo: the post's row is
- * already gone by then.
+ * Deletes a blob whose entry has just landed, signing both as its own
+ * circle identity and as an authority when this device has that key —
+ * the relay accepts either signature, and needs one from anybody else
+ * (see `deleteBlob`). Signing unconditionally costs nothing and saves
+ * knowing, at drain time, whether this device wrote the photo: the
+ * post's row is already gone by then.
  *
  * A refusal is logged and passed over rather than thrown. The bytes are
  * cleanup; the entry is the truth, and it has already landed. Throwing
@@ -141,6 +141,8 @@ export function drainOutbox(circleId: string): Promise<void> {
  * it, which is a much worse outcome than one blob outliving its post.
  */
 async function deleteBlobFor(circleId: string, syncId: string, blobEntryId: string, writeToken: Uint8Array): Promise<void> {
+  const identity = await getCircleIdentity(circleId);
+  const uploaderSignature = identity ? sign(deriveDeleteBlobMessage(syncId, blobEntryId), identity.secretKey) : undefined;
   const masterSeed = await getMasterSeed();
   const authority = masterSeed
     ? (() => {
@@ -153,7 +155,7 @@ async function deleteBlobFor(circleId: string, syncId: string, blobEntryId: stri
     : undefined;
 
   try {
-    await deleteBlob(syncId, blobEntryId, writeToken, authority);
+    await deleteBlob(syncId, blobEntryId, writeToken, uploaderSignature, authority);
   } catch (err) {
     if (!(err instanceof BlobDeleteRefusedError)) throw err;
     console.error(`The relay refused to delete blob ${blobEntryId}`, err);
@@ -233,6 +235,8 @@ async function pushPendingEntries(circleId: string): Promise<void> {
   const current = await getCurrentContentKey(circleId);
   if (!current) throw new Error('No content key on this device.');
   const writeToken = deriveWriteToken(current.key);
+  const identity = await getCircleIdentity(circleId);
+  if (!identity) throw new Error('No circle identity on this device.');
 
   const pending = await getPendingOutboxEntries(circleId);
   for (const entry of pending) {
@@ -248,7 +252,7 @@ async function pushPendingEntries(circleId: string): Promise<void> {
       const attachment = await getAttachment(circleId, entry.entryId);
       if (attachment?.bytes) {
         try {
-          const target = await getUploadTarget(circle.syncId, entry.entryId, writeToken);
+          const target = await getUploadTarget(circle.syncId, entry.entryId, writeToken, identity.publicKey);
           const ciphertext = timedSync(
             `push.encrypt(${Math.round(attachment.bytes.length / 1024)}KB)`,
             () => encrypt(attachment.bytes!, current.key)

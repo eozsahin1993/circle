@@ -5,20 +5,20 @@
 // The only relay endpoint that removes anything, and only bytes: the
 // entries naming the blob stay, so replay still converges.
 //
-// Clients enforce "the photo's author or an admin" from the post's author
-// key, which is inside the ciphertext. The relay can't read that, so it
-// gates on who uploaded the object or on an admin signature — author and
-// uploader coincide, since a post's blob is uploaded by the device that
-// authors its entry.
-//
-// The write token alone is deliberately not enough. It proves "a current
-// member", which would let any member destroy bytes for everyone who
-// hadn't downloaded them yet — unlike a forged `post_delete` entry, which
-// every device rejects on its predicate.
+// Gated on a signature from whoever uploaded the blob, or an admin
+// signature otherwise — the relay can't apply the clients' own
+// author-or-admin rule directly, since the author's key is inside the
+// ciphertext. A write token alone isn't enough (it only proves "a current
+// member," letting anyone destroy bytes nobody else has downloaded yet),
+// and nor is a bare comparison against the recorded public key (every
+// member already sees it via attribution, so knowing it proves nothing —
+// only a signature, proof of the matching private key, actually does).
 package deleteblob
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/hex"
 	"errors"
 
 	"circle-relay/internal/storage/blobstore"
@@ -34,20 +34,21 @@ type Service struct {
 // — distinct from a write-token mismatch.
 var ErrNotUploader = errors.New("deleteblob: caller did not upload this blob")
 
-// Delete removes the blob if accountID uploaded it, or if
-// authorityPublicKey + signature prove an admin authorized it. A blob
-// that isn't there is a success: the client retries from its outbox, so
-// the attempt after a successful one must not read as a failure.
+// Delete removes the blob if uploaderSignature verifies against the
+// public key recorded at upload time, or if authorityPublicKey +
+// authoritySignature prove an admin authorized it. A blob that isn't
+// there is a success: the client retries from its outbox, so the attempt
+// after a successful one must not read as a failure.
 func (s *Service) Delete(
 	ctx context.Context,
-	syncID, entryID, writeToken, accountID, authorityPublicKey string,
-	signature []byte,
+	syncID, entryID, writeToken, uploaderSignature, authorityPublicKey string,
+	authoritySignature []byte,
 ) error {
 	if err := s.LogStore.VerifyWriteToken(ctx, syncID, writeToken); err != nil {
 		return err
 	}
 
-	uploader, err := s.BlobStore.UploaderAccountID(ctx, syncID, entryID)
+	uploaderPublicKey, err := s.BlobStore.UploaderPublicKey(ctx, syncID, entryID)
 	if errors.Is(err, blobstore.ErrBlobNotFound) {
 		return nil
 	}
@@ -55,10 +56,8 @@ func (s *Service) Delete(
 		return err
 	}
 
-	// An empty uploader predates uploader recording: nobody can claim it,
-	// so an admin signature is the only way in.
-	if uploader == "" || uploader != accountID {
-		if authorityPublicKey == "" || len(signature) == 0 {
+	if !verifiesAsUploader(uploaderPublicKey, uploaderSignature, syncID, entryID) {
+		if authorityPublicKey == "" || len(authoritySignature) == 0 {
 			return ErrNotUploader
 		}
 		if err := s.LogStore.VerifyAuthoritySignature(
@@ -66,11 +65,31 @@ func (s *Service) Delete(
 			syncID,
 			authorityPublicKey,
 			logstore.DeleteBlobMessage(syncID, entryID),
-			signature,
+			authoritySignature,
 		); err != nil {
 			return err
 		}
 	}
 
 	return s.BlobStore.Delete(ctx, syncID, entryID)
+}
+
+// verifiesAsUploader reports whether signatureHex proves possession of
+// publicKeyHex's private key, over the delete-blob message. Malformed or
+// missing input is simply not a match, never an error — either an empty
+// publicKeyHex (predates uploader recording) or an absent signature just
+// leaves the admin-signature path to carry the day.
+func verifiesAsUploader(publicKeyHex, signatureHex, syncID, entryID string) bool {
+	if publicKeyHex == "" || signatureHex == "" {
+		return false
+	}
+	publicKey, err := hex.DecodeString(publicKeyHex)
+	if err != nil || len(publicKey) != ed25519.PublicKeySize {
+		return false
+	}
+	signature, err := hex.DecodeString(signatureHex)
+	if err != nil {
+		return false
+	}
+	return ed25519.Verify(publicKey, logstore.DeleteBlobMessage(syncID, entryID), signature)
 }

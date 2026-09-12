@@ -401,11 +401,19 @@ export async function fetchEpochs(syncIds: string[]): Promise<CircleEpochs[]> {
  * a failure, it's also what a legitimate retry sees once the earlier
  * upload succeeded.
  */
-export async function getUploadTarget(syncId: string, entryId: string, writeToken: Uint8Array): Promise<UploadTarget> {
+export async function getUploadTarget(
+  syncId: string,
+  entryId: string,
+  writeToken: Uint8Array,
+  uploaderPublicKey: Uint8Array
+): Promise<UploadTarget> {
   const response = await authorizedFetch(`/v1/circles/${syncId}/entries/${entryId}/upload`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ writeToken: bytesToHex(writeToken) }),
+    body: JSON.stringify({
+      writeToken: bytesToHex(writeToken),
+      uploaderPublicKey: bytesToHex(uploaderPublicKey),
+    }),
   });
   if (response.status === 409) {
     throw new BlobAlreadyExistsError();
@@ -458,12 +466,14 @@ export async function getCoverPhotoUploadTarget(
  * that removes anything, and it removes bytes only: the entries naming
  * this blob stay in the log, immutable, so replay still converges.
  *
- * Gated on being the account that uploaded it, which the relay recorded
- * at upload time. An admin deleting someone else's photo isn't that
- * account, so they pass `authorityPublicKey` + a signature over
- * `deriveDeleteBlobMessage(syncId, entryId)` instead — the relay can't
- * check the clients' author-or-admin rule itself, since the author's key
- * is inside the ciphertext.
+ * Gated on a signature over `deriveDeleteBlobMessage(syncId, entryId)`
+ * that verifies against the public key the relay recorded at upload time
+ * — proof of possessing the uploader's own circle identity key, not just
+ * knowledge of its (already-public, see attribution) public half. An
+ * admin deleting someone else's photo signs the same message with their
+ * authority key instead, passed alongside as `authorityPublicKey` +
+ * `signature` — the relay can't check the clients' author-or-admin rule
+ * itself, since the author's key is inside the ciphertext.
  *
  * Idempotent: deleting what's already gone succeeds, which is what makes
  * the outbox safe to retry this from.
@@ -472,6 +482,7 @@ export async function deleteBlob(
   syncId: string,
   entryId: string,
   writeToken: Uint8Array,
+  uploaderSignature?: Uint8Array,
   authority?: { publicKey: Uint8Array; signature: Uint8Array }
 ): Promise<void> {
   const response = await authorizedFetch(`/v1/circles/${syncId}/entries/${entryId}/delete-blob`, {
@@ -479,6 +490,7 @@ export async function deleteBlob(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       writeToken: bytesToHex(writeToken),
+      ...(uploaderSignature ? { uploaderSignature: bytesToHex(uploaderSignature) } : {}),
       ...(authority
         ? {
             authorityPublicKey: bytesToHex(authority.publicKey),

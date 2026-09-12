@@ -110,8 +110,9 @@ func unreachable(t *testing.T, err error) {
 // Device is one caller of the relay. Named for what it is on the relay's
 // side: an account with a session, holding no circle state of its own.
 type Device struct {
-	relay *Relay
-	token string
+	relay    *Relay
+	token    string
+	identity Authority
 }
 
 // SignIn mints a session for a fresh account, skipping Google and Apple.
@@ -120,7 +121,7 @@ type Device struct {
 func (r *Relay) SignIn() *Device {
 	r.t.Helper()
 	accountID := "test:" + Suffix()
-	d := &Device{relay: r, token: Suffix()}
+	d := &Device{relay: r, token: Suffix(), identity: NewAuthority(r.t)}
 
 	if r.sessions != nil {
 		session := authstore.Session{AccountID: accountID, ExpiresAt: time.Now().Add(sessionTTL)}

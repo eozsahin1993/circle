@@ -39,7 +39,7 @@ func TestService_UploadTarget_SucceedsWithTheCurrentWriteToken(t *testing.T) {
 
 	service := &getuploadtarget.Service{BlobStore: testsupport.NewBlobStore(t), LogStore: logStore}
 
-	target, err := service.UploadTarget(ctx, syncID, "entry-1", token, "google:uploader")
+	target, err := service.UploadTarget(ctx, syncID, "entry-1", token, "circle-scoped-public-key-uploader")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestService_UploadTarget_RejectsWrongWriteToken(t *testing.T) {
 
 	service := &getuploadtarget.Service{BlobStore: testsupport.NewBlobStore(t), LogStore: logStore}
 
-	_, err := service.UploadTarget(ctx, syncID, "entry-1", newToken(t), "google:uploader")
+	_, err := service.UploadTarget(ctx, syncID, "entry-1", newToken(t), "circle-scoped-public-key-uploader")
 	if !errors.Is(err, logstore.ErrWriteTokenMismatch) {
 		t.Fatalf("expected ErrWriteTokenMismatch, got %v", err)
 	}
