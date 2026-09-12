@@ -12,7 +12,8 @@ import { ThemedView } from '@/components/themed-view';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { getProfile } from '@/data/db';
 import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/services/image';
-import { completeProfileSetup } from '@/domain/usecases/account/onboarding';
+import { completeProfileSetup, ensureMasterSeed } from '@/domain/usecases/account/onboarding';
+import { primeOwnColorSeed } from '@/hooks/use-own-color-seed';
 import { useTheme, useTints } from '@/hooks/use-theme';
 import { goPostAuth } from '@/services/pending-deep-link';
 
@@ -33,6 +34,17 @@ export default function ProfileSetupScreen() {
   const [picture, setPicture] = useState<CompressedImage | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [colorSeed, setColorSeed] = useState<string | undefined>(undefined);
+
+  // A fresh install has no seed yet — created for real here rather than
+  // waiting for "Continue" (see `ensureMasterSeed`'s doc comment), so the
+  // avatar preview below has a stable colour to sit on immediately instead
+  // of hashing the name as it's typed, letter by letter.
+  useEffect(() => {
+    ensureMasterSeed()
+      .then((seed) => setColorSeed(primeOwnColorSeed(seed)))
+      .catch((err) => console.error('Failed to ensure a master seed', err));
+  }, []);
 
   // Reused for editing an existing profile, not just first-time setup —
   // load whatever's already saved so this doesn't look like a blank form
@@ -89,7 +101,7 @@ export default function ProfileSetupScreen() {
             </ThemedText>
 
             <Pressable style={styles.pictureRow} onPress={handleAddPicture}>
-              <Avatar size={64} uri={picture?.uri} name={name} />
+              <Avatar size={64} uri={picture?.uri} name={name} colorSeed={colorSeed} />
               <View style={styles.pictureText}>
                 <ThemedText type="cardTitle">Add a picture</ThemedText>
                 <ThemedText type="meta" themeColor="muted">

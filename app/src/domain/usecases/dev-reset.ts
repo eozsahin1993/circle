@@ -1,4 +1,5 @@
 import { getAllCircleIds, resetAllLocalData, resetDatabaseSchema } from '@/data/db';
+import { clearOwnColorSeedCache } from '@/hooks/use-own-color-seed';
 import { deleteAuthToken, deleteCircleKeys, deleteMasterSeed } from '@/services/keystore';
 
 /**
@@ -22,6 +23,9 @@ export async function resetLocalDataForTesting(): Promise<void> {
   await deleteMasterSeed();
   await deleteAuthToken();
   await resetAllLocalData();
+  // The next sign-in's own avatar colour would otherwise keep showing this
+  // account's, cached in memory since ordinary sign-out never clears it.
+  clearOwnColorSeedCache();
 }
 
 /**

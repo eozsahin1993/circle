@@ -149,6 +149,18 @@ export function generateContentKey(): Uint8Array {
   return randomBytes(32);
 }
 
+const AVATAR_COLOR_DOMAIN = new TextEncoder().encode('avatar-color');
+
+/**
+ * This device's own avatar-color seed, hex. From the master seed, not a
+ * circle identity: `deriveCircleIdentity` differs per circle on purpose
+ * (see its doc comment), which would make "your own" avatar a different
+ * colour in every circle you're in.
+ */
+export function deriveOwnColorSeed(masterSeed: Uint8Array): string {
+  return bytesToHex(hkdf(sha256, masterSeed, undefined, AVATAR_COLOR_DOMAIN, 32));
+}
+
 const WRITE_TOKEN_DOMAIN = new TextEncoder().encode('relay-write-token');
 
 /**

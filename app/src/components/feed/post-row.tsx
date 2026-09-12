@@ -174,6 +174,7 @@ function toPostCard(view: FeedPostView, profile: Profile | null): Post {
     missingPhoto: view.photoUri ? undefined : missingPhotoFor(post.photoStatus),
     caption: post.caption,
     reactions: view.reactions,
+    authorPublicKey: post.authorPublicKey,
     latestComment: view.comments.latest ? toCommentItem(view.comments.latest, profile?.name) : undefined,
     commentCount: view.comments.total,
     hasUnseenComments: view.hasUnseenComments,
@@ -192,6 +193,7 @@ function toCommentItem(comment: CommentWithAuthor, ownName?: string): CommentIte
     id: comment.id,
     authorName: comment.authorName || ownName || 'Unknown member',
     authorPhotoUri: pictureUri(comment.authorPicture),
+    authorPublicKey: comment.authorPublicKey,
     body: comment.body,
     timestamp: formatRelative(comment.createdAt),
   };

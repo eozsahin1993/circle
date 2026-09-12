@@ -27,12 +27,15 @@ function firstCodePoint(word: string): string {
  * differing between devices or across a reload would stop telling members
  * apart, which is the only reason to colour the placeholder at all.
  *
- * From the name, not the identity key, though the key is stabler: the
- * initials already come from the name, so one input serves both and nothing
- * extra threads through the view models. A rename recolours accordingly.
+ * Pass the stablest identifier in scope, not necessarily the name: a
+ * rename would otherwise recolour someone, and typing a name letter by
+ * letter would flicker through colours as they type (see `Avatar`'s
+ * `colorSeed` prop, which is what callers should actually be passing here).
+ * Falling back to the name is a last resort for the cases with no better
+ * id — a self-reported, unverified join request, say.
  */
-export function avatarTintFor(name: string | undefined | null): string {
-  return AvatarTints[mix(fnv1a(name ?? '')) % AvatarTints.length];
+export function avatarTintFor(seed: string | undefined | null): string {
+  return AvatarTints[mix(fnv1a(seed ?? '')) % AvatarTints.length];
 }
 
 function fnv1a(value: string): number {

@@ -10,6 +10,8 @@ import { JoinSheet } from '@/components/join-sheet';
 import { PendingCircleCard } from '@/components/pending-circle-card';
 import { EmptyCirclesIcon } from '@/components/empty-circles-icon';
 import { FabButton } from '@/components/fab-button';
+import { PrivacyInfoModal } from '@/components/privacy-info-modal';
+import { PrivacyNotice } from '@/components/privacy-notice';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Icons, Spacing } from '@/constants/theme';
@@ -25,6 +27,7 @@ import {
 import type { PendingJoinRequest } from '@/data/db/pending-join-requests';
 import { resolveCircleCoverUri } from '@/domain/usecases/circle/circle-cover';
 import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/domain/usecases/circle/join-circle';
+import { useOwnColorSeed } from '@/hooks/use-own-color-seed';
 import { takePendingInviteCode } from '@/services/pending-deep-link';
 import { getCircleIdentity } from '@/services/keystore';
 import { bytesToDataUri } from '@/services/image';
@@ -62,6 +65,7 @@ export default function CircleListScreen() {
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
   // Only for the header avatar's initials — the name isn't shown here.
   const [profileName, setProfileName] = useState<string | undefined>();
+  const ownColorSeed = useOwnColorSeed();
   const [circles, setCircles] = useState<CircleListItem[]>([]);
   // Avoids flashing the empty state before the first load resolves.
   const [loaded, setLoaded] = useState(false);
@@ -72,6 +76,7 @@ export default function CircleListScreen() {
   // The invite code a link handed over, if any — the join sheet opens over
   // this screen rather than being a route of its own.
   const [joinCode, setJoinCode] = useState<string | null>(null);
+  const [showPrivacyInfo, setShowPrivacyInfo] = useState(false);
 
   /** Re-reads the circle list from the local database. No network. */
   const loadFromDatabase = useCallback(async () => {
@@ -203,7 +208,7 @@ export default function CircleListScreen() {
           </View>
 
           <Pressable onPress={() => router.push('/account')}>
-            <Avatar size={44} uri={avatarUri} name={profileName} />
+            <Avatar size={44} uri={avatarUri} name={profileName} colorSeed={ownColorSeed} />
           </Pressable>
         </View>
 
@@ -212,23 +217,26 @@ export default function CircleListScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           keyExtractor={(circle) => circle.id}
           ListHeaderComponent={
-            pending.length ? (
-              <View style={styles.pending}>
-                <ThemedText type="eyebrow" themeColor="faint">
-                  {`Waiting to join · ${pending.length}`}
-                </ThemedText>
-                {pending.map((request) => (
-                  <PendingCircleCard
-                    key={request.id}
-                    circleName={request.circleName}
-                    createdByName={request.createdByName}
-                    submittedAt={request.submittedAt}
-                    onPress={() => router.push({ pathname: '/join/pending', params: { requestId: request.id } })}
-                    onCancel={() => handleCancelPending(request)}
-                  />
-                ))}
-              </View>
-            ) : null
+            <>
+              <PrivacyNotice onPress={() => setShowPrivacyInfo(true)} style={styles.privacyNotice} />
+              {pending.length ? (
+                <View style={styles.pending}>
+                  <ThemedText type="eyebrow" themeColor="faint">
+                    {`Waiting to join · ${pending.length}`}
+                  </ThemedText>
+                  {pending.map((request) => (
+                    <PendingCircleCard
+                      key={request.id}
+                      circleName={request.circleName}
+                      createdByName={request.createdByName}
+                      submittedAt={request.submittedAt}
+                      onPress={() => router.push({ pathname: '/join/pending', params: { requestId: request.id } })}
+                      onCancel={() => handleCancelPending(request)}
+                    />
+                  ))}
+                </View>
+              ) : null}
+            </>
           }
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
@@ -277,6 +285,8 @@ export default function CircleListScreen() {
             .catch((err) => console.error('Failed to reload pending requests', err));
         }}
       />
+
+      <PrivacyInfoModal visible={showPrivacyInfo} onClose={() => setShowPrivacyInfo(false)} />
     </ThemedView>
   );
 }
@@ -306,6 +316,9 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     gap: Spacing.cardListGap,
     paddingBottom: Spacing.cardListGap,
+  },
+  privacyNotice: {
+    paddingHorizontal: 0,
   },
   pending: {
     gap: 12,

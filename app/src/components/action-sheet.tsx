@@ -32,6 +32,8 @@ export type ActionSheetProps = {
   avatarUri?: string;
   /** Who the avatar is, for its initials. Unset where it's a photograph rather than a face. */
   avatarName?: string;
+  /** Stabler than `avatarName` for the avatar's colour — see `Avatar`'s `colorSeed` prop. */
+  avatarColorSeed?: string;
   /** Squares off that image, for a sheet about a photograph rather than a person. */
   avatarRadius?: number;
   options: ActionSheetOption[];
@@ -58,6 +60,7 @@ export function ActionSheet({
   subtitle,
   avatarUri,
   avatarName,
+  avatarColorSeed,
   avatarRadius,
   options,
 }: ActionSheetProps) {
@@ -103,7 +106,7 @@ export function ActionSheet({
 
             {title ? (
               <View style={styles.header}>
-                <Avatar size={44} uri={avatarUri} name={avatarName} radius={avatarRadius} />
+                <Avatar size={44} uri={avatarUri} name={avatarName} colorSeed={avatarColorSeed} radius={avatarRadius} />
                 <View style={styles.headerTitle}>
                   <ThemedText type="cardTitle" numberOfLines={1}>
                     {title}

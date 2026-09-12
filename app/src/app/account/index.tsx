@@ -18,6 +18,7 @@ import { logTestPushPayload } from '@/domain/usecases/dev-test-push';
 import { signOut } from '@/domain/usecases/account/sign-in';
 import { PushLevels, type PushLevelId } from '@/domain/usecases/push/push-preferences';
 import { useAppSettings } from '@/hooks/use-app-settings';
+import { useOwnColorSeed } from '@/hooks/use-own-color-seed';
 import { useTints } from '@/hooks/use-theme';
 import { bytesToDataUri } from '@/services/image';
 import type { ThemePreference } from '@/services/settings';
@@ -35,6 +36,7 @@ const APPEARANCE_OPTIONS: { value: ThemePreference; label: string }[] = [
 export default function AccountScreen() {
   const { settings, updateSettings } = useAppSettings();
   const tints = useTints();
+  const ownColorSeed = useOwnColorSeed();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -173,7 +175,12 @@ export default function AccountScreen() {
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.profileRow}>
-            <Avatar size={72} uri={profile?.picture ? bytesToDataUri(profile.picture) : undefined} name={profile?.name} />
+            <Avatar
+              size={72}
+              uri={profile?.picture ? bytesToDataUri(profile.picture) : undefined}
+              name={profile?.name}
+              colorSeed={ownColorSeed}
+            />
             <View style={styles.profileText}>
               <ThemedText type="screenTitle" numberOfLines={1}>
                 {profile?.name || 'Add your name'}

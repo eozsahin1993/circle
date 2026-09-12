@@ -18,15 +18,24 @@ export type AvatarProps = {
    * name displayed beside it, so the two agree. Blank falls to the hatch.
    */
   name?: string;
+  /**
+   * What the initials' background colour is derived from, if not `name` —
+   * a member's `identityPublicKey`, or `useOwnColorSeed()` for this
+   * device's own avatar. Pass this whenever a stabler id than the (possibly
+   * still-being-typed, or later renamed) name is in scope; see
+   * `avatarTintFor`'s doc comment for why that matters.
+   */
+  colorSeed?: string;
   /** Corner radius, defaulting to a circle. Square it off for a thumbnail of a photograph, which isn't a face. */
   radius?: number;
 };
 
 /**
- * A member's picture, else their initials on a colour derived from their
- * name, else a neutral hatch — strictly in that order.
+ * A member's picture, else their initials on a colour derived from
+ * `colorSeed` (falling back to `name`), else a neutral hatch — strictly in
+ * that order.
  */
-export function Avatar({ size = 44, ringColor, uri, name, radius }: AvatarProps) {
+export function Avatar({ size = 44, ringColor, uri, name, colorSeed, radius }: AvatarProps) {
   const { scheme } = useAppSettings();
   const theme = useTheme();
   const tints = useTints();
@@ -77,7 +86,7 @@ export function Avatar({ size = 44, ringColor, uri, name, radius }: AvatarProps)
         </Svg>
       </View>
       {initials ? (
-        <View style={[StyleSheet.absoluteFill, styles.initials, { backgroundColor: avatarTintFor(name) }]}>
+        <View style={[StyleSheet.absoluteFill, styles.initials, { backgroundColor: avatarTintFor(colorSeed ?? name) }]}>
           {/* No scheme here, unlike the hatch: see AvatarTints. Font
               scaling off because the disc can't grow with it. */}
           <Text

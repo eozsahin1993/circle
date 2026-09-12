@@ -5,6 +5,7 @@ import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { Icons, Radius, Type } from '@/constants/theme';
+import { useOwnColorSeed } from '@/hooks/use-own-color-seed';
 import { useTheme, useTints } from '@/hooks/use-theme';
 
 export type CommentItem = {
@@ -12,6 +13,8 @@ export type CommentItem = {
   authorName: string;
   /** Data URI of the author's picture, when known — otherwise their initials show. */
   authorPhotoUri?: string;
+  /** Stabler than `authorName` for the avatar's colour — see `Avatar`'s `colorSeed` prop. */
+  authorPublicKey?: string;
   body: string;
   /** Relative and short — "3d", "6h" — since the post's own timestamp already gives the absolute anchor. */
   timestamp: string;
@@ -64,6 +67,7 @@ export function PostComments({
 }: PostCommentsProps) {
   const theme = useTheme();
   const tints = useTints();
+  const ownColorSeed = useOwnColorSeed();
   const [text, setText] = useState('');
 
   function handleSubmit() {
@@ -76,7 +80,12 @@ export function PostComments({
     <View style={styles.container}>
       {latest ? (
         <View style={styles.commentRow}>
-          <Avatar size={AVATAR_SIZE} uri={latest.authorPhotoUri} name={latest.authorName} />
+          <Avatar
+            size={AVATAR_SIZE}
+            uri={latest.authorPhotoUri}
+            name={latest.authorName}
+            colorSeed={latest.authorPublicKey}
+          />
           <View style={styles.commentBody}>
             <ThemedText type="comment" themeColor="secondary">
               <ThemedText type="postAuthor">{latest.authorName}</ThemedText>
@@ -104,7 +113,7 @@ export function PostComments({
               avatar — here it's one of three controls on a line, and a
               short circle beside a tall box reads as misaligned however
               it's centred. */}
-          <Avatar size={COMPOSER_HEIGHT} uri={selfPhotoUri} name={selfName} />
+          <Avatar size={COMPOSER_HEIGHT} uri={selfPhotoUri} name={selfName} colorSeed={ownColorSeed} />
           <TextInput
             value={text}
             onChangeText={setText}

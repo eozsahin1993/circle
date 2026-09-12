@@ -35,6 +35,7 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
   const [circleName, setCircleName] = useState('');
   const [inviterName, setInviterName] = useState('');
   const [inviterPictureUri, setInviterPictureUri] = useState<string | undefined>();
+  const [inviterPublicKey, setInviterPublicKey] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,6 +56,7 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
         setCircleName(preview.name);
         setInviterName(preview.createdByName);
         setInviterPictureUri(picture ? bytesToDataUri(picture) : undefined);
+        setInviterPublicKey(preview.createdByPublicKey);
         setPhase(already ? 'waiting' : 'asking');
       } catch (err) {
         console.error('Failed to load invite preview', err);
@@ -103,7 +105,7 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
                 rather than screen-height. The circle's name carries the
                 weight; who sent the key is context, not the headline. */}
             <View style={styles.header}>
-              <Avatar size={48} uri={inviterPictureUri} name={inviterName} />
+              <Avatar size={48} uri={inviterPictureUri} name={inviterName} colorSeed={inviterPublicKey} />
               <View style={styles.headerText}>
                 <ThemedText type="meta" themeColor="muted" numberOfLines={1}>
                   {inviterName ? `${inviterName} invited you to` : "You've been invited to"}

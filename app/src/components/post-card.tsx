@@ -24,6 +24,8 @@ export type Post = {
   authorName: string;
   /** Data URI of the author's profile picture, when it's known — otherwise their initials show. */
   authorPhotoUri?: string;
+  /** Stabler than `authorName` for the avatar's colour — see `Avatar`'s `colorSeed` prop. */
+  authorPublicKey?: string;
   timestamp: string;
   /** Data URI of the actual photo, when it's known — otherwise the hatch placeholder shows. */
   photoUri?: string;
@@ -115,7 +117,7 @@ export function PostCard({
   return (
     <ThemedView style={styles.card}>
       <View style={styles.header}>
-        <Avatar uri={post.authorPhotoUri} name={post.authorName} />
+        <Avatar uri={post.authorPhotoUri} name={post.authorName} colorSeed={post.authorPublicKey} />
         <View style={styles.byline}>
           <ThemedText type="postAuthor">{post.authorName}</ThemedText>
           {/* Everyone can see that a photo is kept; only its author or an
