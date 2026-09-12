@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FabButton } from '@/components/fab-button';
 import { gapBetween, stickyIndices, type FeedRow } from '@/components/feed/rows';
 import { HeaderIconButton } from '@/components/navbar/header-icon-button';
-import { PrivacyInfoModal } from '@/components/privacy-info-modal';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 import { ThemedView } from '@/components/themed-view';
@@ -27,8 +26,6 @@ const LIST_BOTTOM_PADDING = 100;
  */
 export default function FeedScreen() {
   const { circleId, justJoined } = useLocalSearchParams<{ circleId: string; justJoined?: string }>();
-  const [showPrivacyInfo, setShowPrivacyInfo] = useState(false);
-  const onPressPrivacy = useCallback(() => setShowPrivacyInfo(true), []);
   const openDetails = useCallback(
     () => router.push({ pathname: '/circle/details', params: { circleId } }),
     [circleId],
@@ -36,7 +33,6 @@ export default function FeedScreen() {
   const theme = useTheme();
   const { rows, circleName, memberCount, refreshing, hasMore, loadingMore, loadMore, reload, refresh } = useCircleFeed(circleId, {
     justJoined: justJoined === '1',
-    onPressPrivacy,
   });
   useFocusEffect(
     useCallback(() => {
@@ -135,8 +131,6 @@ export default function FeedScreen() {
           />
         </SafeAreaView>
       </ThemedSafeAreaView>
-
-      <PrivacyInfoModal visible={showPrivacyInfo} onClose={() => setShowPrivacyInfo(false)} />
     </ThemedView>
   );
 }

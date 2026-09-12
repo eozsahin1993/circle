@@ -15,25 +15,23 @@ export type PrivacyInfoModalProps = {
 
 // This describes the intended end-to-end design, not everything that's
 // actually running today — see the conversation this was added in.
-// Notably: post content isn't encrypted before storage yet, there's no
-// relay yet, and leaving a circle doesn't currently rotate the shared
-// secret. Revisit this copy as those land for real.
+// Notably: content isn't encrypted before storage yet, and leaving a
+// circle doesn't currently rotate the shared secret. Revisit this copy as
+// those land for real. "What we can see" is the exception — worded to
+// match what the relay actually does today (verified against server/
+// directly), not the intended design.
 const SECTIONS = [
   {
-    label: 'On your phone',
-    body: 'The photo is encrypted before it leaves your device. The key belongs to the circle, not to us.',
-  },
-  {
-    label: 'In transit',
-    body: 'Relays pass along sealed bytes. They can see that something moved, never what it was.',
-  },
-  {
-    label: 'At rest',
-    body: 'Copies live on the phones of everyone in the circle. Delete the app from every device and the archive is gone — so we help you keep an offline copy too.',
+    label: 'Your content',
+    body: "Everything you add is meant to be encrypted on your device with a key that belongs to the circle, not us. Copies live on every member's phone, and we help you keep an offline backup too.",
   },
   {
     label: 'If someone leaves',
     body: 'The circle key rotates. They keep what they already downloaded, and receive nothing new.',
+  },
+  {
+    label: 'What we can see',
+    body: "Signing in just proves you're a real person, to stop abuse. It's never attached to your content, and we can't read anything inside a circle. Running the service does mean we see that requests happen at all, which could hint at which circles are active. We keep that as small as we can.",
   },
 ];
 
@@ -87,7 +85,7 @@ export function PrivacyInfoModal({ visible, onClose }: PrivacyInfoModalProps) {
 
             <ScrollView contentContainerStyle={styles.content}>
               <ThemedText type="screenTitle" style={styles.title}>
-                Where your photos live
+                Where your content lives
               </ThemedText>
 
               {SECTIONS.map((section) => (

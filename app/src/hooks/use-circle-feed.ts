@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useJustJoinedRows } from '@/components/feed/just-joined-row';
 import { usePendingRequestRows } from '@/components/feed/pending-request-row';
 import { usePostRows } from '@/components/feed/post-row';
-import { usePrivacyRows } from '@/components/feed/privacy-row';
 import { useRosterChangeRows } from '@/components/feed/roster-change-row';
 import { buildFeedRows, type FeedRow, type FeedRows } from '@/components/feed/rows';
 import {
@@ -22,8 +21,6 @@ import { syncCircle } from '@/sync/sync-circles';
 export type UseCircleFeedOptions = {
   /** Whether to offer the fresh-joiner banner at all — hidden anyway once there are posts. */
   justJoined?: boolean;
-  /** Stable, please: the adapter list rebuilds when it changes. */
-  onPressPrivacy: () => void;
 };
 
 export type CircleFeedController = {
@@ -138,7 +135,6 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
   );
 
   const requests = usePendingRequestRows({ circleId, onRosterChanged: reload });
-  const privacy = usePrivacyRows(options.onPressPrivacy);
   const justJoined = useJustJoinedRows({ justJoined: options.justJoined ?? false, postCount: feed?.posts.length ?? 0 });
   const posts = usePostRows({
     circleId,
@@ -163,8 +159,8 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
    * it instead. Adding a kind is one hook call and one entry.
    */
   const sources: FeedRows[] = useMemo(
-    () => [requests, privacy, justJoined, posts, rosterChanges],
-    [requests, privacy, justJoined, posts, rosterChanges],
+    () => [requests, justJoined, posts, rosterChanges],
+    [requests, justJoined, posts, rosterChanges],
   );
   sourcesRef.current = sources;
 

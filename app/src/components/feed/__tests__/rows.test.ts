@@ -1,6 +1,5 @@
 import { justJoinedRow } from '@/components/feed/just-joined-row';
 import { pendingRequestRow } from '@/components/feed/pending-request-row';
-import { privacyRow } from '@/components/feed/privacy-row';
 import { rosterChangeRows } from '@/components/feed/roster-change-row';
 import { buildFeedRows, gapBetween, stickyIndices, type FeedRow } from '@/components/feed/rows';
 import { Spacing } from '@/constants/theme';
@@ -31,7 +30,6 @@ const noRequestActions = { busy: false, onApprove: () => {}, onDeny: () => {} };
 function build(events: MemberEvent[] = [], justJoined = false): FeedRow[] {
   return buildFeedRows([
     pendingRequestRow({ requesterId: 'a', selfReportedName: 'Marcus', createdAt: 1 }, noRequestActions),
-    privacyRow(() => {}),
     ...(justJoined ? [justJoinedRow()] : []),
     ...rosterChangeRows(events, [], null),
   ]);
@@ -42,7 +40,6 @@ describe('buildFeedRows', () => {
     // A day header, its one group row, then the spacer closing the block — see roster-change-row.tsx.
     expect(build([event('e1', 1_000)]).map((row) => row.key)).toEqual([
       'request:a',
-      'privacy',
       'member-event-day-0-1000',
       'member-event-0-0',
       'member-event-block-end-0',
@@ -58,8 +55,8 @@ describe('buildFeedRows', () => {
     const day3 = new Date(2026, 0, 3, 12, 0, 0).getTime();
     const rows = build([event('old', day1), event('new', day3), event('mid', day2)]);
 
-    expect(rows.slice(0, 2).map((row) => row.key)).toEqual(['request:a', 'privacy']);
-    expect(rows.slice(2).map((row) => row.at)).toEqual([
+    expect(rows.slice(0, 1).map((row) => row.key)).toEqual(['request:a']);
+    expect(rows.slice(1).map((row) => row.at)).toEqual([
       day3 + 1, day3, day3 - 1,
       day2 + 1, day2, day2 - 1,
       day1 + 1, day1, day1 - 1,
@@ -98,7 +95,7 @@ describe('each row decides for itself', () => {
 
   test('only a timeline row carries a time', () => {
     expect(eventRow(5_000).at).toBe(5_000);
-    expect(privacyRow(() => {}).at).toBeUndefined();
+    expect(pendingRequestRow({ requesterId: 'a', selfReportedName: 'M', createdAt: 1 }, noRequestActions).at).toBeUndefined();
   });
 
   /** A roster change means nothing by being scrolled past; a post marks its comments seen. */
@@ -108,7 +105,6 @@ describe('each row decides for itself', () => {
 
   test('a roster change asks for a tighter gap than a card', () => {
     expect(eventRow(1).spacing).toBe(Spacing.gapWithinMemberEventBlock);
-    expect(privacyRow(() => {}).spacing).toBe(Spacing.gapBetweenPosts);
   });
 });
 
