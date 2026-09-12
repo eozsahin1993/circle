@@ -23,15 +23,19 @@ export type PrivacyInfoModalProps = {
 const SECTIONS = [
   {
     label: 'Your content',
-    body: "Everything you add is meant to be encrypted on your device with a key that belongs to the circle, not us. Copies live on every member's phone, and we help you keep an offline backup too.",
+    body: "Everything you add is meant to be encrypted on your device with a key that belongs to the circle, not us. Copies remain on every member's device, and we help you keep an offline backup as well.",
   },
   {
-    label: 'If someone leaves',
-    body: 'The circle key rotates. They keep what they already downloaded, and receive nothing new.',
+    label: 'Your account',
+    body: "Signing in only confirms you're a real person, to prevent abuse. It's stored separately from your circles and is never linked to what you post or who you're with.",
   },
   {
     label: 'What we can see',
-    body: "Signing in just proves you're a real person, to stop abuse. It's never attached to your content, and we can't read anything inside a circle. Running the service does mean we see that requests happen at all, which could hint at which circles are active. We keep that as small as we can.",
+    body: 'At rest, we cannot tell whether two items, even in the same circle, came from the same person. We only see that a circle exists, how active it is, and that requests happen, never who or what.',
+  },
+  {
+    label: 'If someone leaves',
+    body: 'The circle key rotates when someone leaves. They keep what they already downloaded, and receive nothing further.',
   },
 ];
 
