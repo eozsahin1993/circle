@@ -11,7 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { getProfile } from '@/data/db';
-import { recordSignInProviderBestEffort } from '@/domain/usecases/account/account-manifest';
+import { hasUnreadableAccountManifest, recordSignInProviderBestEffort } from '@/domain/usecases/account/account-manifest';
 import { completeProfileSetup } from '@/domain/usecases/account/onboarding';
 import { signInWithApple, signInWithGoogle } from '@/domain/usecases/account/sign-in';
 import { downloadAndCompressImage } from '@/services/image';
@@ -64,6 +64,20 @@ export default function WelcomeScreen() {
       // just a re-auth after signing out) has nothing new to fill in.
       if (hasProfile) {
         await goPostAuth(router);
+        return;
+      }
+
+      // Asked here and nowhere else. Every path below mints a seed, and a
+      // seed is what makes the old identity unreachable — so this is the
+      // last moment the answer can change anything. Best-effort: offline,
+      // it asks anyway rather than minting silently, since a seed made
+      // without the question is the same irreversible loss.
+      const prior = await hasUnreadableAccountManifest().then(
+        (found) => (found ? 'yes' : 'no'),
+        () => 'unknown' as const,
+      );
+      if (prior !== 'no') {
+        router.push({ pathname: '/account/returning', params: { certain: prior === 'yes' ? '1' : '' } });
         return;
       }
 

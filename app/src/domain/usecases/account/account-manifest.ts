@@ -1,5 +1,7 @@
 import { listCircles } from '@/data/db';
 import { decrypt, deriveManifestKey, encryptJSON } from '@/services/crypto';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { getMasterSeed } from '@/services/keystore';
 import { getManifest, putManifest } from '@/services/relay';
 
@@ -25,6 +27,26 @@ export type ManifestPayload = {
  * back afterwards, so every write path treats this as fatal rather than
  * as "no manifest yet".
  */
+/**
+ * Set once, by the screen where someone chose to abandon an account this
+ * device can't read — see `abandonPriorAccount`. Everywhere else a foreign
+ * manifest stays fatal, because overwriting it destroys the only record of
+ * which circles that identity was in.
+ *
+ * Kept in AsyncStorage rather than in memory: the first sync that would
+ * hit it can happen after a restart, and re-asking later is impossible —
+ * by then there's a seed, so the question never comes up again.
+ */
+const FOREIGN_OVERWRITE_KEY = 'account.foreignManifestOverwriteAllowed';
+
+export async function allowForeignManifestOverwrite(): Promise<void> {
+  await AsyncStorage.setItem(FOREIGN_OVERWRITE_KEY, '1');
+}
+
+async function foreignOverwriteAllowed(): Promise<boolean> {
+  return (await AsyncStorage.getItem(FOREIGN_OVERWRITE_KEY)) === '1';
+}
+
 export class ForeignManifestError extends Error {
   constructor() {
     super("The stored manifest was written by a seed this device doesn't have.");
@@ -83,7 +105,7 @@ async function putAccountManifest(
   payload: ManifestPayload,
   state: ManifestState,
 ): Promise<void> {
-  if (state.status === 'foreign') throw new ForeignManifestError();
+  if (state.status === 'foreign' && !(await foreignOverwriteAllowed())) throw new ForeignManifestError();
 
   const key = deriveManifestKey(masterSeed);
   await putManifest(encryptJSON(payload, key));
@@ -105,7 +127,7 @@ export async function syncAccountManifest(): Promise<void> {
   if (!masterSeed) return;
 
   const state = await readAccountManifest(masterSeed);
-  if (state.status === 'foreign') throw new ForeignManifestError();
+  if (state.status === 'foreign' && !(await foreignOverwriteAllowed())) throw new ForeignManifestError();
 
   const current = state.status === 'ours' ? state.payload : { circleIds: [] };
   // listCircles, not getAllCircles: this runs on create/join/leave and
@@ -151,4 +173,23 @@ export async function recordSignInProviderBestEffort(provider: 'google' | 'apple
   } catch (err) {
     console.error('Failed to record sign-in provider', err);
   }
+}
+
+/**
+ * Whether this account has a manifest that this device can't read — the
+ * signature of signing in somewhere new after having used Circle before.
+ *
+ * Only the blob's existence is knowable here, never its contents: it's
+ * encrypted under the old seed, and the relay holds nothing in the clear
+ * that would say how many circles it lists or what they're called. Any
+ * screen built on this has to speak in those terms.
+ *
+ * Asked before onboarding mints a seed, which is the last moment the
+ * answer can change anything — after that the old identity is
+ * unreachable, and `ForeignManifestError` turns every later manifest
+ * write into a failure nobody chose.
+ */
+export async function hasUnreadableAccountManifest(): Promise<boolean> {
+  if (await getMasterSeed()) return false;
+  return (await getManifest()) !== null;
 }

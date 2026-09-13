@@ -1,10 +1,14 @@
 jest.mock('@/services/relay');
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { getAllCircles, initDatabase, insertCircle } from '@/data/db';
 import { decrypt, deriveManifestKey, encryptJSON } from '@/services/crypto';
 import {
+  allowForeignManifestOverwrite,
   fetchAccountManifest,
   ForeignManifestError,
+  hasUnreadableAccountManifest,
   recordSignInProviderBestEffort,
   syncAccountManifest,
   syncAccountManifestBestEffort,
@@ -189,5 +193,61 @@ describe('fetchAccountManifest', () => {
 
     await expect(fetchAccountManifest()).rejects.toThrow();
     expect(getManifest).not.toHaveBeenCalled();
+  });
+});
+
+describe('hasUnreadableAccountManifest', () => {
+  test('true when this device has no seed and the account already has a manifest', async () => {
+    await deleteMasterSeed();
+    (getManifest as jest.Mock).mockResolvedValue(new Uint8Array([1, 2, 3]));
+
+    await expect(hasUnreadableAccountManifest()).resolves.toBe(true);
+  });
+
+  test('false on a genuinely new account', async () => {
+    await deleteMasterSeed();
+    (getManifest as jest.Mock).mockResolvedValue(null);
+
+    await expect(hasUnreadableAccountManifest()).resolves.toBe(false);
+  });
+
+  // A device with a seed can read its own manifest, or is entitled to write
+  // the first one — either way there is nothing to ask about, and asking
+  // would put a returning user through the recovery fork on every re-auth.
+  test('false once this device has a seed, manifest or not', async () => {
+    await saveMasterSeed(new Uint8Array(16).fill(3));
+    (getManifest as jest.Mock).mockResolvedValue(new Uint8Array([1, 2, 3]));
+
+    await expect(hasUnreadableAccountManifest()).resolves.toBe(false);
+  });
+});
+
+describe('abandoning an account this device cannot read', () => {
+  // This file's resetAllMocks strips the implementations off the shipped
+  // AsyncStorage mock, so setItem would silently no-op and the permission
+  // would never be readable back. Restored here rather than weakening the
+  // reset, which the rest of the file relies on.
+  beforeEach(() => {
+    const store = new Map<string, string>();
+    (AsyncStorage.setItem as jest.Mock).mockImplementation(async (key: string, value: string) => {
+      store.set(key, value);
+    });
+    (AsyncStorage.getItem as jest.Mock).mockImplementation(async (key: string) => store.get(key) ?? null);
+  });
+
+  // What the confirmation screen exists to authorize: the one path allowed
+  // to destroy the old identity's record of which circles it was in.
+  test('permits an overwrite that is otherwise fatal', async () => {
+    const theirSeed = new Uint8Array(16).fill(7);
+    (getManifest as jest.Mock).mockResolvedValue(encryptJSON({ circleIds: ['theirs'] }, deriveManifestKey(theirSeed)));
+    await saveMasterSeed(new Uint8Array(16).fill(9));
+    await addCircle('mine-after-fresh-start');
+
+    await expect(syncAccountManifest()).rejects.toThrow(ForeignManifestError);
+
+    await allowForeignManifestOverwrite();
+    await syncAccountManifest();
+
+    expect(putManifest).toHaveBeenCalledTimes(1);
   });
 });

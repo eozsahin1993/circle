@@ -1,5 +1,6 @@
 import { generateSeedPhrase, seedPhraseToEntropy } from '@/services/crypto';
 import { saveProfile } from '@/data/db';
+import { allowForeignManifestOverwrite } from '@/domain/usecases/account/account-manifest';
 import { broadcastProfileUpdate } from '@/domain/usecases/circle/broadcast-profile-update';
 import { getMasterSeed, saveMasterSeed } from '@/services/keystore';
 
@@ -64,4 +65,20 @@ export async function completeProfileSetup(profile: ProfileInput): Promise<void>
   await saveProfile({ ...profile, createdAt: now, updatedAt: now });
   await broadcastProfileUpdate(profile.name, profile.picture);
   await ensureMasterSeed();
+}
+
+/**
+ * Gives up on an account this device can't read, and takes responsibility
+ * for the one thing that makes that irreversible.
+ *
+ * Minting the seed here rather than leaving it to `completeProfileSetup`
+ * is the point: it happens *because* someone chose it, on a screen that
+ * said what it costs. The manifest belonging to the old identity is
+ * overwritten by the first sync after this — normally
+ * `ForeignManifestError` refuses exactly that, and refusing is right when
+ * nobody has decided. Here somebody has.
+ */
+export async function abandonPriorAccount(): Promise<void> {
+  await ensureMasterSeed();
+  await allowForeignManifestOverwrite();
 }
