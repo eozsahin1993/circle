@@ -203,7 +203,7 @@ export default function CircleListScreen() {
         <View style={styles.header}>
           <View>
             <ThemedText type="eyebrow" style={styles.eyebrow}>
-              Hearth
+              Mimoza
             </ThemedText>
             <ThemedText type="circleListHeader">Your Circles</ThemedText>
           </View>

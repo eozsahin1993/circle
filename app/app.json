@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "Circle",
-    "slug": "circle",
+    "name": "Mimoza",
+    "slug": "mimoza",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "circle",
+    "scheme": "mimoza",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.eozsahin.circle",
+      "bundleIdentifier": "com.eozsahin.mimoza",
       "appleTeamId": "N323492Q8L",
       "usesAppleSignIn": true,
       "infoPlist": {
@@ -20,12 +20,12 @@
       "entitlements": {
         "aps-environment": "development",
         "com.apple.security.application-groups": [
-          "group.com.eozsahin.circle"
+          "group.com.eozsahin.mimoza"
         ]
       }
     },
     "android": {
-      "package": "com.eozsahin.circle",
+      "package": "com.eozsahin.mimoza",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -57,7 +57,7 @@
       [
         "@react-native-google-signin/google-signin",
         {
-          "iosUrlScheme": "com.googleusercontent.apps.715618948690-lhieptiff5un7m2nbkm492ps2704o8og"
+          "iosUrlScheme": "com.googleusercontent.apps.REPLACE-WITH-IOS-CLIENT-ID-FOR-com.eozsahin.mimoza"
         }
       ],
       "expo-sharing",

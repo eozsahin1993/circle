@@ -135,7 +135,7 @@ export default function WelcomeScreen() {
 
       <ThemedSafeAreaView edges={['bottom']} style={styles.content}>
         <ThemedText type="eyebrow" themeColor="accentBright">
-          Hearth
+          Mimoza
         </ThemedText>
         <ThemedText type="onboardingHeadline">Private circles for your photos.</ThemedText>
         <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>

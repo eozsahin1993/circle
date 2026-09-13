@@ -2,7 +2,7 @@ import Foundation
 import Security
 import UserNotifications
 
-let appGroup = "group.com.eozsahin.circle"
+let appGroup = "group.com.eozsahin.mimoza"
 
 /// Hardcoded, never read from the payload: a push that can't be decrypted
 /// must not choose its own lock-screen text.
