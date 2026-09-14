@@ -12,7 +12,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Icons, Spacing } from '@/constants/theme';
 import { markCircleViewed } from '@/data/db';
 import { askForPushOnCircle } from '@/features/push/usecases/enable-push';
-import { useCircleFeed } from '@/hooks/use-circle-feed';
+import { useCircleFeed } from '@/features/circle/use-circle-feed';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Scroll clearance above the FAB. The safe-area inset itself is separate — see `ListFooterComponent`. */
