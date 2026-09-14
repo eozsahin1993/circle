@@ -803,7 +803,7 @@ func (s *Store) lookupIdempotencyMarker(ctx context.Context, syncID string, ns l
 // Bootstrapped) reads back
 // as empty rather than an error — Read is used for ordinary catch-up
 // sync, where "nothing here yet" is a normal state, not a caller mistake.
-func (s *Store) Read(ctx context.Context, syncID string, ns logstore.Namespace, since int64) (logstore.FetchResult, error) {
+func (s *Store) Read(ctx context.Context, syncID string, ns logstore.Namespace, sinceEpoch int64) (logstore.FetchResult, error) {
 	if !ns.Valid() {
 		return logstore.FetchResult{}, logstore.ErrInvalidNamespace
 	}
@@ -828,7 +828,7 @@ func (s *Store) Read(ctx context.Context, syncID string, ns logstore.Namespace, 
 			KeyConditionExpression: aws.String(fmt.Sprintf("%s = :pk AND %s BETWEEN :lower AND :upper", dynamoutil.PKAttr, dynamoutil.SKAttr)),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":pk":    &types.AttributeValueMemberS{Value: syncID},
-				":lower": &types.AttributeValueMemberS{Value: entrySK(ns, since+1)},
+				":lower": &types.AttributeValueMemberS{Value: entrySK(ns, sinceEpoch+1)},
 				":upper": &types.AttributeValueMemberS{Value: entrySKUpperBound(ns)},
 			},
 			ScanIndexForward:  aws.Bool(true),

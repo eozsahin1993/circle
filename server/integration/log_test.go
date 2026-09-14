@@ -203,7 +203,7 @@ func TestReadingTakesASessionAndNothingElse(t *testing.T) {
 	c := harness.NewCircle(t, r)
 	c.MustAppend(harness.Content)
 
-	entriesPath := fmt.Sprintf("%s/entries?namespace=%s&since=0", c.Path(), harness.Content)
+	entriesPath := fmt.Sprintf("%s/entries?namespace=%s&sinceEpoch=0", c.Path(), harness.Content)
 
 	// A different account, holding no write token, reads the ciphertext.
 	// That's the design, not a hole: the log's confidentiality is the

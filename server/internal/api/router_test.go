@@ -115,7 +115,7 @@ func TestEndToEnd_BootstrapAppendFetchRotateAndDownload(t *testing.T) {
 	}
 
 	// 3. Fetch it back from the content namespace.
-	fetchResp := authedRequest(t, http.MethodGet, server.URL+"/v1/circles/"+syncID+"/entries?namespace=content&since=0", authToken, "")
+	fetchResp := authedRequest(t, http.MethodGet, server.URL+"/v1/circles/"+syncID+"/entries?namespace=content&sinceEpoch=0", authToken, "")
 	defer fetchResp.Body.Close()
 	if fetchResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 from fetch, got %d", fetchResp.StatusCode)
@@ -145,7 +145,7 @@ func TestEndToEnd_BootstrapAppendFetchRotateAndDownload(t *testing.T) {
 	}
 
 	// The meta namespace must stay empty — nothing was ever appended there.
-	metaFetchResp := authedRequest(t, http.MethodGet, server.URL+"/v1/circles/"+syncID+"/entries?namespace=meta&since=0", authToken, "")
+	metaFetchResp := authedRequest(t, http.MethodGet, server.URL+"/v1/circles/"+syncID+"/entries?namespace=meta&sinceEpoch=0", authToken, "")
 	defer metaFetchResp.Body.Close()
 	var metaFetchBody struct {
 		Entries []json.RawMessage `json:"entries"`
@@ -365,7 +365,7 @@ func TestEndToEnd_PromoteAdminThenHandOverGovernance(t *testing.T) {
 
 	// Every authority change is on meta too, so clients replaying the log
 	// see the same set the relay enforces.
-	fetchResp := authedRequest(t, http.MethodGet, server.URL+"/v1/circles/"+syncID+"/entries?namespace=meta&since=0", authToken, "")
+	fetchResp := authedRequest(t, http.MethodGet, server.URL+"/v1/circles/"+syncID+"/entries?namespace=meta&sinceEpoch=0", authToken, "")
 	defer fetchResp.Body.Close()
 	var fetched struct {
 		Entries []json.RawMessage `json:"entries"`
@@ -472,7 +472,7 @@ func readEntries(t *testing.T, serverURL, authToken, syncID, namespace string) [
 	EncryptedMeta string `json:"encryptedMeta"`
 } {
 	t.Helper()
-	resp := authedRequest(t, http.MethodGet, serverURL+"/v1/circles/"+syncID+"/entries?namespace="+namespace+"&since=0", authToken, "")
+	resp := authedRequest(t, http.MethodGet, serverURL+"/v1/circles/"+syncID+"/entries?namespace="+namespace+"&sinceEpoch=0", authToken, "")
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 reading %s, got %d", namespace, resp.StatusCode)

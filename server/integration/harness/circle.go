@@ -146,7 +146,7 @@ type LogPage struct {
 func (c *Circle) GetLog(ns string, since int64) LogPage {
 	c.t.Helper()
 	var page LogPage
-	c.Device.Get(fmt.Sprintf("%s/entries?namespace=%s&since=%d", c.Path(), ns, since)).
+	c.Device.Get(fmt.Sprintf("%s/entries?namespace=%s&sinceEpoch=%d", c.Path(), ns, since)).
 		Expect(http.StatusOK).Decode(&page)
 	return page
 }

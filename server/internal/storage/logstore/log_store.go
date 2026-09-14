@@ -252,7 +252,9 @@ type Store interface {
 	DeleteCircle(ctx context.Context, deletion CircleDeletion) (CommitResult, error)
 
 	// Read never deletes or evicts — retention is permanent (invariant 1).
-	Read(ctx context.Context, syncID string, ns Namespace, since int64) (FetchResult, error)
+	// sinceEpoch is a position in ns's sequence, not a timestamp; entries
+	// carry their own ReceivedAt for that.
+	Read(ctx context.Context, syncID string, ns Namespace, sinceEpoch int64) (FetchResult, error)
 
 	// Peek is the cheap half of Read — the same control-state check Read
 	// itself starts with, without the entries Query that follows it. Meant

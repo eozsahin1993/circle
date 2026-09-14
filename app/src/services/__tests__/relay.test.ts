@@ -197,7 +197,7 @@ describe('fetchEntries', () => {
     const result = await fetchEntries('sync-a', 'meta', 0);
 
     const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toBe(`${RELAY_URL}/v1/circles/sync-a/entries?namespace=meta&since=0`);
+    expect(url).toBe(`${RELAY_URL}/v1/circles/sync-a/entries?namespace=meta&sinceEpoch=0`);
     expect(init.headers.Authorization).toBe(`Bearer ${AUTH_TOKEN}`);
     expect(result.entries).toEqual([{ epoch: 1, keyVersion: 2, encryptedMeta: new Uint8Array([9, 9, 9]), receivedAt: 111 }]);
     expect(result.currentEpoch).toBe(1);

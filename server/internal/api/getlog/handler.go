@@ -41,17 +41,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	since := int64(0)
-	if raw := r.URL.Query().Get("since"); raw != "" {
+	// An epoch: a position in this namespace's sequence, not a timestamp.
+	// Entries carry their own receivedAt for that.
+	sinceEpoch := int64(0)
+	if raw := r.URL.Query().Get("sinceEpoch"); raw != "" {
 		parsed, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil {
-			httputil.WriteError(w, http.StatusBadRequest, "since must be an integer")
+			httputil.WriteError(w, http.StatusBadRequest, "sinceEpoch must be an integer")
 			return
 		}
-		since = parsed
+		sinceEpoch = parsed
 	}
 
-	result, err := h.Service.Fetch(r.Context(), syncID, ns, since)
+	result, err := h.Service.Fetch(r.Context(), syncID, ns, sinceEpoch)
 	if err != nil {
 		status, message := circleerrors.Status(err)
 		httputil.WriteError(w, status, message)

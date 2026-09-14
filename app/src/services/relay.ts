@@ -336,9 +336,16 @@ export async function deleteCircleOnRelay(deletion: {
   return { epoch: body.epoch, receivedAt: body.receivedAt };
 }
 
-/** Fetches every entry in `namespace` after `since` — GET /v1/circles/{syncId}/entries?namespace=&since=. */
-export async function fetchEntries(syncId: string, namespace: Namespace, since: number): Promise<FetchEntriesResult> {
-  const response = await authorizedFetch(`/v1/circles/${syncId}/entries?namespace=${namespace}&since=${since}`);
+/**
+ * Fetches every entry in `namespace` after `sinceEpoch` — GET
+ * /v1/circles/{syncId}/entries?namespace=&sinceEpoch=.
+ *
+ * An epoch is a position in that namespace's sequence, not a time. Entries
+ * carry a `receivedAt` as well, which is the timestamp; paging is on the
+ * counter.
+ */
+export async function fetchEntries(syncId: string, namespace: Namespace, sinceEpoch: number): Promise<FetchEntriesResult> {
+  const response = await authorizedFetch(`/v1/circles/${syncId}/entries?namespace=${namespace}&sinceEpoch=${sinceEpoch}`);
   if (response.status === 429) {
     throw new RateLimitedError();
   }
