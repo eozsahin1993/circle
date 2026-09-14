@@ -15,9 +15,9 @@ import {
 } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { setMemberRole } from '@/features/circle/usecases/change-member-role';
-import { approveJoinRequest, getOrCreateInvite } from '@/features/circle/usecases/invite-to-circle';
-import type { JoinRequestPayload } from '@/features/circle/usecases/invite-payloads';
-import { buildAndEncryptLogEntry, verifyLogEntry } from '@/features/circle/usecases/log-entry';
+import { approveJoinRequest, getOrCreateInvite } from '@/features/invite/usecases/invite-to-circle';
+import type { JoinRequestPayload } from '@/features/invite/usecases/invite-payloads';
+import { buildAndEncryptLogEntry, verifyLogEntry } from '@/sync/log-entry';
 import { addComment } from '@/features/post/usecases/comment-on-post';
 import { createPost } from '@/features/post/usecases/create-post';
 import { getReactionsForPost, toggleReaction } from '@/features/post/usecases/react-to-post';

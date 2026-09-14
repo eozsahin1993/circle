@@ -2,8 +2,8 @@ import { Buffer } from 'buffer';
 import { getPermissionsAsync } from 'expo-notifications';
 
 import { getAllCircles } from '@/data/db';
-import { getDevicePushToken } from '@/services/push/tokens';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/features/circle/usecases/log-entry';
+import { getDevicePushToken } from '@/services/push-notifications/tokens';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
 import { PushCategories } from '@/features/push/usecases/push-categories';
 import { derivePushFanoutToken, derivePushRoutingId, generateUUID } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey, getMasterSeed } from '@/services/keystore';

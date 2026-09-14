@@ -4,7 +4,7 @@ import { getAllCircles } from '@/data/db';
 import { circlePushPreferences } from '@/features/push/usecases/push-preferences';
 import { registerPushForCircle } from '@/features/push/usecases/push-registration';
 import { refreshPushSnapshot } from '@/features/push/usecases/push-snapshot';
-import { getDevicePushToken } from '@/services/push/tokens';
+import { getDevicePushToken } from '@/services/push-notifications/tokens';
 
 /**
  * Registers this device for every circle it can be reached in — call on

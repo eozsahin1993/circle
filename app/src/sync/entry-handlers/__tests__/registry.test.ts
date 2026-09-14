@@ -1,5 +1,5 @@
 import { outbox } from '@/data/db/schema';
-import { EntryTypes, type EntryType } from '@/features/circle/usecases/log-entry';
+import { EntryTypes, type EntryType } from '@/sync/log-entry';
 import { namespaceFor } from '@/features/circle/usecases/sync-circle';
 import { contentHandlers, metaHandlers } from '@/sync/entry-handlers';
 

@@ -1,4 +1,4 @@
-import { AvatarTints } from '@/constants/theme';
+import { AvatarTints } from '@/theme/tokens';
 import { avatarTintFor, initialsOf } from '@/utils/initials';
 
 describe('initialsOf', () => {

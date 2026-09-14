@@ -14,7 +14,7 @@ import {
   recordMemberAddedLocally,
 } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import type { LogEntryEnvelope } from '@/features/circle/usecases/log-entry';
+import type { LogEntryEnvelope } from '@/sync/log-entry';
 import { encrypt, generateIdentity, generateUUID, hashBytes } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
 import { appendEntry, bootstrapCircle, getBlob } from '@/services/relay';

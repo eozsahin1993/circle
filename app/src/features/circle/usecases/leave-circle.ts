@@ -11,11 +11,11 @@ import {
   OutboxStatuses,
   recordMemberRemovedLocally,
 } from '@/data/db';
-import { removeCircleNotificationChannel } from '@/services/push/channels';
+import { removeCircleNotificationChannel } from '@/services/push-notifications/channels';
 import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
 import { queueDepartingHandover } from '@/features/circle/usecases/authority';
 import { purgeCircleLocally } from '@/features/circle/usecases/purge-circle';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/features/circle/usecases/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { generateUUID } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';

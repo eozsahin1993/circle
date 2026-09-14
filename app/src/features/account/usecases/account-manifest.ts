@@ -9,7 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { compressToThumbnail } from '@/services/image';
 import { getCircleKeyMap, getMasterSeed } from '@/services/keystore';
 import { mergeManifest } from '@/features/account/usecases/manifest-merge';
-import { getManifest, ManifestConflictError, putManifest } from '@/services/relay';
+import { getManifest, ManifestConflictError, putManifest } from '@/features/account/manifest-relay';
 
 /** Everything a phrase alone has to rebuild an account from. Every field optional: there's no schema version to gate on. */
 export type ManifestPayload = {

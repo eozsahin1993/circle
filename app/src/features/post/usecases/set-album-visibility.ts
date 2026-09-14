@@ -6,8 +6,8 @@ import {
   setPostInAlbumAndEnqueue,
   type NewOutboxEntry,
 } from '@/data/db';
-import { isCircleAdmin } from '@/features/circle/usecases/invite-to-circle';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/features/circle/usecases/log-entry';
+import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { generateUUID } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';

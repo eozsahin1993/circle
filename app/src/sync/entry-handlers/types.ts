@@ -2,7 +2,7 @@ import { hexToBytes } from '@noble/curves/utils.js';
 
 import { getMemberByPublicKey } from '@/data/db';
 import { deriveAuthorityKeyProofMessage, verify } from '@/services/crypto';
-import type { LogEntryEnvelope } from '@/features/circle/usecases/log-entry';
+import type { LogEntryEnvelope } from '@/sync/log-entry';
 
 /**
  * One entry type's rules, as a pair of small functions. The walker

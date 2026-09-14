@@ -1,8 +1,8 @@
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 import { getCircle, getCircleMembers, recordMemberRemovedLocally } from '@/data/db';
-import { requireAdminPublicKey } from '@/features/circle/usecases/invite-to-circle';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/features/circle/usecases/log-entry';
+import { requireAdminPublicKey } from '@/features/invite/usecases/invite-to-circle';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
 import {
   deriveAuthorityKeypair,
   deriveRotateMessage,

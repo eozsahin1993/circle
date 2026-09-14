@@ -1,7 +1,7 @@
 import { Pressable, type PressableProps } from 'react-native';
 
 import { Icon, type IconGlyph } from '@/components/icon';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/theme/use-theme';
 
 export type HeaderIconButtonProps = Omit<PressableProps, 'style'> & {
   icon: IconGlyph;

@@ -1,10 +1,10 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/services/relay');
-jest.mock('@/services/push/relay');
+jest.mock('@/services/push-notifications/relay');
 // Only the Android calls are stubbed; the channel id is a pure function
 // and is exactly what this asserts.
-jest.mock('@/services/push/channels', () => ({
+jest.mock('@/services/push-notifications/channels', () => ({
   ensureCircleNotificationChannel: jest.fn().mockResolvedValue(undefined),
   removeCircleNotificationChannel: jest.fn().mockResolvedValue(undefined),
   circleNotificationChannelId: (circleId: string) => `circle-${circleId}`,
@@ -16,7 +16,7 @@ import { bytesToHex } from '@noble/curves/utils.js';
 
 import { initDatabase, MemberRoles, recordMemberAddedLocally } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/features/circle/usecases/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
 import { resetLocalDataForTesting } from '@/dev/dev-reset';
 import { handlePush } from '@/features/push/usecases/handle-push';
 import { derivePushRoutingId, generateIdentity, generateUUID, type Keypair } from '@/services/crypto';

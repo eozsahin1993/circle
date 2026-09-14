@@ -2,13 +2,13 @@ import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
 
 import { missingPhotoFor, PhotoPlaceholder } from '@/components/photo-placeholder';
 import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { ThemedText } from '@/theme/themed-text';
+import { ThemedView } from '@/theme/themed-view';
+import { Spacing } from '@/theme/tokens';
 import { getAlbumPhotos, getAttachment, getCircleSummary, type AlbumPhoto } from '@/data/db';
 import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
 

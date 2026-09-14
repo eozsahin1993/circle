@@ -2,26 +2,26 @@ import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
 
 import { ActionSheet, type ActionSheetOption } from '@/components/action-sheet';
 import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/icon';
-import { InviteSheet } from '@/features/circle/components/invite-sheet';
+import { InviteSheet } from '@/features/invite/components/invite-sheet';
 import { OptionSheet } from '@/components/option-sheet';
 import { PromptSheet } from '@/components/prompt-sheet';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { SecondaryButton } from '@/components/secondary-button';
 import { SettingsGroups, type SettingsGroup } from '@/components/settings-group';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Icons, Radius, Spacing } from '@/constants/theme';
+import { ThemedText } from '@/theme/themed-text';
+import { ThemedView } from '@/theme/themed-view';
+import { Icons, Radius, Spacing } from '@/theme/tokens';
 import { MemberRoles, type Member, type MemberRole } from '@/data/db';
 import { setMemberRole } from '@/features/circle/usecases/change-member-role';
 import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
 import { loadCircleDetails, type CircleDetails } from '@/features/circle/usecases/circle-details';
 import { buildDebugKeysetFlags } from '@/features/circle/usecases/debug-keyset';
-import { getOrCreateInvite, replaceInvite } from '@/features/circle/usecases/invite-to-circle';
+import { getOrCreateInvite, replaceInvite } from '@/features/invite/usecases/invite-to-circle';
 import { departingSuccessor } from '@/features/circle/usecases/authority';
 import { leaveCircle } from '@/features/circle/usecases/leave-circle';
 import { removeMember } from '@/features/circle/usecases/remove-member';
@@ -34,7 +34,7 @@ import {
   type CirclePushPreferences,
   type PushLevelId,
 } from '@/features/push/usecases/push-preferences';
-import { useTheme, useTints } from '@/hooks/use-theme';
+import { useTheme, useTints } from '@/theme/use-theme';
 import { showDone, showError } from '@/services/messages';
 import { bytesToDataUri, pickAndCompressImage } from '@/services/image';
 

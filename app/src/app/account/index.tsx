@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
 
 import { Avatar } from '@/components/avatar';
 import { OptionSheet } from '@/components/option-sheet';
@@ -9,17 +9,17 @@ import { PrivacyInfoModal } from '@/features/account/components/privacy-info-mod
 import { ReactionChip } from '@/features/post/components/reaction-chip';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { SettingsGroups, type SettingsGroup } from '@/components/settings-group';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Icons, Radius, Spacing } from '@/constants/theme';
+import { ThemedText } from '@/theme/themed-text';
+import { ThemedView } from '@/theme/themed-view';
+import { Icons, Radius, Spacing } from '@/theme/tokens';
 import { getProfile, listCircles, type Profile } from '@/data/db';
 import { resetEverythingForTesting } from '@/dev/dev-reset';
 import { logTestPushPayload } from '@/dev/dev-test-push';
 import { signOut } from '@/features/account/usecases/sign-in';
 import { PushLevels, type PushLevelId } from '@/features/push/usecases/push-preferences';
-import { useAppSettings } from '@/hooks/use-app-settings';
-import { useOwnColorSeed } from '@/hooks/use-own-color-seed';
-import { useTints } from '@/hooks/use-theme';
+import { useAppSettings } from '@/theme/use-app-settings';
+import { useOwnColorSeed } from '@/theme/use-own-color-seed';
+import { useTints } from '@/theme/use-theme';
 import { bytesToDataUri } from '@/services/image';
 import type { ThemePreference } from '@/services/settings';
 

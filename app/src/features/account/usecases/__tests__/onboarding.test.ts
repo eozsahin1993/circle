@@ -8,7 +8,7 @@ import { getProfile } from '@/data/db/profile';
 import { getCircleIdentity, getMasterSeed, saveMasterSeed } from '@/services/keystore';
 import { completeProfileSetup } from '@/features/account/usecases/onboarding';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import { EntryTypes } from '@/features/circle/usecases/log-entry';
+import { EntryTypes } from '@/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { compressToThumbnail } from '@/services/image';
 import { appendEntry, bootstrapCircle } from '@/services/relay';

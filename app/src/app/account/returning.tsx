@@ -3,11 +3,11 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon, type IconGlyph } from '@/components/icon';
 import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Icons, Radius, Spacing } from '@/constants/theme';
-import { useTheme, useTints } from '@/hooks/use-theme';
+import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedText } from '@/theme/themed-text';
+import { ThemedView } from '@/theme/themed-view';
+import { Icons, Radius, Spacing } from '@/theme/tokens';
+import { useTheme, useTints } from '@/theme/use-theme';
 
 /**
  * Offered when signing in finds a manifest this device can't read — you've

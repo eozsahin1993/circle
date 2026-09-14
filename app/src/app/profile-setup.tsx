@@ -1,21 +1,21 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
 
 import { Avatar } from '@/components/avatar';
 import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { PrimaryButton } from '@/components/primary-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Fonts, Radius, Spacing } from '@/constants/theme';
+import { ThemedText } from '@/theme/themed-text';
+import { ThemedView } from '@/theme/themed-view';
+import { Fonts, Radius, Spacing } from '@/theme/tokens';
 import { getProfile } from '@/data/db';
 import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/services/image';
 import { completeProfileSetup, ensureMasterSeed } from '@/features/account/usecases/onboarding';
-import { primeOwnColorSeed } from '@/hooks/use-own-color-seed';
-import { useTheme, useTints } from '@/hooks/use-theme';
-import { goPostAuth } from '@/services/pending-deep-link';
+import { primeOwnColorSeed } from '@/theme/use-own-color-seed';
+import { useTheme, useTints } from '@/theme/use-theme';
+import { goPostAuth } from '@/features/invite/pending-invite';
 
 export default function ProfileSetupScreen() {
   const theme = useTheme();

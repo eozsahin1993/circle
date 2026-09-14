@@ -2,19 +2,19 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
 
 import { Avatar } from '@/components/avatar';
 import { CircleCard } from '@/features/circle/components/circle-card';
-import { JoinSheet } from '@/features/circle/components/join-sheet';
-import { PendingCircleCard } from '@/features/circle/components/pending-circle-card';
+import { JoinSheet } from '@/features/invite/components/join-sheet';
+import { PendingCircleCard } from '@/features/invite/components/pending-circle-card';
 import { EmptyCirclesIcon } from '@/features/circle/components/empty-circles-icon';
 import { FabButton } from '@/components/fab-button';
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
 import { PrivacyNotice } from '@/features/account/components/privacy-notice';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Icons, Spacing } from '@/constants/theme';
+import { ThemedText } from '@/theme/themed-text';
+import { ThemedView } from '@/theme/themed-view';
+import { Icons, Spacing } from '@/theme/tokens';
 import {
   getAllPendingJoinRequests,
   getCircleMemberCount,
@@ -26,12 +26,12 @@ import {
 } from '@/data/db';
 import type { PendingJoinRequest } from '@/data/db/pending-join-requests';
 import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
-import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/circle/usecases/join-circle';
-import { useOwnColorSeed } from '@/hooks/use-own-color-seed';
-import { takePendingInviteCode } from '@/services/pending-deep-link';
+import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/invite/usecases/join-circle';
+import { useOwnColorSeed } from '@/theme/use-own-color-seed';
+import { takePendingInviteCode } from '@/features/invite/pending-invite';
 import { getCircleIdentity } from '@/services/keystore';
 import { bytesToDataUri } from '@/services/image';
-import { formatRelativeTime } from '@/services/relative-time';
+import { formatAgo } from '@/utils/time';
 import { nudgePhotoQueue } from '@/sync/photo-queue';
 import { showError } from '@/services/messages';
 import { syncAllCircles } from '@/sync/sync-circles';
@@ -58,7 +58,7 @@ async function resolveUnreadCount(circle: CircleListRow): Promise<number> {
 /** "Last added just now" / "…3 hours ago" / "…6 days ago" — undefined for a circle with no posts yet. */
 async function resolveLatestActivity(circleId: string): Promise<string | undefined> {
   const newestPostCreatedAt = await getNewestPostCreatedAt(circleId);
-  return newestPostCreatedAt === null ? undefined : `Last added ${formatRelativeTime(newestPostCreatedAt)}`;
+  return newestPostCreatedAt === null ? undefined : `Last added ${formatAgo(newestPostCreatedAt)}`;
 }
 
 export default function CircleListScreen() {

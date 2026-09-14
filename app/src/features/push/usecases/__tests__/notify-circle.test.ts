@@ -1,20 +1,20 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/services/relay');
-jest.mock('@/services/push/relay');
+jest.mock('@/services/push-notifications/relay');
 jest.mock('@/services/image');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { addReaction, initDatabase, insertComment, insertPost, MemberRoles, recordMemberAddedLocally, setMemberPushRoutingId } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/features/circle/usecases/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
 import { resetLocalDataForTesting } from '@/dev/dev-reset';
 import { notifyCircle } from '@/features/push/usecases/notify-circle';
 import { PushCategories } from '@/features/push/usecases/push-categories';
 import { derivePushFanoutToken, derivePushRoutingId, generateIdentity, generateUUID } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey, getMasterSeed, saveMasterSeed } from '@/services/keystore';
-import { sendPush } from '@/services/push/relay';
+import { sendPush } from '@/services/push-notifications/relay';
 import { appendEntry, bootstrapCircle } from '@/services/relay';
 
 const payload = new Uint8Array([7, 7, 7]);

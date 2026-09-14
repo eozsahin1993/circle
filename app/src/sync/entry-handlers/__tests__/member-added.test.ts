@@ -5,7 +5,7 @@ import { bytesToHex } from '@noble/curves/utils.js';
 
 import { getCircleMemberEvents, getCircleMembers, initDatabase, insertCircle, insertMember, MemberRoles } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import type { LogEntryEnvelope } from '@/features/circle/usecases/log-entry';
+import type { LogEntryEnvelope } from '@/sync/log-entry';
 import { generateIdentity, generateUUID } from '@/services/crypto';
 import { getCircleIdentity, saveMasterSeed } from '@/services/keystore';
 import { appendEntry, bootstrapCircle } from '@/services/relay';

@@ -10,7 +10,7 @@ import {
   type Invite,
   type Member,
 } from '@/data/db';
-import { isCircleAdmin } from '@/features/circle/usecases/invite-to-circle';
+import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
 import { getCircleIdentity } from '@/services/keystore';
 
 export type CircleDetails = {

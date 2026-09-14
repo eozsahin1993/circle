@@ -4,16 +4,16 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View, type Vie
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FabButton } from '@/components/fab-button';
-import { gapBetween, stickyIndices, type FeedRow } from '@/features/circle/components/feed/rows';
+import { gapBetween, stickyIndices, type FeedRow } from '@/features/feed/components/rows';
 import { HeaderIconButton } from '@/components/navbar/header-icon-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
-import { ThemedView } from '@/components/themed-view';
-import { Icons, Spacing } from '@/constants/theme';
+import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedView } from '@/theme/themed-view';
+import { Icons, Spacing } from '@/theme/tokens';
 import { markCircleViewed } from '@/data/db';
 import { askForPushOnCircle } from '@/features/push/usecases/enable-push';
-import { useCircleFeed } from '@/features/circle/use-circle-feed';
-import { useTheme } from '@/hooks/use-theme';
+import { useCircleFeed } from '@/features/feed/use-circle-feed';
+import { useTheme } from '@/theme/use-theme';
 
 /** Scroll clearance above the FAB. The safe-area inset itself is separate — see `ListFooterComponent`. */
 const LIST_BOTTOM_PADDING = 100;

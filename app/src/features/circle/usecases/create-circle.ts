@@ -15,13 +15,13 @@ import {
   sealToPublicKey,
 } from '@/services/crypto';
 import { getProfile, insertCircle, MemberRoles, recordMemberAddedLocally } from '@/data/db';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/features/circle/usecases/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
 import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
 import { compressToThumbnail } from '@/services/image';
 import { writeCoverFile } from '@/services/photo-cache';
 import { bootstrapCircle, appendEntry } from '@/services/relay';
 import { defaultCircleMask } from '@/features/push/usecases/push-preferences';
-import { ensureCircleNotificationChannel } from '@/services/push/channels';
+import { ensureCircleNotificationChannel } from '@/services/push-notifications/channels';
 import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap } from '@/services/keystore';
 
 export type CreateCircleInput = {

@@ -1,14 +1,14 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/services/relay');
-jest.mock('@/services/push/relay');
+jest.mock('@/services/push-notifications/relay');
 jest.mock('@/services/image');
 
 import { Buffer } from 'buffer';
 
 import { initDatabase, insertPost } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/features/circle/usecases/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
 import { resetLocalDataForTesting } from '@/dev/dev-reset';
 import { resolvePushDestination } from '@/features/push/usecases/push-destination';
 import { derivePushRoutingId, generateUUID, type Keypair } from '@/services/crypto';

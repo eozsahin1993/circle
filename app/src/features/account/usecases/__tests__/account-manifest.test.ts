@@ -1,4 +1,4 @@
-jest.mock('@/services/relay');
+jest.mock('@/features/account/manifest-relay');
 jest.mock('@/services/image');
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,7 +18,7 @@ import {
   type ManifestPayload,
 } from '@/features/account/usecases/account-manifest';
 import { resetLocalDataForTesting } from '@/dev/dev-reset';
-import { getManifest, ManifestConflictError, putManifest } from '@/services/relay';
+import { getManifest, ManifestConflictError, putManifest } from '@/features/account/manifest-relay';
 import { addCircleKeyVersion, deleteMasterSeed, saveCircleKeyMap, saveMasterSeed } from '@/services/keystore';
 
 beforeAll(() => initDatabase());

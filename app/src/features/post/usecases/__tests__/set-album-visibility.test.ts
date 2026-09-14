@@ -14,7 +14,7 @@ import {
   recordRoleChanged,
 } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import { verifyLogEntry } from '@/features/circle/usecases/log-entry';
+import { verifyLogEntry } from '@/sync/log-entry';
 import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
 import { generateIdentity, generateUUID } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/services/keystore';

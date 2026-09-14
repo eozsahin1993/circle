@@ -4,10 +4,10 @@ import { StyleSheet, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { PrimaryButton } from '@/components/primary-button';
-import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedText } from '@/theme/themed-text';
+import { ThemedView } from '@/theme/themed-view';
+import { Spacing } from '@/theme/tokens';
 import { abandonPriorAccount } from '@/features/account/usecases/onboarding';
 import { showError } from '@/services/messages';
 

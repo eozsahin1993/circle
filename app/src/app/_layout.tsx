@@ -9,13 +9,13 @@ import { useEffect, useState } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 
 import { Snackbar } from '@/components/snackbar';
-import { Colors } from '@/constants/theme';
+import { Colors } from '@/theme/tokens';
 import { initDatabase } from '@/data/db';
 import { enablePushEverywhere } from '@/features/push/usecases/enable-push';
-import { startPushHandling } from '@/services/push/task';
-import { startPushTapRouting } from '@/services/push/tap';
-import { AppSettingsProvider, useAppSettings } from '@/hooks/use-app-settings';
-import { useMessages } from '@/hooks/use-messages';
+import { startPushHandling } from '@/services/push-notifications/task';
+import { startPushTapRouting } from '@/services/push-notifications/tap';
+import { AppSettingsProvider, useAppSettings } from '@/theme/use-app-settings';
+import { useMessages } from '@/services/use-messages';
 import { getAppSettings, type AppSettings } from '@/services/settings';
 import { startJankMonitor } from '@/services/timing';
 import { startSyncScheduler } from '@/sync/scheduler';

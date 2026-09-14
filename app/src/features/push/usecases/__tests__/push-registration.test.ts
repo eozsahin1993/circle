@@ -1,7 +1,7 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/services/relay');
-jest.mock('@/services/push/relay');
+jest.mock('@/services/push-notifications/relay');
 jest.mock('@/services/image');
 
 import { bytesToHex } from '@noble/curves/utils.js';
@@ -12,7 +12,7 @@ import {
   initDatabase,
   setMemberPushRoutingId,
 } from '@/data/db';
-import { EntryTypes } from '@/features/circle/usecases/log-entry';
+import { EntryTypes } from '@/sync/log-entry';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { resetLocalDataForTesting } from '@/dev/dev-reset';
 import { PushCategories } from '@/features/push/usecases/push-categories';
@@ -29,7 +29,7 @@ import {
   getMasterSeed,
   saveMasterSeed,
 } from '@/services/keystore';
-import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/services/push/relay';
+import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/services/push-notifications/relay';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { appendEntry, bootstrapCircle } from '@/services/relay';
 

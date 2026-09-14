@@ -1,7 +1,7 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { getCircleMembers, insertOutboxEntry, OutboxStatuses, setMemberPushRoutingId } from '@/data/db';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/features/circle/usecases/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
 import { type PushCategory } from '@/features/push/usecases/push-categories';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import {
@@ -12,7 +12,7 @@ import {
   generateUUID,
 } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey, getMasterSeed, getPushDeviceSecret } from '@/services/keystore';
-import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/services/push/relay';
+import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/services/push-notifications/relay';
 
 /**
  * Registering this account and device for a circle's notifications, and

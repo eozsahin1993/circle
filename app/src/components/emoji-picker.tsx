@@ -1,8 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import { Icons, Radius } from '@/constants/theme';
-import { useTheme, useTints } from '@/hooks/use-theme';
+import { Icons, Radius } from '@/theme/tokens';
+import { useTheme, useTints } from '@/theme/use-theme';
 
 export type EmojiPickerProps = {
   onSelect: (emoji: string) => void;

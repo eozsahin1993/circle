@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 
 import { getProfile } from '@/data/db';
 import { getAuthToken } from '@/services/keystore';
-import { savePendingInviteCode } from '@/services/pending-deep-link';
+import { savePendingInviteCode } from '@/features/invite/pending-invite';
 
 /**
  * Where an invite link lands, and nothing more: it parks the code and

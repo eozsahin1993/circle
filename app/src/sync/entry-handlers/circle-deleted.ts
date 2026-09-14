@@ -1,5 +1,5 @@
 import { deleteCircle, getCircleMembers, MemberRoles } from '@/data/db';
-import { removeCircleNotificationChannel } from '@/services/push/channels';
+import { removeCircleNotificationChannel } from '@/services/push-notifications/channels';
 import { deleteCirclePhotoFiles } from '@/services/photo-cache';
 import { deleteCircleKeys } from '@/services/keystore';
 import { asRecord, numberField, type EntryHandler } from '@/sync/entry-handlers/types';

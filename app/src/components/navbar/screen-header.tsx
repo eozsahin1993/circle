@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { BackButton, type BackButtonProps } from '@/components/navbar/back-button';
-import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { ThemedText } from '@/theme/themed-text';
+import { Spacing } from '@/theme/tokens';
 
 export type ScreenHeaderProps = BackButtonProps & {
   /** What this screen is — "Post", "Album". Omit for a bare arrow. */

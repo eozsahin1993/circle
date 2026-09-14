@@ -2,8 +2,8 @@ import { router } from 'expo-router';
 import { Pressable } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import { Icons } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Icons } from '@/theme/tokens';
+import { useTheme } from '@/theme/use-theme';
 
 export type BackButtonProps = {
   /**

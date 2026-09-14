@@ -5,7 +5,7 @@ import { bytesToHex } from '@noble/curves/utils.js';
 
 import { AttachmentKinds, AttachmentStatuses, initDatabase, insertPost } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import type { LogEntryEnvelope } from '@/features/circle/usecases/log-entry';
+import type { LogEntryEnvelope } from '@/sync/log-entry';
 import { getReactionsForPost } from '@/features/post/usecases/react-to-post';
 import { generateIdentity, generateUUID } from '@/services/crypto';
 import { getCircleIdentity, saveMasterSeed } from '@/services/keystore';

@@ -12,7 +12,7 @@ import {
   insertPost,
 } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import { verifyLogEntry } from '@/features/circle/usecases/log-entry';
+import { verifyLogEntry } from '@/sync/log-entry';
 import { addComment } from '@/features/post/usecases/comment-on-post';
 import { generateUUID } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/services/keystore';

@@ -8,10 +8,10 @@ import { type CommentItem, PostComments } from '@/features/post/components/post-
 import { PhotoPlaceholder, type MissingPhoto } from '@/components/photo-placeholder';
 import { ReactionChip } from '@/features/post/components/reaction-chip';
 import { EmojiPicker } from '@/components/emoji-picker';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { ThemedText } from '@/theme/themed-text';
+import { ThemedView } from '@/theme/themed-view';
+import { Icons, PhotoAspect, Radius, Spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/use-theme';
 
 export type Reaction = {
   emoji: string;

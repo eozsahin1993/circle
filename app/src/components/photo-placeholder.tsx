@@ -2,10 +2,10 @@ import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
 import { StyleSheet, View, type ViewProps } from 'react-native';
 
 import { Icon, type IconGlyph } from '@/components/icon';
-import { ThemedText } from '@/components/themed-text';
-import { Icons, PhotoSlotLight } from '@/constants/theme';
-import { useAppSettings } from '@/hooks/use-app-settings';
-import { useTheme, useTints } from '@/hooks/use-theme';
+import { ThemedText } from '@/theme/themed-text';
+import { Icons, PhotoSlotLight } from '@/theme/tokens';
+import { useAppSettings } from '@/theme/use-app-settings';
+import { useTheme, useTints } from '@/theme/use-theme';
 
 /**
  * Why a photo isn't here. 'arriving' is the ordinary case — the entry

@@ -2,9 +2,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { BottomSheet } from '@/components/bottom-sheet';
 import { Icon } from '@/components/icon';
-import { ThemedText } from '@/components/themed-text';
-import { Icons, Spacing } from '@/constants/theme';
-import { useTheme, useTints } from '@/hooks/use-theme';
+import { ThemedText } from '@/theme/themed-text';
+import { Icons, Spacing } from '@/theme/tokens';
+import { useTheme, useTints } from '@/theme/use-theme';
 
 export type SheetOption<Id extends string> = {
   id: Id;

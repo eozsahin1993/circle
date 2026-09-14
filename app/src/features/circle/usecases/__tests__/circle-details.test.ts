@@ -7,7 +7,7 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { initDatabase, MemberRoles, recordMemberAddedLocally, recordRoleChanged } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { loadCircleDetails } from '@/features/circle/usecases/circle-details';
-import { getOrCreateInvite } from '@/features/circle/usecases/invite-to-circle';
+import { getOrCreateInvite } from '@/features/invite/usecases/invite-to-circle';
 import { generateIdentity, generateUUID } from '@/services/crypto';
 import { getCircleIdentity, saveMasterSeed } from '@/services/keystore';
 import { appendEntry, bootstrapCircle } from '@/services/relay';

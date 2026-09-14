@@ -4,7 +4,7 @@ import { writePhotoFile } from '@/services/photo-cache';
 import { timedSync } from '@/services/timing';
 
 import { generateUUID, hashBytes } from '@/services/crypto';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/features/circle/usecases/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
 import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
 import {
   AttachmentKinds,

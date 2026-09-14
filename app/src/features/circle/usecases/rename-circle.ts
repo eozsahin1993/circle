@@ -1,8 +1,8 @@
 import { deriveWriteToken, generateUUID } from '@/services/crypto';
 import { getCircle, updateCircleName } from '@/data/db';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/features/circle/usecases/log-entry';
-import { isCircleAdmin } from '@/features/circle/usecases/invite-to-circle';
-import { ensureCircleNotificationChannel } from '@/services/push/channels';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
+import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
+import { ensureCircleNotificationChannel } from '@/services/push-notifications/channels';
 import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
 import { appendEntry } from '@/services/relay';
 

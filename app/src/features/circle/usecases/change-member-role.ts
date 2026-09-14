@@ -1,6 +1,6 @@
 import { getMemberByPublicKey, MemberRoles, type MemberRole } from '@/data/db';
 import { addAuthority, removeAuthority } from '@/features/circle/usecases/authority';
-import { requireAdminPublicKey } from '@/features/circle/usecases/invite-to-circle';
+import { requireAdminPublicKey } from '@/features/invite/usecases/invite-to-circle';
 
 /**
  * Promotes a member to admin or demotes an admin to member — admin only,

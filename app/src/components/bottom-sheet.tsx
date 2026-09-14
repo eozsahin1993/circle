@@ -3,10 +3,10 @@ import { Animated, Dimensions, Modal, Pressable, StyleSheet, View } from 'react-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KeyboardAvoider } from '@/components/keyboard-avoider';
-import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
-import { ThemedView } from '@/components/themed-view';
-import { Radius, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedView } from '@/theme/themed-view';
+import { Radius, Spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/use-theme';
 
 export type BottomSheetProps = {
   visible: boolean;

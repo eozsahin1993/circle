@@ -7,15 +7,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
 import { AppleSignInButton, GoogleSignInButton } from '@/features/account/components/social-sign-in-button';
-import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedText } from '@/theme/themed-text';
+import { ThemedView } from '@/theme/themed-view';
+import { Spacing } from '@/theme/tokens';
 import { getProfile } from '@/data/db';
 import { hasUnreadableAccountManifest, recordSignInProviderBestEffort } from '@/features/account/usecases/account-manifest';
 import { signInWithApple, signInWithGoogle } from '@/features/account/usecases/sign-in';
 import { getAuthToken } from '@/services/keystore';
-import { goPostAuth } from '@/services/pending-deep-link';
+import { goPostAuth } from '@/features/invite/pending-invite';
 
 type Provider = 'apple' | 'google';
 

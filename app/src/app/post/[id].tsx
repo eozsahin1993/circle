@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
 
 import { ActionSheet } from '@/components/action-sheet';
 import { Avatar } from '@/components/avatar';
@@ -15,9 +15,9 @@ import { missingPhotoFor, PhotoPlaceholder } from '@/components/photo-placeholde
 import { ReactionChip } from '@/features/post/components/reaction-chip';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Icons, PhotoAspect, Radius, Spacing } from '@/constants/theme';
+import { ThemedText } from '@/theme/themed-text';
+import { ThemedView } from '@/theme/themed-view';
+import { Icons, PhotoAspect, Radius, Spacing } from '@/theme/tokens';
 import {
   getAttachment,
   getCircleSummary,
@@ -30,12 +30,12 @@ import {
   type FeedPost,
   type ReactionSummary,
 } from '@/data/db';
-import { isCircleAdmin } from '@/features/circle/usecases/invite-to-circle';
+import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
 import { addComment } from '@/features/post/usecases/comment-on-post';
 import { deletePost } from '@/features/post/usecases/delete-post';
 import { getReactionsForPost, toggleReaction } from '@/features/post/usecases/react-to-post';
 import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/theme/use-theme';
 import { showError, showMessage } from '@/services/messages';
 import { bytesToDataUri } from '@/services/image';
 import { getCircleIdentity } from '@/services/keystore';

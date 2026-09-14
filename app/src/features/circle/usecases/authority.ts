@@ -10,7 +10,7 @@ import {
   type MemberRole,
   type OutboxAuthorityAction,
 } from '@/data/db';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/features/circle/usecases/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { AuthorityActions, generateUUID } from '@/services/crypto';
 import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';

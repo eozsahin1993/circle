@@ -6,7 +6,7 @@ import { getCircleBySyncId, getProfile, insertCircle, listCircles, saveProfile }
 import { fetchAccountManifest, type RecoverableCircle } from '@/features/account/usecases/account-manifest';
 import { defaultCircleMask } from '@/features/push/usecases/push-preferences';
 import { deriveCircleIdentity, generateUUID, seedPhraseToEntropy } from '@/services/crypto';
-import { ensureCircleNotificationChannel } from '@/services/push/channels';
+import { ensureCircleNotificationChannel } from '@/services/push-notifications/channels';
 import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap, saveMasterSeed } from '@/services/keystore';
 import { syncCircle } from '@/sync/sync-circles';
 

@@ -2,19 +2,19 @@ import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'ex
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
 
 import { PrimaryButton } from '@/components/primary-button';
 import { SecondaryButton } from '@/components/secondary-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Radius, Spacing } from '@/constants/theme';
+import { ThemedText } from '@/theme/themed-text';
+import { ThemedView } from '@/theme/themed-view';
+import { Radius, Spacing } from '@/theme/tokens';
 import {
   approveDeviceTransfer,
   inspectDeviceTransfer,
 } from '@/features/account/usecases/device-transfer';
-import { useTheme, useTints } from '@/hooks/use-theme';
+import { useTheme, useTints } from '@/theme/use-theme';
 import { showDone, showError } from '@/services/messages';
 
 /**

@@ -1,7 +1,7 @@
 import { getCircle } from '@/data/db';
 import { notifyCircleBestEffort } from '@/features/push/usecases/notify-circle';
 import { PushCategories, type PushCategory } from '@/features/push/usecases/push-categories';
-import { EntryTypes } from '@/features/circle/usecases/log-entry';
+import { EntryTypes } from '@/sync/log-entry';
 import { timed, timedSync } from '@/services/timing';
 import { getCircleIdentity, getCurrentContentKey, getMasterSeed } from '@/services/keystore';
 import {

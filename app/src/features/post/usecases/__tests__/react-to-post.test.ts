@@ -5,7 +5,7 @@ import { bytesToHex } from '@noble/curves/utils.js';
 
 import { AttachmentKinds, AttachmentStatuses, getPendingOutboxEntries, initDatabase, insertPost } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import { verifyLogEntry } from '@/features/circle/usecases/log-entry';
+import { verifyLogEntry } from '@/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { getReactionsForPost, toggleReaction } from '@/features/post/usecases/react-to-post';
 import { generateUUID } from '@/services/crypto';

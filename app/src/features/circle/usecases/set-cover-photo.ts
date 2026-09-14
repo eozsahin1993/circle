@@ -1,7 +1,7 @@
 import { deriveAuthorityKeypair, deriveCoverPhotoUploadMessage, deriveWriteToken, encrypt, generateUUID, hashBytes, sign } from '@/services/crypto';
 import { getCircle, updateCirclePicture } from '@/data/db';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/features/circle/usecases/log-entry';
-import { isCircleAdmin } from '@/features/circle/usecases/invite-to-circle';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
+import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
 import { getCircleIdentity, getCurrentContentKey, getMasterSeed } from '@/services/keystore';
 import { writeCoverFile } from '@/services/photo-cache';
 import { appendEntry, getCoverPhotoUploadTarget, uploadBlob } from '@/services/relay';

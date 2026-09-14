@@ -3,10 +3,10 @@ import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { Icon, type IconGlyph } from '@/components/icon';
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Icons, Radius, Spacing } from '@/constants/theme';
-import { useTheme, useTints } from '@/hooks/use-theme';
+import { ThemedText } from '@/theme/themed-text';
+import { ThemedView } from '@/theme/themed-view';
+import { Icons, Radius, Spacing } from '@/theme/tokens';
+import { useTheme, useTints } from '@/theme/use-theme';
 
 /**
  * What sits at the end of a row, by kind rather than by markup — the same

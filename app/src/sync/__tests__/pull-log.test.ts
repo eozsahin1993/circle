@@ -13,7 +13,7 @@ import {
   MemberRoles,
 } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import { buildAndEncryptLogEntry } from '@/features/circle/usecases/log-entry';
+import { buildAndEncryptLogEntry } from '@/sync/log-entry';
 import { generateContentKey, generateIdentity, generateUUID, hashBytes } from '@/services/crypto';
 import {
   getCircleIdentity,

@@ -3,7 +3,7 @@ jest.mock('@/services/relay');
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { decrypt, generateUUID, hashBytes } from '@/services/crypto';
-import { buildAndEncryptLogEntry } from '@/features/circle/usecases/log-entry';
+import { buildAndEncryptLogEntry } from '@/sync/log-entry';
 import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
 import {
   appendEntry,

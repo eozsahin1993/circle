@@ -3,11 +3,11 @@ import { Animated, PanResponder, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon, type IconGlyph } from '@/components/icon';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Icons, Radius, Spacing, type ThemeColor } from '@/constants/theme';
-import { useTheme, useTints } from '@/hooks/use-theme';
-import type { MessageController } from '@/hooks/use-messages';
+import { ThemedText } from '@/theme/themed-text';
+import { ThemedView } from '@/theme/themed-view';
+import { Icons, Radius, Spacing, type ThemeColor } from '@/theme/tokens';
+import { useTheme, useTints } from '@/theme/use-theme';
+import type { MessageController } from '@/services/use-messages';
 import type { Message } from '@/services/messages';
 
 /** How each tone is drawn, given this scheme's tints. The glyph carries the state, never the fill. */

@@ -4,9 +4,9 @@ import { StyleSheet, TextInput, View } from 'react-native';
 import { BottomSheet } from '@/components/bottom-sheet';
 import { PrimaryButton } from '@/components/primary-button';
 import { SecondaryButton } from '@/components/secondary-button';
-import { ThemedText } from '@/components/themed-text';
-import { Radius, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { ThemedText } from '@/theme/themed-text';
+import { Radius, Spacing } from '@/theme/tokens';
+import { useTheme } from '@/theme/use-theme';
 
 export type PromptSheetProps = {
   visible: boolean;

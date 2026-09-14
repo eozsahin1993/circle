@@ -1,11 +1,11 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { getAllCircles, getCircleMembers } from '@/data/db';
-import { EntryTypes } from '@/features/circle/usecases/log-entry';
-import { verifyLogEntry, type LogEntryEnvelope } from '@/features/circle/usecases/log-entry';
+import { EntryTypes } from '@/sync/log-entry';
+import { verifyLogEntry, type LogEntryEnvelope } from '@/sync/log-entry';
 import { derivePushRoutingId } from '@/services/crypto';
 import { getCircleIdentity, getCircleKeyMap, getMasterSeed } from '@/services/keystore';
-import { circleNotificationChannelId } from '@/services/push/channels';
+import { circleNotificationChannelId } from '@/services/push-notifications/channels';
 
 /**
  * Turning a delivered push into the words on the lock screen.

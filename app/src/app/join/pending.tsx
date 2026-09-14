@@ -1,14 +1,14 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, AppState, Pressable, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
 
 import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { ThemedText } from '@/theme/themed-text';
+import { ThemedView } from '@/theme/themed-view';
+import { Spacing } from '@/theme/tokens';
 import { getPendingJoinRequest } from '@/data/db';
-import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/circle/usecases/join-circle';
+import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/invite/usecases/join-circle';
 
 /**
  * Faster than the sync scheduler's 30s: this is someone watching a screen

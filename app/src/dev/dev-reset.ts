@@ -1,5 +1,5 @@
 import { getAllCircleIds, resetAllLocalData, resetDatabaseSchema } from '@/data/db';
-import { clearOwnColorSeedCache } from '@/hooks/use-own-color-seed';
+import { clearOwnColorSeedCache } from '@/theme/use-own-color-seed';
 import { deleteAuthToken, deleteCircleKeys, deleteMasterSeed } from '@/services/keystore';
 
 /**
