@@ -1,6 +1,9 @@
 import { generateSeedPhrase, seedPhraseToEntropy } from '@/services/crypto';
 import { saveProfile } from '@/data/db';
-import { allowForeignManifestOverwrite } from '@/domain/usecases/account/account-manifest';
+import {
+  allowForeignManifestOverwrite,
+  recordInManifestBestEffort,
+} from '@/domain/usecases/account/account-manifest';
 import { broadcastProfileUpdate } from '@/domain/usecases/circle/broadcast-profile-update';
 import { getMasterSeed, saveMasterSeed } from '@/services/keystore';
 
@@ -65,6 +68,10 @@ export async function completeProfileSetup(profile: ProfileInput): Promise<void>
   await saveProfile({ ...profile, createdAt: now, updatedAt: now });
   await broadcastProfileUpdate(profile.name, profile.picture);
   await ensureMasterSeed();
+  // After the seed exists, or there'd be no key to encrypt it under on a
+  // first run. `profile_update` reaches the circles; this is what reaches a
+  // phone that has lost everything and has no circle to replay yet.
+  await recordInManifestBestEffort();
 }
 
 /**

@@ -1,13 +1,13 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
+import { Icon, type IconGlyph } from '@/components/icon';
 import { ScreenHeader } from '@/components/navbar/screen-header';
-import { PrimaryButton } from '@/components/primary-button';
-import { SettingsGroups, type SettingsGroup } from '@/components/settings-group';
 import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Icons, Radius, Spacing } from '@/constants/theme';
+import { useTheme, useTints } from '@/hooks/use-theme';
 
 /**
  * Offered when signing in finds a manifest this device can't read — you've
@@ -30,28 +30,6 @@ export default function ReturningAccountScreen() {
   // doesn't — a first-time user offline would be told they'd been here.
   const { certain } = useLocalSearchParams<{ certain?: string }>();
 
-  const groups: SettingsGroup[] = [
-    {
-      title: 'Get back in',
-      rows: [
-        // Transfer first: it's the only one that gets you back *in*. The
-        // phrase restores who you are, not what you can read.
-        {
-          label: 'Bring them from another device',
-          description: 'Your old phone scans a code from this one. Restores everything.',
-          control: { kind: 'navigate' },
-          onPress: () => router.push('/account/transfer'),
-        },
-        {
-          label: 'Use your recovery phrase',
-          description: 'Comes back as yourself — someone in each circle still has to let you in.',
-          control: { kind: 'navigate' },
-          onPress: () => router.push('/account/restore'),
-        },
-      ],
-    },
-  ];
-
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
@@ -63,22 +41,69 @@ export default function ReturningAccountScreen() {
           </ThemedText>
           <ThemedText type="captionFeed" themeColor="secondary">
             {certain
-              ? "Your circles are still there — this phone just can't read them yet."
-              : "We couldn't reach the server to check. If you've had an account, bring it over now — once this phone makes its own, the old one is out of reach."}
+              ? "Your circles are still there. This phone just can't read them yet."
+              : "We couldn't reach the server to check. If you've had an account, bring it over now. Once this phone makes its own, the old one is out of reach."}
           </ThemedText>
 
           <View style={styles.options}>
-            <SettingsGroups groups={groups} />
+            {/* Transfer first: it's the only one that gets you back *in*.
+                The phrase restores who you are, not what you can read. */}
+            <OptionCard
+              icon={Icons.inviteCode}
+              label="Use another device"
+              description="Your old phone scans a code from this one. Restores everything."
+              onPress={() => router.push('/account/transfer')}
+            />
+            <OptionCard
+              icon={Icons.locked}
+              label="Use your recovery phrase"
+              description="Comes back as yourself. Someone in each circle still has to let you in."
+              onPress={() => router.push('/account/restore')}
+            />
           </View>
         </View>
 
-        <PrimaryButton
-          label="Start fresh instead"
-          onPress={() => router.push('/account/start-fresh')}
-          style={styles.startFresh}
-        />
+        <Pressable style={styles.startFresh} onPress={() => router.push('/account/start-fresh')}>
+          <ThemedText type="meta" themeColor="accent" style={styles.startFreshText}>
+            Start fresh instead. Your previous account details will be gone.
+          </ThemedText>
+        </Pressable>
       </ThemedSafeAreaView>
     </ThemedView>
+  );
+}
+
+type OptionCardProps = {
+  icon: IconGlyph;
+  label: string;
+  description: string;
+  onPress: () => void;
+};
+
+function OptionCard({ icon, label, description, onPress }: OptionCardProps) {
+  const theme = useTheme();
+  const tints = useTints();
+
+  return (
+    <Pressable onPress={onPress}>
+      {({ pressed }) => (
+        <View
+          style={[
+            styles.option,
+            { backgroundColor: tints.privacyWashBg, borderColor: tints.privacyWashBorder },
+            pressed && styles.optionPressed,
+          ]}>
+          <Icon icon={icon} size={24} color={theme.accent} />
+          <View style={styles.optionText}>
+            <ThemedText type="cardTitle">{label}</ThemedText>
+            <ThemedText type="meta" themeColor="muted">
+              {description}
+            </ThemedText>
+          </View>
+          <Icon icon={Icons.disclosure} size={20} color={theme.accent} />
+        </View>
+      )}
+    </Pressable>
   );
 }
 
@@ -99,7 +124,27 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 8,
   },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderWidth: 1,
+    borderRadius: Radius.notice,
+    padding: Spacing.screenPadding,
+  },
+  optionPressed: {
+    opacity: 0.7,
+  },
+  optionText: {
+    flex: 1,
+    gap: 2,
+  },
   startFresh: {
-    marginBottom: 12,
+    alignSelf: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: Spacing.screenPadding,
+  },
+  startFreshText: {
+    textAlign: 'center',
   },
 });

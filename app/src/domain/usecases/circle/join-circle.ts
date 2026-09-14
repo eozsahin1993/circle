@@ -34,7 +34,7 @@ import { writeCoverFile } from '@/services/photo-cache';
 import { defaultCircleMask } from '@/domain/usecases/push/push-preferences';
 import { ensureCircleNotificationChannel } from '@/services/push/channels';
 import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
-import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
+import { recordInManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { compressToThumbnail } from '@/services/image';
 import { deletePendingJoinKeypair, getMasterSeed, getPendingJoinKeypair, saveCircleIdentity, saveCircleKeyMap, savePendingJoinKeypair } from '@/services/keystore';
 import {
@@ -236,7 +236,7 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
 
   await ensureCircleNotificationChannel(circleId, circleName);
 
-  await syncAccountManifestBestEffort();
+  await recordInManifestBestEffort();
 
   await deletePendingJoinKeypair(pending.id);
   await deletePendingJoinRequest(pending.id);

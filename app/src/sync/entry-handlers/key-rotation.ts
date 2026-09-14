@@ -1,6 +1,7 @@
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 import { getCircleMembers, MemberRoles } from '@/data/db';
+import { recordInManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { deriveCircleSealingKeypair, openSealedBox } from '@/services/crypto';
 import { addCircleKeyVersion, getCircleIdentity, getMasterSeed } from '@/services/keystore';
 import { asRecord, numberField, type EntryHandler } from '@/sync/entry-handlers/types';
@@ -70,5 +71,9 @@ export const keyRotationHandler: EntryHandler = {
     }
 
     await addCircleKeyVersion(circleId, payload.version, key);
+    // Straight into the manifest too. The Keychain copy dies with the
+    // phone, so until this lands, everything posted under the new key is
+    // unrecoverable from the recovery phrase alone.
+    await recordInManifestBestEffort();
   },
 };

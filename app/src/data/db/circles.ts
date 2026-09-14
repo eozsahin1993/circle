@@ -30,6 +30,37 @@ export async function getCircle(id: string): Promise<Circle | null> {
 }
 
 /**
+ * Finds a circle by its relay-facing address rather than its local id.
+ *
+ * Only recovery needs this: it learns circles from the account manifest and
+ * must not insert a second local row for one this device already has.
+ * `syncId` has no unique index and `insertCircle` is a plain insert, so
+ * nothing else would catch the duplicate — it would just quietly replay the
+ * same circle into a parallel set of rows.
+ */
+export async function getCircleBySyncId(syncId: string): Promise<Circle | null> {
+  const rows = await db.select().from(circles).where(eq(circles.syncId, syncId));
+  return rows[0] ? normalizeCircle(rows[0]) : null;
+}
+
+/** Each joined circle's local id and log address — what the account manifest records. */
+export async function listCircleAddresses(): Promise<{ id: string; syncId: string }[]> {
+  return db
+    .select({ id: circles.id, syncId: circles.syncId })
+    .from(circles)
+    .where(isNull(circles.leftAt));
+}
+
+/** Circles this device has left but still has a row for — what the account manifest tombstones. */
+export async function listLeftCircles(): Promise<{ id: string; leftAt: number }[]> {
+  const rows = await db
+    .select({ id: circles.id, leftAt: circles.leftAt })
+    .from(circles)
+    .where(isNotNull(circles.leftAt));
+  return rows.map((row) => ({ id: row.id, leftAt: row.leftAt ?? Date.now() }));
+}
+
+/**
  * The circle list's rows, without the cover blob.
  *
  * `getAllCircles` is `select()` — every column, so a 200KB cover crosses

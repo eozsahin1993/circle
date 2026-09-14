@@ -12,12 +12,14 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTints } from '@/hooks/use-theme';
+import { saveRecoveryCard } from '@/domain/usecases/account/recovery-card';
 import { getMasterSeed } from '@/services/keystore';
+import { showDone, showError } from '@/services/messages';
 
 export default function RecoveryPhraseScreen() {
   const tints = useTints();
   const [words, setWords] = useState<string[] | null>(null);
-  const [revealed, setRevealed] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     getMasterSeed().then((seed) => {
@@ -26,11 +28,27 @@ export default function RecoveryPhraseScreen() {
   }, []);
 
   /**
-   * Hands the words to the OS share sheet so they can land in a mailbox
-   * or notes app, which people keep and can search years later, unlike the
-   * paper this screen otherwise implies. Deliberately the device's own
-   * share sheet rather than anything the relay sends: a phrase the server
-   * transmits is a phrase the server saw.
+   * Writes the card and hands it to the share sheet. Steer toward iCloud
+   * Drive over "On My iPhone" in the copy below — the second one sits
+   * right there in the same list and dies with the phone.
+   */
+  async function handleSaveCard() {
+    setSaving(true);
+    try {
+      if (await saveRecoveryCard()) showDone('Save it somewhere that survives this phone');
+      else showError("This device can't share files");
+    } catch (err) {
+      console.error('Failed to save the recovery card', err);
+      showError('Could not make your recovery card');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /**
+   * The words as plain text — lands in a mailbox or notes app, which
+   * people keep and can search years later. Recoverable only by
+   * copy-paste, which is why the card sits above it.
    */
   async function handleSendToSelf() {
     if (!words) return;
@@ -51,7 +69,7 @@ export default function RecoveryPhraseScreen() {
           </ThemedText>
 
           <ThemedView type="surface" style={[styles.card, { borderColor: tints.chipIdleBorder }]}>
-            {revealed && words ? (
+            {words ? (
               <View style={styles.grid}>
                 {words.map((word, index) => (
                   <View key={`${index}-${word}`} style={styles.wordCell}>
@@ -64,24 +82,20 @@ export default function RecoveryPhraseScreen() {
                   </View>
                 ))}
               </View>
-            ) : (
-              <View style={styles.hidden}>
-                <ThemedText type="meta" themeColor="muted" style={styles.hiddenText}>
-                  Make sure nobody can see your screen before revealing these.
-                </ThemedText>
-              </View>
-            )}
+            ) : null}
           </ThemedView>
 
           <View style={styles.spacer} />
 
-          {revealed ? <SecondaryButton label="Save them somewhere" onPress={handleSendToSelf} /> : null}
+          {/* The card first: it's the one that comes back without anyone
+              retyping anything. Sharing the words as text still has a place
+              — a mailbox is searchable years later — but it can only be
+              recovered by copy-paste. */}
+          <SecondaryButton label={saving ? 'Preparing…' : 'Save recovery card'} disabled={saving} onPress={handleSaveCard} />
 
-          <PrimaryButton
-            label={revealed ? 'Done' : 'Reveal words'}
-            disabled={!words}
-            onPress={() => (revealed ? router.back() : setRevealed(true))}
-          />
+          <SecondaryButton label="Send the words as text" onPress={handleSendToSelf} />
+
+          <PrimaryButton label="Done" disabled={!words} onPress={() => router.back()} />
         </View>
       </ThemedSafeAreaView>
     </ThemedView>

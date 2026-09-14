@@ -16,7 +16,7 @@ import {
 } from '@/services/crypto';
 import { getProfile, insertCircle, MemberRoles, recordMemberAddedLocally } from '@/data/db';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
-import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
+import { recordInManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { compressToThumbnail } from '@/services/image';
 import { writeCoverFile } from '@/services/photo-cache';
 import { bootstrapCircle, appendEntry } from '@/services/relay';
@@ -142,7 +142,7 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
 
   await ensureCircleNotificationChannel(circleId, input.name);
 
-  await syncAccountManifestBestEffort();
+  await recordInManifestBestEffort();
 
   return { id: circleId };
 }

@@ -31,7 +31,7 @@ export default function StartFreshScreen() {
       router.replace({ pathname: '/profile-setup', params: { suggestedName: '', suggestedPictureUrl: '' } });
     } catch (err) {
       console.error('Failed to start a fresh account', err);
-      showError('Could not start fresh — try again');
+      showError('Could not start fresh. Try again.');
       setBusy(false);
     }
   }
@@ -49,7 +49,8 @@ export default function StartFreshScreen() {
           </ThemedText>
           <ThemedText type="captionFeed" themeColor="secondary">
             This also clears the record of which circles those were. A recovery phrase found later
-            still proves who you are, but it won&apos;t find them for you.
+            still proves who you are, but it won&apos;t find them for you. The people already in a
+            circle can always invite you back into it.
           </ThemedText>
         </View>
 

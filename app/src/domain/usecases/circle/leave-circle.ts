@@ -12,7 +12,7 @@ import {
   recordMemberRemovedLocally,
 } from '@/data/db';
 import { removeCircleNotificationChannel } from '@/services/push/channels';
-import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
+import { recordInManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { queueDepartingHandover } from '@/domain/usecases/circle/authority';
 import { purgeCircleLocally } from '@/domain/usecases/circle/purge-circle';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/domain/usecases/circle/log-entry';
@@ -113,7 +113,7 @@ export async function leaveCircle(circleId: string): Promise<void> {
   await markCircleLeft(circleId);
   // Deleting the group takes its channels with it.
   await removeCircleNotificationChannel(circleId);
-  await syncAccountManifestBestEffort();
+  await recordInManifestBestEffort();
 
   finishDeparture(circleId).catch((err) => console.error('Failed to push departure', err));
 }
@@ -182,7 +182,7 @@ export async function deleteCircleForEveryone(circleId: string): Promise<void> {
 
   await markCircleLeft(circleId);
   await removeCircleNotificationChannel(circleId);
-  await syncAccountManifestBestEffort();
+  await recordInManifestBestEffort();
 
   finishDeparture(circleId).catch((err) => console.error('Failed to push circle deletion', err));
 }

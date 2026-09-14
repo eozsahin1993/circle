@@ -3,15 +3,24 @@ jest.mock('@/domain/usecases/account/account-manifest');
 jest.mock('@/services/mailbox-relay');
 jest.mock('@/services/relay');
 jest.mock('@/services/image');
+jest.mock('@/sync/sync-circles');
 
-import { initDatabase } from '@/data/db';
+import { bytesToHex } from '@noble/curves/utils.js';
+
+import { getCircleBySyncId, getProfile, initDatabase, listCircles, saveProfile } from '@/data/db';
 import { fetchAccountManifest } from '@/domain/usecases/account/account-manifest';
 import { restoreFromPhrase } from '@/domain/usecases/account/restore-from-phrase';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
 import { resetLocalDataForTesting } from '@/domain/usecases/dev-reset';
 import { deriveCircleIdentity, generateSeedPhrase, seedPhraseToEntropy } from '@/services/crypto';
-import { getMasterSeed, saveMasterSeed } from '@/services/keystore';
+import { getCircleKeyMap, getMasterSeed, saveMasterSeed } from '@/services/keystore';
 import { appendEntry, bootstrapCircle } from '@/services/relay';
+
+const CONTENT_KEY = new Uint8Array(32).fill(7);
+
+function manifestCircle(circleId: string, syncId: string) {
+  return { circleId, syncId, keyMap: { 1: bytesToHex(CONTENT_KEY) } };
+}
 
 beforeAll(async () => {
   await initDatabase();
@@ -21,14 +30,16 @@ beforeEach(async () => {
   jest.clearAllMocks();
   (bootstrapCircle as jest.Mock).mockResolvedValue(undefined);
   (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
-  (fetchAccountManifest as jest.Mock).mockResolvedValue({ circleIds: ['a', 'b'] });
+  (fetchAccountManifest as jest.Mock).mockResolvedValue({
+    circles: [manifestCircle('circle-a', 'sync-a'), manifestCircle('circle-b', 'sync-b')],
+  });
   await resetLocalDataForTesting();
 });
 
 test('a valid phrase restores the seed behind it', async () => {
   const phrase = generateSeedPhrase();
 
-  await expect(restoreFromPhrase(phrase)).resolves.toEqual({ circleCount: 2 });
+  await expect(restoreFromPhrase(phrase)).resolves.toEqual({ circleCount: 2, name: null });
 
   expect(await getMasterSeed()).toEqual(seedPhraseToEntropy(phrase));
 });
@@ -45,6 +56,76 @@ test('the restored seed regenerates the identity the roster already knows', asyn
   await restoreFromPhrase(phrase);
 
   expect(deriveCircleIdentity((await getMasterSeed())!, 'circle-1')).toEqual(before);
+});
+
+/**
+ * The part the seed alone can't do. Content keys are random and unreadable
+ * from the log itself, so the manifest's copy is the only one a phrase can
+ * reach — without it the circles come back locked.
+ */
+test('restores every circle in the manifest, with its content keys', async () => {
+  await restoreFromPhrase(generateSeedPhrase());
+
+  expect(await listCircles()).toHaveLength(2);
+  expect(await getCircleKeyMap('circle-a')).toEqual({ 1: CONTENT_KEY });
+  expect(await getCircleKeyMap('circle-b')).toEqual({ 1: CONTENT_KEY });
+});
+
+/** Replay rebuilds the roster and the posts; restore only has to leave the cursors at zero. */
+test('leaves restored circles at cursor zero so sync replays their whole history', async () => {
+  await restoreFromPhrase(generateSeedPhrase());
+
+  const circle = await getCircleBySyncId('sync-a');
+  expect(circle).toMatchObject({ metaCursor: 0, contentCursor: 0 });
+});
+
+/**
+ * Apple only hands back a name on the very first authorization, so a
+ * recovered phone has no other way to know it.
+ */
+test('restores the profile so a returning member is not asked to retype their name', async () => {
+  (fetchAccountManifest as jest.Mock).mockResolvedValue({
+    circles: [],
+    profile: { name: 'Emre', updatedAt: 1_700_000_000 },
+  });
+
+  await expect(restoreFromPhrase(generateSeedPhrase())).resolves.toEqual({ circleCount: 0, name: 'Emre' });
+
+  // updatedAt carried over, not stamped now — otherwise this device would
+  // outrank a rename made on one that's still running.
+  expect(await getProfile()).toMatchObject({ name: 'Emre', updatedAt: 1_700_000_000 });
+});
+
+/**
+ * A restore that dies partway has already written some circles. Re-running
+ * has to resume rather than either refusing outright or replaying the same
+ * circle into a second set of rows — `syncId` has no unique index to catch it.
+ */
+test('running again after a partial restore resumes instead of duplicating', async () => {
+  const phrase = generateSeedPhrase();
+  await restoreFromPhrase(phrase);
+
+  await expect(restoreFromPhrase(phrase)).resolves.toEqual({ circleCount: 2, name: null });
+
+  expect(await listCircles()).toHaveLength(2);
+});
+
+/**
+ * A re-run after a partial restore must not undo an edit made in between —
+ * the manifest's copy can be the older one by then.
+ */
+test('leaves a newer local profile alone', async () => {
+  (fetchAccountManifest as jest.Mock).mockResolvedValue({
+    circles: [],
+    profile: { name: 'From the manifest', updatedAt: 100 },
+  });
+  const phrase = generateSeedPhrase();
+  await restoreFromPhrase(phrase);
+  await saveProfile({ name: 'Renamed since', picture: null, createdAt: 1, updatedAt: 500 });
+
+  await restoreFromPhrase(phrase);
+
+  expect(await getProfile()).toMatchObject({ name: 'Renamed since', updatedAt: 500 });
 });
 
 test.each([
@@ -66,7 +147,7 @@ test('extra spacing and capitals still restore', async () => {
 });
 
 /** Adopting another seed would file the existing circle's keys under an identity it can't reproduce. */
-test('refuses to run on a phone that is already in a circle', async () => {
+test('refuses a different seed on a phone that is already in a circle', async () => {
   await saveMasterSeed(seedPhraseToEntropy(generateSeedPhrase()));
   await createCircle({ name: 'Family Circle' });
   const seedBefore = await getMasterSeed();
@@ -77,11 +158,11 @@ test('refuses to run on a phone that is already in a circle', async () => {
 });
 
 /** Offline is not a reason to reject words that are perfectly valid. */
-test('an unreachable relay still restores, just without a circle count', async () => {
+test('an unreachable relay still restores, just without the circles', async () => {
   (fetchAccountManifest as jest.Mock).mockRejectedValue(new Error('offline'));
   const phrase = generateSeedPhrase();
 
-  await expect(restoreFromPhrase(phrase)).resolves.toEqual({ circleCount: null });
+  await expect(restoreFromPhrase(phrase)).resolves.toEqual({ circleCount: null, name: null });
 
   expect(await getMasterSeed()).toEqual(seedPhraseToEntropy(phrase));
 });

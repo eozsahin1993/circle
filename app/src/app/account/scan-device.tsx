@@ -1,9 +1,11 @@
+import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Linking, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { PrimaryButton } from '@/components/primary-button';
+import { SecondaryButton } from '@/components/secondary-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -18,15 +20,11 @@ import { showDone, showError } from '@/services/messages';
 /**
  * The established device's half of a transfer: scan the other phone's
  * code, confirm, and seal this account to it.
- *
- * The camera is not wired yet — `expo-camera` is a native dependency and
- * needs a rebuild. Everything downstream of a scanned string is finished
- * and tested, so landing it is a matter of calling `handleScanned` from
- * the barcode callback and replacing the placeholder below.
  */
 export default function ScanDeviceScreen() {
   const theme = useTheme();
   const tints = useTints();
+  const [permission, requestPermission] = useCameraPermissions();
   const [busy, setBusy] = useState(false);
 
   /**
@@ -35,14 +33,11 @@ export default function ScanDeviceScreen() {
    * successful scan alone, so the prompt names the device and says what
    * it is about to get.
    */
-  // Unused only until the camera lands — this is the callback the barcode
-  // scanner calls, kept whole so wiring it is one line rather than a rewrite.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async function handleScanned(raw: string) {
+  async function handleScanned({ data }: BarcodeScanningResult) {
     if (busy) return;
     setBusy(true);
     try {
-      const scanned = await inspectDeviceTransfer(raw);
+      const scanned = await inspectDeviceTransfer(data);
       Alert.alert(
         `Add ${scanned.deviceName}?`,
         `It will hold the same keys as this phone and see all ${
@@ -86,9 +81,26 @@ export default function ScanDeviceScreen() {
           </ThemedText>
 
           <View style={[styles.viewfinder, { backgroundColor: theme.surface, borderColor: tints.chipIdleBorder }]}>
-            <ThemedText type="meta" themeColor="faint" style={styles.placeholder}>
-              The camera needs a new build of the app before this can scan.
-            </ThemedText>
+            {permission?.granted ? (
+              <CameraView
+                style={styles.camera}
+                facing="back"
+                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                onBarcodeScanned={busy ? undefined : handleScanned}
+              />
+            ) : (
+              <View style={styles.permissionPrompt}>
+                <ThemedText type="meta" themeColor="faint" style={styles.placeholder}>
+                  {permission?.canAskAgain === false
+                    ? 'Camera access is off for Circle. Turn it on in Settings to scan.'
+                    : 'Circle needs your camera to scan the code.'}
+                </ThemedText>
+                <SecondaryButton
+                  label={permission?.canAskAgain === false ? 'Open Settings' : 'Allow camera'}
+                  onPress={permission?.canAskAgain === false ? Linking.openSettings : requestPermission}
+                />
+              </View>
+            )}
           </View>
 
           <View style={styles.spacer} />
@@ -122,6 +134,18 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: Radius.panel,
     borderWidth: 1,
+    overflow: 'hidden',
+  },
+  camera: {
+    flex: 1,
+    width: '100%',
+  },
+  permissionPrompt: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.cardListGap,
     padding: Spacing.screenPadding,
   },
   placeholder: {

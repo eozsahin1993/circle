@@ -1,7 +1,7 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { getCircleMembers, MemberRoles, recordMemberRemoved } from '@/data/db';
-import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
+import { getCircleMembers, markCircleLeft, MemberRoles, recordMemberRemoved } from '@/data/db';
+import { recordInManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { purgeCircleLocally } from '@/domain/usecases/circle/purge-circle';
 import { getCircleIdentity } from '@/services/keystore';
 import { asRecord, numberField, stringField, type EntryHandler } from '@/sync/entry-handlers/types';
@@ -81,8 +81,13 @@ export const memberRemovedHandler: EntryHandler = {
 
     const identity = await getCircleIdentity(circleId);
     if (identity && bytesToHex(identity.publicKey) === payload.identityPublicKey) {
+      // Marked, then pushed, then purged. The order is the whole reason
+      // this needs no removal call of its own: reconciliation reads the
+      // departure off the `leftAt` row, and purging first would delete the
+      // only local trace that it happened.
+      await markCircleLeft(circleId);
+      await recordInManifestBestEffort();
       await purgeCircleLocally(circleId);
-      await syncAccountManifestBestEffort();
     }
   },
 };

@@ -5,10 +5,12 @@ import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { PrimaryButton } from '@/components/primary-button';
+import { SecondaryButton } from '@/components/secondary-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radius, Spacing } from '@/constants/theme';
+import { pickRecoveryCard } from '@/domain/usecases/account/recovery-card';
 import { restoreFromPhrase } from '@/domain/usecases/account/restore-from-phrase';
 import { useTheme } from '@/hooks/use-theme';
 import { showDone } from '@/services/messages';
@@ -26,6 +28,7 @@ export default function RestoreScreen() {
   const [phrase, setPhrase] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [picking, setPicking] = useState(false);
 
   const words = phrase.trim() ? phrase.trim().split(/\s+/).length : 0;
 
@@ -54,6 +57,25 @@ export default function RestoreScreen() {
     }
   }
 
+  /**
+   * Fills the field rather than restoring straight away — the words appear
+   * where they were going to be typed, so a wrong file is visible before
+   * it's acted on rather than after.
+   */
+  async function handlePickCard() {
+    setPicking(true);
+    setError(null);
+    try {
+      const picked = await pickRecoveryCard();
+      if (picked) setPhrase(picked);
+    } catch (err) {
+      console.error('Failed to read a recovery card', err);
+      setError(err instanceof Error ? err.message : "Couldn't read that file.");
+    } finally {
+      setPicking(false);
+    }
+  }
+
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
@@ -61,8 +83,18 @@ export default function RestoreScreen() {
 
         <KeyboardAvoider style={styles.body}>
           <ThemedText type="captionFeed" themeColor="secondary">
-            Type the {WORD_COUNT} words from your old phone, in order, separated by spaces.
+            Pick the recovery card you saved, or type the {WORD_COUNT} words from your old phone, in
+            order, separated by spaces.
           </ThemedText>
+
+          {/* First, because it is the path that can't be got wrong. The
+              field below stays for a card that was printed, read aloud, or
+              never saved at all. */}
+          <SecondaryButton
+            label={picking ? 'Reading…' : 'Choose recovery card'}
+            disabled={picking || busy}
+            onPress={handlePickCard}
+          />
 
           <TextInput
             value={phrase}

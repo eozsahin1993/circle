@@ -59,6 +59,14 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.715618948690-lhieptiff5un7m2nbkm492ps2704o8og"
         }
+      ],
+      "expo-sharing",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Circle uses your camera to scan a device transfer code.",
+          "recordAudioAndroid": false
+        }
       ]
     ],
     "experiments": {

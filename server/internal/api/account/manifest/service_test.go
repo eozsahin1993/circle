@@ -2,9 +2,11 @@ package manifest_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"circle-relay/internal/api/account/manifest"
+	"circle-relay/internal/storage/manifeststore"
 	"circle-relay/internal/testsupport"
 )
 
@@ -14,7 +16,7 @@ func TestService_PutThenGet_RoundTrips(t *testing.T) {
 	accountID := testsupport.UniqueAccountID(t)
 	blob := []byte("pretend-ciphertext")
 
-	if err := svc.Put(ctx, accountID, blob); err != nil {
+	if err := svc.Put(ctx, accountID, blob, 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -22,8 +24,8 @@ func TestService_PutThenGet_RoundTrips(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got) != string(blob) {
-		t.Fatalf("expected %q, got %q", blob, got)
+	if string(got.Blob) != string(blob) {
+		t.Fatalf("expected %q, got %q", blob, got.Blob)
 	}
 }
 
@@ -35,7 +37,22 @@ func TestService_Get_ReturnsNilForAnAccountThatNeverStoredAManifest(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != nil {
-		t.Fatalf("expected nil, got %q", got)
+	if got.Blob != nil {
+		t.Fatalf("expected nil, got %q", got.Blob)
+	}
+}
+
+func TestService_Put_SurfacesAVersionMismatch(t *testing.T) {
+	ctx := context.Background()
+	svc := &manifest.Service{ManifestStore: testsupport.NewManifestStore(t)}
+	accountID := testsupport.UniqueAccountID(t)
+
+	if err := svc.Put(ctx, accountID, []byte("first"), 0); err != nil {
+		t.Fatal(err)
+	}
+
+	err := svc.Put(ctx, accountID, []byte("racing"), 0)
+	if !errors.Is(err, manifeststore.ErrVersionMismatch) {
+		t.Fatalf("expected ErrVersionMismatch, got %v", err)
 	}
 }

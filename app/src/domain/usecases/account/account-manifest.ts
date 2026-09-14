@@ -1,32 +1,58 @@
-import { listCircles } from '@/data/db';
+import { Buffer } from 'buffer';
+
+import { bytesToHex } from '@noble/curves/utils.js';
+
+import { getProfile, listCircleAddresses, listLeftCircles, type Profile } from '@/data/db';
 import { decrypt, deriveManifestKey, encryptJSON } from '@/services/crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { getMasterSeed } from '@/services/keystore';
-import { getManifest, putManifest } from '@/services/relay';
+import { compressToThumbnail } from '@/services/image';
+import { getCircleKeyMap, getMasterSeed } from '@/services/keystore';
+import { mergeManifest } from '@/domain/usecases/account/manifest-merge';
+import { getManifest, ManifestConflictError, putManifest } from '@/services/relay';
 
-/**
- * What this account's manifest holds — today circleIds and provider, but
- * meant to grow (the relay only ever sees ciphertext, so a new field here
- * is the whole change). Every field optional: no schema version to gate
- * on, so an older or newer blob may just be missing one. provider is
- * recorded client-side rather than by the server on purpose — it keeps
- * this document entirely client-owned, the server never writes into it.
- */
+/** Everything a phrase alone has to rebuild an account from. Every field optional: there's no schema version to gate on. */
 export type ManifestPayload = {
-  circleIds?: string[];
+  /** Content keys are random and unreadable from the log itself, so this is the only copy a phrase can reach. */
+  circles?: ManifestCircle[];
+  /** Apple withholds the name on every sign-in after the first, so it can't be re-asked for. */
+  profile?: ManifestProfile;
   provider?: 'google' | 'apple';
 };
 
+export type ManifestProfile = {
+  name: string;
+  /** The 96px thumbnail, base64 — not the 1080px original the local row keeps. */
+  picture?: string;
+  /** From `device_profile.updatedAt`, so the newer of two devices' edits wins. */
+  updatedAt: number;
+};
+
 /**
- * Raised when the relay holds a manifest this device's seed can't open.
- * That means the blob belongs to a different seed — the same account on a
- * phone whose seed this one has no way to reproduce — so it is the *only*
- * record of which circles that account belongs to. Overwriting it would
- * destroy the pointer permanently, and no recovery phrase could bring it
- * back afterwards, so every write path treats this as fatal rather than
- * as "no manifest yet".
+ * Departure is tombstoned rather than deleted, so every write stays additive.
+ * Absence can't mean "removed": it's also what a circle joined on the
+ * account's other phone looks like, and dropping that destroys keys only
+ * that phone holds. Tombstones are kept indefinitely, ~60 bytes each.
  */
+export type ManifestCircle = RecoverableCircle | DepartedCircle;
+
+export type RecoverableCircle = {
+  /** Local id — the circle identity derives from it, so it has to come back verbatim. */
+  circleId: string;
+  /** The relay-facing log address, which no amount of seed material can reproduce. */
+  syncId: string;
+  /** Every version this member holds, `{ version: hex key }`. */
+  keyMap: Record<number, string>;
+  /** Present and undefined, not absent: it discriminates the union. */
+  leftAt?: undefined;
+};
+
+/** Nothing left to rebuild, so no address and no keys. */
+export type DepartedCircle = {
+  circleId: string;
+  leftAt: number;
+};
+
 /**
  * Set once, by the screen where someone chose to abandon an account this
  * device can't read — see `abandonPriorAccount`. Everywhere else a foreign
@@ -47,6 +73,14 @@ async function foreignOverwriteAllowed(): Promise<boolean> {
   return (await AsyncStorage.getItem(FOREIGN_OVERWRITE_KEY)) === '1';
 }
 
+/**
+ * Raised when the relay holds a manifest this device's seed can't open.
+ * That means the blob belongs to a different seed — the same account on a
+ * phone whose seed this one has no way to reproduce — so it is the *only*
+ * copy of that identity's circle keys. Overwriting it would destroy them
+ * permanently, and no recovery phrase could bring them back afterwards, so
+ * every write path treats this as fatal rather than as "no manifest yet".
+ */
 export class ForeignManifestError extends Error {
   constructor() {
     super("The stored manifest was written by a seed this device doesn't have.");
@@ -54,37 +88,31 @@ export class ForeignManifestError extends Error {
   }
 }
 
-type ManifestState =
+type ManifestState = { version: number } & (
   | { status: 'absent' }
   | { status: 'ours'; payload: ManifestPayload }
-  | { status: 'foreign' };
+  | { status: 'foreign' }
+);
 
-/**
- * What the relay currently holds for this account, as one of three
- * states rather than a value-or-throw. The distinction that matters is
- * absent vs. foreign: both leave this device with nothing readable, but
- * only the first makes it safe to write.
- */
+/** Absent vs. foreign is the distinction that matters: both leave nothing readable, but only absent is safe to write over. */
 async function readAccountManifest(masterSeed: Uint8Array): Promise<ManifestState> {
-  const blob = await getManifest();
-  if (!blob) return { status: 'absent' };
+  const { blob, version } = await getManifest();
+  if (!blob) return { status: 'absent', version };
 
   try {
     const key = deriveManifestKey(masterSeed);
     const payload = JSON.parse(new TextDecoder().decode(decrypt(blob, key))) as ManifestPayload;
-    // decrypt() already rules out tampering; this just covers a missing field.
-    return { status: 'ours', payload: { ...payload, circleIds: payload.circleIds ?? [] } };
+    return { status: 'ours', payload, version };
   } catch {
-    // AEAD authentication failed, or the plaintext wasn't our JSON — either
-    // way this blob isn't ours to read, and it isn't ours to replace.
-    return { status: 'foreign' };
+    // Not ours to read, so not ours to replace.
+    return { status: 'foreign', version };
   }
 }
 
 /**
- * Fetches and decrypts this account's manifest — `{ circleIds: [] }`
- * before this account has ever stored one, same shape as an empty one.
- * Throws `ForeignManifestError` if one exists under a different seed.
+ * Fetches and decrypts this account's manifest — an empty payload before
+ * this account has ever stored one. Throws `ForeignManifestError` if one
+ * exists under a different seed.
  */
 export async function fetchAccountManifest(): Promise<ManifestPayload> {
   const masterSeed = await getMasterSeed();
@@ -92,87 +120,139 @@ export async function fetchAccountManifest(): Promise<ManifestPayload> {
 
   const state = await readAccountManifest(masterSeed);
   if (state.status === 'foreign') throw new ForeignManifestError();
-  return state.status === 'ours' ? state.payload : { circleIds: [] };
+  return state.status === 'ours' ? state.payload : {};
 }
 
 /**
- * Writes the manifest. `state` is the read this payload was built from,
- * and is required rather than re-fetched so a caller cannot write without
- * having established what it is overwriting — see ForeignManifestError.
+ * One manifest operation at a time on this device, in call order. The
+ * version check would catch interleaving anyway, but at the cost of a wasted
+ * round trip, and this device's own writes have no reason to race.
  */
-async function putAccountManifest(
-  masterSeed: Uint8Array,
-  payload: ManifestPayload,
-  state: ManifestState,
-): Promise<void> {
-  if (state.status === 'foreign' && !(await foreignOverwriteAllowed())) throw new ForeignManifestError();
+let pending: Promise<unknown> = Promise.resolve();
 
-  const key = deriveManifestKey(masterSeed);
-  await putManifest(encryptJSON(payload, key));
+function serialised<T>(work: () => Promise<T>): Promise<T> {
+  const next = pending.then(work, work);
+  pending = next.catch(() => undefined);
+  return next;
 }
 
-/**
- * Pushes this account's current circleId list to the relay, encrypted
- * under a key derived from the master seed. This is the durable record a
- * lost device leans on during recovery to know which circles to even look
- * for — the relay is the one party both the old and new device always
- * talk to, present or not. Call after anything that changes local
- * membership (create, leave, delete). No-op before onboarding generates
- * a seed. Merges onto whatever's already stored (e.g. `provider`) rather
- * than overwriting the whole document, so this can't clobber a field it
- * doesn't know about.
- */
-export async function syncAccountManifest(): Promise<void> {
-  const masterSeed = await getMasterSeed();
-  if (!masterSeed) return;
-
-  const state = await readAccountManifest(masterSeed);
-  if (state.status === 'foreign' && !(await foreignOverwriteAllowed())) throw new ForeignManifestError();
-
-  const current = state.status === 'ours' ? state.payload : { circleIds: [] };
-  // listCircles, not getAllCircles: this runs on create/join/leave and
-  // only needs ids, so there's no reason to drag cover blobs through it.
-  const circles = await listCircles();
-  await putAccountManifest(masterSeed, { ...current, circleIds: circles.map((circle) => circle.id) }, state);
-}
+/** Enough to outlast a couple of devices racing; a real livelock is a bug, not a retry budget. */
+const MAX_WRITE_ATTEMPTS = 4;
 
 /**
- * Same as `syncAccountManifest`, but swallows failures — offline or
- * relay-down shouldn't block creating/leaving/deleting a circle locally,
- * same reasoning as signOut()'s best-effort server revoke.
+ * States everything this device holds and lets `mergeManifest` decide what
+ * changed. The only thing that writes this document.
+ *
+ * Deliberately not per-circle: stating the whole picture means any write
+ * also repairs earlier ones that failed, which a targeted write can't.
+ * Converging on current state rather than replaying missed events is also
+ * why offline needs no queue — SQLite and the Keychain are the durable
+ * record, and what to push is re-derived from them.
+ *
+ * No-op before a seed exists.
  */
-export async function syncAccountManifestBestEffort(): Promise<void> {
-  try {
-    await syncAccountManifest();
-  } catch (err) {
-    console.error('Failed to sync account manifest', err);
-  }
-}
-
-/**
- * Records which provider this account most recently signed in with —
- * call right after a successful sign-in. Best-effort and self-contained
- * (unlike syncAccountManifest, nothing else needs a non-swallowing
- * variant): offline or relay-down shouldn't block finishing sign-in over
- * a purely informational field. Skips the write entirely if the stored
- * value already matches, so a normal repeat sign-in doesn't touch the
- * network at all.
- */
-export async function recordSignInProviderBestEffort(provider: 'google' | 'apple'): Promise<void> {
-  try {
+export function reconcileAccountManifest(): Promise<void> {
+  return serialised(async () => {
     const masterSeed = await getMasterSeed();
     if (!masterSeed) return;
 
-    const state = await readAccountManifest(masterSeed);
-    if (state.status === 'foreign') throw new ForeignManifestError();
+    const key = deriveManifestKey(masterSeed);
+    for (let attempt = 0; attempt < MAX_WRITE_ATTEMPTS; attempt++) {
+      const state = await readAccountManifest(masterSeed);
+      if (state.status === 'foreign' && !(await foreignOverwriteAllowed())) throw new ForeignManifestError();
 
-    const current = state.status === 'ours' ? state.payload : { circleIds: [] };
-    if (current.provider === provider) return;
+      // Local state is read per attempt: leaving a circle between the read
+      // and the write would otherwise be written from a stale snapshot.
+      const payload = mergeManifest(state.status === 'ours' ? state.payload : {}, await describeLocalState());
+      if (!payload) return;
 
-    await putAccountManifest(masterSeed, { ...current, provider }, state);
+      try {
+        await putManifest(encryptJSON(payload, key), state.version);
+        return;
+      } catch (err) {
+        // A conflict re-runs the merge against the newer payload rather than
+        // re-sending this blob, which would drop what the other device wrote.
+        if (!(err instanceof ManifestConflictError)) throw err;
+      }
+    }
+    throw new Error('Another device kept changing the manifest first.');
+  });
+}
+
+/** Local state in the manifest's own shape. Departures come off the `leftAt` rows the leaving paths set before they purge. */
+async function describeLocalState(): Promise<Partial<ManifestPayload>> {
+  const joined = await listCircleAddresses();
+  const described = await Promise.all(joined.map((circle) => describeCircle(circle)));
+  const left = await listLeftCircles();
+  const profile = await getProfile();
+  const provider = await storedSignInProvider();
+
+  return {
+    circles: [
+      ...described.filter((circle): circle is RecoverableCircle => circle !== null),
+      ...left.map(({ id, leftAt }) => ({ circleId: id, leftAt })),
+    ],
+    ...(profile ? { profile: await describeProfile(profile) } : {}),
+    ...(provider ? { provider } : {}),
+  };
+}
+
+/** `reconcileAccountManifest` with the swallowing every caller needs — a dead relay must never block a local join or leave. */
+export async function recordInManifestBestEffort(): Promise<void> {
+  try {
+    await reconcileAccountManifest();
+  } catch (err) {
+    console.error('Failed to record local state in the account manifest', err);
+  }
+}
+
+/** One circle's address and keys, or null if its keys haven't arrived yet — a circle mid-join. */
+async function describeCircle(circle: { id: string; syncId: string }): Promise<RecoverableCircle | null> {
+  const keyMap = await getCircleKeyMap(circle.id);
+  if (!keyMap) return null;
+
+  return {
+    circleId: circle.id,
+    syncId: circle.syncId,
+    keyMap: Object.fromEntries(Object.entries(keyMap).map(([version, key]) => [version, bytesToHex(key)])),
+  };
+}
+
+/** The 96px thumbnail rather than the 1080px original: it's what other members already see, and this document is rewritten often. */
+async function describeProfile(profile: Profile): Promise<ManifestProfile> {
+  const described = { name: profile.name, updatedAt: profile.updatedAt };
+  if (!profile.picture) return described;
+  try {
+    return { ...described, picture: Buffer.from(await compressToThumbnail(profile.picture)).toString('base64') };
+  } catch (err) {
+    // A compression failure mustn't cost the circle keys sharing this write.
+    console.error('Failed to compress profile picture for the account manifest', err);
+    return described;
+  }
+}
+
+/**
+ * Records which provider this account most recently signed in with.
+ *
+ * Saved locally first so it becomes derivable, and therefore rides along on
+ * every later write rather than depending on this one landing. Best-effort:
+ * a dead relay mustn't block finishing sign-in over a field nothing reads
+ * back.
+ */
+export async function recordSignInProviderBestEffort(provider: 'google' | 'apple'): Promise<void> {
+  try {
+    await AsyncStorage.setItem(SIGN_IN_PROVIDER_KEY, provider);
+    await reconcileAccountManifest();
   } catch (err) {
     console.error('Failed to record sign-in provider', err);
   }
+}
+
+const SIGN_IN_PROVIDER_KEY = 'account.signInProvider';
+
+async function storedSignInProvider(): Promise<'google' | 'apple' | undefined> {
+  const provider = await AsyncStorage.getItem(SIGN_IN_PROVIDER_KEY);
+  return provider === 'google' || provider === 'apple' ? provider : undefined;
 }
 
 /**
@@ -191,5 +271,5 @@ export async function recordSignInProviderBestEffort(provider: 'google' | 'apple
  */
 export async function hasUnreadableAccountManifest(): Promise<boolean> {
   if (await getMasterSeed()) return false;
-  return (await getManifest()) !== null;
+  return (await getManifest()).blob !== null;
 }

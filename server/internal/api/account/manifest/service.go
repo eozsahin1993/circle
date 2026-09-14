@@ -19,12 +19,13 @@ type Service struct {
 	ManifestStore manifeststore.Store
 }
 
-// Get returns nil, nil if accountID has never stored a manifest.
-func (s *Service) Get(ctx context.Context, accountID string) ([]byte, error) {
+// Get returns the zero Manifest if accountID has never stored one.
+func (s *Service) Get(ctx context.Context, accountID string) (manifeststore.Manifest, error) {
 	return s.ManifestStore.GetManifest(ctx, accountID)
 }
 
-// Put overwrites accountID's manifest in place.
-func (s *Service) Put(ctx context.Context, accountID string, blob []byte) error {
-	return s.ManifestStore.PutManifest(ctx, accountID, blob)
+// Put replaces accountID's manifest, only if it's still at expectedVersion —
+// returns manifeststore.ErrVersionMismatch if another device wrote first.
+func (s *Service) Put(ctx context.Context, accountID string, blob []byte, expectedVersion int64) error {
+	return s.ManifestStore.PutManifest(ctx, accountID, blob, expectedVersion)
 }

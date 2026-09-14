@@ -128,11 +128,12 @@ export function deriveAuthorityKeypair(masterSeed: Uint8Array, circleId: string)
 }
 
 /**
- * Derives the symmetric key that encrypts the account-recovery manifest
- * (the list of circleIds this account belongs to) before it's sent to the
- * relay. Only this seed can decrypt it, so a stolen backup or database
- * dump doesn't hand over which circles the account is in — though the
- * relay still learns the same membership in real time from ordinary
+ * Derives the symmetric key that encrypts the account-recovery manifest —
+ * each circle's address and content keys, plus this account's profile —
+ * before it's sent to the relay. Only this seed can decrypt it, which is
+ * what lets a phrase alone rebuild an account and why a stolen backup or
+ * database dump hands over neither the circles nor the keys to read them.
+ * The relay still learns the same membership in real time from ordinary
  * authenticated circle-log requests, which this encryption doesn't hide.
  */
 export function deriveManifestKey(masterSeed: Uint8Array): Uint8Array {

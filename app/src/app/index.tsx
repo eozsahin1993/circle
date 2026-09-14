@@ -5,16 +5,15 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
-import { SocialSignInButton } from '@/components/social-sign-in-button';
+import { PrivacyInfoModal } from '@/components/privacy-info-modal';
+import { AppleSignInButton, GoogleSignInButton } from '@/components/social-sign-in-button';
 import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { getProfile } from '@/data/db';
 import { hasUnreadableAccountManifest, recordSignInProviderBestEffort } from '@/domain/usecases/account/account-manifest';
-import { completeProfileSetup } from '@/domain/usecases/account/onboarding';
 import { signInWithApple, signInWithGoogle } from '@/domain/usecases/account/sign-in';
-import { downloadAndCompressImage } from '@/services/image';
 import { getAuthToken } from '@/services/keystore';
 import { goPostAuth } from '@/services/pending-deep-link';
 
@@ -34,6 +33,7 @@ export default function WelcomeScreen() {
   const [hasSession, setHasSession] = useState<boolean | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
+  const [privacyVisible, setPrivacyVisible] = useState(false);
 
   // Re-checked on focus, not just mount, so navigating back here post-sign-in still redirects away.
   useFocusEffect(
@@ -81,24 +81,10 @@ export default function WelcomeScreen() {
         return;
       }
 
-      // Only skip profile-setup entirely when the provider gave us a
-      // *complete* profile — name and picture both. Apple never provides
-      // a picture at all, so this never applies to it; Google usually
-      // does, but a failed download falls through to the form below
-      // rather than silently leaving someone with no picture and no
-      // chance to add one.
-      if (result.suggestedName && result.suggestedPictureUrl) {
-        try {
-          const { bytes } = await downloadAndCompressImage(result.suggestedPictureUrl);
-          await completeProfileSetup({ name: result.suggestedName, picture: bytes });
-          await goPostAuth(router);
-          return;
-        } catch (err) {
-          console.error('Failed to auto-complete profile from sign-in', err);
-          // fall through to the pre-filled manual form below
-        }
-      }
-
+      // Always through the form, pre-filled with whatever the provider
+      // gave us — profile-setup downloads the suggested picture itself.
+      // Nobody gets a name and avatar committed to their circles without
+      // having seen them first.
       router.push({
         pathname: '/profile-setup',
         params: { suggestedName: result.suggestedName ?? '', suggestedPictureUrl: result.suggestedPictureUrl ?? '' },
@@ -148,25 +134,19 @@ export default function WelcomeScreen() {
 
         <View style={styles.actions}>
           {appleAvailable ? (
-            <SocialSignInButton
-              provider="apple"
-              disabled={busyProvider !== null}
-              onPress={() => handleSignIn('apple')}
-            />
+            <AppleSignInButton disabled={busyProvider !== null} onPress={() => handleSignIn('apple')} />
           ) : null}
-          <SocialSignInButton
-            provider="google"
-            disabled={busyProvider !== null}
-            onPress={() => handleSignIn('google')}
-          />
+          <GoogleSignInButton disabled={busyProvider !== null} onPress={() => handleSignIn('google')} />
         </View>
 
-        <Pressable style={styles.footer}>
+        <Pressable style={styles.footer} onPress={() => setPrivacyVisible(true)}>
           <ThemedText type="meta" themeColor="muted">
             How the privacy works
           </ThemedText>
         </Pressable>
       </ThemedSafeAreaView>
+
+      <PrivacyInfoModal visible={privacyVisible} onClose={() => setPrivacyVisible(false)} />
     </ThemedView>
   );
 }

@@ -5,7 +5,7 @@ import { bytesToHex } from '@noble/curves/utils.js';
 
 import { getCircle, getCircleMembers, getMemberByPublicKey, initDatabase, insertMember, MemberRoles } from '@/data/db';
 import { createCircle } from '@/domain/usecases/circle/create-circle';
-import { syncAccountManifestBestEffort } from '@/domain/usecases/account/account-manifest';
+import { recordInManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import type { LogEntryEnvelope } from '@/domain/usecases/circle/log-entry';
 import { generateIdentity, generateUUID } from '@/services/crypto';
 import { getCircleIdentity, saveMasterSeed } from '@/services/keystore';
@@ -21,7 +21,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   (bootstrapCircle as jest.Mock).mockResolvedValue(undefined);
   (appendEntry as jest.Mock).mockResolvedValue({ epoch: 1, receivedAt: Date.now() });
-  (syncAccountManifestBestEffort as jest.Mock).mockResolvedValue(undefined);
+  (recordInManifestBestEffort as jest.Mock).mockResolvedValue(undefined);
 });
 
 /** Same "literal envelope, unchecked signature" approach as member-added.test.ts. */
@@ -133,7 +133,7 @@ describe('apply', () => {
     const target = generateIdentity();
     const targetKey = bytesToHex(target.publicKey);
     await addPlainMember(circleId, targetKey);
-    // createCircle itself calls syncAccountManifestBestEffort — clear that
+    // createCircle records itself in the manifest too — clear that
     // unrelated call so the assertion below is about this apply() only.
     jest.clearAllMocks();
 
@@ -141,7 +141,7 @@ describe('apply', () => {
 
     expect((await getCircle(circleId))?.leftAt).toBeNull();
     expect(await getCircleIdentity(circleId)).not.toBeNull();
-    expect(syncAccountManifestBestEffort).not.toHaveBeenCalled();
+    expect(recordInManifestBestEffort).not.toHaveBeenCalled();
   });
 
   /**
@@ -159,7 +159,7 @@ describe('apply', () => {
     // Only an admin can author a member_removed per the predicate, but
     // apply() never re-checks that — same "handlers trust the walker"
     // assumption member-added.test.ts's apply tests make.
-    // createCircle itself calls syncAccountManifestBestEffort — clear that
+    // createCircle records its own circle in the manifest — clear that
     // unrelated call so the count below is about this apply() only.
     jest.clearAllMocks();
 
@@ -167,6 +167,8 @@ describe('apply', () => {
 
     expect((await getCircle(circleId))?.leftAt).not.toBeNull();
     expect(await getCircleIdentity(circleId)).toBeNull();
-    expect(syncAccountManifestBestEffort).toHaveBeenCalledTimes(1);
+    // Pushed before the purge, so reconciliation can still read the
+    // departure off the `leftAt` row and tombstone it.
+    expect(recordInManifestBestEffort).toHaveBeenCalled();
   });
 });

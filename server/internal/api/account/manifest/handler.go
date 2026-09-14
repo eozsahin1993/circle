@@ -3,15 +3,20 @@ package manifest
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"circle-relay/internal/api/auth"
 	"circle-relay/internal/httputil"
+	"circle-relay/internal/storage/manifeststore"
 )
 
 type getResponse struct {
 	// Blob is null until this account has ever stored a manifest.
 	Blob *string `json:"blob"`
+	// Version to quote back on the next write. 0 both for "never stored"
+	// and for a manifest written before versioning existed.
+	Version int64 `json:"version"`
 }
 
 type GetHandler struct {
@@ -19,22 +24,26 @@ type GetHandler struct {
 }
 
 func (h *GetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	blob, err := h.Service.Get(r.Context(), auth.AccountID(r.Context()))
+	stored, err := h.Service.Get(r.Context(), auth.AccountID(r.Context()))
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to fetch manifest")
 		return
 	}
-	if blob == nil {
+	if stored.Blob == nil {
 		httputil.WriteJSON(w, http.StatusOK, getResponse{})
 		return
 	}
-	encoded := base64.StdEncoding.EncodeToString(blob)
-	httputil.WriteJSON(w, http.StatusOK, getResponse{Blob: &encoded})
+	encoded := base64.StdEncoding.EncodeToString(stored.Blob)
+	httputil.WriteJSON(w, http.StatusOK, getResponse{Blob: &encoded, Version: stored.Version})
 }
 
 type putRequest struct {
 	// Blob is base64-encoded ciphertext — this handler never looks inside it.
 	Blob string `json:"blob"`
+	// ExpectedVersion is the version the client last read. Omitted reads as
+	// 0, which is also what a first write against a never-stored or
+	// pre-versioning manifest sends.
+	ExpectedVersion int64 `json:"expectedVersion"`
 }
 
 type putResponse struct {
@@ -62,7 +71,15 @@ func (h *PutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Service.Put(r.Context(), auth.AccountID(r.Context()), blob); err != nil {
+	err = h.Service.Put(r.Context(), auth.AccountID(r.Context()), blob, req.ExpectedVersion)
+	if errors.Is(err, manifeststore.ErrVersionMismatch) {
+		// Another of this account's devices wrote first. The client has to
+		// re-read and reapply — it can't just retry the same blob, which
+		// would drop whatever that device recorded.
+		httputil.WriteError(w, http.StatusConflict, "manifest changed since it was read")
+		return
+	}
+	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to save manifest")
 		return
 	}

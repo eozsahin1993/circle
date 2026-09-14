@@ -1,14 +1,12 @@
 import { AntDesign } from '@expo/vector-icons';
-import { Pressable, View, StyleSheet, type PressableProps } from 'react-native';
+import { Pressable, View, StyleSheet, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import type { ReactNode } from 'react';
 
 import { ThemedText } from '@/components/themed-text';
 import { ButtonHeight, Radius } from '@/constants/theme';
+import { useAppSettings } from '@/hooks/use-app-settings';
 import { useTheme, useTints } from '@/hooks/use-theme';
-
-export type SocialSignInButtonProps = Omit<PressableProps, 'style'> & {
-  provider: 'apple' | 'google';
-};
 
 /** Google's standard four-color "G" mark — required as-is, not recolored to match app theme. */
 function GoogleLogo() {
@@ -34,43 +32,82 @@ function GoogleLogo() {
   );
 }
 
-/**
- * "Continue with Apple" / "Continue with Google" — Apple's own guidelines
- * require its button as a fixed white/black pair regardless of app theme;
- * Google's mark is similarly fixed-color, but the pill itself follows the
- * app's usual outlined-button look instead of Google's own filled style,
- * to sit next to the Apple button without one looking like an afterthought.
- */
-export function SocialSignInButton({ provider, disabled, ...rest }: SocialSignInButtonProps) {
-  const theme = useTheme();
-  const tints = useTints();
-  const isApple = provider === 'apple';
+type SocialButtonProps = Omit<PressableProps, 'style' | 'children'> & {
+  label: string;
+  icon: ReactNode;
+  contentColor: string;
+  /** The pill's own background/border — one provider fills it, the other outlines it, so this is left fully open rather than assuming a shape. */
+  fillStyle: StyleProp<ViewStyle>;
+};
 
+/** The shape every provider's button renders into — see AppleSignInButton/GoogleSignInButton for what actually goes in it. */
+function SocialButton({ label, icon, contentColor, fillStyle, disabled, ...rest }: SocialButtonProps) {
   return (
     <Pressable disabled={disabled} {...rest}>
       {({ pressed }) => (
-        <View
-          style={[
-            styles.button,
-            isApple ? styles.apple : [styles.google, { borderColor: tints.secondaryButtonBorder }],
-            pressed && styles.pressed,
-            disabled && styles.disabled,
-          ]}>
+        <View style={[styles.button, fillStyle, pressed && styles.pressed, disabled && styles.disabled]}>
           {/*
-            Both icons are wrapped: this render function re-runs on every
+            The icon is wrapped: this render function re-runs on every
             press (`pressed`), and an unwrapped SvgView in a slot that
             re-renders is what Fabric tries to move rather than recreate —
             see photo-placeholder.tsx.
           */}
-          <View style={styles.icon}>
-            {isApple ? <AntDesign name="apple" size={18} color="#000000" /> : <GoogleLogo />}
-          </View>
-          <ThemedText type="buttonLabel" style={isApple ? styles.appleLabel : { color: theme.text }}>
-            Continue with {isApple ? 'Apple' : 'Google'}
+          <View style={styles.icon}>{icon}</View>
+          <ThemedText type="buttonLabel" style={{ color: contentColor }}>
+            {label}
           </ThemedText>
         </View>
       )}
     </Pressable>
+  );
+}
+
+export type AppleSignInButtonProps = Omit<PressableProps, 'style' | 'children'>;
+
+/**
+ * Apple's own guidelines ask for one of its fixed white/black pairs, never
+ * a color recolored to match app branding, but do expect the pair to
+ * switch with light/dark mode so it keeps contrast against the page — the
+ * same reason the native button component takes a light/dark
+ * `buttonStyle`. The pale fill read fine against a dark page but nearly
+ * vanished into the light one, since it was fixed to the same off-white
+ * either way — light mode needs the inverse pair instead.
+ */
+export function AppleSignInButton(props: AppleSignInButtonProps) {
+  const { scheme } = useAppSettings();
+  const fill = scheme === 'dark' ? '#F4EDE2' : '#231A11';
+  const content = scheme === 'dark' ? '#000000' : '#F4EDE2';
+
+  return (
+    <SocialButton
+      {...props}
+      label="Continue with Apple"
+      icon={<AntDesign name="apple" size={18} color={content} />}
+      contentColor={content}
+      fillStyle={{ backgroundColor: fill }}
+    />
+  );
+}
+
+export type GoogleSignInButtonProps = Omit<PressableProps, 'style' | 'children'>;
+
+/**
+ * Google's mark is similarly fixed-color, but the pill itself follows the
+ * app's usual outlined-button look instead of Google's own filled style,
+ * to sit next to the Apple button without one looking like an afterthought.
+ */
+export function GoogleSignInButton(props: GoogleSignInButtonProps) {
+  const theme = useTheme();
+  const tints = useTints();
+
+  return (
+    <SocialButton
+      {...props}
+      label="Continue with Google"
+      icon={<GoogleLogo />}
+      contentColor={theme.text}
+      fillStyle={[styles.google, { borderColor: tints.secondaryButtonBorder }]}
+    />
   );
 }
 
@@ -89,12 +126,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingHorizontal: 24,
-  },
-  apple: {
-    backgroundColor: '#F4EDE2',
-  },
-  appleLabel: {
-    color: '#000000',
   },
   google: {
     borderWidth: 1,

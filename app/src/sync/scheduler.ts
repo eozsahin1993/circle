@@ -1,5 +1,6 @@
 import { AppState, type AppStateStatus } from 'react-native';
 
+import { recordInManifestBestEffort } from '@/domain/usecases/account/account-manifest';
 import { nudgePhotoQueue } from '@/sync/photo-queue';
 import { syncStaleCircles } from '@/sync/sync-circles';
 
@@ -36,6 +37,21 @@ export function runSync(): Promise<void> {
 }
 
 /**
+ * A sync pass, then a manifest repair — for the two triggers where the
+ * repair is worth its request.
+ *
+ * Deliberately *not* on the timer. Everything that changes what the manifest
+ * should say already records it at the point of change (joining, leaving,
+ * renaming, and `key-rotation.ts` when a rotation applies), so this exists
+ * only to retry those when one failed. A failure that outlives the app being
+ * open isn't going to be fixed sooner by asking every thirty seconds, and
+ * asking costs a request that almost always finds nothing to do.
+ */
+function syncAndRepairManifest(): void {
+  runSync().then(() => recordInManifestBestEffort());
+}
+
+/**
  * Starts the background sync triggers and returns a function that stops
  * them. Call once, from the root layout.
  *
@@ -45,15 +61,18 @@ export function runSync(): Promise<void> {
  * anything genuinely background is best-effort and additive on top of
  * these, never a replacement for them.
  *
+ * The first two also repair the account manifest; the timer deliberately
+ * doesn't — see `syncAndRepairManifest`.
+ *
  * Safe to start before sign-in: with no circles `syncAllCircles` is a
  * fast no-op, and without a session each circle's fetch fails and is
  * caught per-circle.
  */
 export function startSyncScheduler(): () => void {
-  runSync();
+  syncAndRepairManifest();
 
   const subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
-    if (state === 'active') runSync();
+    if (state === 'active') syncAndRepairManifest();
   });
   const interval = setInterval(runSync, FOREGROUND_INTERVAL_MS);
 
