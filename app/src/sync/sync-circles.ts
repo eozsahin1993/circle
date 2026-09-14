@@ -1,7 +1,7 @@
 import { getAllCircles, getCircle, getPendingOutboxEntries } from '@/data/db';
-import { finishPendingDepartures } from '@/domain/usecases/circle/leave-circle';
-import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
-import { refreshPushSnapshot } from '@/domain/usecases/push/push-snapshot';
+import { finishPendingDepartures } from '@/features/circle/usecases/leave-circle';
+import { drainOutbox } from '@/features/circle/usecases/sync-circle';
+import { refreshPushSnapshot } from '@/features/push/usecases/push-snapshot';
 import { fetchEpochs } from '@/services/relay';
 import { timed } from '@/services/timing';
 import { pullContent, pullMeta } from '@/sync/pull-log';

@@ -1,7 +1,7 @@
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 import { getCircleMembers, MemberRoles } from '@/data/db';
-import { recordInManifestBestEffort } from '@/domain/usecases/account/account-manifest';
+import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
 import { deriveCircleSealingKeypair, openSealedBox } from '@/services/crypto';
 import { addCircleKeyVersion, getCircleIdentity, getMasterSeed } from '@/services/keystore';
 import { asRecord, numberField, type EntryHandler } from '@/sync/entry-handlers/types';

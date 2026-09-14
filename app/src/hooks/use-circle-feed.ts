@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { useJustJoinedRows } from '@/components/feed/just-joined-row';
-import { usePendingRequestRows } from '@/components/feed/pending-request-row';
-import { usePostRows } from '@/components/feed/post-row';
-import { useRosterChangeRows } from '@/components/feed/roster-change-row';
-import { buildFeedRows, type FeedRow, type FeedRows } from '@/components/feed/rows';
+import { useJustJoinedRows } from '@/features/circle/components/feed/just-joined-row';
+import { usePendingRequestRows } from '@/features/circle/components/feed/pending-request-row';
+import { usePostRows } from '@/features/circle/components/feed/post-row';
+import { useRosterChangeRows } from '@/features/circle/components/feed/roster-change-row';
+import { buildFeedRows, type FeedRow, type FeedRows } from '@/features/circle/components/feed/rows';
 import {
   loadCircleFeedMeta,
   loadCircleFeedPage,
   type CircleFeedMeta,
   type FeedCursor,
   type FeedPostView,
-} from '@/domain/usecases/feed/circle-feed';
+} from '@/features/circle/feed/circle-feed';
 import type { MemberEvent } from '@/data/db';
 import { onPhotoFetched } from '@/services/photo-events';
 import { showError } from '@/services/messages';

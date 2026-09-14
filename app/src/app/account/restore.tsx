@@ -10,8 +10,8 @@ import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radius, Spacing } from '@/constants/theme';
-import { pickRecoveryCard } from '@/domain/usecases/account/recovery-card';
-import { restoreFromPhrase } from '@/domain/usecases/account/restore-from-phrase';
+import { pickRecoveryCard } from '@/features/account/usecases/recovery-card';
+import { restoreFromPhrase } from '@/features/account/usecases/restore-from-phrase';
 import { useTheme } from '@/hooks/use-theme';
 import { showDone } from '@/services/messages';
 

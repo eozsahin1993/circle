@@ -12,7 +12,7 @@ import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { FabButton } from '@/components/fab-button';
 import { HeaderIconButton } from '@/components/navbar/header-icon-button';
 import { missingPhotoFor, PhotoPlaceholder } from '@/components/photo-placeholder';
-import { ReactionChip } from '@/components/reaction-chip';
+import { ReactionChip } from '@/features/post/components/reaction-chip';
 import { EmojiPicker } from '@/components/emoji-picker';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
@@ -30,11 +30,11 @@ import {
   type FeedPost,
   type ReactionSummary,
 } from '@/data/db';
-import { isCircleAdmin } from '@/domain/usecases/circle/invite-to-circle';
-import { addComment } from '@/domain/usecases/post/comment-on-post';
-import { deletePost } from '@/domain/usecases/post/delete-post';
-import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
-import { setAlbumVisibility } from '@/domain/usecases/post/set-album-visibility';
+import { isCircleAdmin } from '@/features/circle/usecases/invite-to-circle';
+import { addComment } from '@/features/post/usecases/comment-on-post';
+import { deletePost } from '@/features/post/usecases/delete-post';
+import { getReactionsForPost, toggleReaction } from '@/features/post/usecases/react-to-post';
+import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
 import { useTheme } from '@/hooks/use-theme';
 import { showError, showMessage } from '@/services/messages';
 import { bytesToDataUri } from '@/services/image';

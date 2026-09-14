@@ -1,5 +1,5 @@
 jest.mock('@/services/relay');
-jest.mock('@/domain/usecases/account/account-manifest');
+jest.mock('@/features/account/usecases/account-manifest');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
@@ -12,7 +12,7 @@ import {
   insertPost,
   updateMemberProfile,
 } from '@/data/db';
-import { createCircle } from '@/domain/usecases/circle/create-circle';
+import { createCircle } from '@/features/circle/usecases/create-circle';
 import { generateUUID } from '@/services/crypto';
 import { getCircleIdentity, saveMasterSeed } from '@/services/keystore';
 import { appendEntry, bootstrapCircle } from '@/services/relay';

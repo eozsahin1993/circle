@@ -12,7 +12,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { getProfile } from '@/data/db';
 import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/services/image';
-import { completeProfileSetup, ensureMasterSeed } from '@/domain/usecases/account/onboarding';
+import { completeProfileSetup, ensureMasterSeed } from '@/features/account/usecases/onboarding';
 import { primeOwnColorSeed } from '@/hooks/use-own-color-seed';
 import { useTheme, useTints } from '@/hooks/use-theme';
 import { goPostAuth } from '@/services/pending-deep-link';

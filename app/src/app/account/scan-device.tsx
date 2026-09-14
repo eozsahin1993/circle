@@ -13,7 +13,7 @@ import { Radius, Spacing } from '@/constants/theme';
 import {
   approveDeviceTransfer,
   inspectDeviceTransfer,
-} from '@/domain/usecases/account/device-transfer';
+} from '@/features/account/usecases/device-transfer';
 import { useTheme, useTints } from '@/hooks/use-theme';
 import { showDone, showError } from '@/services/messages';
 

@@ -14,7 +14,7 @@ import {
   checkDeviceTransfer,
   startDeviceTransfer,
   type PendingDeviceTransfer,
-} from '@/domain/usecases/account/device-transfer';
+} from '@/features/account/usecases/device-transfer';
 import { useTints } from '@/hooks/use-theme';
 import { showDone, showError } from '@/services/messages';
 

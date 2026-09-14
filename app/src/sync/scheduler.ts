@@ -1,6 +1,6 @@
 import { AppState, type AppStateStatus } from 'react-native';
 
-import { recordInManifestBestEffort } from '@/domain/usecases/account/account-manifest';
+import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
 import { nudgePhotoQueue } from '@/sync/photo-queue';
 import { syncStaleCircles } from '@/sync/sync-circles';
 

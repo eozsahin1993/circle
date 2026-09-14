@@ -4,14 +4,14 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View, type Vie
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FabButton } from '@/components/fab-button';
-import { gapBetween, stickyIndices, type FeedRow } from '@/components/feed/rows';
+import { gapBetween, stickyIndices, type FeedRow } from '@/features/circle/components/feed/rows';
 import { HeaderIconButton } from '@/components/navbar/header-icon-button';
 import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 import { ThemedView } from '@/components/themed-view';
 import { Icons, Spacing } from '@/constants/theme';
 import { markCircleViewed } from '@/data/db';
-import { askForPushOnCircle } from '@/domain/usecases/push/enable-push';
+import { askForPushOnCircle } from '@/features/push/usecases/enable-push';
 import { useCircleFeed } from '@/hooks/use-circle-feed';
 import { useTheme } from '@/hooks/use-theme';
 

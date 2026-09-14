@@ -1,5 +1,5 @@
 jest.mock('@/services/relay');
-jest.mock('@/domain/usecases/account/account-manifest');
+jest.mock('@/features/account/usecases/account-manifest');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
@@ -12,8 +12,8 @@ import {
   insertMember,
   MemberRoles,
 } from '@/data/db';
-import { createCircle } from '@/domain/usecases/circle/create-circle';
-import { buildAndEncryptLogEntry } from '@/domain/usecases/circle/log-entry';
+import { createCircle } from '@/features/circle/usecases/create-circle';
+import { buildAndEncryptLogEntry } from '@/features/circle/usecases/log-entry';
 import { generateContentKey, generateIdentity, generateUUID, hashBytes } from '@/services/crypto';
 import {
   getCircleIdentity,

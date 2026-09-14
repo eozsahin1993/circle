@@ -7,7 +7,7 @@ import {
 import { defineTask } from 'expo-task-manager';
 import { Platform } from 'react-native';
 
-import { handlePush } from '@/domain/usecases/push/handle-push';
+import { handlePush } from '@/features/push/usecases/handle-push';
 import { initDatabase } from '@/data/db';
 
 /**

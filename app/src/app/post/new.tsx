@@ -12,7 +12,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, PhotoAspect, Radius, Spacing } from '@/constants/theme';
 import { getCircleSummary, getCircleMembers } from '@/data/db';
-import { createPost } from '@/domain/usecases/post/create-post';
+import { createPost } from '@/features/post/usecases/create-post';
 import { useTheme, useTints } from '@/hooks/use-theme';
 import { pickAndCompressImage, type CompressedImage } from '@/services/image';
 

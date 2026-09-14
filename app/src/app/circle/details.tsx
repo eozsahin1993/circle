@@ -7,7 +7,7 @@ import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 import { ActionSheet, type ActionSheetOption } from '@/components/action-sheet';
 import { Avatar } from '@/components/avatar';
 import { Icon } from '@/components/icon';
-import { InviteSheet } from '@/components/invite-sheet';
+import { InviteSheet } from '@/features/circle/components/invite-sheet';
 import { OptionSheet } from '@/components/option-sheet';
 import { PromptSheet } from '@/components/prompt-sheet';
 import { ScreenHeader } from '@/components/navbar/screen-header';
@@ -17,23 +17,23 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Icons, Radius, Spacing } from '@/constants/theme';
 import { MemberRoles, type Member, type MemberRole } from '@/data/db';
-import { setMemberRole } from '@/domain/usecases/circle/change-member-role';
-import { resolveCircleCoverUri } from '@/domain/usecases/circle/circle-cover';
-import { loadCircleDetails, type CircleDetails } from '@/domain/usecases/circle/circle-details';
-import { buildDebugKeysetFlags } from '@/domain/usecases/circle/debug-keyset';
-import { getOrCreateInvite, replaceInvite } from '@/domain/usecases/circle/invite-to-circle';
-import { departingSuccessor } from '@/domain/usecases/circle/authority';
-import { leaveCircle } from '@/domain/usecases/circle/leave-circle';
-import { removeMember } from '@/domain/usecases/circle/remove-member';
-import { renameCircle } from '@/domain/usecases/circle/rename-circle';
-import { setCoverPhoto } from '@/domain/usecases/circle/set-cover-photo';
+import { setMemberRole } from '@/features/circle/usecases/change-member-role';
+import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
+import { loadCircleDetails, type CircleDetails } from '@/features/circle/usecases/circle-details';
+import { buildDebugKeysetFlags } from '@/features/circle/usecases/debug-keyset';
+import { getOrCreateInvite, replaceInvite } from '@/features/circle/usecases/invite-to-circle';
+import { departingSuccessor } from '@/features/circle/usecases/authority';
+import { leaveCircle } from '@/features/circle/usecases/leave-circle';
+import { removeMember } from '@/features/circle/usecases/remove-member';
+import { renameCircle } from '@/features/circle/usecases/rename-circle';
+import { setCoverPhoto } from '@/features/circle/usecases/set-cover-photo';
 import {
   PushLevels,
   setCircleLevel,
   setCircleSilenced,
   type CirclePushPreferences,
   type PushLevelId,
-} from '@/domain/usecases/push/push-preferences';
+} from '@/features/push/usecases/push-preferences';
 import { useTheme, useTints } from '@/hooks/use-theme';
 import { showDone, showError } from '@/services/messages';
 import { bytesToDataUri, pickAndCompressImage } from '@/services/image';

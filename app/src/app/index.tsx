@@ -5,15 +5,15 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PhotoPlaceholder } from '@/components/photo-placeholder';
-import { PrivacyInfoModal } from '@/components/privacy-info-modal';
-import { AppleSignInButton, GoogleSignInButton } from '@/components/social-sign-in-button';
+import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
+import { AppleSignInButton, GoogleSignInButton } from '@/features/account/components/social-sign-in-button';
 import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { getProfile } from '@/data/db';
-import { hasUnreadableAccountManifest, recordSignInProviderBestEffort } from '@/domain/usecases/account/account-manifest';
-import { signInWithApple, signInWithGoogle } from '@/domain/usecases/account/sign-in';
+import { hasUnreadableAccountManifest, recordSignInProviderBestEffort } from '@/features/account/usecases/account-manifest';
+import { signInWithApple, signInWithGoogle } from '@/features/account/usecases/sign-in';
 import { getAuthToken } from '@/services/keystore';
 import { goPostAuth } from '@/services/pending-deep-link';
 

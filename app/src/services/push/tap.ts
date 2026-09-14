@@ -7,8 +7,8 @@ import {
 import { router } from 'expo-router';
 
 import { initDatabase } from '@/data/db';
-import { resolvePushDestination } from '@/domain/usecases/push/push-destination';
-import type { PushData } from '@/domain/usecases/push/handle-push';
+import { resolvePushDestination } from '@/features/push/usecases/push-destination';
+import type { PushData } from '@/features/push/usecases/handle-push';
 import { syncCircle } from '@/sync/sync-circles';
 
 /**

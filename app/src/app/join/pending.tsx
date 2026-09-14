@@ -8,7 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { getPendingJoinRequest } from '@/data/db';
-import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/domain/usecases/circle/join-circle';
+import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/circle/usecases/join-circle';
 
 /**
  * Faster than the sync scheduler's 30s: this is someone watching a screen

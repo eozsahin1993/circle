@@ -1,6 +1,6 @@
 import { advanceCircleCursor, getCircle } from '@/data/db';
 import { isPermanentWriteFailure } from '@/sync/write-failure';
-import { verifyLogEntry } from '@/domain/usecases/circle/log-entry';
+import { verifyLogEntry } from '@/features/circle/usecases/log-entry';
 import { getCircleKeyMap } from '@/services/keystore';
 import { fetchEntries, type Namespace } from '@/services/relay';
 import { contentHandlers, metaHandlers, type EntryHandler } from '@/sync/entry-handlers';

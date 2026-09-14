@@ -1,11 +1,11 @@
 jest.mock('@/services/relay');
-jest.mock('@/domain/usecases/account/account-manifest');
+jest.mock('@/features/account/usecases/account-manifest');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { initDatabase, insertMember, MemberRoles } from '@/data/db';
-import { createCircle } from '@/domain/usecases/circle/create-circle';
-import type { LogEntryEnvelope } from '@/domain/usecases/circle/log-entry';
+import { createCircle } from '@/features/circle/usecases/create-circle';
+import type { LogEntryEnvelope } from '@/features/circle/usecases/log-entry';
 import { deriveCircleSealingKeypair, generateContentKey, generateIdentity, generateUUID, sealToPublicKey } from '@/services/crypto';
 import { getCircleIdentity, getCircleKeyMap, saveMasterSeed } from '@/services/keystore';
 import { appendEntry, bootstrapCircle } from '@/services/relay';

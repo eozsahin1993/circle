@@ -12,7 +12,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTints } from '@/hooks/use-theme';
-import { saveRecoveryCard } from '@/domain/usecases/account/recovery-card';
+import { saveRecoveryCard } from '@/features/account/usecases/recovery-card';
 import { getMasterSeed } from '@/services/keystore';
 import { showDone, showError } from '@/services/messages';
 

@@ -5,13 +5,13 @@ import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 're
 import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 
 import { Avatar } from '@/components/avatar';
-import { CircleCard } from '@/components/circle-card';
-import { JoinSheet } from '@/components/join-sheet';
-import { PendingCircleCard } from '@/components/pending-circle-card';
-import { EmptyCirclesIcon } from '@/components/empty-circles-icon';
+import { CircleCard } from '@/features/circle/components/circle-card';
+import { JoinSheet } from '@/features/circle/components/join-sheet';
+import { PendingCircleCard } from '@/features/circle/components/pending-circle-card';
+import { EmptyCirclesIcon } from '@/features/circle/components/empty-circles-icon';
 import { FabButton } from '@/components/fab-button';
-import { PrivacyInfoModal } from '@/components/privacy-info-modal';
-import { PrivacyNotice } from '@/components/privacy-notice';
+import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
+import { PrivacyNotice } from '@/features/account/components/privacy-notice';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Icons, Spacing } from '@/constants/theme';
@@ -25,8 +25,8 @@ import {
   type CircleListRow,
 } from '@/data/db';
 import type { PendingJoinRequest } from '@/data/db/pending-join-requests';
-import { resolveCircleCoverUri } from '@/domain/usecases/circle/circle-cover';
-import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/domain/usecases/circle/join-circle';
+import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
+import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/circle/usecases/join-circle';
 import { useOwnColorSeed } from '@/hooks/use-own-color-seed';
 import { takePendingInviteCode } from '@/services/pending-deep-link';
 import { getCircleIdentity } from '@/services/keystore';

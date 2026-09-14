@@ -1,5 +1,5 @@
 jest.mock('@/services/relay');
-jest.mock('@/domain/usecases/account/account-manifest');
+jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/services/mailbox-relay');
 
 import { bytesToHex } from '@noble/curves/utils.js';
@@ -13,14 +13,14 @@ import {
   initDatabase,
   saveProfile,
 } from '@/data/db';
-import { createCircle } from '@/domain/usecases/circle/create-circle';
-import { setMemberRole } from '@/domain/usecases/circle/change-member-role';
-import { approveJoinRequest, getOrCreateInvite } from '@/domain/usecases/circle/invite-to-circle';
-import type { JoinRequestPayload } from '@/domain/usecases/circle/invite-payloads';
-import { buildAndEncryptLogEntry, verifyLogEntry } from '@/domain/usecases/circle/log-entry';
-import { addComment } from '@/domain/usecases/post/comment-on-post';
-import { createPost } from '@/domain/usecases/post/create-post';
-import { getReactionsForPost, toggleReaction } from '@/domain/usecases/post/react-to-post';
+import { createCircle } from '@/features/circle/usecases/create-circle';
+import { setMemberRole } from '@/features/circle/usecases/change-member-role';
+import { approveJoinRequest, getOrCreateInvite } from '@/features/circle/usecases/invite-to-circle';
+import type { JoinRequestPayload } from '@/features/circle/usecases/invite-payloads';
+import { buildAndEncryptLogEntry, verifyLogEntry } from '@/features/circle/usecases/log-entry';
+import { addComment } from '@/features/post/usecases/comment-on-post';
+import { createPost } from '@/features/post/usecases/create-post';
+import { getReactionsForPost, toggleReaction } from '@/features/post/usecases/react-to-post';
 import {
   deriveAuthorityKeyProofMessage,
   deriveJoinRequestKey,
@@ -47,7 +47,7 @@ import {
 } from '@/services/relay';
 import { memberAddedHandler } from '@/sync/entry-handlers/member-added';
 import { drainPhotoQueue } from '@/sync/photo-queue';
-import { drainOutbox } from '@/domain/usecases/circle/sync-circle';
+import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { syncCircle, syncStaleCircles } from '@/sync/sync-circles';
 
 beforeAll(async () => {

@@ -8,7 +8,7 @@ import { ThemedSafeAreaView } from '@/components/themed-safe-area-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { abandonPriorAccount } from '@/domain/usecases/account/onboarding';
+import { abandonPriorAccount } from '@/features/account/usecases/onboarding';
 import { showError } from '@/services/messages';
 
 /**

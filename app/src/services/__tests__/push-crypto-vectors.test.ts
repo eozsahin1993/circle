@@ -2,7 +2,7 @@ import { xchacha20poly1305 } from '@noble/ciphers/chacha.js';
 import { bytesToHex, concatBytes } from '@noble/curves/utils.js';
 
 import { deriveCircleIdentity, derivePushRoutingId, verify } from '@/services/crypto';
-import { buildLogEntry, verifyLogEntry } from '@/domain/usecases/circle/log-entry';
+import { buildLogEntry, verifyLogEntry } from '@/features/circle/usecases/log-entry';
 
 /**
  * Pins the exact bytes the Swift port in

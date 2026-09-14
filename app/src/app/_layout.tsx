@@ -11,7 +11,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { Snackbar } from '@/components/snackbar';
 import { Colors } from '@/constants/theme';
 import { initDatabase } from '@/data/db';
-import { enablePushEverywhere } from '@/domain/usecases/push/enable-push';
+import { enablePushEverywhere } from '@/features/push/usecases/enable-push';
 import { startPushHandling } from '@/services/push/task';
 import { startPushTapRouting } from '@/services/push/tap';
 import { AppSettingsProvider, useAppSettings } from '@/hooks/use-app-settings';

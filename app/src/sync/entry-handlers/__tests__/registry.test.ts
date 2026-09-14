@@ -1,6 +1,6 @@
 import { outbox } from '@/data/db/schema';
-import { EntryTypes, type EntryType } from '@/domain/usecases/circle/log-entry';
-import { namespaceFor } from '@/domain/usecases/circle/sync-circle';
+import { EntryTypes, type EntryType } from '@/features/circle/usecases/log-entry';
+import { namespaceFor } from '@/features/circle/usecases/sync-circle';
 import { contentHandlers, metaHandlers } from '@/sync/entry-handlers';
 
 /**

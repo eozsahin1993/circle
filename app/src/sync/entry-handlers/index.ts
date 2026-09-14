@@ -1,4 +1,4 @@
-import { EntryTypes } from '@/domain/usecases/circle/log-entry';
+import { EntryTypes } from '@/features/circle/usecases/log-entry';
 import { albumVisibilityHandler } from '@/sync/entry-handlers/album-visibility';
 import { commentHandler } from '@/sync/entry-handlers/comment';
 import { circleDeletedHandler } from '@/sync/entry-handlers/circle-deleted';

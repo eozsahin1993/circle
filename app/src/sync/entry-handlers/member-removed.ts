@@ -1,8 +1,8 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { getCircleMembers, markCircleLeft, MemberRoles, recordMemberRemoved } from '@/data/db';
-import { recordInManifestBestEffort } from '@/domain/usecases/account/account-manifest';
-import { purgeCircleLocally } from '@/domain/usecases/circle/purge-circle';
+import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
+import { purgeCircleLocally } from '@/features/circle/usecases/purge-circle';
 import { getCircleIdentity } from '@/services/keystore';
 import { asRecord, numberField, stringField, type EntryHandler } from '@/sync/entry-handlers/types';
 

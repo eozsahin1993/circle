@@ -1,5 +1,5 @@
 jest.mock('@/services/relay');
-jest.mock('@/domain/usecases/account/account-manifest');
+jest.mock('@/features/account/usecases/account-manifest');
 
 import {
   AttachmentKinds,
@@ -9,7 +9,7 @@ import {
   initDatabase,
   insertPost,
 } from '@/data/db';
-import { createCircle } from '@/domain/usecases/circle/create-circle';
+import { createCircle } from '@/features/circle/usecases/create-circle';
 import { encrypt, generateUUID, hashBytes } from '@/services/crypto';
 import { getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
 import { appendEntry, bootstrapCircle, getBlob } from '@/services/relay';

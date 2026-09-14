@@ -11,7 +11,7 @@ import { ScreenHeader } from '@/components/navbar/screen-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, PhotoAspect, Radius, Spacing } from '@/constants/theme';
-import { createCircle } from '@/domain/usecases/circle/create-circle';
+import { createCircle } from '@/features/circle/usecases/create-circle';
 import { useTheme, useTints } from '@/hooks/use-theme';
 import { pickAndCompressImage, type CompressedImage } from '@/services/image';
 
