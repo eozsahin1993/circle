@@ -3,11 +3,13 @@ import { Buffer } from 'buffer';
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { getProfile, listCircleAddresses, listLeftCircles, type Profile } from '@/data/db';
-import { decrypt, deriveManifestKey, encryptJSON } from '@/core/crypto';
+import { decrypt, encryptJSON } from '@/core/crypto/primitives';
+import { deriveManifestKey } from '@/features/account/crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { compressToThumbnail } from '@/core/photo/image';
-import { getCircleKeyMap, getMasterSeed } from '@/core/services/keystore';
+import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed } from '@/core/services/keystore/master-seed';
 import { mergeManifest } from '@/features/account/usecases/manifest-merge';
 import { getManifest, ManifestConflictError, putManifest } from '@/features/account/services/manifest-relay';
 

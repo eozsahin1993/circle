@@ -2,18 +2,9 @@ import { Buffer } from 'buffer';
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import {
-  buildAuthorityKeyClaim,
-  deriveAuthorityKeypair,
-  deriveCircleIdentity,
-  derivePushRoutingId,
-  deriveCircleSealingKeypair,
-  deriveWriteToken,
-  generateContentKey,
-  generateUUID,
-  hashWriteToken,
-  sealToPublicKey,
-} from '@/core/crypto';
+import { generateUUID, sealToPublicKey } from '@/core/crypto/primitives';
+import { buildAuthorityKeyClaim, deriveAuthorityKeypair, deriveCircleIdentity, derivePushRoutingId, deriveCircleSealingKeypair } from '@/core/crypto/identity';
+import { deriveWriteToken, generateContentKey, hashWriteToken } from '@/features/circle/crypto';
 import { getProfile, insertCircle, MemberRoles, recordMemberAddedLocally } from '@/data/db';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
@@ -22,7 +13,8 @@ import { writeCoverFile } from '@/core/photo/photo-cache';
 import { bootstrapCircle, appendEntry } from '@/core/services/relay';
 import { defaultCircleMask } from '@/features/push-notifications/usecases/push-preferences';
 import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
-import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap } from '@/core/services/keystore';
+import { saveCircleIdentity, saveCircleKeyMap } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed } from '@/core/services/keystore/master-seed';
 
 export type CreateCircleInput = {
   name: string;

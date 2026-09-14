@@ -2,8 +2,9 @@ jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/core/services/relay');
 
-import { decrypt, generateUUID, hashBytes, verify } from '@/core/crypto';
-import { getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
+import { decrypt, generateUUID, hashBytes, verify } from '@/core/crypto/primitives';
+import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { getPendingOutboxEntries, initDatabase } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { createPost } from '@/features/post/usecases/create-post';

@@ -1,5 +1,5 @@
 import { getCircleMembers, MemberRoles, recordMemberAdded, type MemberRole } from '@/data/db';
-import { generateUUID } from '@/core/crypto';
+import { generateUUID } from '@/core/crypto/primitives';
 import { parsePictureThumbnail } from '@/core/photo/image';
 import { asRecord, hexField, numberField, provenAuthorityKey, type EntryHandler } from '@/core/sync/entry-handlers/types';
 

@@ -5,7 +5,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { initDatabase, insertCircle, markCircleLeft, saveProfile } from '@/data/db';
-import { decrypt, deriveManifestKey, encryptJSON } from '@/core/crypto';
+import { decrypt, encryptJSON } from '@/core/crypto/primitives';
+import { deriveManifestKey } from '@/features/account/crypto';
 import {
   allowForeignManifestOverwrite,
   fetchAccountManifest,
@@ -19,7 +20,8 @@ import {
 } from '@/features/account/usecases/account-manifest';
 import { resetLocalDataForTesting } from '@/features/dev/dev-reset';
 import { getManifest, ManifestConflictError, putManifest } from '@/features/account/services/manifest-relay';
-import { addCircleKeyVersion, deleteMasterSeed, saveCircleKeyMap, saveMasterSeed } from '@/core/services/keystore';
+import { addCircleKeyVersion, saveCircleKeyMap } from '@/core/services/keystore/circle-keys';
+import { deleteMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
 
 beforeAll(() => initDatabase());
 // resetAllMocks, not clearAllMocks — a mockResolvedValue left over from a

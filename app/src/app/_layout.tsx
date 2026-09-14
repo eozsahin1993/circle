@@ -8,13 +8,13 @@ import { useFonts } from 'expo-font';
 import { useEffect, useState } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 
-import { Snackbar } from '@/core/components/snackbar';
-import { Colors } from '@/core/theme/tokens';
+import { Snackbar } from '@/ui/components/snackbar';
+import { Colors } from '@/ui/theme/tokens';
 import { initDatabase } from '@/data/db';
 import { enablePushEverywhere } from '@/features/push-notifications/usecases/enable-push';
 import { startPushHandling } from '@/features/push-notifications/services/task';
 import { startPushTapRouting } from '@/features/push-notifications/services/tap';
-import { AppSettingsProvider, useAppSettings } from '@/core/theme/use-app-settings';
+import { AppSettingsProvider, useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 import { useMessages } from '@/core/hooks/use-messages';
 import { getAppSettings, type AppSettings } from '@/core/services/settings';
 import { startJankMonitor } from '@/core/utils/timing';

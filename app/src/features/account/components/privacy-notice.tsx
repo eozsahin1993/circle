@@ -1,9 +1,9 @@
 import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
-import { Icon } from '@/core/components/icon';
-import { ThemedText } from '@/core/theme/themed-text';
-import { Icons, Spacing } from '@/core/theme/tokens';
-import { useTheme } from '@/core/theme/use-theme';
+import { Icon } from '@/ui/components/icon';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { Icons, Spacing } from '@/ui/theme/tokens';
+import { useTheme } from '@/ui/theme/hooks/use-theme';
 
 export type PrivacyNoticeProps = {
   /** Opens the privacy explainer sheet — what end-to-end encrypted means here. */

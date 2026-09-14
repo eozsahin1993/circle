@@ -2,20 +2,20 @@ import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
-import { ActionSheet, type ActionSheetOption } from '@/core/components/action-sheet';
-import { Avatar } from '@/core/components/avatar';
-import { Icon } from '@/core/components/icon';
+import { ActionSheet, type ActionSheetOption } from '@/ui/components/action-sheet';
+import { Avatar } from '@/ui/components/avatar/avatar';
+import { Icon } from '@/ui/components/icon';
 import { InviteSheet } from '@/features/invite/components/invite-sheet';
-import { OptionSheet } from '@/core/components/option-sheet';
-import { PromptSheet } from '@/core/components/prompt-sheet';
-import { ScreenHeader } from '@/core/components/navbar/screen-header';
-import { SecondaryButton } from '@/core/components/secondary-button';
-import { SettingsGroups, type SettingsGroup } from '@/core/components/settings-group';
-import { ThemedText } from '@/core/theme/themed-text';
-import { ThemedView } from '@/core/theme/themed-view';
-import { Icons, Radius, Spacing } from '@/core/theme/tokens';
+import { OptionSheet } from '@/ui/components/option-sheet';
+import { PromptSheet } from '@/ui/components/prompt-sheet';
+import { ScreenHeader } from '@/ui/components/navbar/screen-header';
+import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
+import { SettingsGroups, type SettingsGroup } from '@/ui/components/settings-group';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { ThemedView } from '@/ui/theme/themed-view';
+import { Icons, Radius, Spacing } from '@/ui/theme/tokens';
 import { MemberRoles, type Member, type MemberRole } from '@/data/db';
 import { setMemberRole } from '@/features/circle/usecases/change-member-role';
 import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
@@ -34,7 +34,7 @@ import {
   type CirclePushPreferences,
   type PushLevelId,
 } from '@/features/push-notifications/usecases/push-preferences';
-import { useTheme, useTints } from '@/core/theme/use-theme';
+import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { showDone, showError } from '@/core/services/messages';
 import { bytesToDataUri, pickAndCompressImage } from '@/core/photo/image';
 

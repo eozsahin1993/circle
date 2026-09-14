@@ -6,8 +6,9 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { getAttachment, getCircleFeed, getPendingOutboxEntries, initDatabase, markAttachmentFetched } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import type { LogEntryEnvelope } from '@/core/sync/log-entry';
-import { generateIdentity, generateUUID } from '@/core/crypto';
-import { getCircleIdentity, saveMasterSeed } from '@/core/services/keystore';
+import { generateIdentity, generateUUID } from '@/core/crypto/primitives';
+import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 import { postHandler } from '@/core/sync/entry-handlers/post';
 

@@ -14,14 +14,15 @@ import {
 } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { buildAndEncryptLogEntry } from '@/core/sync/log-entry';
-import { generateContentKey, generateIdentity, generateUUID, hashBytes } from '@/core/crypto';
+import { generateIdentity, generateUUID, hashBytes } from '@/core/crypto/primitives';
+import { generateContentKey } from '@/features/circle/crypto';
 import {
   getCircleIdentity,
   getCurrentContentKey,
   saveCircleIdentity,
   saveCircleKeyMap,
-  saveMasterSeed,
-} from '@/core/services/keystore';
+} from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle, fetchEntries, type LogEntry } from '@/core/services/relay';
 import * as postsDb from '@/data/db/posts';
 import { pullContent, pullMeta } from '@/core/sync/pull-log';

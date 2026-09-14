@@ -2,7 +2,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from '@react-native-google-signin/google-signin';
 import { Platform } from 'react-native';
 
-import { deleteAuthToken, getAuthToken, saveAuthToken } from '@/core/services/keystore';
+import { deleteAuthToken, getAuthToken, saveAuthToken } from '@/core/services/keystore/auth-token';
 import {
   logout as relayLogout,
   signInWithApple as relaySignInWithApple,

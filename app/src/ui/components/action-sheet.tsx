@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Animated, Dimensions, Modal, Pressable, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
-import { Avatar } from '@/core/components/avatar';
-import { Icon, type IconGlyph } from '@/core/components/icon';
-import { SecondaryButton } from '@/core/components/secondary-button';
-import { ThemedText } from '@/core/theme/themed-text';
-import { ThemedView } from '@/core/theme/themed-view';
-import { Radius, Spacing } from '@/core/theme/tokens';
-import { useTheme, useTints } from '@/core/theme/use-theme';
+import { Avatar } from '@/ui/components/avatar/avatar';
+import { Icon, type IconGlyph } from '@/ui/components/icon';
+import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { ThemedView } from '@/ui/theme/themed-view';
+import { Radius, Spacing } from '@/ui/theme/tokens';
+import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
 export type ActionSheetOption = {
   label: string;

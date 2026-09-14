@@ -2,19 +2,19 @@ import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'ex
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
-import { PrimaryButton } from '@/core/components/primary-button';
-import { SecondaryButton } from '@/core/components/secondary-button';
-import { ScreenHeader } from '@/core/components/navbar/screen-header';
-import { ThemedText } from '@/core/theme/themed-text';
-import { ThemedView } from '@/core/theme/themed-view';
-import { Radius, Spacing } from '@/core/theme/tokens';
+import { PrimaryButton } from '@/ui/components/buttons/primary-button';
+import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
+import { ScreenHeader } from '@/ui/components/navbar/screen-header';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { ThemedView } from '@/ui/theme/themed-view';
+import { Radius, Spacing } from '@/ui/theme/tokens';
 import {
   approveDeviceTransfer,
   inspectDeviceTransfer,
 } from '@/features/account/usecases/device-transfer';
-import { useTheme, useTints } from '@/core/theme/use-theme';
+import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { showDone, showError } from '@/core/services/messages';
 
 /**

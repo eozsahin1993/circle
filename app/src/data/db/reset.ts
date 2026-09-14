@@ -29,7 +29,7 @@ export async function getAllCircleIds(): Promise<string[]> {
  * on SQLite foreign-key cascade, since this connection doesn't turn PRAGMA
  * foreign_keys on. Doesn't touch the Keychain/Keystore (circle identities,
  * circle secrets, the master seed, pending-join ephemeral keypairs) —
- * that's a separate concern, see services/keystore.ts; callers that want a
+ * that's a separate concern, see services/keystore/; callers that want a
  * full device reset need both.
  */
 /**

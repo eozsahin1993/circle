@@ -3,21 +3,21 @@ import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
-import { ActionSheet } from '@/core/components/action-sheet';
-import { Avatar } from '@/core/components/avatar';
-import { Icon } from '@/core/components/icon';
-import { KeyboardAvoider } from '@/core/components/keyboard-avoider';
-import { FabButton } from '@/core/components/fab-button';
-import { HeaderIconButton } from '@/core/components/navbar/header-icon-button';
-import { missingPhotoFor, PhotoPlaceholder } from '@/core/components/photo-placeholder';
+import { ActionSheet } from '@/ui/components/action-sheet';
+import { Avatar } from '@/ui/components/avatar/avatar';
+import { Icon } from '@/ui/components/icon';
+import { KeyboardAvoider } from '@/ui/components/keyboard-avoider';
+import { FabButton } from '@/ui/components/buttons/fab-button';
+import { HeaderIconButton } from '@/ui/components/navbar/header-icon-button';
+import { missingPhotoFor, PhotoPlaceholder } from '@/ui/components/photo-placeholder';
 import { ReactionChip } from '@/features/post/components/reaction-chip';
-import { EmojiPicker } from '@/core/components/emoji-picker';
-import { ScreenHeader } from '@/core/components/navbar/screen-header';
-import { ThemedText } from '@/core/theme/themed-text';
-import { ThemedView } from '@/core/theme/themed-view';
-import { Icons, PhotoAspect, Radius, Spacing } from '@/core/theme/tokens';
+import { EmojiPicker } from '@/ui/components/emoji-picker';
+import { ScreenHeader } from '@/ui/components/navbar/screen-header';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { ThemedView } from '@/ui/theme/themed-view';
+import { Icons, PhotoAspect, Radius, Spacing } from '@/ui/theme/tokens';
 import {
   getAttachment,
   getCircleSummary,
@@ -35,10 +35,10 @@ import { addComment } from '@/features/post/usecases/comment-on-post';
 import { deletePost } from '@/features/post/usecases/delete-post';
 import { getReactionsForPost, toggleReaction } from '@/features/post/usecases/react-to-post';
 import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
-import { useTheme } from '@/core/theme/use-theme';
+import { useTheme } from '@/ui/theme/hooks/use-theme';
 import { showError, showMessage } from '@/core/services/messages';
 import { bytesToDataUri } from '@/core/photo/image';
-import { getCircleIdentity } from '@/core/services/keystore';
+import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
 import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
 import { onPhotoFetched } from '@/core/photo/photo-events';
 import { formatDay, formatRelative, formatTimestamp } from '@/core/utils/time';

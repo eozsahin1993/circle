@@ -12,8 +12,9 @@ import {
 } from '@/data/db';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { AuthorityActions, generateUUID } from '@/core/crypto';
-import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore';
+import { generateUUID } from '@/core/crypto/primitives';
+import { AuthorityActions } from '@/core/crypto/signed-messages';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 
 /**
  * The relay's authority set decides who may rotate a key, set a cover

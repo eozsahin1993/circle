@@ -9,8 +9,9 @@ import { initDatabase, MemberRoles, recordMemberAddedLocally, recordRoleChanged 
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { loadCircleDetails } from '@/features/circle/usecases/circle-details';
 import { getOrCreateInvite } from '@/features/invite/usecases/invite-to-circle';
-import { generateIdentity, generateUUID } from '@/core/crypto';
-import { getCircleIdentity, saveMasterSeed } from '@/core/services/keystore';
+import { generateIdentity, generateUUID } from '@/core/crypto/primitives';
+import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 beforeAll(async () => {

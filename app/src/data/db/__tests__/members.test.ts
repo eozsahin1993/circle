@@ -1,4 +1,4 @@
-import { generateUUID } from '@/core/crypto';
+import { generateUUID } from '@/core/crypto/primitives';
 import { initDatabase } from '@/data/db';
 import { insertCircle } from '@/data/db/circles';
 import {

@@ -2,17 +2,8 @@ import { Buffer } from 'buffer';
 
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
-import {
-  decrypt,
-  deriveInvitePreviewKey,
-  deriveInviteTag,
-  deriveJoinRequestKey,
-  encryptJSON,
-  generateInviteCode,
-  generateUUID,
-  sealToPublicKey,
-  sign,
-} from '@/core/crypto';
+import { decrypt, encryptJSON, generateInviteCode, generateUUID, sealToPublicKey, sign } from '@/core/crypto/primitives';
+import { deriveInvitePreviewKey, deriveInviteTag, deriveJoinRequestKey } from '@/features/invite/crypto';
 import {
   getCircle,
   getCurrentInvite,
@@ -31,7 +22,7 @@ import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { bytesToDataUri, compressToThumbnail, parsePictureThumbnail } from '@/core/photo/image';
 import { pullMeta } from '@/core/sync/pull-log';
-import { getCircleIdentity, getCircleKeyMap } from '@/core/services/keystore';
+import { getCircleIdentity, getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { deleteJoinRequest, listJoinRequests, putJoinApproval } from '@/core/services/mailbox-relay';
 import { putInvitePreview } from '@/features/invite/services/invite-preview-relay';
 

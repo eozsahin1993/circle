@@ -1,12 +1,12 @@
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
-import { Icon, type IconGlyph } from '@/core/components/icon';
-import { PhotoPlaceholder } from '@/core/components/photo-placeholder';
-import { ThemedText } from '@/core/theme/themed-text';
-import { ThemedView } from '@/core/theme/themed-view';
-import { Icons, Radius, Spacing } from '@/core/theme/tokens';
-import { useTheme, useTints } from '@/core/theme/use-theme';
+import { Icon, type IconGlyph } from '@/ui/components/icon';
+import { PhotoPlaceholder } from '@/ui/components/photo-placeholder';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { ThemedView } from '@/ui/theme/themed-view';
+import { Icons, Radius, Spacing } from '@/ui/theme/tokens';
+import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
 /**
  * What sits at the end of a row, by kind rather than by markup — the same

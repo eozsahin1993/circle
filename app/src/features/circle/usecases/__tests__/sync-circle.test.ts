@@ -2,9 +2,10 @@ jest.mock('@/core/services/relay');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { decrypt, generateUUID, hashBytes } from '@/core/crypto';
+import { decrypt, generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { buildAndEncryptLogEntry } from '@/core/sync/log-entry';
-import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import {
   appendEntry,
   BlobAlreadyExistsError,

@@ -3,7 +3,7 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { getCircleMembers, markCircleLeft, MemberRoles, recordMemberRemoved } from '@/data/db';
 import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
 import { purgeCircleLocally } from '@/features/circle/usecases/purge-circle';
-import { getCircleIdentity } from '@/core/services/keystore';
+import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
 import { asRecord, numberField, stringField, type EntryHandler } from '@/core/sync/entry-handlers/types';
 
 /** What `remove-member.ts` puts in a `member_removed` entry. */

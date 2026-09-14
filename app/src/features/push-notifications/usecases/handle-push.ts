@@ -3,8 +3,9 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { getAllCircles, getCircleMembers } from '@/data/db';
 import { EntryTypes } from '@/core/sync/log-entry';
 import { verifyLogEntry, type LogEntryEnvelope } from '@/core/sync/log-entry';
-import { derivePushRoutingId } from '@/core/crypto';
-import { getCircleIdentity, getCircleKeyMap, getMasterSeed } from '@/core/services/keystore';
+import { derivePushRoutingId } from '@/core/crypto/identity';
+import { getCircleIdentity, getCircleKeyMap } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed } from '@/core/services/keystore/master-seed';
 import { circleNotificationChannelId } from '@/features/push-notifications/services/channels';
 
 /**

@@ -10,13 +10,14 @@ import { Buffer } from 'buffer';
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 import { getCircle, getCircleMembers, getPendingJoinRequest, initDatabase, saveProfile } from '@/data/db';
-import { getPendingJoinKeypair } from '@/core/services/keystore';
+import { getPendingJoinKeypair } from '@/features/invite/keystore';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { approveJoinRequest, getOrCreateInvite } from '@/features/invite/usecases/invite-to-circle';
 import type { JoinApprovalEnvelope, JoinApprovalPayload, JoinRequestPayload } from '@/features/invite/usecases/invite-payloads';
 import { cancelPendingJoinRequest, checkPendingJoinRequest, requestToJoin } from '@/features/invite/usecases/join-circle';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { decrypt, deriveInviteTag, deriveJoinRequestKey, encrypt, generateIdentity, sealToPublicKey, sign } from '@/core/crypto';
+import { decrypt, encrypt, generateIdentity, sealToPublicKey, sign } from '@/core/crypto/primitives';
+import { deriveInviteTag, deriveJoinRequestKey } from '@/features/invite/crypto';
 import { compressToThumbnail } from '@/core/photo/image';
 import {
   JoinRequestGoneError,
@@ -27,7 +28,8 @@ import {
   putJoinRequest,
 } from '@/core/services/mailbox-relay';
 import { getInvitePreview, putInvitePreview } from '@/features/invite/services/invite-preview-relay';
-import { getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
+import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle, fetchEntries, getBlob } from '@/core/services/relay';
 
 beforeAll(async () => {

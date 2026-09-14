@@ -1,7 +1,8 @@
 import { hexToBytes } from '@noble/curves/utils.js';
 
 import { getMemberByPublicKey } from '@/data/db';
-import { deriveAuthorityKeyProofMessage, verify } from '@/core/crypto';
+import { verify } from '@/core/crypto/primitives';
+import { deriveAuthorityKeyProofMessage } from '@/core/crypto/signed-messages';
 import type { LogEntryEnvelope } from '@/core/sync/log-entry';
 
 /**

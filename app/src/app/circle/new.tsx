@@ -2,17 +2,17 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
-import { KeyboardAvoider } from '@/core/components/keyboard-avoider';
-import { PhotoPlaceholder } from '@/core/components/photo-placeholder';
-import { PrimaryButton } from '@/core/components/primary-button';
-import { ScreenHeader } from '@/core/components/navbar/screen-header';
-import { ThemedText } from '@/core/theme/themed-text';
-import { ThemedView } from '@/core/theme/themed-view';
-import { Fonts, PhotoAspect, Radius, Spacing } from '@/core/theme/tokens';
+import { KeyboardAvoider } from '@/ui/components/keyboard-avoider';
+import { PhotoPlaceholder } from '@/ui/components/photo-placeholder';
+import { PrimaryButton } from '@/ui/components/buttons/primary-button';
+import { ScreenHeader } from '@/ui/components/navbar/screen-header';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { ThemedView } from '@/ui/theme/themed-view';
+import { Fonts, PhotoAspect, Radius, Spacing } from '@/ui/theme/tokens';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import { useTheme, useTints } from '@/core/theme/use-theme';
+import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { pickAndCompressImage, type CompressedImage } from '@/core/photo/image';
 
 export default function NewCircleScreen() {

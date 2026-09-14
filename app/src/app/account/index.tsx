@@ -1,25 +1,25 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
-import { Avatar } from '@/core/components/avatar';
-import { OptionSheet } from '@/core/components/option-sheet';
+import { Avatar } from '@/ui/components/avatar/avatar';
+import { OptionSheet } from '@/ui/components/option-sheet';
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
 import { ReactionChip } from '@/features/post/components/reaction-chip';
-import { ScreenHeader } from '@/core/components/navbar/screen-header';
-import { SettingsGroups, type SettingsGroup } from '@/core/components/settings-group';
-import { ThemedText } from '@/core/theme/themed-text';
-import { ThemedView } from '@/core/theme/themed-view';
-import { Icons, Radius, Spacing } from '@/core/theme/tokens';
+import { ScreenHeader } from '@/ui/components/navbar/screen-header';
+import { SettingsGroups, type SettingsGroup } from '@/ui/components/settings-group';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { ThemedView } from '@/ui/theme/themed-view';
+import { Icons, Radius, Spacing } from '@/ui/theme/tokens';
 import { getProfile, listCircles, type Profile } from '@/data/db';
 import { resetEverythingForTesting } from '@/features/dev/dev-reset';
 import { logTestPushPayload } from '@/features/dev/dev-test-push';
 import { signOut } from '@/features/account/usecases/sign-in';
 import { PushLevels, type PushLevelId } from '@/features/push-notifications/usecases/push-preferences';
-import { useAppSettings } from '@/core/theme/use-app-settings';
-import { useOwnColorSeed } from '@/core/theme/use-own-color-seed';
-import { useTints } from '@/core/theme/use-theme';
+import { useAppSettings } from '@/ui/theme/hooks/use-app-settings';
+import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
+import { useTints } from '@/ui/theme/hooks/use-theme';
 import { bytesToDataUri } from '@/core/photo/image';
 import type { ThemePreference } from '@/core/services/settings';
 

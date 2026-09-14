@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
 
 import { getProfile } from '@/data/db';
-import { getAuthToken } from '@/core/services/keystore';
+import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { savePendingInviteCode } from '@/features/invite/services/pending-invite';
 
 /**

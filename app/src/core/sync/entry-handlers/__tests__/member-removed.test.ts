@@ -7,8 +7,9 @@ import { getCircle, getCircleMembers, getMemberByPublicKey, initDatabase, insert
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
 import type { LogEntryEnvelope } from '@/core/sync/log-entry';
-import { generateIdentity, generateUUID } from '@/core/crypto';
-import { getCircleIdentity, saveMasterSeed } from '@/core/services/keystore';
+import { generateIdentity, generateUUID } from '@/core/crypto/primitives';
+import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 import { memberRemovedHandler } from '@/core/sync/entry-handlers/member-removed';
 

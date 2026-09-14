@@ -3,9 +3,9 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { writePhotoFile } from '@/core/photo/photo-cache';
 import { timedSync } from '@/core/utils/timing';
 
-import { generateUUID, hashBytes } from '@/core/crypto';
+import { generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
-import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import {
   AttachmentKinds,
   AttachmentStatuses,

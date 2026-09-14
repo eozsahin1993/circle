@@ -4,14 +4,12 @@ import { getCircleMembers, insertOutboxEntry, OutboxStatuses, setMemberPushRouti
 import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { type PushCategory } from '@/features/push-notifications/usecases/push-categories';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import {
-  derivePushDeviceId,
-  derivePushFanoutHash,
-  derivePushFanoutToken,
-  derivePushRoutingId,
-  generateUUID,
-} from '@/core/crypto';
-import { getCircleIdentity, getCurrentContentKey, getMasterSeed, getPushDeviceSecret } from '@/core/services/keystore';
+import { generateUUID } from '@/core/crypto/primitives';
+import { derivePushRoutingId } from '@/core/crypto/identity';
+import { derivePushDeviceId, derivePushFanoutHash, derivePushFanoutToken } from '@/features/push-notifications/crypto';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed } from '@/core/services/keystore/master-seed';
+import { getPushDeviceSecret } from '@/features/push-notifications/keystore';
 import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/features/push-notifications/services/relay';
 
 /**

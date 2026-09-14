@@ -2,11 +2,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Dimensions, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { KeyboardAvoider } from '@/core/components/keyboard-avoider';
-import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
-import { ThemedView } from '@/core/theme/themed-view';
-import { Radius, Spacing } from '@/core/theme/tokens';
-import { useTheme } from '@/core/theme/use-theme';
+import { KeyboardAvoider } from '@/ui/components/keyboard-avoider';
+import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
+import { ThemedView } from '@/ui/theme/themed-view';
+import { Radius, Spacing } from '@/ui/theme/tokens';
+import { useTheme } from '@/ui/theme/hooks/use-theme';
 
 export type BottomSheetProps = {
   visible: boolean;

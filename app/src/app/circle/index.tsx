@@ -2,19 +2,19 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
-import { Avatar } from '@/core/components/avatar';
+import { Avatar } from '@/ui/components/avatar/avatar';
 import { CircleCard } from '@/features/circle/components/circle-card';
 import { JoinSheet } from '@/features/invite/components/join-sheet';
 import { PendingCircleCard } from '@/features/invite/components/pending-circle-card';
 import { EmptyCirclesIcon } from '@/features/circle/components/empty-circles-icon';
-import { FabButton } from '@/core/components/fab-button';
+import { FabButton } from '@/ui/components/buttons/fab-button';
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
 import { PrivacyNotice } from '@/features/account/components/privacy-notice';
-import { ThemedText } from '@/core/theme/themed-text';
-import { ThemedView } from '@/core/theme/themed-view';
-import { Icons, Spacing } from '@/core/theme/tokens';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { ThemedView } from '@/ui/theme/themed-view';
+import { Icons, Spacing } from '@/ui/theme/tokens';
 import {
   getAllPendingJoinRequests,
   getCircleMemberCount,
@@ -27,9 +27,9 @@ import {
 import type { PendingJoinRequest } from '@/data/db/pending-join-requests';
 import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
 import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/invite/usecases/join-circle';
-import { useOwnColorSeed } from '@/core/theme/use-own-color-seed';
+import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
 import { takePendingInviteCode } from '@/features/invite/services/pending-invite';
-import { getCircleIdentity } from '@/core/services/keystore';
+import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
 import { bytesToDataUri } from '@/core/photo/image';
 import { formatAgo } from '@/core/utils/time';
 import { nudgePhotoQueue } from '@/core/photo/photo-queue';

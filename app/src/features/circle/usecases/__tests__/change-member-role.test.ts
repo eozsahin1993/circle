@@ -3,8 +3,10 @@ jest.mock('@/core/services/relay');
 
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
-import { decrypt, generateIdentity, generateUUID, sign, verify, deriveAuthorityKeyProofMessage } from '@/core/crypto';
-import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
+import { decrypt, generateIdentity, generateUUID, sign, verify } from '@/core/crypto/primitives';
+import { deriveAuthorityKeyProofMessage } from '@/core/crypto/signed-messages';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { getCircleMembers, getPendingOutboxEntries, initDatabase, insertMember, MemberRoles } from '@/data/db';
 import { setMemberRole } from '@/features/circle/usecases/change-member-role';
 import { createCircle } from '@/features/circle/usecases/create-circle';

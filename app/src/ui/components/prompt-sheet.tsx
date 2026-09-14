@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
-import { BottomSheet } from '@/core/components/bottom-sheet';
-import { PrimaryButton } from '@/core/components/primary-button';
-import { SecondaryButton } from '@/core/components/secondary-button';
-import { ThemedText } from '@/core/theme/themed-text';
-import { Radius, Spacing } from '@/core/theme/tokens';
-import { useTheme } from '@/core/theme/use-theme';
+import { BottomSheet } from '@/ui/components/bottom-sheet';
+import { PrimaryButton } from '@/ui/components/buttons/primary-button';
+import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { Radius, Spacing } from '@/ui/theme/tokens';
+import { useTheme } from '@/ui/theme/hooks/use-theme';
 
 export type PromptSheetProps = {
   visible: boolean;

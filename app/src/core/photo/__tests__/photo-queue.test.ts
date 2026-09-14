@@ -10,8 +10,9 @@ import {
   insertPost,
 } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import { encrypt, generateUUID, hashBytes } from '@/core/crypto';
-import { getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
+import { encrypt, generateUUID, hashBytes } from '@/core/crypto/primitives';
+import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle, getBlob } from '@/core/services/relay';
 import { drainPhotoQueue } from '@/core/photo/photo-queue';
 

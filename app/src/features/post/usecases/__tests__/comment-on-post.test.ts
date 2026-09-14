@@ -14,8 +14,9 @@ import {
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { verifyLogEntry } from '@/core/sync/log-entry';
 import { addComment } from '@/features/post/usecases/comment-on-post';
-import { generateUUID } from '@/core/crypto';
-import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
+import { generateUUID } from '@/core/crypto/primitives';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 beforeAll(async () => {

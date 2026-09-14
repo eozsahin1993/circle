@@ -1,10 +1,10 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { BottomSheet } from '@/core/components/bottom-sheet';
-import { Icon } from '@/core/components/icon';
-import { ThemedText } from '@/core/theme/themed-text';
-import { Icons, Spacing } from '@/core/theme/tokens';
-import { useTheme, useTints } from '@/core/theme/use-theme';
+import { BottomSheet } from '@/ui/components/bottom-sheet';
+import { Icon } from '@/ui/components/icon';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { Icons, Spacing } from '@/ui/theme/tokens';
+import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
 export type SheetOption<Id extends string> = {
   id: Id;

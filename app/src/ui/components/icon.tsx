@@ -1,13 +1,6 @@
-import type { LucideIcon } from 'lucide-react-native';
+import type { IconGlyph } from '@/core/utils/icon-glyph';
 
-/**
- * A glyph from the icon set, as the component that draws it rather than a
- * name to look up — see `Icons`, which is where the app names them. Deep
- * imports plus a component reference are what keep the bundle to the two
- * dozen icons actually used: Metro doesn't tree-shake, so a string-keyed
- * registry over lucide's barrel would ship all ~1,600.
- */
-export type IconGlyph = LucideIcon;
+export type { IconGlyph } from '@/core/utils/icon-glyph';
 
 export type IconProps = {
   icon: IconGlyph;

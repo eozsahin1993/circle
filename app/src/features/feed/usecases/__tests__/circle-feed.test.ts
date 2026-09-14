@@ -7,8 +7,9 @@ import { initDatabase, insertPost } from '@/data/db';
 import { recordMemberAdded } from '@/data/db/member-events';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { FEED_PAGE_SIZE, loadCircleFeedMeta, loadCircleFeedPage } from '@/features/feed/usecases/circle-feed';
-import { generateUUID } from '@/core/crypto';
-import { getCircleIdentity, saveMasterSeed } from '@/core/services/keystore';
+import { generateUUID } from '@/core/crypto/primitives';
+import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 beforeAll(async () => {

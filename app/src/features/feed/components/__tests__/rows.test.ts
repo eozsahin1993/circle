@@ -2,7 +2,7 @@ import { justJoinedRow } from '@/features/feed/components/just-joined-row';
 import { pendingRequestRow } from '@/features/feed/components/pending-request-row';
 import { rosterChangeRows } from '@/features/feed/components/roster-change-row';
 import { buildFeedRows, gapBetween, stickyIndices, type FeedRow } from '@/features/feed/components/rows';
-import { Spacing } from '@/core/theme/tokens';
+import { Spacing } from '@/ui/theme/tokens';
 import type { MemberEvent } from '@/data/db';
 
 function event(id: string, occurredAt: number): MemberEvent {

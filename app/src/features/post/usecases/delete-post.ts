@@ -4,8 +4,8 @@ import { deletePostAndEnqueue, getPost, OutboxStatuses, type NewOutboxEntry } fr
 import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { generateUUID } from '@/core/crypto';
-import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore';
+import { generateUUID } from '@/core/crypto/primitives';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { deletePhotoFile } from '@/core/photo/photo-cache';
 
 /**

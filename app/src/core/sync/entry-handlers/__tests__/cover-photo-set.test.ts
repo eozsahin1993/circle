@@ -15,8 +15,9 @@ import {
 } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import type { LogEntryEnvelope } from '@/core/sync/log-entry';
-import { encrypt, generateIdentity, generateUUID, hashBytes } from '@/core/crypto';
-import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
+import { encrypt, generateIdentity, generateUUID, hashBytes } from '@/core/crypto/primitives';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle, getBlob } from '@/core/services/relay';
 import { coverPhotoSetHandler } from '@/core/sync/entry-handlers/cover-photo-set';
 import { drainPhotoQueue } from '@/core/photo/photo-queue';

@@ -7,7 +7,7 @@ import { createCircle } from '@/features/circle/usecases/create-circle';
 import { createPost } from '@/features/post/usecases/create-post';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { getCircleFeed } from '@/data/db/posts';
-import { saveMasterSeed } from '@/core/services/keystore';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 beforeAll(async () => {

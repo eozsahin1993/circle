@@ -1,6 +1,6 @@
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
-import { type Keypair, decrypt, encrypt, sign, verify } from '@/core/crypto';
+import { type Keypair, decrypt, encrypt, sign, verify } from '@/core/crypto/primitives';
 
 /**
  * Every entry type this app writes. Named so no call site hand-types the

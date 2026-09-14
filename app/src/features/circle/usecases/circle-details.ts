@@ -11,7 +11,7 @@ import {
   type Member,
 } from '@/data/db';
 import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
-import { getCircleIdentity } from '@/core/services/keystore';
+import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
 
 export type CircleDetails = {
   circle: CircleListRow | null;

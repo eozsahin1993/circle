@@ -1,4 +1,4 @@
-import { generateUUID } from '@/core/crypto';
+import { generateUUID } from '@/core/crypto/primitives';
 import { initDatabase } from '@/data/db';
 import { AttachmentKinds, AttachmentStatuses, type NewAttachment } from '@/data/db/attachments';
 import { insertComment } from '@/data/db/comments';

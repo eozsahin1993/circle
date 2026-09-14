@@ -1,9 +1,9 @@
 import { Pressable, StyleSheet, Text, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 
-import { Icon, type IconGlyph } from '@/core/components/icon';
-import { ThemedText } from '@/core/theme/themed-text';
-import { Radius } from '@/core/theme/tokens';
-import { useTheme, useTints } from '@/core/theme/use-theme';
+import { Icon, type IconGlyph } from '@/ui/components/icon';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { Radius } from '@/ui/theme/tokens';
+import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
 export type ReactionChipProps = Omit<PressableProps, 'style'> & {
   /**

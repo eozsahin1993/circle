@@ -3,8 +3,8 @@
  * https://docs.expo.dev/guides/color-schemes/
  */
 
-import { Colors, Tints } from '@/core/theme/tokens';
-import { useAppSettings } from '@/core/theme/use-app-settings';
+import { Colors, Tints } from '@/ui/theme/tokens';
+import { useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 
 export function useTheme() {
   const { scheme } = useAppSettings();

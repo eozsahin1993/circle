@@ -20,11 +20,12 @@ import {
 } from '@/features/invite/usecases/invite-to-circle';
 import type { JoinRequestPayload } from '@/features/invite/usecases/invite-payloads';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { deriveInviteTag, deriveJoinRequestKey, encryptJSON, generateEphemeralKeypair } from '@/core/crypto';
+import { encryptJSON, generateEphemeralKeypair } from '@/core/crypto/primitives';
+import { deriveInviteTag, deriveJoinRequestKey } from '@/features/invite/crypto';
 import { bytesToHex } from '@noble/curves/utils.js';
 import { deleteJoinRequest, listJoinRequests } from '@/core/services/mailbox-relay';
 import { putInvitePreview } from '@/features/invite/services/invite-preview-relay';
-import { saveMasterSeed } from '@/core/services/keystore';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 beforeAll(async () => {

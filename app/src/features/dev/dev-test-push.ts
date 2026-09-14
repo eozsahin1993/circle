@@ -5,8 +5,11 @@ import { getAllCircles } from '@/data/db';
 import { getDevicePushToken } from '@/features/push-notifications/services/tokens';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { PushCategories } from '@/features/push-notifications/usecases/push-categories';
-import { derivePushFanoutToken, derivePushRoutingId, generateUUID } from '@/core/crypto';
-import { getCircleIdentity, getCurrentContentKey, getMasterSeed } from '@/core/services/keystore';
+import { generateUUID } from '@/core/crypto/primitives';
+import { derivePushRoutingId } from '@/core/crypto/identity';
+import { derivePushFanoutToken } from '@/features/push-notifications/crypto';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed } from '@/core/services/keystore/master-seed';
 
 /**
  * DEV-ONLY: logs a `curl` against the relay's /push/send that targets

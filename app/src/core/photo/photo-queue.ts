@@ -6,8 +6,8 @@ import {
   updateCirclePicture,
   type FetchableAttachment,
 } from '@/data/db';
-import { decrypt, hashBytes } from '@/core/crypto';
-import { getCircleKeyMap } from '@/core/services/keystore';
+import { decrypt, hashBytes } from '@/core/crypto/primitives';
+import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { writeCoverFile, writePhotoFile } from '@/core/photo/photo-cache';
 import { notifyPhotoFetched } from '@/core/photo/photo-events';
 import { getBlob } from '@/core/services/relay';

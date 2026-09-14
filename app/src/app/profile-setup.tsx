@@ -1,20 +1,20 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
-import { Avatar } from '@/core/components/avatar';
-import { KeyboardAvoider } from '@/core/components/keyboard-avoider';
-import { PrimaryButton } from '@/core/components/primary-button';
-import { ScreenHeader } from '@/core/components/navbar/screen-header';
-import { ThemedText } from '@/core/theme/themed-text';
-import { ThemedView } from '@/core/theme/themed-view';
-import { Fonts, Radius, Spacing } from '@/core/theme/tokens';
+import { Avatar } from '@/ui/components/avatar/avatar';
+import { KeyboardAvoider } from '@/ui/components/keyboard-avoider';
+import { PrimaryButton } from '@/ui/components/buttons/primary-button';
+import { ScreenHeader } from '@/ui/components/navbar/screen-header';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { ThemedView } from '@/ui/theme/themed-view';
+import { Fonts, Radius, Spacing } from '@/ui/theme/tokens';
 import { getProfile } from '@/data/db';
 import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/core/photo/image';
 import { completeProfileSetup, ensureMasterSeed } from '@/features/account/usecases/onboarding';
-import { primeOwnColorSeed } from '@/core/theme/use-own-color-seed';
-import { useTheme, useTints } from '@/core/theme/use-theme';
+import { primeOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
+import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { goPostAuth } from '@/features/invite/services/pending-invite';
 
 export default function ProfileSetupScreen() {

@@ -11,7 +11,7 @@ import {
   type AddedMemberProfile,
 } from '@/data/db/member-events';
 import { getCircleMembers, getMemberByPublicKey, MemberRoles } from '@/data/db/members';
-import { generateUUID } from '@/core/crypto';
+import { generateUUID } from '@/core/crypto/primitives';
 
 beforeAll(() => initDatabase());
 

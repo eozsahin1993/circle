@@ -17,8 +17,8 @@ import { queueDepartingHandover } from '@/features/circle/usecases/authority';
 import { purgeCircleLocally } from '@/features/circle/usecases/purge-circle';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { generateUUID } from '@/core/crypto';
-import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore';
+import { generateUUID } from '@/core/crypto/primitives';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { pullMeta } from '@/core/sync/pull-log';
 
 /**

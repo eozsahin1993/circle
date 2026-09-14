@@ -23,8 +23,10 @@ import { circleMembers } from '@/data/db/schema';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { finishDeparture, finishPendingDepartures, leaveCircle } from '@/features/circle/usecases/leave-circle';
 import { buildAndEncryptLogEntry } from '@/core/sync/log-entry';
-import { deriveAuthorityKeyProofMessage, generateIdentity, generateUUID, sign } from '@/core/crypto';
-import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
+import { generateIdentity, generateUUID, sign } from '@/core/crypto/primitives';
+import { deriveAuthorityKeyProofMessage } from '@/core/crypto/signed-messages';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle, changeAuthority, deleteCircleOnRelay, fetchEntries } from '@/core/services/relay';
 
 beforeAll(async () => {

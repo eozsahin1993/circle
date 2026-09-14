@@ -22,20 +22,13 @@ import { buildAndEncryptLogEntry, verifyLogEntry } from '@/core/sync/log-entry';
 import { addComment } from '@/features/post/usecases/comment-on-post';
 import { createPost } from '@/features/post/usecases/create-post';
 import { getReactionsForPost, toggleReaction } from '@/features/post/usecases/react-to-post';
-import {
-  deriveAuthorityKeyProofMessage,
-  deriveJoinRequestKey,
-  encrypt,
-  encryptJSON,
-  generateEphemeralKeypair,
-  generateIdentity,
-  generateUUID,
-  hashBytes,
-  sign,
-} from '@/core/crypto';
+import { encrypt, encryptJSON, generateEphemeralKeypair, generateIdentity, generateUUID, hashBytes, sign } from '@/core/crypto/primitives';
+import { deriveAuthorityKeyProofMessage } from '@/core/crypto/signed-messages';
+import { deriveJoinRequestKey } from '@/features/invite/crypto';
 import { listJoinRequests, putJoinApproval } from '@/core/services/mailbox-relay';
 import { putInvitePreview } from '@/features/invite/services/invite-preview-relay';
-import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import {
   appendEntry,
   bootstrapCircle,

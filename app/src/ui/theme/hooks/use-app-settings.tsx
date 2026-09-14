@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 
-import { useColorScheme } from '@/core/theme/use-color-scheme';
+import { useColorScheme } from '@/ui/theme/hooks/use-color-scheme';
 import { showError } from '@/core/services/messages';
 import { updateAppSettings, type AppSettings } from '@/core/services/settings';
 

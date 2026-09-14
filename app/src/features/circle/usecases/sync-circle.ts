@@ -3,16 +3,12 @@ import { notifyCircleBestEffort } from '@/features/push-notifications/usecases/n
 import { PushCategories, type PushCategory } from '@/features/push-notifications/usecases/push-categories';
 import { EntryTypes } from '@/core/sync/log-entry';
 import { timed, timedSync } from '@/core/utils/timing';
-import { getCircleIdentity, getCurrentContentKey, getMasterSeed } from '@/core/services/keystore';
-import {
-  deriveAuthorityChangeMessage,
-  deriveAuthorityKeypair,
-  deriveDeleteBlobMessage,
-  deriveDeleteCircleMessage,
-  deriveWriteToken,
-  encrypt,
-  sign,
-} from '@/core/crypto';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed } from '@/core/services/keystore/master-seed';
+import { encrypt, sign } from '@/core/crypto/primitives';
+import { deriveAuthorityKeypair } from '@/core/crypto/identity';
+import { deriveAuthorityChangeMessage, deriveDeleteBlobMessage, deriveDeleteCircleMessage } from '@/core/crypto/signed-messages';
+import { deriveWriteToken } from '@/features/circle/crypto';
 import {
   appendEntry,
   BlobAlreadyExistsError,

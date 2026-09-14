@@ -2,22 +2,9 @@ import { Buffer } from 'buffer';
 
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
-import {
-  buildAuthorityKeyClaim,
-  decrypt,
-  deriveAuthorityKeypair,
-  deriveCircleIdentity,
-  derivePushRoutingId,
-  deriveCircleSealingKeypair,
-  deriveInvitePreviewKey,
-  deriveInviteTag,
-  deriveJoinRequestKey,
-  encryptJSON,
-  generateEphemeralKeypair,
-  generateUUID,
-  openSealedBox,
-  verify,
-} from '@/core/crypto';
+import { decrypt, encryptJSON, generateEphemeralKeypair, generateUUID, openSealedBox, verify } from '@/core/crypto/primitives';
+import { buildAuthorityKeyClaim, deriveAuthorityKeypair, deriveCircleIdentity, derivePushRoutingId, deriveCircleSealingKeypair } from '@/core/crypto/identity';
+import { deriveInvitePreviewKey, deriveInviteTag, deriveJoinRequestKey } from '@/features/invite/crypto';
 import {
   deletePendingJoinRequest,
   getAllPendingJoinRequests,
@@ -36,7 +23,9 @@ import { ensureCircleNotificationChannel } from '@/features/push-notifications/s
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
 import { compressToThumbnail } from '@/core/photo/image';
-import { deletePendingJoinKeypair, getMasterSeed, getPendingJoinKeypair, saveCircleIdentity, saveCircleKeyMap, savePendingJoinKeypair } from '@/core/services/keystore';
+import { saveCircleIdentity, saveCircleKeyMap } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed } from '@/core/services/keystore/master-seed';
+import { deletePendingJoinKeypair, getPendingJoinKeypair, savePendingJoinKeypair } from '@/features/invite/keystore';
 import {
   JoinRequestGoneError,
   deleteJoinRequest,

@@ -5,8 +5,9 @@ import { File, Paths, UploadType } from 'expo-file-system';
 import { NativeModules, Platform } from 'react-native';
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { generateUUID, type AuthorityAction } from '@/core/crypto';
-import { getAuthToken } from '@/core/services/keystore';
+import { generateUUID } from '@/core/crypto/primitives';
+import { type AuthorityAction } from '@/core/crypto/signed-messages';
+import { getAuthToken } from '@/core/services/keystore/auth-token';
 
 /**
  * Thin fetch-based client for the relay's circle-log endpoints (server-side:

@@ -1,17 +1,9 @@
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 import { getAllCircles, getCircle, getProfile, insertCircle, saveProfile } from '@/data/db';
-import {
-  decrypt,
-  deriveCircleIdentity,
-  deriveDeviceTransferRequestKey,
-  deriveDeviceTransferTag,
-  encryptJSON,
-  generateEphemeralKeypair,
-  generateInviteCode,
-  openSealedBox,
-  sealToPublicKey,
-} from '@/core/crypto';
+import { decrypt, encryptJSON, generateEphemeralKeypair, generateInviteCode, openSealedBox, sealToPublicKey } from '@/core/crypto/primitives';
+import { deriveCircleIdentity } from '@/core/crypto/identity';
+import { deriveDeviceTransferRequestKey, deriveDeviceTransferTag } from '@/features/account/crypto';
 import {
   deleteJoinRequest,
   getJoinRequestApproval,
@@ -20,14 +12,13 @@ import {
   putJoinRequest,
 } from '@/core/services/mailbox-relay';
 import {
-  getCircleKeyMap,
   getCircleIdentity,
-  getMasterSeed,
+  getCircleKeyMap,
   saveCircleIdentity,
   saveCircleKeyMap,
-  saveMasterSeed,
-} from '@/core/services/keystore';
-import type { Keypair } from '@/core/crypto';
+} from '@/core/services/keystore/circle-keys';
+import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
+import type { Keypair } from '@/core/crypto/primitives';
 
 /**
  * Moving an account onto a second phone: the invite handshake with the

@@ -1,4 +1,4 @@
-import { AvatarTints } from '@/core/theme/tokens';
+import { AvatarTints } from '@/ui/theme/tokens';
 
 /**
  * The one or two letters standing in for a member with no profile picture.

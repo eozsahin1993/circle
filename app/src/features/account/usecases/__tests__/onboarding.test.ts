@@ -5,7 +5,8 @@ jest.mock('@/core/photo/image');
 
 import { getCircleMembers, getPendingOutboxEntries, initDatabase } from '@/data/db';
 import { getProfile } from '@/data/db/profile';
-import { getCircleIdentity, getMasterSeed, saveMasterSeed } from '@/core/services/keystore';
+import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { completeProfileSetup } from '@/features/account/usecases/onboarding';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { EntryTypes } from '@/core/sync/log-entry';

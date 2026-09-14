@@ -21,14 +21,10 @@ import {
   silenceCircle,
   unregisterDeviceForCircle,
 } from '@/features/push-notifications/usecases/push-registration';
-import { derivePushFanoutHash, derivePushFanoutToken, derivePushRoutingId } from '@/core/crypto';
-import {
-  deleteCircleKeys,
-  getCircleIdentity,
-  getCurrentContentKey,
-  getMasterSeed,
-  saveMasterSeed,
-} from '@/core/services/keystore';
+import { derivePushRoutingId } from '@/core/crypto/identity';
+import { derivePushFanoutHash, derivePushFanoutToken } from '@/features/push-notifications/crypto';
+import { deleteCircleKeys, getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/features/push-notifications/services/relay';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';

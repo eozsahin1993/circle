@@ -452,7 +452,7 @@ export const outbox = sqliteTable(
  * reopened before approval ever lands.
  * `id` is the requester-chosen id used both as the mailbox row's sort key
  * suffix and as the Keychain key for the matching ephemeral secret key
- * (see `keystore.ts`'s `savePendingJoinKeypair`) — the secret key itself
+ * (see invite's `keystore.ts`'s `savePendingJoinKeypair`) — the secret key itself
  * never lives here. `status` is 'approved' only for the brief window
  * between decrypting the approval and finishing local setup; the row is
  * deleted entirely once that completes, so there's no long-lived "joined"

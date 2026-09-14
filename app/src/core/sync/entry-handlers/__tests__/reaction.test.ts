@@ -7,8 +7,9 @@ import { AttachmentKinds, AttachmentStatuses, initDatabase, insertPost } from '@
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import type { LogEntryEnvelope } from '@/core/sync/log-entry';
 import { getReactionsForPost } from '@/features/post/usecases/react-to-post';
-import { generateIdentity, generateUUID } from '@/core/crypto';
-import { getCircleIdentity, saveMasterSeed } from '@/core/services/keystore';
+import { generateIdentity, generateUUID } from '@/core/crypto/primitives';
+import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 import { reactionHandler } from '@/core/sync/entry-handlers/reaction';
 

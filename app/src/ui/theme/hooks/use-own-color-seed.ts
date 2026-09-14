@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
-import { deriveOwnColorSeed } from '@/core/crypto';
-import { getMasterSeed } from '@/core/services/keystore';
+import { deriveOwnColorSeed } from '@/core/crypto/identity';
+import { getMasterSeed } from '@/core/services/keystore/master-seed';
 
 // Module-level, not per-hook-instance: `PostComments` mounts one of these
 // per visible feed row, and every one of them wants the same value. Without

@@ -19,8 +19,10 @@ import { createCircle } from '@/features/circle/usecases/create-circle';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { resetLocalDataForTesting } from '@/features/dev/dev-reset';
 import { handlePush } from '@/features/push-notifications/usecases/handle-push';
-import { derivePushRoutingId, generateIdentity, generateUUID, type Keypair } from '@/core/crypto';
-import { addCircleKeyVersion, getCircleIdentity, getCurrentContentKey, getMasterSeed, saveMasterSeed } from '@/core/services/keystore';
+import { generateIdentity, generateUUID, type Keypair } from '@/core/crypto/primitives';
+import { derivePushRoutingId } from '@/core/crypto/identity';
+import { addCircleKeyVersion, getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 beforeAll(async () => {

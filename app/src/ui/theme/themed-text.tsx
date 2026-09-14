@@ -1,7 +1,7 @@
 import { StyleSheet, Text, type TextProps } from 'react-native';
 
-import { Type, type ThemeColor } from '@/core/theme/tokens';
-import { useTheme } from '@/core/theme/use-theme';
+import { Type, type ThemeColor } from '@/ui/theme/tokens';
+import { useTheme } from '@/ui/theme/hooks/use-theme';
 
 export type ThemedTextType = keyof typeof Type;
 

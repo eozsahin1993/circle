@@ -5,9 +5,12 @@ import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 import { getCircleBySyncId, getProfile, insertCircle, listCircles, saveProfile } from '@/data/db';
 import { fetchAccountManifest, type RecoverableCircle } from '@/features/account/usecases/account-manifest';
 import { defaultCircleMask } from '@/features/push-notifications/usecases/push-preferences';
-import { deriveCircleIdentity, generateUUID, seedPhraseToEntropy } from '@/core/crypto';
+import { generateUUID } from '@/core/crypto/primitives';
+import { deriveCircleIdentity } from '@/core/crypto/identity';
+import { seedPhraseToEntropy } from '@/features/account/crypto';
 import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
-import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap, saveMasterSeed } from '@/core/services/keystore';
+import { saveCircleIdentity, saveCircleKeyMap } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { syncCircle } from '@/core/sync/sync-circles';
 
 export type RestoreResult = {

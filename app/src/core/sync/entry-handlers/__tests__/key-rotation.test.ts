@@ -6,8 +6,11 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { initDatabase, insertMember, MemberRoles } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import type { LogEntryEnvelope } from '@/core/sync/log-entry';
-import { deriveCircleSealingKeypair, generateContentKey, generateIdentity, generateUUID, sealToPublicKey } from '@/core/crypto';
-import { getCircleIdentity, getCircleKeyMap, saveMasterSeed } from '@/core/services/keystore';
+import { generateIdentity, generateUUID, sealToPublicKey } from '@/core/crypto/primitives';
+import { deriveCircleSealingKeypair } from '@/core/crypto/identity';
+import { generateContentKey } from '@/features/circle/crypto';
+import { getCircleIdentity, getCircleKeyMap } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 import { keyRotationHandler } from '@/core/sync/entry-handlers/key-rotation';
 

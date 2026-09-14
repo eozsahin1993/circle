@@ -1,5 +1,5 @@
-import { AvatarTints } from '@/core/theme/tokens';
-import { avatarTintFor, initialsOf } from '@/core/utils/initials';
+import { AvatarTints } from '@/ui/theme/tokens';
+import { avatarTintFor, initialsOf } from '@/ui/components/avatar/initials';
 
 describe('initialsOf', () => {
   it('takes one letter from a single name and the outer two from more', () => {

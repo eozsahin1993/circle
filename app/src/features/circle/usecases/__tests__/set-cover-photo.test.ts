@@ -2,8 +2,12 @@ jest.mock('@/core/services/relay');
 
 import { hexToBytes } from '@noble/curves/utils.js';
 
-import { decrypt, deriveAuthorityKeypair, deriveCoverPhotoUploadMessage, deriveWriteToken, hashBytes, verify } from '@/core/crypto';
-import { getCurrentContentKey, getMasterSeed, saveMasterSeed } from '@/core/services/keystore';
+import { decrypt, hashBytes, verify } from '@/core/crypto/primitives';
+import { deriveAuthorityKeypair } from '@/core/crypto/identity';
+import { deriveCoverPhotoUploadMessage } from '@/core/crypto/signed-messages';
+import { deriveWriteToken } from '@/features/circle/crypto';
+import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { getCircle, initDatabase } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { setCoverPhoto } from '@/features/circle/usecases/set-cover-photo';

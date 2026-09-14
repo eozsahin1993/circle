@@ -12,8 +12,10 @@ import { fetchAccountManifest } from '@/features/account/usecases/account-manife
 import { restoreFromPhrase } from '@/features/account/usecases/restore-from-phrase';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { resetLocalDataForTesting } from '@/features/dev/dev-reset';
-import { deriveCircleIdentity, generateSeedPhrase, seedPhraseToEntropy } from '@/core/crypto';
-import { getCircleKeyMap, getMasterSeed, saveMasterSeed } from '@/core/services/keystore';
+import { deriveCircleIdentity } from '@/core/crypto/identity';
+import { generateSeedPhrase, seedPhraseToEntropy } from '@/features/account/crypto';
+import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 const CONTENT_KEY = new Uint8Array(32).fill(7);

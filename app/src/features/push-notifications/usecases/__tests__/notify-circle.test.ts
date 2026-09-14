@@ -12,8 +12,11 @@ import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { resetLocalDataForTesting } from '@/features/dev/dev-reset';
 import { notifyCircle } from '@/features/push-notifications/usecases/notify-circle';
 import { PushCategories } from '@/features/push-notifications/usecases/push-categories';
-import { derivePushFanoutToken, derivePushRoutingId, generateIdentity, generateUUID } from '@/core/crypto';
-import { getCircleIdentity, getCurrentContentKey, getMasterSeed, saveMasterSeed } from '@/core/services/keystore';
+import { generateIdentity, generateUUID } from '@/core/crypto/primitives';
+import { derivePushRoutingId } from '@/core/crypto/identity';
+import { derivePushFanoutToken } from '@/features/push-notifications/crypto';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { sendPush } from '@/features/push-notifications/services/relay';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 

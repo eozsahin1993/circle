@@ -3,8 +3,8 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { getCircleMembers, getCommentAuthors, getPost, hasOtherReaction } from '@/data/db';
 import { verifyLogEntry } from '@/core/sync/log-entry';
 import { PushCategories, type PushCategory } from '@/features/push-notifications/usecases/push-categories';
-import { derivePushFanoutToken } from '@/core/crypto';
-import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore';
+import { derivePushFanoutToken } from '@/features/push-notifications/crypto';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { sendPush } from '@/features/push-notifications/services/relay';
 
 /**

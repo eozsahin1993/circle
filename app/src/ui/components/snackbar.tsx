@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { Animated, PanResponder, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Icon, type IconGlyph } from '@/core/components/icon';
-import { ThemedText } from '@/core/theme/themed-text';
-import { ThemedView } from '@/core/theme/themed-view';
-import { Icons, Radius, Spacing, type ThemeColor } from '@/core/theme/tokens';
-import { useTheme, useTints } from '@/core/theme/use-theme';
+import { Icon, type IconGlyph } from '@/ui/components/icon';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { ThemedView } from '@/ui/theme/themed-view';
+import { Icons, Radius, Spacing, type ThemeColor } from '@/ui/theme/tokens';
+import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import type { MessageController } from '@/core/hooks/use-messages';
 import type { Message } from '@/core/services/messages';
 

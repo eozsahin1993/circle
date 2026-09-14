@@ -14,7 +14,7 @@ jest.mock('expo-file-system', () => ({
 jest.mock('expo-constants', () => ({ __esModule: true, default: { expoConfig: {} } }));
 
 const mockGetAuthToken = jest.fn();
-jest.mock('@/core/services/keystore', () => ({
+jest.mock('@/core/services/keystore/auth-token', () => ({
   getAuthToken: () => mockGetAuthToken(),
 }));
 

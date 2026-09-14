@@ -19,7 +19,7 @@ import {
   syncPushPreferences,
 } from '@/features/push-notifications/usecases/push-preferences';
 import { PushCategories } from '@/features/push-notifications/usecases/push-categories';
-import { saveMasterSeed } from '@/core/services/keystore';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { deletePushRouting, putPushPrefs } from '@/features/push-notifications/services/relay';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 import { getAppSettings } from '@/core/services/settings';

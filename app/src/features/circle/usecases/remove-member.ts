@@ -3,17 +3,12 @@ import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 import { getCircle, getCircleMembers, recordMemberRemovedLocally } from '@/data/db';
 import { requireAdminPublicKey } from '@/features/invite/usecases/invite-to-circle';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
-import {
-  deriveAuthorityKeypair,
-  deriveRotateMessage,
-  deriveWriteToken,
-  generateContentKey,
-  generateUUID,
-  hashWriteToken,
-  sealToPublicKey,
-  sign,
-} from '@/core/crypto';
-import { addCircleKeyVersion, getCircleIdentity, getCurrentContentKey, getMasterSeed } from '@/core/services/keystore';
+import { generateUUID, sealToPublicKey, sign } from '@/core/crypto/primitives';
+import { deriveAuthorityKeypair } from '@/core/crypto/identity';
+import { deriveRotateMessage } from '@/core/crypto/signed-messages';
+import { deriveWriteToken, generateContentKey, hashWriteToken } from '@/features/circle/crypto';
+import { addCircleKeyVersion, getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, rotateLog } from '@/core/services/relay';
 import { pullMeta } from '@/core/sync/pull-log';
 

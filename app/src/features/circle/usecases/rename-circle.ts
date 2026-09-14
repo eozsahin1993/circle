@@ -1,9 +1,10 @@
-import { deriveWriteToken, generateUUID } from '@/core/crypto';
+import { generateUUID } from '@/core/crypto/primitives';
+import { deriveWriteToken } from '@/features/circle/crypto';
 import { getCircle, updateCircleName } from '@/data/db';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
 import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
-import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { appendEntry } from '@/core/services/relay';
 
 /**

@@ -5,7 +5,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { Directory, File, Paths } from 'expo-file-system';
 import { Image } from 'react-native';
 
-import { generateUUID } from '@/core/crypto';
+import { generateUUID } from '@/core/crypto/primitives';
 
 /**
  * Long-edge cap and JPEG quality for anything we store or send. The relay

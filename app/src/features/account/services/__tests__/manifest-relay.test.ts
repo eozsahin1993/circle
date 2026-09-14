@@ -1,5 +1,5 @@
 const mockGetAuthToken = jest.fn();
-jest.mock('@/core/services/keystore', () => ({
+jest.mock('@/core/services/keystore/auth-token', () => ({
   getAuthToken: () => mockGetAuthToken(),
 }));
 

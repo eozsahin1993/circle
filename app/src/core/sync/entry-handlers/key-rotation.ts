@@ -2,8 +2,10 @@ import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 import { getCircleMembers, MemberRoles } from '@/data/db';
 import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
-import { deriveCircleSealingKeypair, openSealedBox } from '@/core/crypto';
-import { addCircleKeyVersion, getCircleIdentity, getMasterSeed } from '@/core/services/keystore';
+import { openSealedBox } from '@/core/crypto/primitives';
+import { deriveCircleSealingKeypair } from '@/core/crypto/identity';
+import { addCircleKeyVersion, getCircleIdentity } from '@/core/services/keystore/circle-keys';
+import { getMasterSeed } from '@/core/services/keystore/master-seed';
 import { asRecord, numberField, type EntryHandler } from '@/core/sync/entry-handlers/types';
 
 /** What `remove-member.ts` puts in a `key_rotation` entry — one wrap per remaining member, keyed by their identityPublicKey. */

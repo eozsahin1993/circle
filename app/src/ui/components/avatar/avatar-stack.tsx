@@ -1,8 +1,8 @@
 import { StyleSheet, View } from 'react-native';
 
-import { Avatar } from '@/core/components/avatar';
-import { ThemedText } from '@/core/theme/themed-text';
-import { useTheme } from '@/core/theme/use-theme';
+import { Avatar } from '@/ui/components/avatar/avatar';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { useTheme } from '@/ui/theme/hooks/use-theme';
 
 export type AvatarStackProps = {
   count: number;

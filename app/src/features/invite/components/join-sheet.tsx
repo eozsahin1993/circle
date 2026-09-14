@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Avatar } from '@/core/components/avatar';
-import { BottomSheet } from '@/core/components/bottom-sheet';
-import { PrimaryButton } from '@/core/components/primary-button';
-import { ThemedText } from '@/core/theme/themed-text';
-import { Spacing } from '@/core/theme/tokens';
+import { Avatar } from '@/ui/components/avatar/avatar';
+import { BottomSheet } from '@/ui/components/bottom-sheet';
+import { PrimaryButton } from '@/ui/components/buttons/primary-button';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { Spacing } from '@/ui/theme/tokens';
 import { findPendingJoinRequestForInvite, previewInvite, requestToJoin } from '@/features/invite/usecases/join-circle';
 import { bytesToDataUri, parsePictureThumbnail } from '@/core/photo/image';
 import { showError } from '@/core/services/messages';

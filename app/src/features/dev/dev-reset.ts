@@ -1,6 +1,8 @@
 import { getAllCircleIds, resetAllLocalData, resetDatabaseSchema } from '@/data/db';
-import { clearOwnColorSeedCache } from '@/core/theme/use-own-color-seed';
-import { deleteAuthToken, deleteCircleKeys, deleteMasterSeed } from '@/core/services/keystore';
+import { clearOwnColorSeedCache } from '@/ui/theme/hooks/use-own-color-seed';
+import { deleteCircleKeys } from '@/core/services/keystore/circle-keys';
+import { deleteMasterSeed } from '@/core/services/keystore/master-seed';
+import { deleteAuthToken } from '@/core/services/keystore/auth-token';
 
 /**
  * DEV-ONLY testing tool — wipes every circle identity/secret in the

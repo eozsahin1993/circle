@@ -1,8 +1,8 @@
 import { Pressable, StyleSheet, View, type PressableProps } from 'react-native';
 
-import { ThemedText } from '@/core/theme/themed-text';
-import { ButtonHeight, Radius } from '@/core/theme/tokens';
-import { useTheme, useTints } from '@/core/theme/use-theme';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { ButtonHeight, Radius } from '@/ui/theme/tokens';
+import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
 export type SecondaryButtonProps = PressableProps & {
   label: string;

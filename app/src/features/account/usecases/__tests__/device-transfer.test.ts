@@ -15,15 +15,15 @@ import {
   startDeviceTransfer,
 } from '@/features/account/usecases/device-transfer';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import { deriveDeviceTransferTag, generateEphemeralKeypair, openSealedBox } from '@/core/crypto';
+import { generateEphemeralKeypair, openSealedBox } from '@/core/crypto/primitives';
+import { deriveDeviceTransferTag } from '@/features/account/crypto';
 import {
   addCircleKeyVersion,
   deleteCircleKeys,
   getCircleIdentity,
   getCircleKeyMap,
-  getMasterSeed,
-  saveMasterSeed,
-} from '@/core/services/keystore';
+} from '@/core/services/keystore/circle-keys';
+import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
 import {
   deleteJoinRequest,
   getJoinRequestApproval,

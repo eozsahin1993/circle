@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 
 import type { FeedRow, FeedRows } from '@/features/feed/components/rows';
 import { DayDivider, MembershipEventGroupRow, type MembershipEventGroupItem } from '@/features/feed/components/membership-event-row';
-import { Spacing } from '@/core/theme/tokens';
+import { Spacing } from '@/ui/theme/tokens';
 import type { MemberEvent } from '@/data/db';
 import { groupMemberEvents, type MembershipEventGroup } from '@/features/feed/usecases/group-member-events';
 

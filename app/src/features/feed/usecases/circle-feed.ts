@@ -18,7 +18,7 @@ import {
 } from '@/data/db';
 import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
 import { getPostReactionSummaries } from '@/data/db';
-import { getCircleIdentity } from '@/core/services/keystore';
+import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
 import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
 
 export type { FeedCursor };

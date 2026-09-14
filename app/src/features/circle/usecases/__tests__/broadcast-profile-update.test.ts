@@ -5,8 +5,9 @@ jest.mock('@/core/photo/image');
 
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
-import { decrypt, generateUUID, verify } from '@/core/crypto';
-import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
+import { decrypt, generateUUID, verify } from '@/core/crypto/primitives';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { getCircleMembers, getPendingOutboxEntries, initDatabase, insertCircle } from '@/data/db';
 import { broadcastProfileUpdate } from '@/features/circle/usecases/broadcast-profile-update';
 import { createCircle } from '@/features/circle/usecases/create-circle';

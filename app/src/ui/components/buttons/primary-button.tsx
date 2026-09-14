@@ -1,10 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, type PressableProps } from 'react-native';
 
-import { ButtonHeight, Radius } from '@/core/theme/tokens';
-import { ThemedText } from '@/core/theme/themed-text';
-import { ThemedView } from '@/core/theme/themed-view';
-import { useTheme } from '@/core/theme/use-theme';
+import { ButtonHeight, Radius } from '@/ui/theme/tokens';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { ThemedView } from '@/ui/theme/themed-view';
+import { useTheme } from '@/ui/theme/hooks/use-theme';
 
 export type PrimaryButtonProps = PressableProps & {
   label: string;

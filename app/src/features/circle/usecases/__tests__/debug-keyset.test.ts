@@ -8,7 +8,8 @@ import { getCircle, initDatabase } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { buildDebugKeysetFlags } from '@/features/circle/usecases/debug-keyset';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { getCircleKeyMap, saveMasterSeed } from '@/core/services/keystore';
+import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 beforeAll(async () => {

@@ -1,4 +1,4 @@
-import type { IconGlyph } from '@/core/components/icon';
+import type { IconGlyph } from '@/core/utils/icon-glyph';
 
 /**
  * A brief message for the person using the app — `SnackbarHost` draws it.

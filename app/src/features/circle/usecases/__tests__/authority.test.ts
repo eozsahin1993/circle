@@ -6,15 +6,11 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { getMemberByPublicKey, initDatabase, MemberRoles } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import {
-  decrypt,
-  deriveAuthorityKeypair,
-  deriveAuthorityKeyProofMessage,
-  generateIdentity,
-  sign,
-  verify,
-} from '@/core/crypto';
-import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
+import { decrypt, generateIdentity, sign, verify } from '@/core/crypto/primitives';
+import { deriveAuthorityKeypair } from '@/core/crypto/identity';
+import { deriveAuthorityKeyProofMessage } from '@/core/crypto/signed-messages';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 const MASTER_SEED = new Uint8Array(16);

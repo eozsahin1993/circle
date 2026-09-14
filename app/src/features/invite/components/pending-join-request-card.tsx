@@ -1,12 +1,12 @@
 import { StyleSheet, View } from 'react-native';
 
-import { Avatar } from '@/core/components/avatar';
-import { PrimaryButton } from '@/core/components/primary-button';
-import { SecondaryButton } from '@/core/components/secondary-button';
-import { ThemedText } from '@/core/theme/themed-text';
-import { ThemedView } from '@/core/theme/themed-view';
-import { Radius } from '@/core/theme/tokens';
-import { useTints } from '@/core/theme/use-theme';
+import { Avatar } from '@/ui/components/avatar/avatar';
+import { PrimaryButton } from '@/ui/components/buttons/primary-button';
+import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
+import { ThemedText } from '@/ui/theme/themed-text';
+import { ThemedView } from '@/ui/theme/themed-view';
+import { Radius } from '@/ui/theme/tokens';
+import { useTints } from '@/ui/theme/hooks/use-theme';
 import type { PendingRequest } from '@/features/invite/usecases/invite-to-circle';
 
 function formatAgo(ms: number): string {

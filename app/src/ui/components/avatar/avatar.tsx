@@ -2,10 +2,10 @@ import { Image } from 'expo-image';
 import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { AvatarInk, Fonts, PhotoSlotLight } from '@/core/theme/tokens';
-import { useAppSettings } from '@/core/theme/use-app-settings';
-import { useTheme, useTints } from '@/core/theme/use-theme';
-import { avatarTintFor, initialsOf } from '@/core/utils/initials';
+import { AvatarInk, Fonts, PhotoSlotLight } from '@/ui/theme/tokens';
+import { useAppSettings } from '@/ui/theme/hooks/use-app-settings';
+import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
+import { avatarTintFor, initialsOf } from '@/ui/components/avatar/initials';
 
 export type AvatarProps = {
   size?: number;

@@ -31,7 +31,7 @@ import TriangleAlert from 'lucide-react-native/icons/triangle-alert';
 import UserX from 'lucide-react-native/icons/user-x';
 import X from 'lucide-react-native/icons/x';
 
-import type { IconGlyph } from '@/core/components/icon';
+import type { IconGlyph } from '@/core/utils/icon-glyph';
 
 export const Colors = {
   dark: {
