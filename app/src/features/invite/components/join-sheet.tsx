@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Avatar } from '@/components/avatar';
-import { BottomSheet } from '@/components/bottom-sheet';
-import { PrimaryButton } from '@/components/primary-button';
-import { ThemedText } from '@/theme/themed-text';
-import { Spacing } from '@/theme/tokens';
+import { Avatar } from '@/core/components/avatar';
+import { BottomSheet } from '@/core/components/bottom-sheet';
+import { PrimaryButton } from '@/core/components/primary-button';
+import { ThemedText } from '@/core/theme/themed-text';
+import { Spacing } from '@/core/theme/tokens';
 import { findPendingJoinRequestForInvite, previewInvite, requestToJoin } from '@/features/invite/usecases/join-circle';
-import { bytesToDataUri, parsePictureThumbnail } from '@/services/image';
-import { showError } from '@/services/messages';
+import { bytesToDataUri, parsePictureThumbnail } from '@/core/photo/image';
+import { showError } from '@/core/services/messages';
 
 /**
  * The whole join flow, in one sheet over the circle list.

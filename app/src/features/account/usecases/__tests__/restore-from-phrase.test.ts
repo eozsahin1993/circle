@@ -1,9 +1,9 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/services/mailbox-relay');
-jest.mock('@/services/relay');
-jest.mock('@/services/image');
-jest.mock('@/sync/sync-circles');
+jest.mock('@/core/services/mailbox-relay');
+jest.mock('@/core/services/relay');
+jest.mock('@/core/photo/image');
+jest.mock('@/core/sync/sync-circles');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
@@ -11,10 +11,10 @@ import { getCircleBySyncId, getProfile, initDatabase, listCircles, saveProfile }
 import { fetchAccountManifest } from '@/features/account/usecases/account-manifest';
 import { restoreFromPhrase } from '@/features/account/usecases/restore-from-phrase';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import { resetLocalDataForTesting } from '@/dev/dev-reset';
-import { deriveCircleIdentity, generateSeedPhrase, seedPhraseToEntropy } from '@/services/crypto';
-import { getCircleKeyMap, getMasterSeed, saveMasterSeed } from '@/services/keystore';
-import { appendEntry, bootstrapCircle } from '@/services/relay';
+import { resetLocalDataForTesting } from '@/features/dev/dev-reset';
+import { deriveCircleIdentity, generateSeedPhrase, seedPhraseToEntropy } from '@/core/crypto';
+import { getCircleKeyMap, getMasterSeed, saveMasterSeed } from '@/core/services/keystore';
+import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 const CONTENT_KEY = new Uint8Array(32).fill(7);
 

@@ -2,14 +2,14 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { ScreenHeader } from '@/components/navbar/screen-header';
-import { PrimaryButton } from '@/components/primary-button';
-import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Spacing } from '@/theme/tokens';
+import { ScreenHeader } from '@/core/components/navbar/screen-header';
+import { PrimaryButton } from '@/core/components/primary-button';
+import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Spacing } from '@/core/theme/tokens';
 import { abandonPriorAccount } from '@/features/account/usecases/onboarding';
-import { showError } from '@/services/messages';
+import { showError } from '@/core/services/messages';
 
 /**
  * Confirms giving up on an account this device can't read.

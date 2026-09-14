@@ -3,9 +3,9 @@ import { StyleSheet } from 'react-native';
 
 import type { FeedRow, FeedRows } from '@/features/feed/components/rows';
 import { PendingJoinRequestCard } from '@/features/invite/components/pending-join-request-card';
-import { ThemedView } from '@/theme/themed-view';
-import { Spacing } from '@/theme/tokens';
-import { showError } from '@/services/messages';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Spacing } from '@/core/theme/tokens';
+import { showError } from '@/core/services/messages';
 import {
   approveJoinRequest,
   denyJoinRequest,

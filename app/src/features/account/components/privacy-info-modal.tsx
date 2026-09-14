@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Animated, Dimensions, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
 
-import { SecondaryButton } from '@/components/secondary-button';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Radius, Spacing } from '@/theme/tokens';
-import { useTheme } from '@/theme/use-theme';
+import { SecondaryButton } from '@/core/components/secondary-button';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Radius, Spacing } from '@/core/theme/tokens';
+import { useTheme } from '@/core/theme/use-theme';
 
 export type PrivacyInfoModalProps = {
   visible: boolean;

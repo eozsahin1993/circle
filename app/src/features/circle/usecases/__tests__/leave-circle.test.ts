@@ -1,4 +1,4 @@
-jest.mock('@/services/relay');
+jest.mock('@/core/services/relay');
 jest.mock('@/features/account/usecases/account-manifest');
 
 import { bytesToHex } from '@noble/curves/utils.js';
@@ -22,10 +22,10 @@ import { db } from '@/data/db/connection';
 import { circleMembers } from '@/data/db/schema';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { finishDeparture, finishPendingDepartures, leaveCircle } from '@/features/circle/usecases/leave-circle';
-import { buildAndEncryptLogEntry } from '@/sync/log-entry';
-import { deriveAuthorityKeyProofMessage, generateIdentity, generateUUID, sign } from '@/services/crypto';
-import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
-import { appendEntry, bootstrapCircle, changeAuthority, deleteCircleOnRelay, fetchEntries } from '@/services/relay';
+import { buildAndEncryptLogEntry } from '@/core/sync/log-entry';
+import { deriveAuthorityKeyProofMessage, generateIdentity, generateUUID, sign } from '@/core/crypto';
+import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
+import { appendEntry, bootstrapCircle, changeAuthority, deleteCircleOnRelay, fetchEntries } from '@/core/services/relay';
 
 beforeAll(async () => {
   await initDatabase();

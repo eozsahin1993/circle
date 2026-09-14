@@ -1,18 +1,18 @@
-jest.mock('@/services/relay');
+jest.mock('@/core/services/relay');
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/services/image');
+jest.mock('@/core/photo/image');
 
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
-import { decrypt, generateUUID, verify } from '@/services/crypto';
-import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
+import { decrypt, generateUUID, verify } from '@/core/crypto';
+import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
 import { getCircleMembers, getPendingOutboxEntries, initDatabase, insertCircle } from '@/data/db';
 import { broadcastProfileUpdate } from '@/features/circle/usecases/broadcast-profile-update';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { compressToThumbnail } from '@/services/image';
-import { appendEntry, bootstrapCircle } from '@/services/relay';
+import { compressToThumbnail } from '@/core/photo/image';
+import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 // The real compressToThumbnail runs actual image-decoding native modules —
 // tests pass plain byte arrays as "pictures", not real image files, so it's

@@ -13,16 +13,16 @@ import {
   generateUUID,
   hashWriteToken,
   sealToPublicKey,
-} from '@/services/crypto';
+} from '@/core/crypto';
 import { getProfile, insertCircle, MemberRoles, recordMemberAddedLocally } from '@/data/db';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
-import { compressToThumbnail } from '@/services/image';
-import { writeCoverFile } from '@/services/photo-cache';
-import { bootstrapCircle, appendEntry } from '@/services/relay';
-import { defaultCircleMask } from '@/features/push/usecases/push-preferences';
-import { ensureCircleNotificationChannel } from '@/services/push-notifications/channels';
-import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap } from '@/services/keystore';
+import { compressToThumbnail } from '@/core/photo/image';
+import { writeCoverFile } from '@/core/photo/photo-cache';
+import { bootstrapCircle, appendEntry } from '@/core/services/relay';
+import { defaultCircleMask } from '@/features/push-notifications/usecases/push-preferences';
+import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
+import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap } from '@/core/services/keystore';
 
 export type CreateCircleInput = {
   name: string;

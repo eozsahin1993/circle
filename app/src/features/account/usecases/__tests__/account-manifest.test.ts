@@ -1,11 +1,11 @@
-jest.mock('@/features/account/manifest-relay');
-jest.mock('@/services/image');
+jest.mock('@/features/account/services/manifest-relay');
+jest.mock('@/core/photo/image');
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { initDatabase, insertCircle, markCircleLeft, saveProfile } from '@/data/db';
-import { decrypt, deriveManifestKey, encryptJSON } from '@/services/crypto';
+import { decrypt, deriveManifestKey, encryptJSON } from '@/core/crypto';
 import {
   allowForeignManifestOverwrite,
   fetchAccountManifest,
@@ -17,9 +17,9 @@ import {
   type RecoverableCircle,
   type ManifestPayload,
 } from '@/features/account/usecases/account-manifest';
-import { resetLocalDataForTesting } from '@/dev/dev-reset';
-import { getManifest, ManifestConflictError, putManifest } from '@/features/account/manifest-relay';
-import { addCircleKeyVersion, deleteMasterSeed, saveCircleKeyMap, saveMasterSeed } from '@/services/keystore';
+import { resetLocalDataForTesting } from '@/features/dev/dev-reset';
+import { getManifest, ManifestConflictError, putManifest } from '@/features/account/services/manifest-relay';
+import { addCircleKeyVersion, deleteMasterSeed, saveCircleKeyMap, saveMasterSeed } from '@/core/services/keystore';
 
 beforeAll(() => initDatabase());
 // resetAllMocks, not clearAllMocks — a mockResolvedValue left over from a

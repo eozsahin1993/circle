@@ -1,11 +1,11 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
-import { BottomSheet } from '@/components/bottom-sheet';
-import { PrimaryButton } from '@/components/primary-button';
-import { ThemedText } from '@/theme/themed-text';
-import { Colors, Radius, Spacing } from '@/theme/tokens';
-import { useTints } from '@/theme/use-theme';
+import { BottomSheet } from '@/core/components/bottom-sheet';
+import { PrimaryButton } from '@/core/components/primary-button';
+import { ThemedText } from '@/core/theme/themed-text';
+import { Colors, Radius, Spacing } from '@/core/theme/tokens';
+import { useTints } from '@/core/theme/use-theme';
 
 export type InviteSheetProps = {
   visible: boolean;

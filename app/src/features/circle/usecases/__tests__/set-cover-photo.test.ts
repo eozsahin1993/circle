@@ -1,13 +1,13 @@
-jest.mock('@/services/relay');
+jest.mock('@/core/services/relay');
 
 import { hexToBytes } from '@noble/curves/utils.js';
 
-import { decrypt, deriveAuthorityKeypair, deriveCoverPhotoUploadMessage, deriveWriteToken, hashBytes, verify } from '@/services/crypto';
-import { getCurrentContentKey, getMasterSeed, saveMasterSeed } from '@/services/keystore';
+import { decrypt, deriveAuthorityKeypair, deriveCoverPhotoUploadMessage, deriveWriteToken, hashBytes, verify } from '@/core/crypto';
+import { getCurrentContentKey, getMasterSeed, saveMasterSeed } from '@/core/services/keystore';
 import { getCircle, initDatabase } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { setCoverPhoto } from '@/features/circle/usecases/set-cover-photo';
-import { appendEntry, getCoverPhotoUploadTarget, uploadBlob } from '@/services/relay';
+import { appendEntry, getCoverPhotoUploadTarget, uploadBlob } from '@/core/services/relay';
 
 const uploadTarget = { url: 'https://s3/bucket', fields: { key: 'sync-a/cover' } };
 

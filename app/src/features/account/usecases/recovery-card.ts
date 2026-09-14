@@ -4,8 +4,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
-import { seedPhraseToEntropy } from '@/services/crypto';
-import { getMasterSeed } from '@/services/keystore';
+import { seedPhraseToEntropy } from '@/core/crypto';
+import { getMasterSeed } from '@/core/services/keystore';
 
 const PHRASE_LENGTH = 12;
 

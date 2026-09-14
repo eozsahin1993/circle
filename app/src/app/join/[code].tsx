@@ -2,8 +2,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
 
 import { getProfile } from '@/data/db';
-import { getAuthToken } from '@/services/keystore';
-import { savePendingInviteCode } from '@/features/invite/pending-invite';
+import { getAuthToken } from '@/core/services/keystore';
+import { savePendingInviteCode } from '@/features/invite/services/pending-invite';
 
 /**
  * Where an invite link lands, and nothing more: it parks the code and

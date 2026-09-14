@@ -1,7 +1,7 @@
 import Svg, { Circle, Rect } from 'react-native-svg';
 import { View } from 'react-native';
 
-import { useTheme } from '@/theme/use-theme';
+import { useTheme } from '@/core/theme/use-theme';
 
 /** Decorative mark for the "no circles yet" state — two fanned cards inside a loose ring. */
 export function EmptyCirclesIcon({ size = 160 }: { size?: number }) {

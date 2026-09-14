@@ -1,7 +1,7 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { getCircle } from '@/data/db';
-import { getCircleKeyMap } from '@/services/keystore';
+import { getCircleKeyMap } from '@/core/services/keystore';
 
 /**
  * Formats this circle's syncId and full content-key history as

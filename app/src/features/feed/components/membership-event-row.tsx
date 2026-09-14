@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { ThemedText } from '@/theme/themed-text';
-import { Spacing } from '@/theme/tokens';
-import { useTheme } from '@/theme/use-theme';
+import { ThemedText } from '@/core/theme/themed-text';
+import { Spacing } from '@/core/theme/tokens';
+import { useTheme } from '@/core/theme/use-theme';
 
 export type MembershipEventItem = {
   id: string;

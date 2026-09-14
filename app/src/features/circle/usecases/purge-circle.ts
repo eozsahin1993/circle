@@ -1,6 +1,6 @@
 import { deleteCircle } from '@/data/db';
-import { deleteCirclePhotoFiles } from '@/services/photo-cache';
-import { deleteCircleKeys } from '@/services/keystore';
+import { deleteCirclePhotoFiles } from '@/core/photo/photo-cache';
+import { deleteCircleKeys } from '@/core/services/keystore';
 
 /**
  * Removes every trace of a circle from this device: rows (which take the

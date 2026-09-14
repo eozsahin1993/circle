@@ -1,6 +1,6 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { circlePushPreferences, type CirclePushPreferences } from '@/features/push/usecases/push-preferences';
+import { circlePushPreferences, type CirclePushPreferences } from '@/features/push-notifications/usecases/push-preferences';
 
 import {
   getCircleMembers,
@@ -11,7 +11,7 @@ import {
   type Member,
 } from '@/data/db';
 import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
-import { getCircleIdentity } from '@/services/keystore';
+import { getCircleIdentity } from '@/core/services/keystore';
 
 export type CircleDetails = {
   circle: CircleListRow | null;

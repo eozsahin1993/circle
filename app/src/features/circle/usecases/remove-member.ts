@@ -2,7 +2,7 @@ import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 import { getCircle, getCircleMembers, recordMemberRemovedLocally } from '@/data/db';
 import { requireAdminPublicKey } from '@/features/invite/usecases/invite-to-circle';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import {
   deriveAuthorityKeypair,
   deriveRotateMessage,
@@ -12,10 +12,10 @@ import {
   hashWriteToken,
   sealToPublicKey,
   sign,
-} from '@/services/crypto';
-import { addCircleKeyVersion, getCircleIdentity, getCurrentContentKey, getMasterSeed } from '@/services/keystore';
-import { appendEntry, rotateLog } from '@/services/relay';
-import { pullMeta } from '@/sync/pull-log';
+} from '@/core/crypto';
+import { addCircleKeyVersion, getCircleIdentity, getCurrentContentKey, getMasterSeed } from '@/core/services/keystore';
+import { appendEntry, rotateLog } from '@/core/services/relay';
+import { pullMeta } from '@/core/sync/pull-log';
 
 /**
  * Removes a member and rotates the content key — admin only. Roster

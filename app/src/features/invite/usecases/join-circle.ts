@@ -17,7 +17,7 @@ import {
   generateUUID,
   openSealedBox,
   verify,
-} from '@/services/crypto';
+} from '@/core/crypto';
 import {
   deletePendingJoinRequest,
   getAllPendingJoinRequests,
@@ -30,21 +30,21 @@ import {
   type PendingJoinRequest,
 } from '@/data/db';
 import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinRequestPayload } from '@/features/invite/usecases/invite-payloads';
-import { writeCoverFile } from '@/services/photo-cache';
-import { defaultCircleMask } from '@/features/push/usecases/push-preferences';
-import { ensureCircleNotificationChannel } from '@/services/push-notifications/channels';
+import { writeCoverFile } from '@/core/photo/photo-cache';
+import { defaultCircleMask } from '@/features/push-notifications/usecases/push-preferences';
+import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
-import { compressToThumbnail } from '@/services/image';
-import { deletePendingJoinKeypair, getMasterSeed, getPendingJoinKeypair, saveCircleIdentity, saveCircleKeyMap, savePendingJoinKeypair } from '@/services/keystore';
+import { compressToThumbnail } from '@/core/photo/image';
+import { deletePendingJoinKeypair, getMasterSeed, getPendingJoinKeypair, saveCircleIdentity, saveCircleKeyMap, savePendingJoinKeypair } from '@/core/services/keystore';
 import {
   JoinRequestGoneError,
   deleteJoinRequest,
-  getInvitePreview,
   getJoinRequestApproval,
   putJoinRequest,
-} from '@/services/mailbox-relay';
-import { getBlob } from '@/services/relay';
+} from '@/core/services/mailbox-relay';
+import { getInvitePreview } from '@/features/invite/services/invite-preview-relay';
+import { getBlob } from '@/core/services/relay';
 
 /**
  * Fetches and decrypts the circle's cover photo, if it has one — the

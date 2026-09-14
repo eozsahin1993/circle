@@ -7,10 +7,10 @@ import {
   type NewOutboxEntry,
 } from '@/data/db';
 import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { generateUUID } from '@/services/crypto';
-import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
+import { generateUUID } from '@/core/crypto';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore';
 
 /**
  * Adds a post to its circle's album, or takes it back out, for everyone.

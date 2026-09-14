@@ -2,13 +2,13 @@ import { Buffer } from 'buffer';
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { generateUUID } from '@/services/crypto';
+import { generateUUID } from '@/core/crypto';
 import { insertOutboxEntry, listCircles, OutboxStatuses, updateMemberProfile } from '@/data/db';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { compressToThumbnail } from '@/services/image';
-import { showError } from '@/services/messages';
-import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
+import { compressToThumbnail } from '@/core/photo/image';
+import { showError } from '@/core/services/messages';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore';
 
 /**
  * Queues one circle's `profile_update` and applies it to this device's own

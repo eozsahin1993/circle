@@ -1,34 +1,34 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/services/mailbox-relay');
-jest.mock('@/services/image');
-jest.mock('@/services/relay');
+jest.mock('@/core/services/mailbox-relay');
+jest.mock('@/features/invite/services/invite-preview-relay');
+jest.mock('@/core/photo/image');
+jest.mock('@/core/services/relay');
 
 import { Buffer } from 'buffer';
 
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 import { getCircle, getCircleMembers, getPendingJoinRequest, initDatabase, saveProfile } from '@/data/db';
-import { getPendingJoinKeypair } from '@/services/keystore';
+import { getPendingJoinKeypair } from '@/core/services/keystore';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { approveJoinRequest, getOrCreateInvite } from '@/features/invite/usecases/invite-to-circle';
 import type { JoinApprovalEnvelope, JoinApprovalPayload, JoinRequestPayload } from '@/features/invite/usecases/invite-payloads';
 import { cancelPendingJoinRequest, checkPendingJoinRequest, requestToJoin } from '@/features/invite/usecases/join-circle';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { decrypt, deriveInviteTag, deriveJoinRequestKey, encrypt, generateIdentity, sealToPublicKey, sign } from '@/services/crypto';
-import { compressToThumbnail } from '@/services/image';
+import { decrypt, deriveInviteTag, deriveJoinRequestKey, encrypt, generateIdentity, sealToPublicKey, sign } from '@/core/crypto';
+import { compressToThumbnail } from '@/core/photo/image';
 import {
-  getInvitePreview,
   JoinRequestGoneError,
   deleteJoinRequest,
   getJoinRequestApproval,
   listJoinRequests,
-  putInvitePreview,
   putJoinApproval,
   putJoinRequest,
-} from '@/services/mailbox-relay';
-import { getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
-import { appendEntry, bootstrapCircle, fetchEntries, getBlob } from '@/services/relay';
+} from '@/core/services/mailbox-relay';
+import { getInvitePreview, putInvitePreview } from '@/features/invite/services/invite-preview-relay';
+import { getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
+import { appendEntry, bootstrapCircle, fetchEntries, getBlob } from '@/core/services/relay';
 
 beforeAll(async () => {
   await initDatabase();

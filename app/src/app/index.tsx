@@ -4,18 +4,18 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { PhotoPlaceholder } from '@/components/photo-placeholder';
+import { PhotoPlaceholder } from '@/core/components/photo-placeholder';
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
 import { AppleSignInButton, GoogleSignInButton } from '@/features/account/components/social-sign-in-button';
-import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Spacing } from '@/theme/tokens';
+import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Spacing } from '@/core/theme/tokens';
 import { getProfile } from '@/data/db';
 import { hasUnreadableAccountManifest, recordSignInProviderBestEffort } from '@/features/account/usecases/account-manifest';
 import { signInWithApple, signInWithGoogle } from '@/features/account/usecases/sign-in';
-import { getAuthToken } from '@/services/keystore';
-import { goPostAuth } from '@/features/invite/pending-invite';
+import { getAuthToken } from '@/core/services/keystore';
+import { goPostAuth } from '@/features/invite/services/pending-invite';
 
 type Provider = 'apple' | 'google';
 

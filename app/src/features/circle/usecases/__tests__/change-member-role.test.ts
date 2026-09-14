@@ -1,15 +1,15 @@
 jest.mock('@/features/circle/usecases/sync-circle');
-jest.mock('@/services/relay');
+jest.mock('@/core/services/relay');
 
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
-import { decrypt, generateIdentity, generateUUID, sign, verify, deriveAuthorityKeyProofMessage } from '@/services/crypto';
-import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
+import { decrypt, generateIdentity, generateUUID, sign, verify, deriveAuthorityKeyProofMessage } from '@/core/crypto';
+import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
 import { getCircleMembers, getPendingOutboxEntries, initDatabase, insertMember, MemberRoles } from '@/data/db';
 import { setMemberRole } from '@/features/circle/usecases/change-member-role';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { appendEntry, bootstrapCircle } from '@/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 beforeAll(async () => {
   await initDatabase();

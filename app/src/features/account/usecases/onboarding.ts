@@ -1,11 +1,11 @@
-import { generateSeedPhrase, seedPhraseToEntropy } from '@/services/crypto';
+import { generateSeedPhrase, seedPhraseToEntropy } from '@/core/crypto';
 import { saveProfile } from '@/data/db';
 import {
   allowForeignManifestOverwrite,
   recordInManifestBestEffort,
 } from '@/features/account/usecases/account-manifest';
 import { broadcastProfileUpdate } from '@/features/circle/usecases/broadcast-profile-update';
-import { getMasterSeed, saveMasterSeed } from '@/services/keystore';
+import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore';
 
 export type ProfileInput = {
   name: string;

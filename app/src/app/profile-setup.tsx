@@ -1,21 +1,21 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
 
-import { Avatar } from '@/components/avatar';
-import { KeyboardAvoider } from '@/components/keyboard-avoider';
-import { PrimaryButton } from '@/components/primary-button';
-import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Fonts, Radius, Spacing } from '@/theme/tokens';
+import { Avatar } from '@/core/components/avatar';
+import { KeyboardAvoider } from '@/core/components/keyboard-avoider';
+import { PrimaryButton } from '@/core/components/primary-button';
+import { ScreenHeader } from '@/core/components/navbar/screen-header';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Fonts, Radius, Spacing } from '@/core/theme/tokens';
 import { getProfile } from '@/data/db';
-import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/services/image';
+import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/core/photo/image';
 import { completeProfileSetup, ensureMasterSeed } from '@/features/account/usecases/onboarding';
-import { primeOwnColorSeed } from '@/theme/use-own-color-seed';
-import { useTheme, useTints } from '@/theme/use-theme';
-import { goPostAuth } from '@/features/invite/pending-invite';
+import { primeOwnColorSeed } from '@/core/theme/use-own-color-seed';
+import { useTheme, useTints } from '@/core/theme/use-theme';
+import { goPostAuth } from '@/features/invite/services/pending-invite';
 
 export default function ProfileSetupScreen() {
   const theme = useTheme();

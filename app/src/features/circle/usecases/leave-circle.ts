@@ -11,15 +11,15 @@ import {
   OutboxStatuses,
   recordMemberRemovedLocally,
 } from '@/data/db';
-import { removeCircleNotificationChannel } from '@/services/push-notifications/channels';
+import { removeCircleNotificationChannel } from '@/features/push-notifications/services/channels';
 import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
 import { queueDepartingHandover } from '@/features/circle/usecases/authority';
 import { purgeCircleLocally } from '@/features/circle/usecases/purge-circle';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { generateUUID } from '@/services/crypto';
-import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
-import { pullMeta } from '@/sync/pull-log';
+import { generateUUID } from '@/core/crypto';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore';
+import { pullMeta } from '@/core/sync/pull-log';
 
 /**
  * Leaves a circle without deleting it locally. The rows stay, but nothing

@@ -3,13 +3,13 @@ import { Buffer } from 'buffer';
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { getProfile, listCircleAddresses, listLeftCircles, type Profile } from '@/data/db';
-import { decrypt, deriveManifestKey, encryptJSON } from '@/services/crypto';
+import { decrypt, deriveManifestKey, encryptJSON } from '@/core/crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { compressToThumbnail } from '@/services/image';
-import { getCircleKeyMap, getMasterSeed } from '@/services/keystore';
+import { compressToThumbnail } from '@/core/photo/image';
+import { getCircleKeyMap, getMasterSeed } from '@/core/services/keystore';
 import { mergeManifest } from '@/features/account/usecases/manifest-merge';
-import { getManifest, ManifestConflictError, putManifest } from '@/features/account/manifest-relay';
+import { getManifest, ManifestConflictError, putManifest } from '@/features/account/services/manifest-relay';
 
 /** Everything a phrase alone has to rebuild an account from. Every field optional: there's no schema version to gate on. */
 export type ManifestPayload = {

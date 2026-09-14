@@ -2,15 +2,15 @@ import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
 
-import { missingPhotoFor, PhotoPlaceholder } from '@/components/photo-placeholder';
-import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Spacing } from '@/theme/tokens';
+import { missingPhotoFor, PhotoPlaceholder } from '@/core/components/photo-placeholder';
+import { ScreenHeader } from '@/core/components/navbar/screen-header';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Spacing } from '@/core/theme/tokens';
 import { getAlbumPhotos, getAttachment, getCircleSummary, type AlbumPhoto } from '@/data/db';
-import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
+import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
 
 /** Photos per row. Four fits a month on a screen without shrinking faces past recognising. */
 const COLUMNS = 4;

@@ -1,6 +1,6 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/services/relay');
+jest.mock('@/core/services/relay');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
@@ -8,8 +8,8 @@ import { getCircle, initDatabase } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { buildDebugKeysetFlags } from '@/features/circle/usecases/debug-keyset';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { getCircleKeyMap, saveMasterSeed } from '@/services/keystore';
-import { appendEntry, bootstrapCircle } from '@/services/relay';
+import { getCircleKeyMap, saveMasterSeed } from '@/core/services/keystore';
+import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 beforeAll(async () => {
   await initDatabase();

@@ -3,18 +3,18 @@ import { useMemo } from 'react';
 
 import type { FeedRow, FeedRows } from '@/features/feed/components/rows';
 import { type CommentItem } from '@/features/post/components/post-comments';
-import { missingPhotoFor } from '@/components/photo-placeholder';
+import { missingPhotoFor } from '@/core/components/photo-placeholder';
 import { PostCard, type Post } from '@/features/post/components/post-card';
-import { Spacing } from '@/theme/tokens';
-import { showError } from '@/services/messages';
+import { Spacing } from '@/core/theme/tokens';
+import { showError } from '@/core/services/messages';
 import type { CommentSummary, CommentWithAuthor, Profile } from '@/data/db';
-import type { FeedPostView } from '@/features/feed/circle-feed';
+import type { FeedPostView } from '@/features/feed/usecases/circle-feed';
 import { getCommentSummaries, markPostViewed } from '@/data/db';
 import { addComment } from '@/features/post/usecases/comment-on-post';
 import { getReactionsForPost, toggleReaction } from '@/features/post/usecases/react-to-post';
 import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
-import { bytesToDataUri } from '@/services/image';
-import { formatRelative, formatTimestamp } from '@/utils/time';
+import { bytesToDataUri } from '@/core/photo/image';
+import { formatRelative, formatTimestamp } from '@/core/utils/time';
 
 /**
  * What this kind can't work out for itself. The feed lives in whoever

@@ -1,12 +1,12 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, AppState, Pressable, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
 
-import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Spacing } from '@/theme/tokens';
+import { ScreenHeader } from '@/core/components/navbar/screen-header';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Spacing } from '@/core/theme/tokens';
 import { getPendingJoinRequest } from '@/data/db';
 import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/invite/usecases/join-circle';
 

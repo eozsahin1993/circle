@@ -10,10 +10,10 @@ import {
   type MemberRole,
   type OutboxAuthorityAction,
 } from '@/data/db';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { AuthorityActions, generateUUID } from '@/services/crypto';
-import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
+import { AuthorityActions, generateUUID } from '@/core/crypto';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore';
 
 /**
  * The relay's authority set decides who may rotate a key, set a cover

@@ -1,10 +1,10 @@
-import { deriveAuthorityKeypair, deriveCoverPhotoUploadMessage, deriveWriteToken, encrypt, generateUUID, hashBytes, sign } from '@/services/crypto';
+import { deriveAuthorityKeypair, deriveCoverPhotoUploadMessage, deriveWriteToken, encrypt, generateUUID, hashBytes, sign } from '@/core/crypto';
 import { getCircle, updateCirclePicture } from '@/data/db';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
-import { getCircleIdentity, getCurrentContentKey, getMasterSeed } from '@/services/keystore';
-import { writeCoverFile } from '@/services/photo-cache';
-import { appendEntry, getCoverPhotoUploadTarget, uploadBlob } from '@/services/relay';
+import { getCircleIdentity, getCurrentContentKey, getMasterSeed } from '@/core/services/keystore';
+import { writeCoverFile } from '@/core/photo/photo-cache';
+import { appendEntry, getCoverPhotoUploadTarget, uploadBlob } from '@/core/services/relay';
 
 /**
  * Sets (or replaces) a circle's cover photo — admin-only. Two relay calls,

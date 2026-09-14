@@ -1,5 +1,5 @@
 jest.mock('@/features/circle/usecases/sync-circle');
-jest.mock('@/services/relay');
+jest.mock('@/core/services/relay');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
@@ -13,9 +13,9 @@ import {
   generateIdentity,
   sign,
   verify,
-} from '@/services/crypto';
-import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
-import { appendEntry, bootstrapCircle } from '@/services/relay';
+} from '@/core/crypto';
+import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
+import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 const MASTER_SEED = new Uint8Array(16);
 

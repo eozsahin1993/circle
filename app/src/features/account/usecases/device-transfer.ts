@@ -11,14 +11,14 @@ import {
   generateInviteCode,
   openSealedBox,
   sealToPublicKey,
-} from '@/services/crypto';
+} from '@/core/crypto';
 import {
   deleteJoinRequest,
   getJoinRequestApproval,
   listJoinRequests,
   putJoinApproval,
   putJoinRequest,
-} from '@/services/mailbox-relay';
+} from '@/core/services/mailbox-relay';
 import {
   getCircleKeyMap,
   getCircleIdentity,
@@ -26,8 +26,8 @@ import {
   saveCircleIdentity,
   saveCircleKeyMap,
   saveMasterSeed,
-} from '@/services/keystore';
-import type { Keypair } from '@/services/crypto';
+} from '@/core/services/keystore';
+import type { Keypair } from '@/core/crypto';
 
 /**
  * Moving an account onto a second phone: the invite handshake with the

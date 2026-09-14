@@ -1,8 +1,8 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/services/mailbox-relay');
-jest.mock('@/services/relay');
-jest.mock('@/services/image');
+jest.mock('@/core/services/mailbox-relay');
+jest.mock('@/core/services/relay');
+jest.mock('@/core/photo/image');
 
 import { Buffer } from 'buffer';
 import { bytesToHex } from '@noble/curves/utils.js';
@@ -15,7 +15,7 @@ import {
   startDeviceTransfer,
 } from '@/features/account/usecases/device-transfer';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import { deriveDeviceTransferTag, generateEphemeralKeypair, openSealedBox } from '@/services/crypto';
+import { deriveDeviceTransferTag, generateEphemeralKeypair, openSealedBox } from '@/core/crypto';
 import {
   addCircleKeyVersion,
   deleteCircleKeys,
@@ -23,17 +23,17 @@ import {
   getCircleKeyMap,
   getMasterSeed,
   saveMasterSeed,
-} from '@/services/keystore';
+} from '@/core/services/keystore';
 import {
   deleteJoinRequest,
   getJoinRequestApproval,
   listJoinRequests,
   putJoinApproval,
   putJoinRequest,
-} from '@/services/mailbox-relay';
-import { appendEntry, bootstrapCircle } from '@/services/relay';
-import { compressToThumbnail } from '@/services/image';
-import { resetLocalDataForTesting } from '@/dev/dev-reset';
+} from '@/core/services/mailbox-relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { compressToThumbnail } from '@/core/photo/image';
+import { resetLocalDataForTesting } from '@/features/dev/dev-reset';
 
 const SEED = new Uint8Array(16).fill(7);
 

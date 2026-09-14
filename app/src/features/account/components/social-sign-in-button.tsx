@@ -3,10 +3,10 @@ import { Pressable, View, StyleSheet, type PressableProps, type StyleProp, type 
 import Svg, { Path } from 'react-native-svg';
 import type { ReactNode } from 'react';
 
-import { ThemedText } from '@/theme/themed-text';
-import { ButtonHeight, Radius } from '@/theme/tokens';
-import { useAppSettings } from '@/theme/use-app-settings';
-import { useTheme, useTints } from '@/theme/use-theme';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ButtonHeight, Radius } from '@/core/theme/tokens';
+import { useAppSettings } from '@/core/theme/use-app-settings';
+import { useTheme, useTints } from '@/core/theme/use-theme';
 
 /** Google's standard four-color "G" mark — required as-is, not recolored to match app theme. */
 function GoogleLogo() {

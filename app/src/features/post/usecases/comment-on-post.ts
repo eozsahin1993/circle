@@ -1,10 +1,10 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { getPost, insertCommentAndEnqueue, OutboxStatuses, type Comment, type NewOutboxEntry } from '@/data/db';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { generateUUID } from '@/services/crypto';
-import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
+import { generateUUID } from '@/core/crypto';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore';
 
 /**
  * Adds a comment as this device's own circle identity, and queues it for

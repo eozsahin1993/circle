@@ -1,10 +1,10 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Icon } from '@/components/icon';
-import { ThemedText } from '@/theme/themed-text';
-import { Icons, Radius } from '@/theme/tokens';
-import { useTheme, useTints } from '@/theme/use-theme';
-import { formatAgo } from '@/utils/time';
+import { Icon } from '@/core/components/icon';
+import { ThemedText } from '@/core/theme/themed-text';
+import { Icons, Radius } from '@/core/theme/tokens';
+import { useTheme, useTints } from '@/core/theme/use-theme';
+import { formatAgo } from '@/core/utils/time';
 
 export type PendingCircleCardProps = {
   circleName: string;

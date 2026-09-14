@@ -1,10 +1,10 @@
-import { deriveWriteToken, generateUUID } from '@/services/crypto';
+import { deriveWriteToken, generateUUID } from '@/core/crypto';
 import { getCircle, updateCircleName } from '@/data/db';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
-import { ensureCircleNotificationChannel } from '@/services/push-notifications/channels';
-import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
-import { appendEntry } from '@/services/relay';
+import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore';
+import { appendEntry } from '@/core/services/relay';
 
 /**
  * Renames a circle for everyone — admin only, and the same shape as

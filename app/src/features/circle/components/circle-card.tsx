@@ -1,10 +1,10 @@
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { PhotoPlaceholder } from '@/components/photo-placeholder';
-import { ThemedText } from '@/theme/themed-text';
-import { Radius } from '@/theme/tokens';
-import { useTints } from '@/theme/use-theme';
+import { PhotoPlaceholder } from '@/core/components/photo-placeholder';
+import { ThemedText } from '@/core/theme/themed-text';
+import { Radius } from '@/core/theme/tokens';
+import { useTints } from '@/core/theme/use-theme';
 
 export type CircleCardProps = {
   name: string;

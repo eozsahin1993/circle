@@ -2,9 +2,9 @@ import { useMemo } from 'react';
 
 import type { FeedRow, FeedRows } from '@/features/feed/components/rows';
 import { DayDivider, MembershipEventGroupRow, type MembershipEventGroupItem } from '@/features/feed/components/membership-event-row';
-import { Spacing } from '@/theme/tokens';
+import { Spacing } from '@/core/theme/tokens';
 import type { MemberEvent } from '@/data/db';
-import { groupMemberEvents, type MembershipEventGroup } from '@/features/feed/group-member-events';
+import { groupMemberEvents, type MembershipEventGroup } from '@/features/feed/usecases/group-member-events';
 
 /**
  * Someone joined, left, or changed role — grouped into blocks by day (a

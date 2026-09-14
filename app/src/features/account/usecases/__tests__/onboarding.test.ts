@@ -1,17 +1,17 @@
-jest.mock('@/services/relay');
+jest.mock('@/core/services/relay');
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/services/image');
+jest.mock('@/core/photo/image');
 
 import { getCircleMembers, getPendingOutboxEntries, initDatabase } from '@/data/db';
 import { getProfile } from '@/data/db/profile';
-import { getCircleIdentity, getMasterSeed, saveMasterSeed } from '@/services/keystore';
+import { getCircleIdentity, getMasterSeed, saveMasterSeed } from '@/core/services/keystore';
 import { completeProfileSetup } from '@/features/account/usecases/onboarding';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import { EntryTypes } from '@/sync/log-entry';
+import { EntryTypes } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { compressToThumbnail } from '@/services/image';
-import { appendEntry, bootstrapCircle } from '@/services/relay';
+import { compressToThumbnail } from '@/core/photo/image';
+import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 import { bytesToHex } from '@noble/curves/utils.js';
 
 // Pictures here are plain byte arrays rather than real images, so the

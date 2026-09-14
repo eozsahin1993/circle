@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
-import { Avatar } from '@/components/avatar';
-import { Icon } from '@/components/icon';
-import { ThemedText } from '@/theme/themed-text';
-import { Icons, Radius, Type } from '@/theme/tokens';
-import { useOwnColorSeed } from '@/theme/use-own-color-seed';
-import { useTheme, useTints } from '@/theme/use-theme';
+import { Avatar } from '@/core/components/avatar';
+import { Icon } from '@/core/components/icon';
+import { ThemedText } from '@/core/theme/themed-text';
+import { Icons, Radius, Type } from '@/core/theme/tokens';
+import { useOwnColorSeed } from '@/core/theme/use-own-color-seed';
+import { useTheme, useTints } from '@/core/theme/use-theme';
 
 export type CommentItem = {
   id: string;

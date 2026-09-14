@@ -2,11 +2,11 @@ import { bytesToHex } from '@noble/curves/utils.js';
 
 import { deletePostAndEnqueue, getPost, OutboxStatuses, type NewOutboxEntry } from '@/data/db';
 import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { generateUUID } from '@/services/crypto';
-import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
-import { deletePhotoFile } from '@/services/photo-cache';
+import { generateUUID } from '@/core/crypto';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore';
+import { deletePhotoFile } from '@/core/photo/photo-cache';
 
 /**
  * Removes a photo from the circle, for everyone.

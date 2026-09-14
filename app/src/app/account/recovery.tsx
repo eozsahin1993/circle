@@ -3,18 +3,18 @@ import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Share, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
 
-import { PrimaryButton } from '@/components/primary-button';
-import { SecondaryButton } from '@/components/secondary-button';
-import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Radius, Spacing } from '@/theme/tokens';
-import { useTints } from '@/theme/use-theme';
+import { PrimaryButton } from '@/core/components/primary-button';
+import { SecondaryButton } from '@/core/components/secondary-button';
+import { ScreenHeader } from '@/core/components/navbar/screen-header';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Radius, Spacing } from '@/core/theme/tokens';
+import { useTints } from '@/core/theme/use-theme';
 import { saveRecoveryCard } from '@/features/account/usecases/recovery-card';
-import { getMasterSeed } from '@/services/keystore';
-import { showDone, showError } from '@/services/messages';
+import { getMasterSeed } from '@/core/services/keystore';
+import { showDone, showError } from '@/core/services/messages';
 
 export default function RecoveryPhraseScreen() {
   const tints = useTints();

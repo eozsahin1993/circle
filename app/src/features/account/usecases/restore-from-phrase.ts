@@ -4,11 +4,11 @@ import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
 import { getCircleBySyncId, getProfile, insertCircle, listCircles, saveProfile } from '@/data/db';
 import { fetchAccountManifest, type RecoverableCircle } from '@/features/account/usecases/account-manifest';
-import { defaultCircleMask } from '@/features/push/usecases/push-preferences';
-import { deriveCircleIdentity, generateUUID, seedPhraseToEntropy } from '@/services/crypto';
-import { ensureCircleNotificationChannel } from '@/services/push-notifications/channels';
-import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap, saveMasterSeed } from '@/services/keystore';
-import { syncCircle } from '@/sync/sync-circles';
+import { defaultCircleMask } from '@/features/push-notifications/usecases/push-preferences';
+import { deriveCircleIdentity, generateUUID, seedPhraseToEntropy } from '@/core/crypto';
+import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
+import { getMasterSeed, saveCircleIdentity, saveCircleKeyMap, saveMasterSeed } from '@/core/services/keystore';
+import { syncCircle } from '@/core/sync/sync-circles';
 
 export type RestoreResult = {
   /** How many circles came back. Null when the relay couldn't be reached, which doesn't fail the restore. */

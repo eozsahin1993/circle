@@ -3,17 +3,17 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View, type ViewToken } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { FabButton } from '@/components/fab-button';
+import { FabButton } from '@/core/components/fab-button';
 import { gapBetween, stickyIndices, type FeedRow } from '@/features/feed/components/rows';
-import { HeaderIconButton } from '@/components/navbar/header-icon-button';
-import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
-import { ThemedView } from '@/theme/themed-view';
-import { Icons, Spacing } from '@/theme/tokens';
+import { HeaderIconButton } from '@/core/components/navbar/header-icon-button';
+import { ScreenHeader } from '@/core/components/navbar/screen-header';
+import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Icons, Spacing } from '@/core/theme/tokens';
 import { markCircleViewed } from '@/data/db';
-import { askForPushOnCircle } from '@/features/push/usecases/enable-push';
-import { useCircleFeed } from '@/features/feed/use-circle-feed';
-import { useTheme } from '@/theme/use-theme';
+import { askForPushOnCircle } from '@/features/push-notifications/usecases/enable-push';
+import { useCircleFeed } from '@/features/feed/hooks/use-circle-feed';
+import { useTheme } from '@/core/theme/use-theme';
 
 /** Scroll clearance above the FAB. The safe-area inset itself is separate — see `ListFooterComponent`. */
 const LIST_BOTTOM_PADDING = 100;

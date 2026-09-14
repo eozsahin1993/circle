@@ -1,11 +1,11 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { writePhotoFile } from '@/services/photo-cache';
-import { timedSync } from '@/services/timing';
+import { writePhotoFile } from '@/core/photo/photo-cache';
+import { timedSync } from '@/core/utils/timing';
 
-import { generateUUID, hashBytes } from '@/services/crypto';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
-import { getCircleIdentity, getCurrentContentKey } from '@/services/keystore';
+import { generateUUID, hashBytes } from '@/core/crypto';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
+import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore';
 import {
   AttachmentKinds,
   AttachmentStatuses,

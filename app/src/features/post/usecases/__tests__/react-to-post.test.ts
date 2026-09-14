@@ -1,16 +1,16 @@
-jest.mock('@/services/relay');
+jest.mock('@/core/services/relay');
 jest.mock('@/features/account/usecases/account-manifest');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { AttachmentKinds, AttachmentStatuses, getPendingOutboxEntries, initDatabase, insertPost } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
-import { verifyLogEntry } from '@/sync/log-entry';
+import { verifyLogEntry } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { getReactionsForPost, toggleReaction } from '@/features/post/usecases/react-to-post';
-import { generateUUID } from '@/services/crypto';
-import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/services/keystore';
-import { appendEntry, bootstrapCircle } from '@/services/relay';
+import { generateUUID } from '@/core/crypto';
+import { getCircleIdentity, getCurrentContentKey, saveMasterSeed } from '@/core/services/keystore';
+import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 beforeAll(async () => {
   await initDatabase();

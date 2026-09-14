@@ -1,4 +1,4 @@
-import { generateUUID } from '@/services/crypto';
+import { generateUUID } from '@/core/crypto';
 import { initDatabase } from '@/data/db';
 import { insertComment } from '@/data/db/comments';
 import {

@@ -1,5 +1,5 @@
 import { getCircleCoverBytes, getNewestFetchedPostId } from '@/data/db';
-import { cachedCoverUri, ensurePhotoUri, writeCoverFile } from '@/services/photo-cache';
+import { cachedCoverUri, ensurePhotoUri, writeCoverFile } from '@/core/photo/photo-cache';
 
 /**
  * The circle's image as a cached `file://` path. Only a circle whose file

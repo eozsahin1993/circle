@@ -2,20 +2,20 @@ import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'ex
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
 
-import { PrimaryButton } from '@/components/primary-button';
-import { SecondaryButton } from '@/components/secondary-button';
-import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Radius, Spacing } from '@/theme/tokens';
+import { PrimaryButton } from '@/core/components/primary-button';
+import { SecondaryButton } from '@/core/components/secondary-button';
+import { ScreenHeader } from '@/core/components/navbar/screen-header';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Radius, Spacing } from '@/core/theme/tokens';
 import {
   approveDeviceTransfer,
   inspectDeviceTransfer,
 } from '@/features/account/usecases/device-transfer';
-import { useTheme, useTints } from '@/theme/use-theme';
-import { showDone, showError } from '@/services/messages';
+import { useTheme, useTints } from '@/core/theme/use-theme';
+import { showDone, showError } from '@/core/services/messages';
 
 /**
  * The established device's half of a transfer: scan the other phone's

@@ -1,7 +1,8 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/services/mailbox-relay');
-jest.mock('@/services/relay');
+jest.mock('@/core/services/mailbox-relay');
+jest.mock('@/features/invite/services/invite-preview-relay');
+jest.mock('@/core/services/relay');
 
 import { Buffer } from 'buffer';
 
@@ -19,11 +20,12 @@ import {
 } from '@/features/invite/usecases/invite-to-circle';
 import type { JoinRequestPayload } from '@/features/invite/usecases/invite-payloads';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { deriveInviteTag, deriveJoinRequestKey, encryptJSON, generateEphemeralKeypair } from '@/services/crypto';
+import { deriveInviteTag, deriveJoinRequestKey, encryptJSON, generateEphemeralKeypair } from '@/core/crypto';
 import { bytesToHex } from '@noble/curves/utils.js';
-import { deleteJoinRequest, listJoinRequests, putInvitePreview } from '@/services/mailbox-relay';
-import { saveMasterSeed } from '@/services/keystore';
-import { appendEntry, bootstrapCircle } from '@/services/relay';
+import { deleteJoinRequest, listJoinRequests } from '@/core/services/mailbox-relay';
+import { putInvitePreview } from '@/features/invite/services/invite-preview-relay';
+import { saveMasterSeed } from '@/core/services/keystore';
+import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 beforeAll(async () => {
   await initDatabase();

@@ -2,19 +2,19 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Switch, TextInput, View, StyleSheet } from 'react-native';
-import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
 
-import { KeyboardAvoider } from '@/components/keyboard-avoider';
-import { PhotoPlaceholder } from '@/components/photo-placeholder';
-import { PrimaryButton } from '@/components/primary-button';
-import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Fonts, PhotoAspect, Radius, Spacing } from '@/theme/tokens';
+import { KeyboardAvoider } from '@/core/components/keyboard-avoider';
+import { PhotoPlaceholder } from '@/core/components/photo-placeholder';
+import { PrimaryButton } from '@/core/components/primary-button';
+import { ScreenHeader } from '@/core/components/navbar/screen-header';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Fonts, PhotoAspect, Radius, Spacing } from '@/core/theme/tokens';
 import { getCircleSummary, getCircleMembers } from '@/data/db';
 import { createPost } from '@/features/post/usecases/create-post';
-import { useTheme, useTints } from '@/theme/use-theme';
-import { pickAndCompressImage, type CompressedImage } from '@/services/image';
+import { useTheme, useTints } from '@/core/theme/use-theme';
+import { pickAndCompressImage, type CompressedImage } from '@/core/photo/image';
 
 export default function NewPostScreen() {
   const theme = useTheme();

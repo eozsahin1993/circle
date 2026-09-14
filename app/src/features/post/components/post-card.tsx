@@ -2,16 +2,16 @@ import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Avatar } from '@/components/avatar';
-import { Icon } from '@/components/icon';
+import { Avatar } from '@/core/components/avatar';
+import { Icon } from '@/core/components/icon';
 import { type CommentItem, PostComments } from '@/features/post/components/post-comments';
-import { PhotoPlaceholder, type MissingPhoto } from '@/components/photo-placeholder';
+import { PhotoPlaceholder, type MissingPhoto } from '@/core/components/photo-placeholder';
 import { ReactionChip } from '@/features/post/components/reaction-chip';
-import { EmojiPicker } from '@/components/emoji-picker';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Icons, PhotoAspect, Radius, Spacing } from '@/theme/tokens';
-import { useTheme } from '@/theme/use-theme';
+import { EmojiPicker } from '@/core/components/emoji-picker';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Icons, PhotoAspect, Radius, Spacing } from '@/core/theme/tokens';
+import { useTheme } from '@/core/theme/use-theme';
 
 export type Reaction = {
   emoji: string;

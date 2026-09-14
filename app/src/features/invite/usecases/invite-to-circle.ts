@@ -12,7 +12,7 @@ import {
   generateUUID,
   sealToPublicKey,
   sign,
-} from '@/services/crypto';
+} from '@/core/crypto';
 import {
   getCircle,
   getCurrentInvite,
@@ -27,12 +27,13 @@ import {
   type Invite,
 } from '@/data/db';
 import type { InvitePreviewPayload, JoinApprovalEnvelope, JoinApprovalPayload, JoinRequestPayload } from '@/features/invite/usecases/invite-payloads';
-import { buildAndEncryptLogEntry, EntryTypes } from '@/sync/log-entry';
+import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { bytesToDataUri, compressToThumbnail, parsePictureThumbnail } from '@/services/image';
-import { pullMeta } from '@/sync/pull-log';
-import { getCircleIdentity, getCircleKeyMap } from '@/services/keystore';
-import { deleteJoinRequest, listJoinRequests, putInvitePreview, putJoinApproval } from '@/services/mailbox-relay';
+import { bytesToDataUri, compressToThumbnail, parsePictureThumbnail } from '@/core/photo/image';
+import { pullMeta } from '@/core/sync/pull-log';
+import { getCircleIdentity, getCircleKeyMap } from '@/core/services/keystore';
+import { deleteJoinRequest, listJoinRequests, putJoinApproval } from '@/core/services/mailbox-relay';
+import { putInvitePreview } from '@/features/invite/services/invite-preview-relay';
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 

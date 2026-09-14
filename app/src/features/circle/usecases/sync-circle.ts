@@ -1,9 +1,9 @@
 import { getCircle } from '@/data/db';
-import { notifyCircleBestEffort } from '@/features/push/usecases/notify-circle';
-import { PushCategories, type PushCategory } from '@/features/push/usecases/push-categories';
-import { EntryTypes } from '@/sync/log-entry';
-import { timed, timedSync } from '@/services/timing';
-import { getCircleIdentity, getCurrentContentKey, getMasterSeed } from '@/services/keystore';
+import { notifyCircleBestEffort } from '@/features/push-notifications/usecases/notify-circle';
+import { PushCategories, type PushCategory } from '@/features/push-notifications/usecases/push-categories';
+import { EntryTypes } from '@/core/sync/log-entry';
+import { timed, timedSync } from '@/core/utils/timing';
+import { getCircleIdentity, getCurrentContentKey, getMasterSeed } from '@/core/services/keystore';
 import {
   deriveAuthorityChangeMessage,
   deriveAuthorityKeypair,
@@ -12,7 +12,7 @@ import {
   deriveWriteToken,
   encrypt,
   sign,
-} from '@/services/crypto';
+} from '@/core/crypto';
 import {
   appendEntry,
   BlobAlreadyExistsError,
@@ -24,7 +24,7 @@ import {
   uploadBlob,
   type AppendResult,
   type Namespace,
-} from '@/services/relay';
+} from '@/core/services/relay';
 import { getPendingOutboxEntries, markOutboxEntrySynced, type OutboxEntry } from '@/data/db';
 import { hexToBytes } from '@noble/curves/utils.js';
 import { getAttachment } from '@/data/db/attachments';

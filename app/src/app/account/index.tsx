@@ -1,27 +1,27 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
 
-import { Avatar } from '@/components/avatar';
-import { OptionSheet } from '@/components/option-sheet';
+import { Avatar } from '@/core/components/avatar';
+import { OptionSheet } from '@/core/components/option-sheet';
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
 import { ReactionChip } from '@/features/post/components/reaction-chip';
-import { ScreenHeader } from '@/components/navbar/screen-header';
-import { SettingsGroups, type SettingsGroup } from '@/components/settings-group';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Icons, Radius, Spacing } from '@/theme/tokens';
+import { ScreenHeader } from '@/core/components/navbar/screen-header';
+import { SettingsGroups, type SettingsGroup } from '@/core/components/settings-group';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Icons, Radius, Spacing } from '@/core/theme/tokens';
 import { getProfile, listCircles, type Profile } from '@/data/db';
-import { resetEverythingForTesting } from '@/dev/dev-reset';
-import { logTestPushPayload } from '@/dev/dev-test-push';
+import { resetEverythingForTesting } from '@/features/dev/dev-reset';
+import { logTestPushPayload } from '@/features/dev/dev-test-push';
 import { signOut } from '@/features/account/usecases/sign-in';
-import { PushLevels, type PushLevelId } from '@/features/push/usecases/push-preferences';
-import { useAppSettings } from '@/theme/use-app-settings';
-import { useOwnColorSeed } from '@/theme/use-own-color-seed';
-import { useTints } from '@/theme/use-theme';
-import { bytesToDataUri } from '@/services/image';
-import type { ThemePreference } from '@/services/settings';
+import { PushLevels, type PushLevelId } from '@/features/push-notifications/usecases/push-preferences';
+import { useAppSettings } from '@/core/theme/use-app-settings';
+import { useOwnColorSeed } from '@/core/theme/use-own-color-seed';
+import { useTints } from '@/core/theme/use-theme';
+import { bytesToDataUri } from '@/core/photo/image';
+import type { ThemePreference } from '@/core/services/settings';
 
 function pushLevelLabel(level: PushLevelId): string {
   return PushLevels.find((candidate) => candidate.id === level)?.label ?? '';

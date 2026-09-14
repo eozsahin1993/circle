@@ -2,9 +2,9 @@ import { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 
 import type { FeedRow, FeedRows } from '@/features/feed/components/rows';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Radius, Spacing } from '@/theme/tokens';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Radius, Spacing } from '@/core/theme/tokens';
 
 export type JustJoinedRowsInput = {
   /** Whether this arrival was a join at all — the route carries that, not the feed. */

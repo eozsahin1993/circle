@@ -2,20 +2,20 @@ import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
 
-import { ActionSheet, type ActionSheetOption } from '@/components/action-sheet';
-import { Avatar } from '@/components/avatar';
-import { Icon } from '@/components/icon';
+import { ActionSheet, type ActionSheetOption } from '@/core/components/action-sheet';
+import { Avatar } from '@/core/components/avatar';
+import { Icon } from '@/core/components/icon';
 import { InviteSheet } from '@/features/invite/components/invite-sheet';
-import { OptionSheet } from '@/components/option-sheet';
-import { PromptSheet } from '@/components/prompt-sheet';
-import { ScreenHeader } from '@/components/navbar/screen-header';
-import { SecondaryButton } from '@/components/secondary-button';
-import { SettingsGroups, type SettingsGroup } from '@/components/settings-group';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Icons, Radius, Spacing } from '@/theme/tokens';
+import { OptionSheet } from '@/core/components/option-sheet';
+import { PromptSheet } from '@/core/components/prompt-sheet';
+import { ScreenHeader } from '@/core/components/navbar/screen-header';
+import { SecondaryButton } from '@/core/components/secondary-button';
+import { SettingsGroups, type SettingsGroup } from '@/core/components/settings-group';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Icons, Radius, Spacing } from '@/core/theme/tokens';
 import { MemberRoles, type Member, type MemberRole } from '@/data/db';
 import { setMemberRole } from '@/features/circle/usecases/change-member-role';
 import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
@@ -33,10 +33,10 @@ import {
   setCircleSilenced,
   type CirclePushPreferences,
   type PushLevelId,
-} from '@/features/push/usecases/push-preferences';
-import { useTheme, useTints } from '@/theme/use-theme';
-import { showDone, showError } from '@/services/messages';
-import { bytesToDataUri, pickAndCompressImage } from '@/services/image';
+} from '@/features/push-notifications/usecases/push-preferences';
+import { useTheme, useTints } from '@/core/theme/use-theme';
+import { showDone, showError } from '@/core/services/messages';
+import { bytesToDataUri, pickAndCompressImage } from '@/core/photo/image';
 
 function inviteLink(code: string): string {
   return `circle://join/${code}`;

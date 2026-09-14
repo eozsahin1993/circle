@@ -2,12 +2,12 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from '@react-native-google-signin/google-signin';
 import { Platform } from 'react-native';
 
-import { deleteAuthToken, getAuthToken, saveAuthToken } from '@/services/keystore';
+import { deleteAuthToken, getAuthToken, saveAuthToken } from '@/core/services/keystore';
 import {
   logout as relayLogout,
   signInWithApple as relaySignInWithApple,
   signInWithGoogle as relaySignInWithGoogle,
-} from '@/services/relay';
+} from '@/core/services/relay';
 
 export type SignInOutcome = 'success' | 'cancelled';
 

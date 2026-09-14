@@ -1,6 +1,7 @@
-jest.mock('@/services/relay');
+jest.mock('@/core/services/relay');
 jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/services/mailbox-relay');
+jest.mock('@/core/services/mailbox-relay');
+jest.mock('@/features/invite/services/invite-preview-relay');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
@@ -8,9 +9,9 @@ import { initDatabase, MemberRoles, recordMemberAddedLocally, recordRoleChanged 
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { loadCircleDetails } from '@/features/circle/usecases/circle-details';
 import { getOrCreateInvite } from '@/features/invite/usecases/invite-to-circle';
-import { generateIdentity, generateUUID } from '@/services/crypto';
-import { getCircleIdentity, saveMasterSeed } from '@/services/keystore';
-import { appendEntry, bootstrapCircle } from '@/services/relay';
+import { generateIdentity, generateUUID } from '@/core/crypto';
+import { getCircleIdentity, saveMasterSeed } from '@/core/services/keystore';
+import { appendEntry, bootstrapCircle } from '@/core/services/relay';
 
 beforeAll(async () => {
   await initDatabase();

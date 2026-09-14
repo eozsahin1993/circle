@@ -1,19 +1,19 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
 
-import { KeyboardAvoider } from '@/components/keyboard-avoider';
-import { PrimaryButton } from '@/components/primary-button';
-import { SecondaryButton } from '@/components/secondary-button';
-import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Radius, Spacing } from '@/theme/tokens';
+import { KeyboardAvoider } from '@/core/components/keyboard-avoider';
+import { PrimaryButton } from '@/core/components/primary-button';
+import { SecondaryButton } from '@/core/components/secondary-button';
+import { ScreenHeader } from '@/core/components/navbar/screen-header';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Radius, Spacing } from '@/core/theme/tokens';
 import { pickRecoveryCard } from '@/features/account/usecases/recovery-card';
 import { restoreFromPhrase } from '@/features/account/usecases/restore-from-phrase';
-import { useTheme } from '@/theme/use-theme';
-import { showDone } from '@/services/messages';
+import { useTheme } from '@/core/theme/use-theme';
+import { showDone } from '@/core/services/messages';
 
 const WORD_COUNT = 12;
 

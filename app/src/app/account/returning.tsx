@@ -1,13 +1,13 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Icon, type IconGlyph } from '@/components/icon';
-import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Icons, Radius, Spacing } from '@/theme/tokens';
-import { useTheme, useTints } from '@/theme/use-theme';
+import { Icon, type IconGlyph } from '@/core/components/icon';
+import { ScreenHeader } from '@/core/components/navbar/screen-header';
+import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Icons, Radius, Spacing } from '@/core/theme/tokens';
+import { useTheme, useTints } from '@/core/theme/use-theme';
 
 /**
  * Offered when signing in finds a manifest this device can't read — you've

@@ -3,21 +3,21 @@ import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { ThemedSafeAreaView } from '@/theme/themed-safe-area-view';
+import { ThemedSafeAreaView } from '@/core/theme/themed-safe-area-view';
 
-import { ActionSheet } from '@/components/action-sheet';
-import { Avatar } from '@/components/avatar';
-import { Icon } from '@/components/icon';
-import { KeyboardAvoider } from '@/components/keyboard-avoider';
-import { FabButton } from '@/components/fab-button';
-import { HeaderIconButton } from '@/components/navbar/header-icon-button';
-import { missingPhotoFor, PhotoPlaceholder } from '@/components/photo-placeholder';
+import { ActionSheet } from '@/core/components/action-sheet';
+import { Avatar } from '@/core/components/avatar';
+import { Icon } from '@/core/components/icon';
+import { KeyboardAvoider } from '@/core/components/keyboard-avoider';
+import { FabButton } from '@/core/components/fab-button';
+import { HeaderIconButton } from '@/core/components/navbar/header-icon-button';
+import { missingPhotoFor, PhotoPlaceholder } from '@/core/components/photo-placeholder';
 import { ReactionChip } from '@/features/post/components/reaction-chip';
-import { EmojiPicker } from '@/components/emoji-picker';
-import { ScreenHeader } from '@/components/navbar/screen-header';
-import { ThemedText } from '@/theme/themed-text';
-import { ThemedView } from '@/theme/themed-view';
-import { Icons, PhotoAspect, Radius, Spacing } from '@/theme/tokens';
+import { EmojiPicker } from '@/core/components/emoji-picker';
+import { ScreenHeader } from '@/core/components/navbar/screen-header';
+import { ThemedText } from '@/core/theme/themed-text';
+import { ThemedView } from '@/core/theme/themed-view';
+import { Icons, PhotoAspect, Radius, Spacing } from '@/core/theme/tokens';
 import {
   getAttachment,
   getCircleSummary,
@@ -35,13 +35,13 @@ import { addComment } from '@/features/post/usecases/comment-on-post';
 import { deletePost } from '@/features/post/usecases/delete-post';
 import { getReactionsForPost, toggleReaction } from '@/features/post/usecases/react-to-post';
 import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
-import { useTheme } from '@/theme/use-theme';
-import { showError, showMessage } from '@/services/messages';
-import { bytesToDataUri } from '@/services/image';
-import { getCircleIdentity } from '@/services/keystore';
-import { ensurePhotoUri, writePhotoFile } from '@/services/photo-cache';
-import { onPhotoFetched } from '@/services/photo-events';
-import { formatDay, formatRelative, formatTimestamp } from '@/utils/time';
+import { useTheme } from '@/core/theme/use-theme';
+import { showError, showMessage } from '@/core/services/messages';
+import { bytesToDataUri } from '@/core/photo/image';
+import { getCircleIdentity } from '@/core/services/keystore';
+import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
+import { onPhotoFetched } from '@/core/photo/photo-events';
+import { formatDay, formatRelative, formatTimestamp } from '@/core/utils/time';
 
 /** Names shown before the rest become "& N others" — enough to recognise who, not a roster dump. */
 const PREVIEW_NAMES = 3;

@@ -1,5 +1,5 @@
 import { buildRecoveryCard, extractSeedPhrase } from '@/features/account/usecases/recovery-card';
-import { generateSeedPhrase } from '@/services/crypto';
+import { generateSeedPhrase } from '@/core/crypto';
 
 describe('extractSeedPhrase', () => {
   // The round trip that matters: whatever the card writer produces, the
