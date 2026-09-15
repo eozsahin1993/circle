@@ -24,6 +24,7 @@ export const EntryTypes = {
   POST_DELETE: 'post_delete',
   PUSH_ENABLED: 'push_enabled',
   CIRCLE_DELETED: 'circle_deleted',
+  ACCOUNT_DELETED: 'account_deleted',
 } as const;
 
 export type EntryType = (typeof EntryTypes)[keyof typeof EntryTypes];

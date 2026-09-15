@@ -7,8 +7,9 @@ import { decrypt, generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { buildAndEncryptLogEntry } from '@/core/sync/log-entry';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle, deletePostOnRelay } from '@/core/services/log-relay';
-import { BlobAlreadyExistsError, getUploadTarget, uploadBlob } from '@/core/services/blob-relay';
+import { appendEntry, bootstrapCircle, deleteEntryOnRelay } from '@/core/services/log-relay';
+import { getUploadTarget, uploadBlob } from '@/core/services/blob-relay';
+import { BlobAlreadyExistsError } from '@/core/services/relay-errors';
 import {
   AttachmentKinds,
   AttachmentStatuses,
@@ -253,11 +254,11 @@ describe('an entry that deletes a post', () => {
     const { circleId } = await makeCircle();
     const postId = generateUUID();
     await enqueueDeletion(circleId, postId);
-    (deletePostOnRelay as jest.Mock).mockResolvedValue({ epoch: 5, receivedAt: 999 });
+    (deleteEntryOnRelay as jest.Mock).mockResolvedValue({ epoch: 5, receivedAt: 999 });
 
     await drainOutbox(circleId);
 
-    expect(deletePostOnRelay).toHaveBeenCalledWith(
+    expect(deleteEntryOnRelay).toHaveBeenCalledWith(
       expect.any(String),
       postId,
       expect.any(String),
@@ -274,7 +275,7 @@ describe('an entry that deletes a post', () => {
   test('a failed deletion leaves the entry pending', async () => {
     const { circleId } = await makeCircle();
     await enqueueDeletion(circleId, generateUUID());
-    (deletePostOnRelay as jest.Mock).mockRejectedValue(new Error('offline'));
+    (deleteEntryOnRelay as jest.Mock).mockRejectedValue(new Error('offline'));
 
     await expect(drainOutbox(circleId)).rejects.toThrow('offline');
 
@@ -289,6 +290,6 @@ describe('an entry that deletes a post', () => {
 
     await drainOutbox(circleId);
 
-    expect(deletePostOnRelay).not.toHaveBeenCalled();
+    expect(deleteEntryOnRelay).not.toHaveBeenCalled();
   });
 });

@@ -7,11 +7,11 @@ import { useTheme } from '@/ui/theme/hooks/use-theme';
 
 export type MembershipEventItem = {
   id: string;
-  kind: 'created' | 'added' | 'removed' | 'role_changed';
+  kind: 'created' | 'added' | 'removed' | 'role_changed' | 'account_deleted';
   subjectName: string;
   /** Null when this device never saw the actor join — the line renders unattributed rather than guessing. */
   actorName: string | null;
-  /** The subject acted on themselves: founding the circle, or leaving it. */
+  /** The subject acted on themselves: founding the circle, leaving it, or deleting their account. */
   selfInflicted: boolean;
   /** Whether each side is the person reading the feed — those get "you" rather than their own name. */
   subjectIsYou: boolean;
@@ -66,6 +66,11 @@ export function describeMembershipEvent(event: MembershipEventItem): Segment[] {
     return [subject, { text: ' was added by ' }, actor];
   }
 
+  // Always self-inflicted (nobody deletes an account but its own), and
+  // its own kind rather than `removed` plus a flag — a different reason
+  // for leaving, not a special case of "left".
+  if (event.kind === 'account_deleted') return [subject, { text: event.subjectIsYou ? ' deleted your account' : ' deleted their account' }];
+
   if (event.kind === 'removed') {
     if (event.selfInflicted) return [subject, { text: ' left' }];
     if (!attributed) return [subject, { text: event.subjectIsYou ? ' are no longer in this circle' : ' is no longer in this circle' }];
@@ -99,7 +104,7 @@ export type GroupedSubject = { subjectName: string; subjectIsYou: boolean };
  */
 export type MembershipEventGroupItem = {
   /** Includes `created` only so a solo group can pass it straight to `describeMembershipEvent` — a circle has exactly one founder, so it's never anything but solo. */
-  kind: 'created' | 'added' | 'removed' | 'role_changed';
+  kind: 'created' | 'added' | 'removed' | 'role_changed' | 'account_deleted';
   role: 'admin' | 'member' | null;
   selfInflicted: boolean;
   actorName: string | null;
@@ -154,6 +159,13 @@ export function describeMembershipEventGroup(group: MembershipEventGroupItem, ex
     if (!attributed) return [...capitalizeLeadingYou(subjectList), { text: ' joined' }];
     if (group.actorIsYou) return [{ text: 'You', name: true }, { text: ' added ' }, ...subjectList];
     return [actor as Segment, { text: ' added ' }, ...subjectList];
+  }
+
+  // Its own kind, not `removed` plus a flag — see group-member-events.ts's
+  // groupKey, which is what keeps a group's subjects from ever mixing
+  // "left" with "deleted their account".
+  if (group.kind === 'account_deleted') {
+    return [...capitalizeLeadingYou(subjectList), { text: group.subjects.length > 1 ? ' deleted their accounts' : ' deleted their account' }];
   }
 
   if (group.kind === 'removed') {

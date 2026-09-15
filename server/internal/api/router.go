@@ -8,6 +8,7 @@ package api
 import (
 	"net/http"
 
+	"circle-relay/internal/api/account/deleteaccount"
 	"circle-relay/internal/api/account/manifest"
 	"circle-relay/internal/api/appendlog"
 	"circle-relay/internal/api/auth"
@@ -17,9 +18,10 @@ import (
 	"circle-relay/internal/api/auth/oidcverify"
 	"circle-relay/internal/api/changeauthority"
 	"circle-relay/internal/api/createlog"
+	"circle-relay/internal/api/deleteauthorcontent"
 	"circle-relay/internal/api/deleteblob"
 	"circle-relay/internal/api/deletecircle"
-	"circle-relay/internal/api/deletepost"
+	"circle-relay/internal/api/deleteentry"
 	"circle-relay/internal/api/getblob"
 	"circle-relay/internal/api/getcoverphotouploadtarget"
 	"circle-relay/internal/api/getepochs"
@@ -99,7 +101,8 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	getblob.Register(circleMux, &getblob.Service{BlobStore: deps.Blob}, readLimit)
 	getuploadtarget.Register(circleMux, &getuploadtarget.Service{BlobStore: deps.Blob, LogStore: deps.Log}, writeLimit)
 	deleteblob.Register(circleMux, &deleteblob.Service{BlobStore: deps.Blob, LogStore: deps.Log}, writeLimit)
-	deletepost.Register(circleMux, &deletepost.Service{LogStore: deps.Log, BlobStore: deps.Blob}, writeLimit)
+	deleteentry.Register(circleMux, &deleteentry.Service{LogStore: deps.Log, BlobStore: deps.Blob}, writeLimit)
+	deleteauthorcontent.Register(circleMux, &deleteauthorcontent.Service{LogStore: deps.Log, BlobStore: deps.Blob}, writeLimit)
 	getcoverphotouploadtarget.Register(circleMux, &getcoverphotouploadtarget.Service{BlobStore: deps.Blob, LogStore: deps.Log}, writeLimit)
 	mux.Handle("/circles/", auth.RequireSession(deps.Auth, circleMux))
 
@@ -108,6 +111,9 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	accountMux := http.NewServeMux()
 	manifest.Register(accountMux, &manifest.Service{ManifestStore: deps.Manifest})
 	mux.Handle("/account/", auth.RequireSession(deps.Auth, accountMux))
+	deleteaccount.Register(mux, &deleteaccount.Service{ManifestStore: deps.Manifest, AuthStore: deps.Auth}, func(h http.Handler) http.Handler {
+		return auth.RequireSession(deps.Auth, h)
+	})
 
 	// Invite-tag-scoped, not circle- or account-scoped — its own sub-mux,
 	// same RequireSession wrapping as circleMux/accountMux above. Still

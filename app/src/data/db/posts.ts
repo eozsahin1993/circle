@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, lt, ne, or } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lt, ne, or } from 'drizzle-orm';
 
 import { type Attachment, type NewAttachment } from '@/data/db/attachments';
 import { normalizeBlob } from '@/data/db/blob';
@@ -259,6 +259,31 @@ export async function deletePostLocally(circleId: string, id: string): Promise<v
       .run();
     tx.delete(posts).where(eq(posts.id, id)).run();
   });
+}
+
+/**
+ * Deletes every post one author wrote in a circle, `deletePostLocally`'s
+ * whole-account analog — everyone's comments/reactions on those posts and
+ * their attachments go with them. Returns the deleted post ids so the
+ * caller can clear their cached photo files too.
+ */
+export async function deletePostsByAuthor(circleId: string, authorPublicKey: string): Promise<string[]> {
+  const rows = await db
+    .select({ id: posts.id })
+    .from(posts)
+    .where(and(eq(posts.circleId, circleId), eq(posts.authorPublicKey, authorPublicKey)));
+  const ids = rows.map((row) => row.id);
+  if (ids.length === 0) return ids;
+
+  db.transaction((tx) => {
+    tx.delete(postComments).where(inArray(postComments.postId, ids)).run();
+    tx.delete(postReactions).where(inArray(postReactions.postId, ids)).run();
+    tx.delete(attachments)
+      .where(and(eq(attachments.circleId, circleId), inArray(attachments.entryId, ids)))
+      .run();
+    tx.delete(posts).where(inArray(posts.id, ids)).run();
+  });
+  return ids;
 }
 
 /** Deletes a post here and queues the deletion for every other device, atomically — same reasoning as `setPostInAlbumAndEnqueue`. */

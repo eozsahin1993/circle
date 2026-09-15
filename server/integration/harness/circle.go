@@ -386,10 +386,10 @@ func (c *Circle) DeleteBlob(entryID string, req DeleteBlobRequest) Response {
 	return c.Device.PostRequest(c.entryPath(entryID)+"/delete-blob", req)
 }
 
-// DeletePostRequest is POST /circles/{syncId}/entries/{postEntryId}/delete-post
-// — see internal/api/deletepost. Same author-or-admin shape as
+// DeleteEntryRequest is POST /circles/{syncId}/entries/{entryId}/delete-entry
+// — see internal/api/deleteentry. Same author-or-admin shape as
 // DeleteBlobRequest.
-type DeletePostRequest struct {
+type DeleteEntryRequest struct {
 	WriteToken         string `json:"writeToken"`
 	TombstoneEntryID   string `json:"tombstoneEntryId"`
 	EncryptedMeta      string `json:"encryptedMeta"`
@@ -399,12 +399,12 @@ type DeletePostRequest struct {
 	AuthoritySignature string `json:"authoritySignature"`
 }
 
-// NewDeletePost deletes postEntryID as its own author — this device's own
+// NewDeleteEntry deletes entryID as its own author — this device's own
 // identity key, the same one an append would have declared for it.
-func (c *Circle) NewDeletePost(postEntryID string) DeletePostRequest {
+func (c *Circle) NewDeleteEntry(entryID string) DeleteEntryRequest {
 	tombstoneEntryID := Suffix()
-	deletion := logstore.PostDeletion{SyncID: c.SyncID, PostEntryID: postEntryID, TombstoneEntryID: tombstoneEntryID}
-	return DeletePostRequest{
+	deletion := logstore.EntryDeletion{SyncID: c.SyncID, TargetEntryID: entryID, TombstoneEntryID: tombstoneEntryID}
+	return DeleteEntryRequest{
 		WriteToken:       c.Token.Raw,
 		TombstoneEntryID: tombstoneEntryID,
 		EncryptedMeta:    Ciphertext(),
@@ -413,11 +413,11 @@ func (c *Circle) NewDeletePost(postEntryID string) DeletePostRequest {
 	}
 }
 
-// NewAdminDeletePost deletes somebody else's post, signed by signer.
-func (c *Circle) NewAdminDeletePost(postEntryID string, signer Authority) DeletePostRequest {
+// NewAdminDeleteEntry deletes somebody else's post, signed by signer.
+func (c *Circle) NewAdminDeleteEntry(entryID string, signer Authority) DeleteEntryRequest {
 	tombstoneEntryID := Suffix()
-	deletion := logstore.PostDeletion{SyncID: c.SyncID, PostEntryID: postEntryID, TombstoneEntryID: tombstoneEntryID}
-	return DeletePostRequest{
+	deletion := logstore.EntryDeletion{SyncID: c.SyncID, TargetEntryID: entryID, TombstoneEntryID: tombstoneEntryID}
+	return DeleteEntryRequest{
 		WriteToken:         c.Token.Raw,
 		TombstoneEntryID:   tombstoneEntryID,
 		EncryptedMeta:      Ciphertext(),
@@ -427,8 +427,50 @@ func (c *Circle) NewAdminDeletePost(postEntryID string, signer Authority) Delete
 	}
 }
 
-func (c *Circle) DeletePost(postEntryID string, req DeletePostRequest) Response {
-	return c.Device.PostRequest(c.entryPath(postEntryID)+"/delete-post", req)
+func (c *Circle) DeleteEntry(entryID string, req DeleteEntryRequest) Response {
+	return c.Device.PostRequest(c.entryPath(entryID)+"/delete-entry", req)
+}
+
+// DeleteAuthorContentRequest is POST /circles/{syncId}/delete-author-content
+// — see internal/api/deleteauthorcontent. Tombstone fields present is a
+// current member's erase-and-announce; absent is a departed member's
+// strip-only erase.
+type DeleteAuthorContentRequest struct {
+	AuthorIdentityPublicKey string `json:"authorIdentityPublicKey"`
+	AuthorSignature         string `json:"authorSignature"`
+	TombstoneEntryID        string `json:"tombstoneEntryId,omitempty"`
+	EncryptedMeta           string `json:"encryptedMeta,omitempty"`
+	KeyVersion              int64  `json:"keyVersion,omitempty"`
+	WriteToken              string `json:"writeToken,omitempty"`
+}
+
+// NewDeleteAuthorContent erases everything this device's identity authored,
+// announcing it with a tombstone — the current-member mode.
+func (c *Circle) NewDeleteAuthorContent() DeleteAuthorContentRequest {
+	tombstoneEntryID := Suffix()
+	deletion := logstore.AuthorContentDeletion{SyncID: c.SyncID, AuthorIdentityPublicKey: c.Device.identity.PublicKey(), TombstoneEntryID: tombstoneEntryID}
+	return DeleteAuthorContentRequest{
+		AuthorIdentityPublicKey: c.Device.identity.PublicKey(),
+		AuthorSignature:         c.Device.identity.Sign(deletion.Message()),
+		TombstoneEntryID:        tombstoneEntryID,
+		EncryptedMeta:           Ciphertext(),
+		KeyVersion:              1,
+		WriteToken:              c.Token.Raw,
+	}
+}
+
+// NewStripOnlyAuthorContent is the departed-member mode: no tombstone, no
+// write token, just the author signature.
+func (c *Circle) NewStripOnlyAuthorContent() DeleteAuthorContentRequest {
+	deletion := logstore.AuthorContentDeletion{SyncID: c.SyncID, AuthorIdentityPublicKey: c.Device.identity.PublicKey()}
+	return DeleteAuthorContentRequest{
+		AuthorIdentityPublicKey: c.Device.identity.PublicKey(),
+		AuthorSignature:         c.Device.identity.Sign(deletion.Message()),
+	}
+}
+
+func (c *Circle) DeleteAuthorContent(req DeleteAuthorContentRequest) Response {
+	return c.Device.PostRequest(c.Path()+"/delete-author-content", req)
 }
 
 // CoverUploadRequest is POST /circles/{syncId}/cover-photo/upload — see

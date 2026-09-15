@@ -136,6 +136,24 @@ export async function recordMemberRemoved(event: EventBase): Promise<void> {
 }
 
 /**
+ * Records an account deletion — `account_deleted`'s own analog of
+ * `recordMemberRemoved`, which it replaces for this departure rather than
+ * running alongside: one entry announces it, one history row records it,
+ * so the feed never has to reconcile two events describing the same
+ * departure. Meta, same as every other roster-terminal entry (see
+ * `logstore`'s meta/content split on the relay) — an account deletion
+ * needs to reach every device eagerly, not wait on paged content.
+ */
+export async function recordAccountDeleted(event: EventBase): Promise<void> {
+  await insertEvent({ ...event, kind: 'account_deleted', role: null });
+
+  await db
+    .update(circleMembers)
+    .set({ removedAt: event.occurredAt })
+    .where(and(eq(circleMembers.circleId, event.circleId), eq(circleMembers.identityPublicKey, event.subjectPublicKey)));
+}
+
+/**
  * The optimistic half of an add, for the device performing it — the
  * founder creating a circle, an admin approving a request, a joiner
  * completing their own join. Writes state only: there is no epoch yet
@@ -323,6 +341,9 @@ async function queryCircleMemberEvents(circleId: string, sinceOccurredAt?: numbe
           untilOccurredAt !== undefined ? lt(memberEvents.occurredAt, untilOccurredAt) : undefined
         )
       )
+      // account_deleted shares the same meta epoch sequence every other
+      // event here already does — see recordAccountDeleted — so this
+      // stays a single, correct chronological order across every kind.
       .orderBy(asc(memberEvents.epoch)),
     db
       .select({ identityPublicKey: circleMembers.identityPublicKey, name: circleMembers.name })
@@ -333,7 +354,7 @@ async function queryCircleMemberEvents(circleId: string, sinceOccurredAt?: numbe
   const names = new Map(roster.map((member) => [member.identityPublicKey, member.name]));
 
   return rows
-    .map((row) => ({
+    .map((row): MemberEvent => ({
       id: String(row.id),
       kind: row.kind,
       subjectName: names.get(row.subjectPublicKey) ?? '',

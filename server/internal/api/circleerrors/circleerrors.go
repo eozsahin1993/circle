@@ -45,10 +45,10 @@ func Status(err error) (int, string) {
 		return http.StatusGone, "circle has been deleted"
 	case errors.Is(err, logstore.ErrConcurrentModification):
 		return http.StatusConflict, "circle state changed concurrently, retry"
-	case errors.Is(err, logstore.ErrPostNotFound):
-		return http.StatusNotFound, "no such post in this circle"
-	case errors.Is(err, logstore.ErrPostNotAuthorized):
-		return http.StatusForbidden, "only the post's author or an admin can delete it"
+	case errors.Is(err, logstore.ErrEntryNotFound):
+		return http.StatusNotFound, "no such entry in this circle"
+	case errors.Is(err, logstore.ErrEntryNotAuthorized):
+		return http.StatusForbidden, "only the entry's author or an admin can delete it"
 	case errors.Is(err, blobstore.ErrBlobAlreadyExists):
 		// Not necessarily an attack — also what a legitimate retry sees
 		// after a successful upload the caller never heard back from. See

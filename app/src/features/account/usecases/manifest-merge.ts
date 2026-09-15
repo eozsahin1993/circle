@@ -48,16 +48,11 @@ export function mergeManifest(stored: ManifestPayload, mine: Partial<ManifestPay
   return changed ? merged : null;
 }
 
-/**
- * Circles combine by id, and key versions within a circle, because a device
- * behind on a rotation holds an older map and one that hasn't heard of a
- * circle holds none of it. A version's key never changes, so combining can't
- * conflict.
- *
- * A departure is terminal for its id: no later contribution puts the keys
- * back, which is what lets a device that hasn't synced its own removal keep
- * contributing the circle harmlessly.
- */
+/** A departure is terminal: once `leftAt` is set, nothing later ever changes the record. */
+function hasLeft(circle: ManifestCircle | undefined): boolean {
+  return circle?.leftAt !== undefined;
+}
+
 function mergeCircles(stored: ManifestCircle[] | undefined, mine: ManifestCircle[] | undefined) {
   if (!mine?.length) return stored;
 
@@ -69,19 +64,12 @@ function mergeCircles(stored: ManifestCircle[] | undefined, mine: ManifestCircle
 
   for (const circle of mine) {
     const existing = byId.get(circle.circleId);
-    if (existing?.leftAt !== undefined) continue;
-
-    if (circle.leftAt !== undefined) {
-      // Nothing recorded, so nothing to retire. Tombstoning anyway would
-      // grow the document for circles that never reached it.
-      if (!existing) continue;
-      byId.set(circle.circleId, { circleId: circle.circleId, leftAt: circle.leftAt });
-      changed = true;
-      continue;
-    }
+    if (hasLeft(existing)) continue;
 
     const keyMap = { ...existing?.keyMap, ...circle.keyMap };
-    if (existing && Object.keys(keyMap).length === Object.keys(existing.keyMap).length) continue;
+    const keyMapGrew = !existing || Object.keys(keyMap).length !== Object.keys(existing.keyMap).length;
+    if (!hasLeft(circle) && !keyMapGrew) continue;
+
     byId.set(circle.circleId, { ...circle, keyMap });
     changed = true;
   }

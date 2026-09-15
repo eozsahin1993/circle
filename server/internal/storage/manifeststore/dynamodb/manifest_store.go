@@ -84,3 +84,13 @@ func (s *Store) PutManifest(ctx context.Context, accountID string, blob []byte, 
 	}
 	return err
 }
+
+func (s *Store) DeleteManifest(ctx context.Context, accountID string) error {
+	_, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(s.tableName),
+		Key: map[string]types.AttributeValue{
+			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: accountID},
+		},
+	})
+	return err
+}

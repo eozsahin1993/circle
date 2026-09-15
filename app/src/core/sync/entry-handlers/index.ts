@@ -1,4 +1,5 @@
 import { EntryTypes } from '@/core/sync/log-entry';
+import { accountDeletedHandler } from '@/core/sync/entry-handlers/account-deleted';
 import { albumVisibilityHandler } from '@/core/sync/entry-handlers/album-visibility';
 import { commentHandler } from '@/core/sync/entry-handlers/comment';
 import { circleDeletedHandler } from '@/core/sync/entry-handlers/circle-deleted';
@@ -37,6 +38,7 @@ export const metaHandlers: Record<string, EntryHandler> = {
   [EntryTypes.CIRCLE_RENAMED]: circleRenamedHandler,
   [EntryTypes.PUSH_ENABLED]: pushEnabledHandler,
   [EntryTypes.CIRCLE_DELETED]: circleDeletedHandler,
+  [EntryTypes.ACCOUNT_DELETED]: accountDeletedHandler,
 };
 
 /** Content entry types this build understands. */

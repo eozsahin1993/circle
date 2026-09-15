@@ -52,12 +52,12 @@ export async function listCircleAddresses(): Promise<{ id: string; syncId: strin
 }
 
 /** Circles this device has left but still has a row for — what the account manifest tombstones. */
-export async function listLeftCircles(): Promise<{ id: string; leftAt: number }[]> {
+export async function listLeftCircles(): Promise<{ id: string; syncId: string; leftAt: number }[]> {
   const rows = await db
-    .select({ id: circles.id, leftAt: circles.leftAt })
+    .select({ id: circles.id, syncId: circles.syncId, leftAt: circles.leftAt })
     .from(circles)
     .where(isNotNull(circles.leftAt));
-  return rows.map((row) => ({ id: row.id, leftAt: row.leftAt ?? Date.now() }));
+  return rows.map((row) => ({ id: row.id, syncId: row.syncId, leftAt: row.leftAt ?? Date.now() }));
 }
 
 /**

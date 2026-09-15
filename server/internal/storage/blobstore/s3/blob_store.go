@@ -147,6 +147,29 @@ func (s *Store) Delete(ctx context.Context, syncID, entryID string) error {
 	return err
 }
 
+// DeleteMany batch-deletes in pages of S3's 1000-key cap. Keys that never
+// existed (entries that had no blob) count as deleted, same as Delete.
+func (s *Store) DeleteMany(ctx context.Context, syncID string, entryIDs []string) error {
+	for first := 0; first < len(entryIDs); first += 1000 {
+		last := min(first+1000, len(entryIDs))
+		objects := make([]s3types.ObjectIdentifier, 0, last-first)
+		for _, entryID := range entryIDs[first:last] {
+			objects = append(objects, s3types.ObjectIdentifier{Key: aws.String(blobKey(syncID, entryID))})
+		}
+		out, err := s.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(s.bucketName),
+			Delete: &s3types.Delete{Objects: objects, Quiet: aws.Bool(true)},
+		})
+		if err != nil {
+			return err
+		}
+		if len(out.Errors) > 0 {
+			return fmt.Errorf("deleting %d blobs for %s: %d failed, first: %s", len(objects), syncID, len(out.Errors), aws.ToString(out.Errors[0].Message))
+		}
+	}
+	return nil
+}
+
 // DeleteCircle lists and deletes a page at a time rather than collecting
 // every key first. The trailing slash matters: without it the prefix
 // would also match a circle whose syncID merely starts with this one.

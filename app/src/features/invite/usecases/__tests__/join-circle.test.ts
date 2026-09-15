@@ -21,13 +21,13 @@ import { decrypt, encrypt, generateIdentity, sealToPublicKey, sign } from '@/cor
 import { deriveInviteTag, deriveJoinRequestKey } from '@/features/invite/crypto';
 import { compressToThumbnail } from '@/core/photo/image';
 import {
-  JoinRequestGoneError,
   deleteJoinRequest,
   getJoinRequestApproval,
   listJoinRequests,
   putJoinApproval,
   putJoinRequest,
 } from '@/core/services/mailbox-relay';
+import { JoinRequestGoneError } from '@/core/services/relay-errors';
 import { getInvitePreview, putInvitePreview } from '@/features/invite/services/invite-preview-relay';
 import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';

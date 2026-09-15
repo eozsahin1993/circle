@@ -35,4 +35,9 @@ type Store interface {
 	// responding to a suspected leak). Idempotent: deleting an
 	// already-gone or already-expired session succeeds, doesn't error.
 	DeleteSession(ctx context.Context, token string) error
+	// DeleteAllSessions revokes every session for accountID, not just one
+	// token — account deletion's own call, so a different device's still
+	// live session can't outlive the account it belonged to. Idempotent,
+	// same as DeleteSession.
+	DeleteAllSessions(ctx context.Context, accountID string) error
 }

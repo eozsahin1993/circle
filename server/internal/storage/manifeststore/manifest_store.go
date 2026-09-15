@@ -50,4 +50,8 @@ type Store interface {
 	// if the stored manifest is still at that version, and returns
 	// ErrVersionMismatch otherwise.
 	PutManifest(ctx context.Context, accountID string, blob []byte, expectedVersion int64) error
+	// DeleteManifest removes the account's manifest outright — account
+	// deletion's final write. Idempotent; no version check, since the
+	// account is ending either way.
+	DeleteManifest(ctx context.Context, accountID string) error
 }

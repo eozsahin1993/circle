@@ -200,9 +200,10 @@ describe('reconcileAccountManifest', () => {
 });
 
 describe('a departure for a circle the manifest never held', () => {
-  // Nothing recorded means nothing to retire, and tombstoning anyway would
-  // grow the document for circles that never reached it.
-  test('writes nothing', async () => {
+  // Still worth recording: unlike a bare tombstone, this carries the
+  // address and keys account deletion needs later — it isn't "retiring"
+  // a prior entry, it's the only record of this circle at all.
+  test('is recorded with its address and keys', async () => {
     await saveMasterSeed(SEED);
     await addCircle('never-recorded');
     await markCircleLeft('never-recorded');
@@ -210,7 +211,9 @@ describe('a departure for a circle the manifest never held', () => {
 
     await reconcileAccountManifest();
 
-    expect(putManifest).not.toHaveBeenCalled();
+    expect(pushedPayload().circles).toEqual([
+      { circleId: 'never-recorded', syncId: 'sync-never-recorded', keyMap: { 1: bytesToHex(CONTENT_KEY) }, leftAt: expect.any(Number) },
+    ]);
   });
 });
 
@@ -256,7 +259,7 @@ describe('a departure', () => {
 
     expect(pushedPayload().circles).toEqual([
       kept,
-      { circleId: 'left', leftAt: expect.any(Number) },
+      { circleId: 'left', syncId: 'sync-left', keyMap: { 1: bytesToHex(CONTENT_KEY) }, leftAt: expect.any(Number) },
     ]);
   });
 
@@ -265,7 +268,7 @@ describe('a departure', () => {
     await saveMasterSeed(SEED);
     await addCircle('left');
     (getManifest as jest.Mock).mockResolvedValue(
-      stored({ circles: [{ circleId: 'left', leftAt: 123 }] }, SEED),
+      stored({ circles: [{ circleId: 'left', syncId: 'sync-left', keyMap: {}, leftAt: 123 }] }, SEED),
     );
 
     await reconcileAccountManifest();
@@ -312,7 +315,7 @@ describe('two devices on one account', () => {
     await reconcileAccountManifest();
 
     expect(pushedPayload().circles).toEqual([
-      { circleId: 'removed-elsewhere', leftAt: expect.any(Number) },
+      { circleId: 'removed-elsewhere', syncId: 'sync-removed-elsewhere', keyMap: { 1: bytesToHex(CONTENT_KEY) }, leftAt: expect.any(Number) },
     ]);
   });
 
@@ -392,7 +395,7 @@ describe('reconcileAccountManifest', () => {
 
     await reconcileAccountManifest();
 
-    expect(pushedPayload().circles).toEqual([{ circleId: 'gone', leftAt: expect.any(Number) }]);
+    expect(pushedPayload().circles).toEqual([{ circleId: 'gone', syncId: 'sync-gone', keyMap: { 1: bytesToHex(CONTENT_KEY) }, leftAt: expect.any(Number) }]);
   });
 
   /**
@@ -461,7 +464,7 @@ describe('ordering between two manifest writes', () => {
     await markCircleLeft('leaving');
     await reconcileAccountManifest();
 
-    expect(latest.circles).toEqual([{ circleId: 'leaving', leftAt: expect.any(Number) }]);
+    expect(latest.circles).toEqual([{ circleId: 'leaving', syncId: 'sync-leaving', keyMap: { 1: bytesToHex(CONTENT_KEY) }, leftAt: expect.any(Number) }]);
   });
 });
 
@@ -483,7 +486,7 @@ describe('leaving a circle and rejoining it', () => {
     await reconcileAccountManifest();
 
     expect(pushedPayload().circles).toEqual([
-      { circleId: 'before', leftAt: expect.any(Number) },
+      { circleId: 'before', syncId: 'sync-before', keyMap: { 1: bytesToHex(CONTENT_KEY) }, leftAt: expect.any(Number) },
       { circleId: 'after', syncId: 'sync-after', keyMap: { 1: bytesToHex(CONTENT_KEY) } },
     ]);
   });
@@ -499,7 +502,7 @@ describe('leaving a circle and rejoining it', () => {
     await saveMasterSeed(SEED);
     await addCircle('reused');
     (getManifest as jest.Mock).mockResolvedValue(
-      stored({ circles: [{ circleId: 'reused', leftAt: 123 }] }, SEED),
+      stored({ circles: [{ circleId: 'reused', syncId: 'sync-reused', keyMap: {}, leftAt: 123 }] }, SEED),
     );
 
     await reconcileAccountManifest();

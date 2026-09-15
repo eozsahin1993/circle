@@ -2,7 +2,7 @@ import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 
 import { normalizeBlob } from '@/data/db/blob';
 import { db } from '@/data/db/connection';
-import { circleMembers, outbox, postComments } from '@/data/db/schema';
+import { circleMembers, outbox, postComments, posts } from '@/data/db/schema';
 import type { NewOutboxEntry } from '@/data/db/outbox';
 
 export type Comment = typeof postComments.$inferSelect;
@@ -167,4 +167,17 @@ export async function getCommentAuthors(postId: string): Promise<string[]> {
     .from(postComments)
     .where(eq(postComments.postId, postId));
   return rows.map((row) => row.authorPublicKey);
+}
+
+/** Deletes one author's comments on other people's posts in a circle — the author's own posts take their comments with them separately. */
+export async function deleteCommentsByAuthor(circleId: string, authorPublicKey: string): Promise<void> {
+  await db.delete(postComments).where(
+    and(
+      eq(postComments.authorPublicKey, authorPublicKey),
+      inArray(
+        postComments.postId,
+        db.select({ id: posts.id }).from(posts).where(eq(posts.circleId, circleId))
+      )
+    )
+  );
 }

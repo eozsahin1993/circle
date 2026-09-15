@@ -10,16 +10,10 @@ import { getAuthToken } from '@/core/services/keystore/auth-token';
  * blob-relay.ts, and the per-feature `*-relay.ts` modules, all of which
  * build on `authorizedFetch`/`baseUrl` from here. Raw key/token/signature
  * material is always accepted as `Uint8Array` and hex-encoded at the wire
- * boundary in those modules — callers never hand-encode.
+ * boundary in those modules — callers never hand-encode. Named errors
+ * those modules throw live in `relay-errors.ts`, not here or beside each
+ * endpoint.
  */
-
-/** Thrown on HTTP 429 (see server/internal/api/ratelimit) — not handled specially, just identifiable in logs. Callers already retry any thrown error later (outbox, pullMeta, photo-queue.ts), and the budget is sized to make this rare. */
-export class RateLimitedError extends Error {
-  constructor() {
-    super('Rate limit exceeded — try again shortly.');
-    this.name = 'RateLimitedError';
-  }
-}
 
 const DEV_RELAY_PORT = process.env.EXPO_PUBLIC_RELAY_PORT ?? '8090';
 

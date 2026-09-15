@@ -222,6 +222,9 @@ func NewAuthStore(t testing.TB) authstore.Store {
 
 	sessionsTableOnce.Do(func() {
 		sessionsTableErr = localstack.CreateTable(context.Background(), client, sessionsTableName, localstack.HashOnly)
+		if sessionsTableErr == nil {
+			sessionsTableErr = localstack.EnsureAccountIDIndex(context.Background(), client, sessionsTableName)
+		}
 	})
 	if sessionsTableErr != nil {
 		unreachable(t, "DynamoDB", sessionsTableErr)

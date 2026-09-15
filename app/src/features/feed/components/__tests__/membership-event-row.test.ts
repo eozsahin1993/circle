@@ -85,6 +85,21 @@ describe('describeMembershipEvent', () => {
 
     expect(words(event({ subjectName: long }))).toBe(`${long} was added by Nadia`);
   });
+
+  /**
+   * Its own kind, not `removed` plus a flag — see `account-deleted.ts`,
+   * which writes `account_deleted` directly rather than reusing
+   * `removed`'s history row.
+   */
+  test('an account deletion says so, not "left"', () => {
+    expect(words(event({ kind: 'account_deleted', selfInflicted: true }))).toBe('Marcus deleted their account');
+  });
+
+  test('reads in the second person when the reader is the one who deleted their account', () => {
+    expect(
+      words(event({ kind: 'account_deleted', selfInflicted: true, subjectIsYou: true }))
+    ).toBe('You deleted your account');
+  });
 });
 
 function subject(name: string, isYou = false): GroupedSubject {

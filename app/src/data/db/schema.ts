@@ -142,9 +142,12 @@ export const memberEvents = sqliteTable(
     /**
      * Local-only, unlike `EntryTypes` — this table is a disposable
      * projection rebuilt by replaying from epoch 0, so these values can
-     * be renamed freely. Wire format cannot.
+     * be renamed freely. Wire format cannot. `account_deleted` replaces
+     * `removed` for a departure triggered by deleting the account, rather
+     * than sharing `removed` plus a separate flag — same reasons `role`
+     * splits `role_changed` by direction instead of a boolean.
      */
-    kind: text('kind', { enum: ['created', 'added', 'removed', 'role_changed'] }).notNull(),
+    kind: text('kind', { enum: ['created', 'added', 'removed', 'role_changed', 'account_deleted'] }).notNull(),
     /** Who it happened to. */
     subjectPublicKey: text('subject_public_key').notNull(),
     /**
@@ -377,6 +380,7 @@ export const outbox = sqliteTable(
         'post_delete',
         'push_enabled',
         'circle_deleted',
+        'account_deleted',
       ],
     }).notNull(),
     /**

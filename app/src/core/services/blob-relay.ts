@@ -2,7 +2,8 @@ import { File, Paths, UploadType } from 'expo-file-system';
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { generateUUID } from '@/core/crypto/primitives';
-import { authorizedFetch, describeError, RateLimitedError } from '@/core/services/relay';
+import { authorizedFetch, describeError } from '@/core/services/relay';
+import { BlobAlreadyExistsError, BlobDeleteRefusedError, RateLimitedError } from '@/core/services/relay-errors';
 
 /**
  * The relay's blob endpoints (server-side: getuploadtarget,
@@ -14,27 +15,6 @@ export type UploadTarget = {
   url: string;
   fields: Record<string, string>;
 };
-
-/** Thrown by `getUploadTarget` specifically — see its own doc comment for why this isn't necessarily a failure. */
-export class BlobAlreadyExistsError extends Error {
-  constructor() {
-    super('A blob already exists for this entry.');
-    this.name = 'BlobAlreadyExistsError';
-  }
-}
-
-/**
- * Thrown when the relay refuses to delete a blob (403): this device
- * neither uploaded it nor holds an admin key the circle recognises. A
- * permanent refusal, not a transient one — see `deleteBlobFor`, which
- * gives up on the bytes rather than blocking the queue behind it.
- */
-export class BlobDeleteRefusedError extends Error {
-  constructor(detail: string) {
-    super(detail);
-    this.name = 'BlobDeleteRefusedError';
-  }
-}
 
 /**
  * Obtains a presigned upload target for one entry's blob — POST
