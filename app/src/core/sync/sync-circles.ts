@@ -1,4 +1,5 @@
 import { getAllCircles, getCircle, getPendingOutboxEntries } from '@/data/db';
+import { finishAccountDeletionIfPending } from '@/features/account/usecases/delete-account';
 import { finishPendingDepartures } from '@/features/circle/usecases/leave-circle';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
@@ -59,6 +60,9 @@ export async function syncAllCircles(): Promise<number> {
   // with a departure still queued needs a pass of its own until that
   // entry has gone out — see finishDeparture.
   await finishPendingDepartures();
+  // Same reasoning, one level up: an account deletion still finishing in
+  // the background needs a pass regardless of what any circle needs.
+  await finishAccountDeletionIfPending();
   return failed;
 }
 
@@ -83,6 +87,7 @@ export async function syncAllCircles(): Promise<number> {
  */
 export async function syncStaleCircles(): Promise<void> {
   await finishPendingDepartures();
+  await finishAccountDeletionIfPending();
 
   const circles = await getAllCircles();
   if (circles.length === 0) return;

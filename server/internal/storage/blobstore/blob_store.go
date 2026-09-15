@@ -81,6 +81,10 @@ type Store interface {
 	// only the ciphertext goes.
 	Delete(ctx context.Context, syncID, entryID string) error
 
+	// DeleteMany is Delete over a set of entries in batched calls —
+	// entries that never had a blob count as deleted, same as Delete.
+	DeleteMany(ctx context.Context, syncID string, entryIDs []string) error
+
 	// DeleteCircle removes every blob a circle owns, cover photo included
 	// — they all share the syncID prefix. Idempotent and resumable: a
 	// caller that fails partway retries the whole thing, and objects

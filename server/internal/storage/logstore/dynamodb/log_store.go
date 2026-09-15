@@ -45,7 +45,7 @@ const (
 // writes to the same circle — vanishingly rare at family-circle scale.
 const maxCASAttempts = 5
 
-// EntryIDIndexName is the GSI DeletePost queries to find a post by id —
+// EntryIDIndexName is the GSI DeleteEntry queries to find a post by id —
 // see modules/storage/dynamodb.tf. Exported so internal/localstack can
 // create it under the same name in tests.
 const EntryIDIndexName = "entryId-index"
@@ -424,15 +424,15 @@ func (s *Store) DeleteCircle(ctx context.Context, deletion logstore.CircleDeleti
 	return logstore.CommitResult{}, logstore.ErrConcurrentModification
 }
 
-// findPostByID resolves a content-namespace entry by id via the
+// findEntryByID resolves a content-namespace entry by id via the
 // entryId-index GSI, then fetches the full row from the base table (the
-// GSI is KEYS_ONLY). ErrPostNotFound if absent or in a different circle.
+// GSI is KEYS_ONLY). ErrEntryNotFound if absent or in a different circle.
 //
 // The GSI is only eventually consistent, so a post deleted right after
 // being posted can briefly not show up yet — retried with the same
 // backoff Peek uses for its own eventually-consistent reads, rather than
 // failing a legitimate delete on timing.
-func (s *Store) findPostByID(ctx context.Context, syncID, entryID string) (logstore.LogEntry, error) {
+func (s *Store) findEntryByID(ctx context.Context, syncID, entryID string) (logstore.LogEntry, error) {
 	var queryOut *dynamodb.QueryOutput
 	for attempt := 0; attempt < maxCASAttempts; attempt++ {
 		if attempt > 0 {
@@ -458,11 +458,11 @@ func (s *Store) findPostByID(ctx context.Context, syncID, entryID string) (logst
 		}
 	}
 	if queryOut == nil {
-		return logstore.LogEntry{}, logstore.ErrPostNotFound
+		return logstore.LogEntry{}, logstore.ErrEntryNotFound
 	}
 	pk, _ := dynamoutil.AttrString(queryOut.Items[0], dynamoutil.PKAttr)
 	if pk != syncID {
-		return logstore.LogEntry{}, logstore.ErrPostNotFound
+		return logstore.LogEntry{}, logstore.ErrEntryNotFound
 	}
 	sk, _ := dynamoutil.AttrString(queryOut.Items[0], dynamoutil.SKAttr)
 
@@ -475,7 +475,7 @@ func (s *Store) findPostByID(ctx context.Context, syncID, entryID string) (logst
 		return logstore.LogEntry{}, err
 	}
 	if out.Item == nil {
-		return logstore.LogEntry{}, logstore.ErrPostNotFound
+		return logstore.LogEntry{}, logstore.ErrEntryNotFound
 	}
 	epoch, err := dynamoutil.AttrInt(out.Item, "epoch")
 	if err != nil {
@@ -485,16 +485,16 @@ func (s *Store) findPostByID(ctx context.Context, syncID, entryID string) (logst
 	return logstore.LogEntry{Epoch: epoch, AuthorIdentityPublicKey: authorIdentityPublicKey}, nil
 }
 
-// DeletePost strips a post's payload and appends its tombstone — see
-// logstore.Store.DeletePost.
-func (s *Store) DeletePost(ctx context.Context, deletion logstore.PostDeletion) (logstore.CommitResult, error) {
+// DeleteEntry strips a post's payload and appends its tombstone — see
+// logstore.Store.DeleteEntry.
+func (s *Store) DeleteEntry(ctx context.Context, deletion logstore.EntryDeletion) (logstore.CommitResult, error) {
 	if existing, err := s.lookupIdempotencyMarker(ctx, deletion.SyncID, logstore.NamespaceContent, deletion.TombstoneEntryID); err != nil {
 		return logstore.CommitResult{}, err
 	} else if existing != nil {
 		return *existing, nil
 	}
 
-	post, err := s.findPostByID(ctx, deletion.SyncID, deletion.PostEntryID)
+	post, err := s.findEntryByID(ctx, deletion.SyncID, deletion.TargetEntryID)
 	if err != nil {
 		return logstore.CommitResult{}, err
 	}
@@ -502,7 +502,7 @@ func (s *Store) DeletePost(ctx context.Context, deletion logstore.PostDeletion) 
 	authorizedBy := post.AuthorIdentityPublicKey
 	if verifyAuthoritySignature(post.AuthorIdentityPublicKey, deletion.Message(), deletion.AuthorSignature) != nil {
 		if deletion.AuthorityPublicKey == "" || len(deletion.AuthoritySignature) == 0 {
-			return logstore.CommitResult{}, logstore.ErrPostNotAuthorized
+			return logstore.CommitResult{}, logstore.ErrEntryNotAuthorized
 		}
 		if err := s.VerifyAuthoritySignature(ctx, deletion.SyncID, deletion.AuthorityPublicKey, deletion.Message(), deletion.AuthoritySignature); err != nil {
 			return logstore.CommitResult{}, err
@@ -599,6 +599,131 @@ func (s *Store) DeletePost(ctx context.Context, deletion logstore.PostDeletion) 
 		}
 	}
 	return logstore.CommitResult{}, logstore.ErrConcurrentModification
+}
+
+// DeleteAuthorContent strips every content entry one identity authored —
+// see logstore.Store.DeleteAuthorContent.
+//
+// The strip itself carries no control-state CAS: it appends nothing and
+// each row mutation is idempotent, so concurrent appends don't need
+// fencing out. Only the optional tombstone goes through Append's usual
+// gate. Re-running after a partial failure converges — stripped rows no
+// longer match the query's attribute_exists(encryptedMeta) filter.
+func (s *Store) DeleteAuthorContent(ctx context.Context, deletion logstore.AuthorContentDeletion) (logstore.AuthorContentResult, error) {
+	// A failed signature here is a refused credential, not a malformed
+	// request — it's the only thing authorizing the strip.
+	if err := verifyAuthoritySignature(deletion.AuthorIdentityPublicKey, deletion.Message(), deletion.AuthorSignature); err != nil {
+		if errors.Is(err, logstore.ErrInvalidSignature) {
+			return logstore.AuthorContentResult{}, logstore.ErrEntryNotAuthorized
+		}
+		return logstore.AuthorContentResult{}, err
+	}
+
+	withTombstone := deletion.TombstoneEntryID != ""
+	if withTombstone {
+		// Checked before the strip so a stale token fails the whole call
+		// up front rather than after rows are already gone. Append below
+		// re-checks it atomically.
+		if err := s.VerifyWriteToken(ctx, deletion.SyncID, deletion.WriteToken); err != nil {
+			return logstore.AuthorContentResult{}, err
+		}
+	} else if _, err := s.getControlState(ctx, deletion.SyncID, false); err != nil {
+		return logstore.AuthorContentResult{}, err
+	}
+
+	stripped, err := s.stripAuthorContent(ctx, deletion.SyncID, deletion.AuthorIdentityPublicKey)
+	if err != nil {
+		return logstore.AuthorContentResult{}, err
+	}
+
+	result := logstore.AuthorContentResult{StrippedEntryIDs: stripped}
+	if withTombstone {
+		commit, err := s.Append(ctx, deletion.SyncID, logstore.NamespaceMeta, deletion.TombstoneEntryID, deletion.EncryptedPayload, deletion.KeyVersion, deletion.WriteToken, deletion.AuthorIdentityPublicKey)
+		if err != nil {
+			return logstore.AuthorContentResult{}, err
+		}
+		result.CommitResult = commit
+	}
+	return result, nil
+}
+
+// stripAuthorContent pages the circle's content range for rows authored
+// by authorKey that still carry ciphertext, and strips each — the same
+// mutation DeleteEntry makes, minus its tombstone. The tombstone itself
+// (meta-namespace) is never a candidate here: it lives outside the
+// content SK range this pages, so a retry can't strip what it just
+// appended.
+//
+// Individually conditioned UpdateItems rather than a transaction: an
+// unconditioned Update on a row a concurrent circle-deletion sweep just
+// removed would resurrect it as a ghost item, and one condition failure
+// inside TransactWriteItems would abort rows that did nothing wrong.
+// Bounded fan-out, same reasoning as sweepConcurrency.
+func (s *Store) stripAuthorContent(ctx context.Context, syncID, authorKey string) ([]string, error) {
+	type target struct{ sk, entryID string }
+	var targets []target
+
+	paginator := dynamodb.NewQueryPaginator(s.client, &dynamodb.QueryInput{
+		TableName:              aws.String(s.tableName),
+		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :pk AND %s BETWEEN :lower AND :upper", dynamoutil.PKAttr, dynamoutil.SKAttr)),
+		FilterExpression:       aws.String("authorIdentityPublicKey = :author AND attribute_exists(encryptedMeta)"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":pk":     &types.AttributeValueMemberS{Value: syncID},
+			":lower":  &types.AttributeValueMemberS{Value: entrySK(logstore.NamespaceContent, 1)},
+			":upper":  &types.AttributeValueMemberS{Value: entrySKUpperBound(logstore.NamespaceContent)},
+			":author": &types.AttributeValueMemberS{Value: authorKey},
+		},
+		ProjectionExpression: aws.String(fmt.Sprintf("%s, entryId", dynamoutil.SKAttr)),
+	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range page.Items {
+			sk, _ := dynamoutil.AttrString(item, dynamoutil.SKAttr)
+			entryID, _ := dynamoutil.AttrString(item, "entryId")
+			targets = append(targets, target{sk: sk, entryID: entryID})
+		}
+	}
+
+	deletedAt := dynamoutil.NowMillis()
+	var wg sync.WaitGroup
+	errs := make(chan error, len(targets))
+	sem := make(chan struct{}, sweepConcurrency)
+	for _, t := range targets {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(sk string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			_, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+				TableName:           aws.String(s.tableName),
+				Key:                 map[string]types.AttributeValue{dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: syncID}, dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: sk}},
+				UpdateExpression:    aws.String("REMOVE encryptedMeta SET deletedAt = :t, deletedBy = :who"),
+				ConditionExpression: aws.String(fmt.Sprintf("attribute_exists(%s)", dynamoutil.PKAttr)),
+				ExpressionAttributeValues: map[string]types.AttributeValue{
+					":t":   &types.AttributeValueMemberN{Value: strconv.FormatInt(deletedAt, 10)},
+					":who": &types.AttributeValueMemberS{Value: authorKey},
+				},
+			})
+			var conditionFailed *types.ConditionalCheckFailedException
+			if err != nil && !errors.As(err, &conditionFailed) {
+				errs <- err
+			}
+		}(t.sk)
+	}
+	wg.Wait()
+	close(errs)
+	if err := <-errs; err != nil {
+		return nil, err
+	}
+
+	entryIDs := make([]string, 0, len(targets))
+	for _, t := range targets {
+		entryIDs = append(entryIDs, t.entryID)
+	}
+	return entryIDs, nil
 }
 
 // sweepDeleted clears out a circle that has just been tombstoned: content
@@ -1046,7 +1171,7 @@ func (s *Store) Read(ctx context.Context, syncID string, ns logstore.Namespace, 
 			if err != nil {
 				return logstore.FetchResult{}, err
 			}
-			// Absent on a DeletePost-stripped row (never on any other kind —
+			// Absent on a DeleteEntry-stripped row (never on any other kind —
 			// everything else always writes it). Empty rather than an error:
 			// the client's own decrypt already treats malformed/absent
 			// ciphertext as unreadable and skips it, same as any entry it

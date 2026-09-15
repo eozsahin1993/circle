@@ -10,6 +10,7 @@ import {
   markCircleLeft,
   OutboxStatuses,
   recordMemberRemovedLocally,
+  type OutboxEntry,
 } from '@/data/db';
 import { removeCircleNotificationChannel } from '@/features/push-notifications/services/channels';
 import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
@@ -18,7 +19,7 @@ import { purgeCircleLocally } from '@/features/circle/usecases/purge-circle';
 import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { generateUUID } from '@/core/crypto/primitives';
-import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
+import { getCircleIdentity, getCurrentContentKey, type CircleIdentity } from '@/core/services/keystore/circle-keys';
 import { pullMeta } from '@/core/sync/pull-log';
 
 /**
@@ -54,6 +55,54 @@ import { pullMeta } from '@/core/sync/pull-log';
  * **Authority is handed back first** — see `queueDepartingHandover`.
  */
 export async function leaveCircle(circleId: string): Promise<void> {
+  await departFromCircle(circleId, EntryTypes.MEMBER_REMOVED, (identity, currentKey, occurredAt) =>
+    buildAndEncryptLogEntry(
+      EntryTypes.MEMBER_REMOVED,
+      // Carried on the entry for the same reason member_added carries
+      // theirs — so a device replaying meta from epoch 0 dates this
+      // departure when it happened, not when it read about it. Doubly so
+      // here, where the gap can be days of being offline.
+      { identityPublicKey: bytesToHex(identity.publicKey), createdAt: occurredAt },
+      identity,
+      currentKey
+    )
+  );
+}
+
+/**
+ * `leaveCircle`'s account-deletion sibling: queues one `account_deleted`
+ * entry instead of `member_removed`. It replaces that departure entirely
+ * rather than running alongside it — `account_deleted` already carries
+ * everything a departure needs to announce (see `account-deleted.ts`) —
+ * so there is never a separate `member_removed` for this circle too.
+ *
+ * Everything else about leaving is unrelated to *why* this device is
+ * leaving, so `departFromCircle` runs it unchanged: the last member out
+ * still deletes the circle instead of departing it
+ * (`deleteCircleForEveryone` — its own tombstone-and-sweep already
+ * erases everything, so a redundant `account_deleted` there would add
+ * nothing), and an admin still hands off authority before giving up
+ * their own key.
+ */
+export async function leaveCircleForAccountDeletion(circleId: string): Promise<void> {
+  await departFromCircle(circleId, EntryTypes.ACCOUNT_DELETED, (identity, currentKey, occurredAt) =>
+    buildAndEncryptLogEntry(EntryTypes.ACCOUNT_DELETED, { createdAt: occurredAt }, identity, currentKey)
+  );
+}
+
+/**
+ * The shared shape behind `leaveCircle` and `leaveCircleForAccountDeletion`
+ * — everything about leaving except which one entry announces it and
+ * what that entry's payload holds. `entryType`/`buildEntry` are the only
+ * per-caller pieces; the solo-member check, the handover, the local
+ * optimistic write, and the background push are identical regardless of
+ * why the departure is happening.
+ */
+async function departFromCircle(
+  circleId: string,
+  entryType: OutboxEntry['entryType'],
+  buildEntry: (identity: CircleIdentity, currentKey: Uint8Array, occurredAt: number) => Uint8Array
+): Promise<void> {
   const circle = await getCircle(circleId);
   if (!circle) throw new Error('No local circle row for this id.');
   const identity = await getCircleIdentity(circleId);
@@ -87,29 +136,18 @@ export async function leaveCircle(circleId: string): Promise<void> {
   // the departure to reach the relay while this device can still sign it.
   await queueDepartingHandover(circleId);
 
-  const ownPublicKey = bytesToHex(identity.publicKey);
-  // Carried on the entry for the same reason member_added and
-  // member_removed carry theirs — so a device replaying meta from epoch 0
-  // dates this departure when it happened, not when it read about it.
-  // Doubly so here, where the gap can be days of being offline.
-  const removedAt = Date.now();
-  const entry = buildAndEncryptLogEntry(
-    EntryTypes.MEMBER_REMOVED,
-    { identityPublicKey: ownPublicKey, createdAt: removedAt },
-    identity,
-    current.key
-  );
+  const occurredAt = Date.now();
   await insertOutboxEntry({
     circleId,
-    entryType: EntryTypes.MEMBER_REMOVED,
+    entryType,
     entryId: generateUUID(),
     status: OutboxStatuses.pending,
     epoch: null,
     blobEntryId: null,
-    encryptedMeta: entry,
+    encryptedMeta: buildEntry(identity, current.key, occurredAt),
   });
 
-  await recordMemberRemovedLocally({ circleId, subjectPublicKey: ownPublicKey, removedAt });
+  await recordMemberRemovedLocally({ circleId, subjectPublicKey: bytesToHex(identity.publicKey), removedAt: occurredAt });
   await markCircleLeft(circleId);
   // Deleting the group takes its channels with it.
   await removeCircleNotificationChannel(circleId);

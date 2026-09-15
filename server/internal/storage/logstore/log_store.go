@@ -87,12 +87,12 @@ var (
 	// past the retry budget. Expected to be vanishingly rare at
 	// family-circle scale — treat as "retry," not a hard failure.
 	ErrConcurrentModification = errors.New("logstore: control state changed concurrently, exceeded retry budget")
-	// ErrPostNotFound: DeletePost's postEntryID doesn't resolve to a row
+	// ErrEntryNotFound: DeleteEntry's TargetEntryID doesn't resolve to a row
 	// in this circle.
-	ErrPostNotFound = errors.New("logstore: no such post in this circle")
-	// ErrPostNotAuthorized: neither AuthorSignature nor
+	ErrEntryNotFound = errors.New("logstore: no such entry in this circle")
+	// ErrEntryNotAuthorized: neither AuthorSignature nor
 	// AuthorityPublicKey/AuthoritySignature verified.
-	ErrPostNotAuthorized = errors.New("logstore: caller is neither the post's author nor a recognized authority")
+	ErrEntryNotAuthorized = errors.New("logstore: caller is neither the entry's author nor a recognized authority")
 )
 
 // LogEntry is one entry in a circle's append-only log — never decrypted
@@ -112,7 +112,7 @@ type LogEntry struct {
 	// written by Rotate, ChangeAuthority, or DeleteCircle, which have no
 	// content author in this sense.
 	AuthorIdentityPublicKey string
-	// DeletedAt is nonzero only on a DeletePost-stripped row — lets a
+	// DeletedAt is nonzero only on a DeleteEntry-stripped row — lets a
 	// client skip it as an expected deletion rather than logging it
 	// alongside genuine decrypt/verify failures.
 	DeletedAt int64
@@ -190,14 +190,14 @@ func (d CircleDeletion) Message() []byte {
 	return []byte("circle-relay/delete-circle/v1\x00" + d.SyncID + "\x00" + d.EntryID)
 }
 
-// PostDeletion is one post being deleted — the tombstone entry, and the
+// EntryDeletion is one post being deleted — the tombstone entry, and the
 // two capabilities it can be authorized by: the post's own author
-// (AuthorSignature, checked against whatever DeletePost finds on the
+// (AuthorSignature, checked against whatever DeleteEntry finds on the
 // row) or a circle admin (AuthorityPublicKey/AuthoritySignature) — same
 // shape as deleteblob's uploader-or-admin check.
-type PostDeletion struct {
+type EntryDeletion struct {
 	SyncID           string
-	PostEntryID      string
+	TargetEntryID    string
 	TombstoneEntryID string
 	EncryptedPayload []byte
 	KeyVersion       int64
@@ -211,8 +211,43 @@ type PostDeletion struct {
 
 // Message binds the circle, the post, and the tombstone entry — not the
 // lookup, which is never signed.
-func (d PostDeletion) Message() []byte {
-	return []byte("circle-relay/delete-post/v1\x00" + d.SyncID + "\x00" + d.PostEntryID + "\x00" + d.TombstoneEntryID)
+func (d EntryDeletion) Message() []byte {
+	return []byte("circle-relay/delete-entry/v1\x00" + d.SyncID + "\x00" + d.TargetEntryID + "\x00" + d.TombstoneEntryID)
+}
+
+// AuthorContentDeletion is every content entry one identity authored in
+// one circle being erased at once — account deletion's per-circle call.
+// Authorized only by AuthorSignature against AuthorIdentityPublicKey
+// itself: proving control of the exact key stamped on every row being
+// stripped is a stronger claim than write-token possession, which is why
+// the tombstone fields (and the write token they need) are optional — a
+// departed member can still erase what they authored, they just can't
+// append the tombstone announcing it.
+type AuthorContentDeletion struct {
+	SyncID                  string
+	AuthorIdentityPublicKey string
+
+	// Optional TombstoneEntryID for circles that you already have write access
+	TombstoneEntryID string
+	EncryptedPayload []byte
+	KeyVersion       int64
+	WriteToken       string
+
+	AuthorSignature []byte
+}
+
+// Message binds the circle, the author, and the tombstone entry ("" in
+// strip-only mode) — same construction as every other signed message.
+func (d AuthorContentDeletion) Message() []byte {
+	return []byte("circle-relay/delete-author-content/v1\x00" + d.SyncID + "\x00" + d.AuthorIdentityPublicKey + "\x00" + d.TombstoneEntryID)
+}
+
+// AuthorContentResult is what DeleteAuthorContent hands back:
+// StrippedEntryIDs so the caller can delete the blobs behind them, and
+// the tombstone's CommitResult (zero in strip-only mode).
+type AuthorContentResult struct {
+	CommitResult
+	StrippedEntryIDs []string
 }
 
 // Store is storage for the append-only per-circle log, plus the small
@@ -298,7 +333,7 @@ type Store interface {
 	// silent data loss.
 	DeleteCircle(ctx context.Context, deletion CircleDeletion) (CommitResult, error)
 
-	// DeletePost strips a post's EncryptedMeta, stamps deletedAt/deletedBy,
+	// DeleteEntry strips a post's EncryptedMeta, stamps deletedAt/deletedBy,
 	// and appends the tombstone entry — the row itself survives, since
 	// comments/reactions reference it by id. Finds the post via a GSI on
 	// entryId, not anything the caller supplies. AuthorSignature is
@@ -306,7 +341,17 @@ type Store interface {
 	// falling back to AuthorityPublicKey/AuthoritySignature — same
 	// author-or-admin shape as deleteblob, relay-enforced here instead of
 	// left to every client's own predicate.
-	DeletePost(ctx context.Context, deletion PostDeletion) (CommitResult, error)
+	DeleteEntry(ctx context.Context, deletion EntryDeletion) (CommitResult, error)
+
+	// DeleteAuthorContent strips every content entry authored by
+	// AuthorIdentityPublicKey — the same per-row mutation as DeleteEntry,
+	// found by a paged query over the circle's content range rather than
+	// an index (rare operation, deliberately unindexed). With a
+	// TombstoneEntryID it then appends the tombstone through the ordinary
+	// possession-gated path; without one it strips and stops. Idempotent
+	// end to end: a re-run finds nothing left to strip and the tombstone
+	// converges on its idempotency marker.
+	DeleteAuthorContent(ctx context.Context, deletion AuthorContentDeletion) (AuthorContentResult, error)
 
 	// Read never deletes or evicts — retention is permanent (invariant 1).
 	// sinceEpoch is a position in ns's sequence, not a timestamp; entries

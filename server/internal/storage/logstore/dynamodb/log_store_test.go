@@ -1158,12 +1158,12 @@ func TestLogStore_DeleteCircle_WithNoContentAtAll(t *testing.T) {
 	}
 }
 
-// deletePost builds a PostDeletion signed by author for postEntryID —
+// deleteEntry builds an EntryDeletion signed by author for entryID —
 // tests that want a wrong signature edit AuthorSignature after.
-func deletePost(author authorityKey, syncID, postEntryID, tombstoneEntryID, token string) logstore.PostDeletion {
-	deletion := logstore.PostDeletion{
+func deleteEntry(author authorityKey, syncID, entryID, tombstoneEntryID, token string) logstore.EntryDeletion {
+	deletion := logstore.EntryDeletion{
 		SyncID:           syncID,
-		PostEntryID:      postEntryID,
+		TargetEntryID:    entryID,
 		TombstoneEntryID: tombstoneEntryID,
 		EncryptedPayload: []byte("post_delete payload"),
 		KeyVersion:       1,
@@ -1173,7 +1173,7 @@ func deletePost(author authorityKey, syncID, postEntryID, tombstoneEntryID, toke
 	return deletion
 }
 
-func TestLogStore_DeletePost_SucceedsViaAuthorSignature(t *testing.T) {
+func TestLogStore_DeleteEntry_SucceedsViaAuthorSignature(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
 	syncID := testsupport.UniqueSyncID(t)
@@ -1189,7 +1189,7 @@ func TestLogStore_DeletePost_SucceedsViaAuthorSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	commit, err := store.DeletePost(ctx, deletePost(author, syncID, postID, "tombstone-1", token))
+	commit, err := store.DeleteEntry(ctx, deleteEntry(author, syncID, postID, "tombstone-1", token))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1220,7 +1220,7 @@ func TestLogStore_DeletePost_SucceedsViaAuthorSignature(t *testing.T) {
 	}
 }
 
-func TestLogStore_DeletePost_SucceedsViaAuthoritySignature(t *testing.T) {
+func TestLogStore_DeleteEntry_SucceedsViaAuthoritySignature(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
 	syncID := testsupport.UniqueSyncID(t)
@@ -1234,9 +1234,9 @@ func TestLogStore_DeletePost_SucceedsViaAuthoritySignature(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	deletion := logstore.PostDeletion{
+	deletion := logstore.EntryDeletion{
 		SyncID:           syncID,
-		PostEntryID:      postID,
+		TargetEntryID:    postID,
 		TombstoneEntryID: "tombstone-1",
 		EncryptedPayload: []byte("post_delete payload"),
 		KeyVersion:       1,
@@ -1246,12 +1246,12 @@ func TestLogStore_DeletePost_SucceedsViaAuthoritySignature(t *testing.T) {
 	}
 	deletion.AuthoritySignature = ed25519.Sign(founder.private, deletion.Message())
 
-	if _, err := store.DeletePost(ctx, deletion); err != nil {
+	if _, err := store.DeleteEntry(ctx, deletion); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestLogStore_DeletePost_RejectsWrongSignature(t *testing.T) {
+func TestLogStore_DeleteEntry_RejectsWrongSignature(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
 	syncID := testsupport.UniqueSyncID(t)
@@ -1266,12 +1266,12 @@ func TestLogStore_DeletePost_RejectsWrongSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := store.DeletePost(ctx, deletePost(impostor, syncID, postID, "tombstone-1", token)); !errors.Is(err, logstore.ErrPostNotAuthorized) {
-		t.Fatalf("expected ErrPostNotAuthorized, got %v", err)
+	if _, err := store.DeleteEntry(ctx, deleteEntry(impostor, syncID, postID, "tombstone-1", token)); !errors.Is(err, logstore.ErrEntryNotAuthorized) {
+		t.Fatalf("expected ErrEntryNotAuthorized, got %v", err)
 	}
 }
 
-func TestLogStore_DeletePost_RejectsUnknownPostEntryID(t *testing.T) {
+func TestLogStore_DeleteEntry_RejectsUnknownTargetEntryID(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
 	syncID := testsupport.UniqueSyncID(t)
@@ -1279,12 +1279,12 @@ func TestLogStore_DeletePost_RejectsUnknownPostEntryID(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.DeletePost(ctx, deletePost(founder, syncID, "no-such-post", "tombstone-1", token)); !errors.Is(err, logstore.ErrPostNotFound) {
-		t.Fatalf("expected ErrPostNotFound, got %v", err)
+	if _, err := store.DeleteEntry(ctx, deleteEntry(founder, syncID, "no-such-post", "tombstone-1", token)); !errors.Is(err, logstore.ErrEntryNotFound) {
+		t.Fatalf("expected ErrEntryNotFound, got %v", err)
 	}
 }
 
-func TestLogStore_DeletePost_RetryWithTheSameTombstoneEntryIDIsIdempotent(t *testing.T) {
+func TestLogStore_DeleteEntry_RetryWithTheSameTombstoneEntryIDIsIdempotent(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
 	syncID := testsupport.UniqueSyncID(t)
@@ -1298,15 +1298,242 @@ func TestLogStore_DeletePost_RetryWithTheSameTombstoneEntryIDIsIdempotent(t *tes
 		t.Fatal(err)
 	}
 
-	first, err := store.DeletePost(ctx, deletePost(author, syncID, postID, "tombstone-1", token))
+	first, err := store.DeleteEntry(ctx, deleteEntry(author, syncID, postID, "tombstone-1", token))
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := store.DeletePost(ctx, deletePost(author, syncID, postID, "tombstone-1", token))
+	second, err := store.DeleteEntry(ctx, deleteEntry(author, syncID, postID, "tombstone-1", token))
 	if err != nil {
 		t.Fatalf("a retry must converge rather than fail: %v", err)
 	}
 	if first != second {
 		t.Fatalf("expected the retry to return the original commit, got %+v then %+v", first, second)
+	}
+}
+
+// authorContentDeletion builds an AuthorContentDeletion signed by author —
+// tombstoneEntryID "" means strip-only mode, which also sends no token.
+func authorContentDeletion(author authorityKey, syncID, tombstoneEntryID, token string) logstore.AuthorContentDeletion {
+	deletion := logstore.AuthorContentDeletion{
+		SyncID:                  syncID,
+		AuthorIdentityPublicKey: author.publicKeyHex,
+		TombstoneEntryID:        tombstoneEntryID,
+	}
+	if tombstoneEntryID != "" {
+		deletion.EncryptedPayload = []byte("account_deleted payload")
+		deletion.KeyVersion = 1
+		deletion.WriteToken = token
+	}
+	deletion.AuthorSignature = ed25519.Sign(author.private, deletion.Message())
+	return deletion
+}
+
+func TestLogStore_DeleteAuthorContent_StripsTheAuthorsRowsAndAppendsTheTombstone(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	author := newAuthorityKey(t)
+	other := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	for i, id := range []string{"-a1", "-a2", "-a3"} {
+		if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, syncID+id, []byte(fmt.Sprintf("author content %d", i)), 1, token, author.publicKeyHex); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, syncID+"-b1", []byte("other content"), 1, token, other.publicKeyHex); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceMeta, syncID+"-m1", []byte("member_added"), 1, token, author.publicKeyHex); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.StrippedEntryIDs) != 3 {
+		t.Fatalf("expected 3 stripped entries, got %v", result.StrippedEntryIDs)
+	}
+	// The existing member_added is meta epoch 1; the tombstone lands right
+	// after it, in meta — not content, even though what it strips is
+	// content — since it also carries the roster removal every client's
+	// account-deletion path folds into it, and meta is what's synced
+	// eagerly and in full.
+	if result.Epoch != 2 {
+		t.Fatalf("expected the tombstone at meta epoch 2, got %d", result.Epoch)
+	}
+
+	read, err := store.Read(ctx, syncID, logstore.NamespaceContent, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Entries) != 4 {
+		t.Fatalf("expected the 4 content rows to survive, tombstone excluded, got %d", len(read.Entries))
+	}
+	for _, entry := range read.Entries[:3] {
+		if len(entry.EncryptedMeta) != 0 || entry.DeletedAt == 0 {
+			t.Fatalf("expected the author's rows stripped and stamped, got %+v", entry)
+		}
+	}
+	if len(read.Entries[3].EncryptedMeta) == 0 {
+		t.Fatal("expected the other member's row untouched")
+	}
+
+	meta, err := store.Read(ctx, syncID, logstore.NamespaceMeta, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(meta.Entries) != 2 || len(meta.Entries[0].EncryptedMeta) == 0 {
+		t.Fatal("expected the author's original meta entry untouched")
+	}
+	if len(meta.Entries[1].EncryptedMeta) == 0 {
+		t.Fatal("expected the tombstone itself intact")
+	}
+}
+
+func TestLogStore_DeleteAuthorContent_StripOnlyModeAppendsNothing(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	author := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, syncID+"-a1", []byte("caption"), 1, token, author.publicKeyHex); err != nil {
+		t.Fatal(err)
+	}
+
+	// No tombstone and no write token — a departed member's erase.
+	result, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, "", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.StrippedEntryIDs) != 1 || result.Epoch != 0 {
+		t.Fatalf("expected one strip and no tombstone commit, got %+v", result)
+	}
+
+	read, err := store.Read(ctx, syncID, logstore.NamespaceContent, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Entries) != 1 || len(read.Entries[0].EncryptedMeta) != 0 {
+		t.Fatalf("expected just the stripped row, got %d entries", len(read.Entries))
+	}
+}
+
+func TestLogStore_DeleteAuthorContent_RejectsAWrongSignature(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	author := newAuthorityKey(t)
+	impostor := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, syncID+"-a1", []byte("caption"), 1, token, author.publicKeyHex); err != nil {
+		t.Fatal(err)
+	}
+
+	// The impostor claims the author's key but can't sign for it.
+	deletion := authorContentDeletion(impostor, syncID, "", "")
+	deletion.AuthorIdentityPublicKey = author.publicKeyHex
+	if _, err := store.DeleteAuthorContent(ctx, deletion); !errors.Is(err, logstore.ErrEntryNotAuthorized) {
+		t.Fatalf("expected ErrEntryNotAuthorized, got %v", err)
+	}
+
+	read, err := store.Read(ctx, syncID, logstore.NamespaceContent, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Entries[0].EncryptedMeta) == 0 {
+		t.Fatal("expected the row to survive a refused erase")
+	}
+}
+
+func TestLogStore_DeleteAuthorContent_RetryConvergesWithoutStrippingTheTombstone(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	author := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, syncID+"-a1", []byte("caption"), 1, token, author.publicKeyHex); err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The tombstone is authored by the same key — a retry must not treat
+	// it as content to strip.
+	second, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
+	if err != nil {
+		t.Fatalf("a retry must converge rather than fail: %v", err)
+	}
+	if second.CommitResult != first.CommitResult {
+		t.Fatalf("expected the retry to return the original commit, got %+v then %+v", first.CommitResult, second.CommitResult)
+	}
+	if len(second.StrippedEntryIDs) != 0 {
+		t.Fatalf("expected nothing left to strip on retry, got %v", second.StrippedEntryIDs)
+	}
+
+	read, err := store.Read(ctx, syncID, logstore.NamespaceContent, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Entries) != 1 || len(read.Entries[0].EncryptedMeta) != 0 {
+		t.Fatalf("expected just the stripped content row, got %d entries", len(read.Entries))
+	}
+
+	meta, err := store.Read(ctx, syncID, logstore.NamespaceMeta, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(meta.Entries) != 1 || len(meta.Entries[0].EncryptedMeta) == 0 {
+		t.Fatal("expected the tombstone's ciphertext intact after the retry, in meta")
+	}
+}
+
+func TestLogStore_DeleteAuthorContent_UnknownCircleIsNotFound(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	author := newAuthorityKey(t)
+
+	if _, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, testsupport.UniqueSyncID(t), "", "")); !errors.Is(err, logstore.ErrCircleNotFound) {
+		t.Fatalf("expected ErrCircleNotFound, got %v", err)
+	}
+}
+
+func TestLogStore_DeleteAuthorContent_StaleTokenFailsBeforeAnythingIsStripped(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	author := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, syncID+"-a1", []byte("caption"), 1, token, author.publicKeyHex); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, syncID+"-tomb", newToken(t))); !errors.Is(err, logstore.ErrWriteTokenMismatch) {
+		t.Fatalf("expected ErrWriteTokenMismatch, got %v", err)
+	}
+
+	read, err := store.Read(ctx, syncID, logstore.NamespaceContent, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Entries[0].EncryptedMeta) == 0 {
+		t.Fatal("expected nothing stripped under a stale token")
 	}
 }

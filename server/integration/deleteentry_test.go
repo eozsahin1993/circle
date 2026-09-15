@@ -7,19 +7,19 @@ import (
 	"circle-relay/integration/harness"
 )
 
-// deletepost, end to end: the relay strips a post's ciphertext and
+// deleteentry, end to end: the relay strips an entry's ciphertext and
 // appends its tombstone in one authorized call. internal/storage/logstore
-// dynamodb's own tests already prove DeletePost's behavior in isolation;
+// dynamodb's own tests already prove DeleteEntry's behavior in isolation;
 // what's missing there is the session and routing layer these tests
 // drive, the same gap blob_test.go fills for deleteblob.
 
-func TestDeletePost_TheAuthorCanDeleteTheirOwnPost(t *testing.T) {
+func TestDeleteEntry_TheAuthorCanDeleteTheirOwnPost(t *testing.T) {
 	r := harness.Start(t)
 	c := harness.NewCircle(t, r)
 	post := c.NewAppend(harness.Content)
 	c.AppendLog(post).Expect(http.StatusOK)
 
-	c.DeletePost(post.EntryID, c.NewDeletePost(post.EntryID)).Expect(http.StatusOK)
+	c.DeleteEntry(post.EntryID, c.NewDeleteEntry(post.EntryID)).Expect(http.StatusOK)
 
 	entries := c.Entries(harness.Content)
 	if len(entries) != 2 {
@@ -33,7 +33,7 @@ func TestDeletePost_TheAuthorCanDeleteTheirOwnPost(t *testing.T) {
 	}
 }
 
-func TestDeletePost_AnotherMemberWithNoSignatureIsRefused(t *testing.T) {
+func TestDeleteEntry_AnotherMemberWithNoSignatureIsRefused(t *testing.T) {
 	r := harness.Start(t)
 	c := harness.NewCircle(t, r)
 	post := c.NewAppend(harness.Content)
@@ -42,7 +42,7 @@ func TestDeletePost_AnotherMemberWithNoSignatureIsRefused(t *testing.T) {
 	// A different account holding the same write token — a second device
 	// in the same circle, same gap deleteblob closes for uploads.
 	other := c.As(r.SignIn())
-	other.DeletePost(post.EntryID, other.NewDeletePost(post.EntryID)).Expect(http.StatusForbidden)
+	other.DeleteEntry(post.EntryID, other.NewDeleteEntry(post.EntryID)).Expect(http.StatusForbidden)
 
 	entries := c.Entries(harness.Content)
 	if len(entries) != 1 || entries[0].DeletedAt != 0 {
@@ -50,14 +50,14 @@ func TestDeletePost_AnotherMemberWithNoSignatureIsRefused(t *testing.T) {
 	}
 }
 
-func TestDeletePost_AnAdminSignatureDeletesSomeoneElsesPost(t *testing.T) {
+func TestDeleteEntry_AnAdminSignatureDeletesSomeoneElsesPost(t *testing.T) {
 	r := harness.Start(t)
 	c := harness.NewCircle(t, r)
 	post := c.NewAppend(harness.Content)
 	c.AppendLog(post).Expect(http.StatusOK)
 
 	other := c.As(r.SignIn())
-	other.DeletePost(post.EntryID, other.NewAdminDeletePost(post.EntryID, c.Admin)).Expect(http.StatusOK)
+	other.DeleteEntry(post.EntryID, other.NewAdminDeleteEntry(post.EntryID, c.Admin)).Expect(http.StatusOK)
 
 	entries := c.Entries(harness.Content)
 	if entries[0].DeletedAt == 0 {
@@ -65,20 +65,20 @@ func TestDeletePost_AnAdminSignatureDeletesSomeoneElsesPost(t *testing.T) {
 	}
 }
 
-func TestDeletePost_UnknownPostEntryIDIsRefused(t *testing.T) {
+func TestDeleteEntry_UnknownTargetEntryIDIsRefused(t *testing.T) {
 	r := harness.Start(t)
 	c := harness.NewCircle(t, r)
 
-	c.DeletePost(harness.Suffix(), c.NewDeletePost(harness.Suffix())).Expect(http.StatusNotFound)
+	c.DeleteEntry(harness.Suffix(), c.NewDeleteEntry(harness.Suffix())).Expect(http.StatusNotFound)
 }
 
-func TestDeletePost_MissingTombstoneEntryIDIsRejected(t *testing.T) {
+func TestDeleteEntry_MissingTombstoneEntryIDIsRejected(t *testing.T) {
 	r := harness.Start(t)
 	c := harness.NewCircle(t, r)
 	post := c.NewAppend(harness.Content)
 	c.AppendLog(post).Expect(http.StatusOK)
 
-	req := c.NewDeletePost(post.EntryID)
+	req := c.NewDeleteEntry(post.EntryID)
 	req.TombstoneEntryID = ""
-	c.DeletePost(post.EntryID, req).Expect(http.StatusBadRequest)
+	c.DeleteEntry(post.EntryID, req).Expect(http.StatusBadRequest)
 }

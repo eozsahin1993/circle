@@ -77,6 +77,23 @@ export function deriveDeleteCircleMessage(syncId: string, entryId: string): Uint
  * Bound to both the post and the tombstone entry id, so one signature
  * can't be replayed against a different tombstone attempt later.
  */
-export function deriveDeletePostMessage(syncId: string, postEntryId: string, tombstoneEntryId: string): Uint8Array {
-  return new TextEncoder().encode(`circle-relay/delete-post/v1\x00${syncId}\x00${postEntryId}\x00${tombstoneEntryId}`);
+export function deriveDeleteEntryMessage(syncId: string, entryId: string, tombstoneEntryId: string): Uint8Array {
+  return new TextEncoder().encode(`circle-relay/delete-entry/v1\x00${syncId}\x00${entryId}\x00${tombstoneEntryId}`);
+}
+
+/**
+ * The exact byte sequence a signature must cover to erase everything one
+ * identity authored in a circle — must match the relay's
+ * `logstore.AuthorContentDeletion.Message()` byte-for-byte.
+ * `tombstoneEntryId` is the empty string in strip-only mode (a circle
+ * already departed, where no tombstone can be appended).
+ */
+export function deriveDeleteAuthorContentMessage(
+  syncId: string,
+  authorIdentityPublicKey: string,
+  tombstoneEntryId: string
+): Uint8Array {
+  return new TextEncoder().encode(
+    `circle-relay/delete-author-content/v1\x00${syncId}\x00${authorIdentityPublicKey}\x00${tombstoneEntryId}`
+  );
 }

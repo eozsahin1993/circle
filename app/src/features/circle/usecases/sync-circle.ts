@@ -9,15 +9,17 @@ import { encrypt, sign } from '@/core/crypto/primitives';
 import { deriveAuthorityKeypair } from '@/core/crypto/identity';
 import {
   deriveAuthorityChangeMessage,
+  deriveDeleteAuthorContentMessage,
   deriveDeleteCircleMessage,
-  deriveDeletePostMessage,
+  deriveDeleteEntryMessage,
 } from '@/core/crypto/signed-messages';
 import { deriveWriteToken } from '@/features/circle/crypto';
 import {
   appendEntry,
   changeAuthority,
+  deleteAuthorContentOnRelay,
   deleteCircleOnRelay,
-  deletePostOnRelay,
+  deleteEntryOnRelay,
   type AppendResult,
   type Namespace,
 } from '@/core/services/log-relay';
@@ -27,7 +29,7 @@ import {
   uploadBlob,
 } from '@/core/services/blob-relay';
 import { getPendingOutboxEntries, markOutboxEntrySynced, type OutboxEntry } from '@/data/db';
-import { hexToBytes } from '@noble/curves/utils.js';
+import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 import { getAttachment } from '@/data/db/attachments';
 
 /**
@@ -49,6 +51,9 @@ const META_ENTRY_TYPES: OutboxEntry['entryType'][] = [
   EntryTypes.CIRCLE_RENAMED,
   EntryTypes.PUSH_ENABLED,
   EntryTypes.CIRCLE_DELETED,
+  // Replaces MEMBER_REMOVED for this departure — see account-deleted.ts —
+  // so it needs the same eager, full sync a roster-terminal entry does.
+  EntryTypes.ACCOUNT_DELETED,
   // Never actually queued — rotateLog's atomic write-token swap doesn't
   // fit the generic append path (see remove-member.ts) — but listed so
   // the mapping is right if it ever is.
@@ -141,11 +146,11 @@ async function pushPostDeletion(
   keyVersion: number,
   writeToken: Uint8Array
 ): Promise<AppendResult> {
-  const postEntryId = entry.blobEntryId;
-  if (!postEntryId) throw new Error('Queued post deletion is missing the post it targets.');
+  const entryId = entry.blobEntryId;
+  if (!entryId) throw new Error('Queued post deletion is missing the post it targets.');
 
   const identity = await getCircleIdentity(circleId);
-  const message = deriveDeletePostMessage(syncId, postEntryId, entry.entryId);
+  const message = deriveDeleteEntryMessage(syncId, entryId, entry.entryId);
   const authorSignature = identity ? sign(message, identity.secretKey) : undefined;
   const masterSeed = await getMasterSeed();
   const authority = masterSeed
@@ -155,7 +160,32 @@ async function pushPostDeletion(
       })()
     : undefined;
 
-  return deletePostOnRelay(syncId, postEntryId, entry.entryId, entry.encryptedMeta, keyVersion, writeToken, authorSignature, authority);
+  return deleteEntryOnRelay(syncId, entryId, entry.entryId, entry.encryptedMeta, keyVersion, writeToken, authorSignature, authority);
+}
+
+/**
+ * Pushes a queued account deletion — see `deleteAccount`. One call erases
+ * everything this identity authored in the circle and appends the queued
+ * tombstone; signed at drain time with the circle identity, the same key
+ * whose content it erases.
+ */
+async function pushAccountDeletion(
+  circleId: string,
+  syncId: string,
+  entry: OutboxEntry,
+  keyVersion: number,
+  writeToken: Uint8Array
+): Promise<AppendResult> {
+  const identity = await getCircleIdentity(circleId);
+  if (!identity) throw new Error('No circle identity on this device.');
+
+  const message = deriveDeleteAuthorContentMessage(syncId, bytesToHex(identity.publicKey), entry.entryId);
+  return deleteAuthorContentOnRelay(syncId, identity.publicKey, sign(message, identity.secretKey), {
+    entryId: entry.entryId,
+    encryptedMeta: entry.encryptedMeta,
+    keyVersion,
+    writeToken,
+  });
 }
 
 /**
@@ -275,6 +305,9 @@ async function pushPendingEntries(circleId: string): Promise<void> {
           break;
         case EntryTypes.POST_DELETE:
           result = await pushPostDeletion(circleId, circle.syncId, entry, current.version, writeToken);
+          break;
+        case EntryTypes.ACCOUNT_DELETED:
+          result = await pushAccountDeletion(circleId, circle.syncId, entry, current.version, writeToken);
           break;
         default:
           result = await appendEntry(circle.syncId, namespace, entry.entryId, entry.encryptedMeta, current.version, writeToken, identity.publicKey);

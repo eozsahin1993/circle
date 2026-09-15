@@ -1,4 +1,4 @@
-package deletepost
+package deleteauthorcontent
 
 import "net/http"
 
@@ -9,5 +9,5 @@ func Register(mux *http.ServeMux, service *Service, wrap func(http.Handler) http
 	if wrap != nil {
 		h = wrap(h)
 	}
-	mux.Handle("POST /circles/{syncId}/entries/{entryId}/delete-post", h)
+	mux.Handle("POST /circles/{syncId}/delete-author-content", h)
 }

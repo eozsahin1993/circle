@@ -114,12 +114,9 @@ function buildBlock(events: MemberEvent[]): MembershipEventBlock {
 /**
  * What makes two events "the same action" — actor, kind, and role
  * (`role_changed` only, so a promotion never merges with a demotion).
- *
- * Self-inflicted events (today: only leaving) drop the actor from the
- * key entirely rather than using it as-is. The actor *is* the subject for
- * these, so keying on it would mean every departure has a different
- * "actor" and none of them would ever merge with each other — the
- * opposite of what grouping several people leaving the same day is for.
+ * `kind` already carries the "left" vs "deleted their account" split —
+ * `account_deleted` is its own value here (see `DisplayedMemberEventKind`),
+ * not `removed` plus a side flag — so this needs no special case for it.
  */
 function groupKey(event: MemberEvent): string {
   const actor = event.selfInflicted ? 'self' : event.actorPublicKey;

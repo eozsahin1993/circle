@@ -54,10 +54,19 @@ export function mergeManifest(stored: ManifestPayload, mine: Partial<ManifestPay
  * circle holds none of it. A version's key never changes, so combining can't
  * conflict.
  *
- * A departure is terminal for its id: no later contribution puts the keys
- * back, which is what lets a device that hasn't synced its own removal keep
- * contributing the circle harmlessly.
+ * A departure is terminal for its id: once `leftAt` is set no later
+ * contribution changes the record, which is what lets a device that hasn't
+ * synced its own removal keep contributing the circle harmlessly. `leftAt`
+ * is a flag, nothing else about the record changes at departure — unlike
+ * the old keyless tombstone, a departure is recorded even for a circle
+ * the manifest never held before: it isn't just "retiring" a prior entry
+ * anymore, it's the only place account deletion can later find this
+ * circle's address and keys to erase its content there.
  */
+function hasLeft(circle: ManifestCircle | undefined): boolean {
+  return circle?.leftAt !== undefined;
+}
+
 function mergeCircles(stored: ManifestCircle[] | undefined, mine: ManifestCircle[] | undefined) {
   if (!mine?.length) return stored;
 
@@ -69,19 +78,12 @@ function mergeCircles(stored: ManifestCircle[] | undefined, mine: ManifestCircle
 
   for (const circle of mine) {
     const existing = byId.get(circle.circleId);
-    if (existing?.leftAt !== undefined) continue;
-
-    if (circle.leftAt !== undefined) {
-      // Nothing recorded, so nothing to retire. Tombstoning anyway would
-      // grow the document for circles that never reached it.
-      if (!existing) continue;
-      byId.set(circle.circleId, { circleId: circle.circleId, leftAt: circle.leftAt });
-      changed = true;
-      continue;
-    }
+    if (hasLeft(existing)) continue;
 
     const keyMap = { ...existing?.keyMap, ...circle.keyMap };
-    if (existing && Object.keys(keyMap).length === Object.keys(existing.keyMap).length) continue;
+    const keyMapGrew = !existing || Object.keys(keyMap).length !== Object.keys(existing.keyMap).length;
+    if (!hasLeft(circle) && !keyMapGrew) continue;
+
     byId.set(circle.circleId, { ...circle, keyMap });
     changed = true;
   }

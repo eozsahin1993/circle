@@ -1,4 +1,4 @@
-package deletepost
+package deleteentry
 
 import (
 	"encoding/base64"
@@ -38,8 +38,8 @@ type Handler struct {
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	syncID := r.PathValue("syncId")
-	postEntryID := r.PathValue("entryId")
-	if postEntryID == "" {
+	entryID := r.PathValue("entryId")
+	if entryID == "" {
 		httputil.WriteError(w, http.StatusBadRequest, "entryId is required")
 		return
 	}
@@ -86,9 +86,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		authoritySignature = decoded
 	}
 
-	result, err := h.Service.Delete(r.Context(), logstore.PostDeletion{
+	result, err := h.Service.Delete(r.Context(), logstore.EntryDeletion{
 		SyncID:             syncID,
-		PostEntryID:        postEntryID,
+		TargetEntryID:        entryID,
 		TombstoneEntryID:   req.TombstoneEntryID,
 		EncryptedPayload:   encryptedMeta,
 		KeyVersion:         req.KeyVersion,

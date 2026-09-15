@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm';
 
 import { db } from '@/data/db/connection';
-import { circleMembers, outbox, postReactions } from '@/data/db/schema';
+import { circleMembers, outbox, postReactions, posts } from '@/data/db/schema';
 import type { NewOutboxEntry } from '@/data/db/outbox';
 
 export type PostReaction = typeof postReactions.$inferSelect;
@@ -173,4 +173,17 @@ export async function toggleReactionAndEnqueue(
     }
     tx.insert(outbox).values(outboxEntry).run();
   });
+}
+
+/** Deletes one author's reactions on other people's posts in a circle — the author's own posts take their reactions with them separately. */
+export async function deleteReactionsByAuthor(circleId: string, authorPublicKey: string): Promise<void> {
+  await db.delete(postReactions).where(
+    and(
+      eq(postReactions.authorPublicKey, authorPublicKey),
+      inArray(
+        postReactions.postId,
+        db.select({ id: posts.id }).from(posts).where(eq(posts.circleId, circleId))
+      )
+    )
+  );
 }

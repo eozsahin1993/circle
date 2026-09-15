@@ -34,26 +34,21 @@ export type ManifestProfile = {
  * Departure is tombstoned rather than deleted, so every write stays additive.
  * Absence can't mean "removed": it's also what a circle joined on the
  * account's other phone looks like, and dropping that destroys keys only
- * that phone holds. Tombstones are kept indefinitely, ~60 bytes each.
+ * that phone holds. Tombstones are kept indefinitely.
  */
-export type ManifestCircle = RecoverableCircle | DepartedCircle;
-
-export type RecoverableCircle = {
+export type ManifestCircle = {
   /** Local id — the circle identity derives from it, so it has to come back verbatim. */
   circleId: string;
   /** The relay-facing log address, which no amount of seed material can reproduce. */
   syncId: string;
   /** Every version this member holds, `{ version: hex key }`. */
   keyMap: Record<number, string>;
-  /** Present and undefined, not absent: it discriminates the union. */
-  leftAt?: undefined;
+  /** Set when no longer a member, whatever the reason — left, removed, or the circle deleted for everyone. Mirrors `circles.leftAt`. */
+  leftAt?: number;
 };
 
-/** Nothing left to rebuild, so no address and no keys. */
-export type DepartedCircle = {
-  circleId: string;
-  leftAt: number;
-};
+/** A circle the phrase can actually rebuild — joined, with its keys. */
+export type RecoverableCircle = ManifestCircle & { leftAt?: undefined };
 
 /**
  * Set once, by the screen where someone chose to abandon an account this
@@ -163,9 +158,17 @@ export function reconcileAccountManifest(): Promise<void> {
       const state = await readAccountManifest(masterSeed);
       if (state.status === 'foreign' && !(await foreignOverwriteAllowed())) throw new ForeignManifestError();
 
-      // Local state is read per attempt: leaving a circle between the read
-      // and the write would otherwise be written from a stale snapshot.
-      const payload = mergeManifest(state.status === 'ours' ? state.payload : {}, await describeLocalState());
+      // Already-departed ids the stored manifest holds — see
+      // describeLocalState for why these are skipped rather than
+      // re-described. Local state is read per attempt: leaving a circle
+      // between the read and the write would otherwise be written from a
+      // stale snapshot.
+      const alreadyDeparted = new Set(
+        (state.status === 'ours' ? state.payload.circles : [])
+          ?.filter((circle) => circle.leftAt !== undefined)
+          .map((circle) => circle.circleId)
+      );
+      const payload = mergeManifest(state.status === 'ours' ? state.payload : {}, await describeLocalState(alreadyDeparted));
       if (!payload) return;
 
       try {
@@ -181,19 +184,34 @@ export function reconcileAccountManifest(): Promise<void> {
   });
 }
 
-/** Local state in the manifest's own shape. Departures come off the `leftAt` rows the leaving paths set before they purge. */
-async function describeLocalState(): Promise<Partial<ManifestPayload>> {
+/**
+ * Local state in the manifest's own shape. Departures come off the
+ * `leftAt` rows the leaving paths set before they purge.
+ *
+ * `alreadyDeparted` skips the keystore lookup for a circle the stored
+ * manifest already tombstones — `mergeCircles` treats that record as
+ * immutable, so describing it again here would just be thrown away.
+ * The lookup only ever matters once: the pass that first records a
+ * circle as left, while its keys are still in the keystore (or, for one
+ * this device left before ever recording it, its last chance to).
+ */
+async function describeLocalState(alreadyDeparted: Set<string>): Promise<Partial<ManifestPayload>> {
   const joined = await listCircleAddresses();
   const described = await Promise.all(joined.map((circle) => describeCircle(circle)));
   const left = await listLeftCircles();
+  const leftDescribed = await Promise.all(
+    left.map(async ({ id, syncId, leftAt }) => ({
+      circleId: id,
+      syncId,
+      keyMap: alreadyDeparted.has(id) ? {} : ((await describeCircle({ id, syncId }))?.keyMap ?? {}),
+      leftAt,
+    }))
+  );
   const profile = await getProfile();
   const provider = await storedSignInProvider();
 
   return {
-    circles: [
-      ...described.filter((circle): circle is RecoverableCircle => circle !== null),
-      ...left.map(({ id, leftAt }) => ({ circleId: id, leftAt })),
-    ],
+    circles: [...described.filter((circle): circle is RecoverableCircle => circle !== null), ...leftDescribed],
     ...(profile ? { profile: await describeProfile(profile) } : {}),
     ...(provider ? { provider } : {}),
   };

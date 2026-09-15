@@ -216,7 +216,7 @@ export async function deleteCircleOnRelay(deletion: {
 }
 
 /**
- * Deletes a post — POST /v1/circles/{syncId}/entries/{postEntryId}/delete-post.
+ * Deletes a post — POST /v1/circles/{syncId}/entries/{entryId}/delete-entry.
  * Strips the post's ciphertext and deletes its blob on the relay, then
  * appends the tombstone entry (`encryptedMeta`) that already-synced
  * devices hide it on. `authorSignature` and `authority` are optional and
@@ -224,9 +224,9 @@ export async function deleteCircleOnRelay(deletion: {
  * `authorSignature` and needs nothing else; an admin deleting someone
  * else's post sends `authority` instead.
  */
-export async function deletePostOnRelay(
+export async function deleteEntryOnRelay(
   syncId: string,
-  postEntryId: string,
+  entryId: string,
   tombstoneEntryId: string,
   encryptedMeta: Uint8Array,
   keyVersion: number,
@@ -234,7 +234,7 @@ export async function deletePostOnRelay(
   authorSignature?: Uint8Array,
   authority?: { publicKey: Uint8Array; signature: Uint8Array }
 ): Promise<AppendResult> {
-  const response = await authorizedFetch(`/v1/circles/${syncId}/entries/${postEntryId}/delete-post`, {
+  const response = await authorizedFetch(`/v1/circles/${syncId}/entries/${entryId}/delete-entry`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -256,6 +256,67 @@ export async function deletePostOnRelay(
   }
   const body = await response.json();
   return { epoch: body.epoch, receivedAt: body.receivedAt };
+}
+
+/** The relay refused a strip because the circle no longer exists — deleted for everyone, so the erase is already done. */
+export class CircleGoneError extends Error {
+  constructor() {
+    super('The circle no longer exists on the relay.');
+    this.name = 'CircleGoneError';
+  }
+}
+
+/**
+ * Erases everything one identity authored in a circle — POST
+ * /v1/circles/{syncId}/delete-author-content. Strips every content entry's
+ * ciphertext and deletes the blobs behind them in one call; the relay
+ * finds the rows by the author key itself. With `tombstone` it also
+ * appends the account_deleted entry other devices drop their local copies
+ * on; without it (a circle already departed — no current write token to
+ * append under) it strips and stops, and other members keep what they
+ * already have.
+ */
+export async function deleteAuthorContentOnRelay(
+  syncId: string,
+  authorIdentityPublicKey: Uint8Array,
+  authorSignature: Uint8Array,
+  tombstone?: { entryId: string; encryptedMeta: Uint8Array; keyVersion: number; writeToken: Uint8Array }
+): Promise<AppendResult> {
+  const response = await authorizedFetch(`/v1/circles/${syncId}/delete-author-content`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      authorIdentityPublicKey: bytesToHex(authorIdentityPublicKey),
+      authorSignature: bytesToHex(authorSignature),
+      ...(tombstone
+        ? {
+            tombstoneEntryId: tombstone.entryId,
+            encryptedMeta: Buffer.from(tombstone.encryptedMeta).toString('base64'),
+            keyVersion: tombstone.keyVersion,
+            writeToken: bytesToHex(tombstone.writeToken),
+          }
+        : {}),
+    }),
+  });
+  if (response.status === 404) {
+    throw new CircleGoneError();
+  }
+  if (response.status === 429) {
+    throw new RateLimitedError();
+  }
+  if (!response.ok) {
+    throw new Error(await describeError(response, 'Failed to erase authored content'));
+  }
+  const body = await response.json();
+  return { epoch: body.epoch ?? 0, receivedAt: body.receivedAt ?? 0 };
+}
+
+/** Deletes the relay account itself — sessions and manifest included. DELETE /v1/account, the account's final relay call. */
+export async function deleteAccountOnRelay(): Promise<void> {
+  const response = await authorizedFetch(`/v1/account`, { method: 'DELETE' });
+  if (!response.ok) {
+    throw new Error(await describeError(response, 'Failed to delete account'));
+  }
 }
 
 /**
