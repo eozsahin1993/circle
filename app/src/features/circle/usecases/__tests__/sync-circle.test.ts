@@ -8,7 +8,8 @@ import { buildAndEncryptLogEntry } from '@/core/sync/log-entry';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { appendEntry, bootstrapCircle, deleteEntryOnRelay } from '@/core/services/log-relay';
-import { BlobAlreadyExistsError, getUploadTarget, uploadBlob } from '@/core/services/blob-relay';
+import { getUploadTarget, uploadBlob } from '@/core/services/blob-relay';
+import { BlobAlreadyExistsError } from '@/core/services/relay-errors';
 import {
   AttachmentKinds,
   AttachmentStatuses,

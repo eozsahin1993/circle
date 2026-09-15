@@ -5,7 +5,8 @@ import { sign } from '@/core/crypto/primitives';
 import { deriveCircleIdentity } from '@/core/crypto/identity';
 import { deriveDeleteAuthorContentMessage } from '@/core/crypto/signed-messages';
 import { getMasterSeed } from '@/core/services/keystore/master-seed';
-import { CircleGoneError, deleteAccountOnRelay, deleteAuthorContentOnRelay } from '@/core/services/log-relay';
+import { deleteAccountOnRelay, deleteAuthorContentOnRelay } from '@/core/services/log-relay';
+import { CircleGoneError } from '@/core/services/relay-errors';
 import { getLeftCircles, listCircles } from '@/data/db';
 import { resetLocalDataForTesting } from '@/features/dev/dev-reset';
 import { fetchAccountManifest } from '@/features/account/usecases/account-manifest';
@@ -120,7 +121,14 @@ async function finishAccountDeletionIfPendingOnce(): Promise<void> {
   try {
     const manifest = await fetchAccountManifest();
     for (const circle of manifest.circles ?? []) {
-      if (circle.leftAt === undefined) continue;
+      // A tombstone written before this manifest shape kept a `syncId`
+      // (the old two-field `{circleId, leftAt}` shape) has no address to
+      // strip — the same honest, deliberate boundary as any other circle
+      // left before this feature shipped. Skipped explicitly rather than
+      // left to fail: calling the relay with `syncId` missing happens to
+      // 404 today, and 404 already means "done" here, but that's an
+      // accident of the URL, not something this should depend on.
+      if (circle.leftAt === undefined || !circle.syncId) continue;
       try {
         await stripDepartedCircleContent(masterSeed, circle.circleId, circle.syncId);
       } catch (err) {

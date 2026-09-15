@@ -647,12 +647,19 @@ func (s *Store) DeleteAuthorContent(ctx context.Context, deletion logstore.Autho
 	return result, nil
 }
 
-// stripAuthorContent pages the circle's content range for rows authored
-// by authorKey that still carry ciphertext, and strips each — the same
-// mutation DeleteEntry makes, minus its tombstone. The tombstone itself
-// (meta-namespace) is never a candidate here: it lives outside the
-// content SK range this pages, so a retry can't strip what it just
-// appended.
+// stripAuthorContent pages the circle's content range for every row
+// authored by authorKey — stripped already or not — and (re-)strips
+// each. The same mutation DeleteEntry makes, minus its tombstone; safe to
+// re-run on an already-stripped row, since the update's own condition
+// only checks the row still exists, not that it still carries ciphertext.
+//
+// Deliberately not filtered to rows that still carry ciphertext: the
+// caller needs every authored entryId back to clean up blobs, including
+// ones stripped by an earlier call whose tombstone Append then failed —
+// filtering them out here would silently drop those blobs from cleanup
+// forever, since a retry would never see them again. The tombstone
+// itself (meta-namespace) is never a candidate regardless: it lives
+// outside the content SK range this pages.
 //
 // Individually conditioned UpdateItems rather than a transaction: an
 // unconditioned Update on a row a concurrent circle-deletion sweep just
@@ -666,7 +673,7 @@ func (s *Store) stripAuthorContent(ctx context.Context, syncID, authorKey string
 	paginator := dynamodb.NewQueryPaginator(s.client, &dynamodb.QueryInput{
 		TableName:              aws.String(s.tableName),
 		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :pk AND %s BETWEEN :lower AND :upper", dynamoutil.PKAttr, dynamoutil.SKAttr)),
-		FilterExpression:       aws.String("authorIdentityPublicKey = :author AND attribute_exists(encryptedMeta)"),
+		FilterExpression:       aws.String("authorIdentityPublicKey = :author"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":pk":     &types.AttributeValueMemberS{Value: syncID},
 			":lower":  &types.AttributeValueMemberS{Value: entrySK(logstore.NamespaceContent, 1)},

@@ -2,7 +2,8 @@ import { Buffer } from 'buffer';
 import { bytesToHex } from '@noble/curves/utils.js';
 
 import { type AuthorityAction } from '@/core/crypto/signed-messages';
-import { authorizedFetch, describeError, RateLimitedError } from '@/core/services/relay';
+import { authorizedFetch, describeError } from '@/core/services/relay';
+import { CircleGoneError, RateLimitedError } from '@/core/services/relay-errors';
 
 /**
  * The relay's circle-log endpoints (server-side: server/internal/api's
@@ -256,14 +257,6 @@ export async function deleteEntryOnRelay(
   }
   const body = await response.json();
   return { epoch: body.epoch, receivedAt: body.receivedAt };
-}
-
-/** The relay refused a strip because the circle no longer exists — deleted for everyone, so the erase is already done. */
-export class CircleGoneError extends Error {
-  constructor() {
-    super('The circle no longer exists on the relay.');
-    this.name = 'CircleGoneError';
-  }
 }
 
 /**

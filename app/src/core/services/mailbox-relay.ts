@@ -1,6 +1,7 @@
 import { Buffer } from 'buffer';
 
 import { authorizedFetch } from '@/core/services/relay';
+import { JoinRequestGoneError } from '@/core/services/relay-errors';
 
 /**
  * Thin fetch-based client for the invite mailbox's endpoints (server-side:
@@ -49,18 +50,6 @@ export async function listJoinRequests(inviteTag: string): Promise<MailboxJoinRe
     encryptedApproval: request.encryptedApproval ? new Uint8Array(Buffer.from(request.encryptedApproval, 'base64')) : null,
     createdAt: request.createdAt,
   }));
-}
-
-/**
- * Raised when a join request's row is gone: the creator denied it, or it
- * aged out. Permanent either way — a caller that keeps polling will keep
- * getting it, so this is the signal to stop and say so.
- */
-export class JoinRequestGoneError extends Error {
-  constructor() {
-    super('That join request is no longer waiting for an answer.');
-    this.name = 'JoinRequestGoneError';
-  }
 }
 
 /**

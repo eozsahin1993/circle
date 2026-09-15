@@ -23,11 +23,8 @@ import {
   type AppendResult,
   type Namespace,
 } from '@/core/services/log-relay';
-import {
-  BlobAlreadyExistsError,
-  getUploadTarget,
-  uploadBlob,
-} from '@/core/services/blob-relay';
+import { getUploadTarget, uploadBlob } from '@/core/services/blob-relay';
+import { BlobAlreadyExistsError } from '@/core/services/relay-errors';
 import { getPendingOutboxEntries, markOutboxEntrySynced, type OutboxEntry } from '@/data/db';
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 import { getAttachment } from '@/data/db/attachments';

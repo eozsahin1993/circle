@@ -11,11 +11,11 @@ import {
   appendEntry,
   bootstrapCircle,
   changeAuthority,
-  CircleGoneError,
   deleteAccountOnRelay,
   deleteAuthorContentOnRelay,
   fetchEntries,
 } from '@/core/services/log-relay';
+import { CircleGoneError } from '@/core/services/relay-errors';
 import { deleteCircle, getCircle, initDatabase, insertCircle, MemberRoles, recordMemberAddedLocally } from '@/data/db';
 import { fetchAccountManifest } from '@/features/account/usecases/account-manifest';
 import { deleteAccount, finishAccountDeletionIfPending } from '@/features/account/usecases/delete-account';
@@ -158,6 +158,20 @@ test('erases a departed circle by re-deriving its signing key, strip-only', asyn
   expect(calledSyncId).toBe(syncId);
   expect(bytesToHex(authorKey)).toBe(bytesToHex(deriveCircleIdentity(masterSeed, circleId).publicKey));
   expect(tombstone).toBeUndefined();
+  expect(deleteAccountOnRelay).toHaveBeenCalledTimes(1);
+});
+
+test('a legacy departure tombstone with no syncId is skipped, not retried forever', async () => {
+  // The old two-field {circleId, leftAt} shape, from before DepartedCircle
+  // kept an address — real data an existing account can still carry.
+  (fetchAccountManifest as jest.Mock).mockResolvedValue({
+    circles: [{ circleId: 'ancient-departure', leftAt: 1000 } as unknown as { circleId: string; syncId: string; keyMap: {}; leftAt: number }],
+  });
+
+  await deleteAccount();
+  await finishAccountDeletionIfPending();
+
+  expect(deleteAuthorContentOnRelay).not.toHaveBeenCalled();
   expect(deleteAccountOnRelay).toHaveBeenCalledTimes(1);
 });
 

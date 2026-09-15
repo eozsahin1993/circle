@@ -26,12 +26,8 @@ import { compressToThumbnail } from '@/core/photo/image';
 import { saveCircleIdentity, saveCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { getMasterSeed } from '@/core/services/keystore/master-seed';
 import { deletePendingJoinKeypair, getPendingJoinKeypair, savePendingJoinKeypair } from '@/features/invite/keystore';
-import {
-  JoinRequestGoneError,
-  deleteJoinRequest,
-  getJoinRequestApproval,
-  putJoinRequest,
-} from '@/core/services/mailbox-relay';
+import { deleteJoinRequest, getJoinRequestApproval, putJoinRequest } from '@/core/services/mailbox-relay';
+import { JoinRequestGoneError } from '@/core/services/relay-errors';
 import { getInvitePreview } from '@/features/invite/services/invite-preview-relay';
 import { getBlob } from '@/core/services/blob-relay';
 

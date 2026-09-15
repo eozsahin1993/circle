@@ -1473,7 +1473,8 @@ func TestLogStore_DeleteAuthorContent_RetryConvergesWithoutStrippingTheTombstone
 		t.Fatal(err)
 	}
 	// The tombstone is authored by the same key — a retry must not treat
-	// it as content to strip.
+	// it as content to strip (it's meta, outside the range paged here,
+	// regardless).
 	second, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
 	if err != nil {
 		t.Fatalf("a retry must converge rather than fail: %v", err)
@@ -1481,8 +1482,12 @@ func TestLogStore_DeleteAuthorContent_RetryConvergesWithoutStrippingTheTombstone
 	if second.CommitResult != first.CommitResult {
 		t.Fatalf("expected the retry to return the original commit, got %+v then %+v", first.CommitResult, second.CommitResult)
 	}
-	if len(second.StrippedEntryIDs) != 0 {
-		t.Fatalf("expected nothing left to strip on retry, got %v", second.StrippedEntryIDs)
+	// Deliberately still returned, not empty: a retry re-reports every
+	// authored entryId regardless of whether it was already stripped, so
+	// the caller's blob cleanup gets another chance if an earlier attempt
+	// stripped content but then failed appending its tombstone.
+	if len(second.StrippedEntryIDs) != 1 {
+		t.Fatalf("expected the retry to still report the stripped entry for blob cleanup, got %v", second.StrippedEntryIDs)
 	}
 
 	read, err := store.Read(ctx, syncID, logstore.NamespaceContent, 0)
