@@ -1,4 +1,4 @@
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 jest.mock('@/features/account/usecases/account-manifest');
 
 import { bytesToHex } from '@noble/curves/utils.js';
@@ -9,7 +9,7 @@ import type { LogEntryEnvelope } from '@/core/sync/log-entry';
 import { generateIdentity, generateUUID } from '@/core/crypto/primitives';
 import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 import { pushEnabledHandler } from '@/core/sync/entry-handlers/push-enabled';
 
 const ROUTING = 'a'.repeat(64);

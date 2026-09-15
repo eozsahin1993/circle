@@ -9,7 +9,7 @@ import { deriveRotateMessage } from '@/core/crypto/signed-messages';
 import { deriveWriteToken, generateContentKey, hashWriteToken } from '@/features/circle/crypto';
 import { addCircleKeyVersion, getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { getMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, rotateLog } from '@/core/services/relay';
+import { appendEntry, rotateLog } from '@/core/services/log-relay';
 import { pullMeta } from '@/core/sync/pull-log';
 
 /**

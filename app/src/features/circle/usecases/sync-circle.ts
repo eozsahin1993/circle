@@ -11,16 +11,18 @@ import { deriveAuthorityChangeMessage, deriveDeleteBlobMessage, deriveDeleteCirc
 import { deriveWriteToken } from '@/features/circle/crypto';
 import {
   appendEntry,
-  BlobAlreadyExistsError,
-  BlobDeleteRefusedError,
   changeAuthority,
   deleteCircleOnRelay,
+  type AppendResult,
+  type Namespace,
+} from '@/core/services/log-relay';
+import {
+  BlobAlreadyExistsError,
+  BlobDeleteRefusedError,
   deleteBlob,
   getUploadTarget,
   uploadBlob,
-  type AppendResult,
-  type Namespace,
-} from '@/core/services/relay';
+} from '@/core/services/blob-relay';
 import { getPendingOutboxEntries, markOutboxEntrySynced, type OutboxEntry } from '@/data/db';
 import { hexToBytes } from '@noble/curves/utils.js';
 import { getAttachment } from '@/data/db/attachments';

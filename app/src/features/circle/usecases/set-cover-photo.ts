@@ -8,7 +8,8 @@ import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { getMasterSeed } from '@/core/services/keystore/master-seed';
 import { writeCoverFile } from '@/core/photo/photo-cache';
-import { appendEntry, getCoverPhotoUploadTarget, uploadBlob } from '@/core/services/relay';
+import { appendEntry } from '@/core/services/log-relay';
+import { getCoverPhotoUploadTarget, uploadBlob } from '@/core/services/blob-relay';
 
 /**
  * Sets (or replaces) a circle's cover photo — admin-only. Two relay calls,

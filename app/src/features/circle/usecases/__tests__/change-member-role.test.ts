@@ -1,5 +1,5 @@
 jest.mock('@/features/circle/usecases/sync-circle');
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
@@ -11,7 +11,7 @@ import { getCircleMembers, getPendingOutboxEntries, initDatabase, insertMember, 
 import { setMemberRole } from '@/features/circle/usecases/change-member-role';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 
 beforeAll(async () => {
   await initDatabase();

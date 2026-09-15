@@ -1,5 +1,5 @@
 jest.mock('@/features/circle/usecases/sync-circle');
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
@@ -12,7 +12,7 @@ import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { getCircle, getCircleMembers, initDatabase, insertMember, MemberRoles } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { removeMember } from '@/features/circle/usecases/remove-member';
-import { appendEntry, bootstrapCircle, fetchEntries, rotateLog } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle, fetchEntries, rotateLog } from '@/core/services/log-relay';
 
 const MASTER_SEED = new Uint8Array(16);
 

@@ -3,7 +3,8 @@ jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/core/services/mailbox-relay');
 jest.mock('@/features/invite/services/invite-preview-relay');
 jest.mock('@/core/photo/image');
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
+jest.mock('@/core/services/blob-relay');
 
 import { Buffer } from 'buffer';
 
@@ -30,7 +31,8 @@ import {
 import { getInvitePreview, putInvitePreview } from '@/features/invite/services/invite-preview-relay';
 import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle, fetchEntries, getBlob } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle, fetchEntries } from '@/core/services/log-relay';
+import { getBlob } from '@/core/services/blob-relay';
 
 beforeAll(async () => {
   await initDatabase();

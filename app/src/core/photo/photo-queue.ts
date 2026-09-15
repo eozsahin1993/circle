@@ -10,7 +10,7 @@ import { decrypt, hashBytes } from '@/core/crypto/primitives';
 import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { writeCoverFile, writePhotoFile } from '@/core/photo/photo-cache';
 import { notifyPhotoFetched } from '@/core/photo/photo-events';
-import { getBlob } from '@/core/services/relay';
+import { getBlob } from '@/core/services/blob-relay';
 import { timed, timedSync } from '@/core/utils/timing';
 
 /** First retry waits this long; each further failure doubles it, up to `MAX_BACKOFF_MS`. */

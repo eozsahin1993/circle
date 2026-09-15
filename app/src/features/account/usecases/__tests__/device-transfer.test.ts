@@ -1,7 +1,7 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/core/services/mailbox-relay');
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 jest.mock('@/core/photo/image');
 
 import { Buffer } from 'buffer';
@@ -31,7 +31,7 @@ import {
   putJoinApproval,
   putJoinRequest,
 } from '@/core/services/mailbox-relay';
-import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 import { compressToThumbnail } from '@/core/photo/image';
 import { resetLocalDataForTesting } from '@/features/dev/dev-reset';
 

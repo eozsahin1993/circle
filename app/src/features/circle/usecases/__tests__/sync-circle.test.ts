@@ -1,4 +1,5 @@
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
+jest.mock('@/core/services/blob-relay');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
@@ -6,15 +7,14 @@ import { decrypt, generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { buildAndEncryptLogEntry } from '@/core/sync/log-entry';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 import {
-  appendEntry,
   BlobAlreadyExistsError,
   BlobDeleteRefusedError,
-  bootstrapCircle,
   deleteBlob,
   getUploadTarget,
   uploadBlob,
-} from '@/core/services/relay';
+} from '@/core/services/blob-relay';
 import {
   AttachmentKinds,
   AttachmentStatuses,

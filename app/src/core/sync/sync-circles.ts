@@ -2,7 +2,7 @@ import { getAllCircles, getCircle, getPendingOutboxEntries } from '@/data/db';
 import { finishPendingDepartures } from '@/features/circle/usecases/leave-circle';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
-import { fetchEpochs } from '@/core/services/relay';
+import { fetchEpochs } from '@/core/services/log-relay';
 import { timed } from '@/core/utils/timing';
 import { pullContent, pullMeta } from '@/core/sync/pull-log';
 

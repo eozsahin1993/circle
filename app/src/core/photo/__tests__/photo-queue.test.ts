@@ -1,4 +1,5 @@
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
+jest.mock('@/core/services/blob-relay');
 jest.mock('@/features/account/usecases/account-manifest');
 
 import {
@@ -13,7 +14,8 @@ import { createCircle } from '@/features/circle/usecases/create-circle';
 import { encrypt, generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle, getBlob } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
+import { getBlob } from '@/core/services/blob-relay';
 import { drainPhotoQueue } from '@/core/photo/photo-queue';
 
 beforeAll(async () => {

@@ -1,4 +1,4 @@
-import type { IconGlyph } from '@/core/utils/icon-glyph';
+import type { IconGlyph } from '@/ui/components/icon';
 
 /**
  * A brief message for the person using the app — `SnackbarHost` draws it.
@@ -11,7 +11,8 @@ import type { IconGlyph } from '@/core/utils/icon-glyph';
  *
  * Hence plain functions, not a hook, and hence this module sitting here
  * rather than beside the component: nothing under `components/` or
- * `hooks/` is imported by the layers below them.
+ * `hooks/` runs in the layers below them — the `IconGlyph` import is a
+ * type, erased before Metro sees it.
  */
 export type MessageOptions = {
   /** The one way out, if there is one. Dismisses the message when tapped. */

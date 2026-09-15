@@ -1,4 +1,4 @@
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 jest.mock('@/features/account/usecases/account-manifest');
 
 import { bytesToHex } from '@noble/curves/utils.js';
@@ -10,7 +10,7 @@ import { FEED_PAGE_SIZE, loadCircleFeedMeta, loadCircleFeedPage } from '@/featur
 import { generateUUID } from '@/core/crypto/primitives';
 import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 
 beforeAll(async () => {
   await initDatabase();

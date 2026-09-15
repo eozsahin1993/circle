@@ -1,7 +1,7 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/core/services/mailbox-relay');
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 jest.mock('@/core/photo/image');
 jest.mock('@/core/sync/sync-circles');
 
@@ -16,7 +16,7 @@ import { deriveCircleIdentity } from '@/core/crypto/identity';
 import { generateSeedPhrase, seedPhraseToEntropy } from '@/features/account/crypto';
 import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 
 const CONTENT_KEY = new Uint8Array(32).fill(7);
 

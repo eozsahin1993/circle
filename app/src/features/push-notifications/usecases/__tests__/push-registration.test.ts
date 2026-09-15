@@ -1,6 +1,6 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 jest.mock('@/features/push-notifications/services/relay');
 jest.mock('@/core/photo/image');
 
@@ -27,7 +27,7 @@ import { deleteCircleKeys, getCircleIdentity, getCurrentContentKey } from '@/cor
 import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/features/push-notifications/services/relay';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
-import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 
 const registration = {
   pushToken: 'fcm-registration-token',

@@ -1,4 +1,4 @@
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/core/photo/image');
@@ -12,7 +12,7 @@ import { createCircle } from '@/features/circle/usecases/create-circle';
 import { EntryTypes } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { compressToThumbnail } from '@/core/photo/image';
-import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 import { bytesToHex } from '@noble/curves/utils.js';
 
 // Pictures here are plain byte arrays rather than real images, so the

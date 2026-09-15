@@ -2,7 +2,7 @@ import { advanceCircleCursor, getCircle } from '@/data/db';
 import { isPermanentWriteFailure } from '@/core/sync/write-failure';
 import { verifyLogEntry } from '@/core/sync/log-entry';
 import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
-import { fetchEntries, type Namespace } from '@/core/services/relay';
+import { fetchEntries, type Namespace } from '@/core/services/log-relay';
 import { contentHandlers, metaHandlers, type EntryHandler } from '@/core/sync/entry-handlers';
 
 /**

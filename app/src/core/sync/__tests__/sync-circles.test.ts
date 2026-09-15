@@ -1,4 +1,5 @@
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
+jest.mock('@/core/services/blob-relay');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/core/services/mailbox-relay');
 jest.mock('@/features/invite/services/invite-preview-relay');
@@ -35,11 +36,9 @@ import {
   changeAuthority,
   fetchEntries,
   fetchEpochs,
-  getBlob,
-  getUploadTarget,
-  uploadBlob,
   type Namespace,
-} from '@/core/services/relay';
+} from '@/core/services/log-relay';
+import { getBlob, getUploadTarget, uploadBlob } from '@/core/services/blob-relay';
 import { memberAddedHandler } from '@/core/sync/entry-handlers/member-added';
 import { drainPhotoQueue } from '@/core/photo/photo-queue';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
