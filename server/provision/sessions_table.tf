@@ -14,6 +14,21 @@ resource "aws_dynamodb_table" "sessions" {
     type = "S"
   }
 
+  attribute {
+    name = "accountId"
+    type = "S"
+  }
+
+  # Lets account deletion revoke every session for an account, not just
+  # the one that made the call — sessions are otherwise only ever looked
+  # up by token. KEYS_ONLY: DeleteAllSessions only needs the pk (token)
+  # back to delete each item.
+  global_secondary_index {
+    name            = "accountId-index"
+    hash_key        = "accountId"
+    projection_type = "KEYS_ONLY"
+  }
+
   ttl {
     attribute_name = "expiresAt"
     enabled        = true

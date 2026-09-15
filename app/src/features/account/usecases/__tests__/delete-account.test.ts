@@ -1,5 +1,6 @@
 jest.mock('@/core/services/log-relay');
 jest.mock('@/features/account/usecases/account-manifest');
+jest.mock('@/features/push-notifications/services/channels');
 
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 

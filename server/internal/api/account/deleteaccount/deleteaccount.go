@@ -1,11 +1,8 @@
 // Package deleteaccount is the vertical slice for DELETE /account — the
 // final relay call an account ever makes. Deletes the manifest (the one
-// piece of account-keyed storage) and revokes the calling session.
-//
-// Other outstanding sessions for the account can't be enumerated —
-// sessions are keyed by token with no account index, by design — so they
-// age out on their own TTL; everything account-keyed they could touch is
-// already gone by then.
+// piece of account-keyed storage) and revokes every session for the
+// account, not just the one making this call — another signed-in device
+// must not be able to outlive the account it belonged to.
 package deleteaccount
 
 import (
@@ -23,14 +20,14 @@ type Service struct {
 	AuthStore     authstore.Store
 }
 
-// Delete removes the manifest first, the session second — reversed, a
-// failure between the two would leave a signed-out caller whose manifest
-// survives with no session to retry the delete under.
-func (s *Service) Delete(ctx context.Context, accountID, token string) error {
+// Delete removes the manifest first, sessions second — reversed, a
+// failure between the two would leave a signed-out account whose
+// manifest survives with no session left to retry the delete under.
+func (s *Service) Delete(ctx context.Context, accountID string) error {
 	if err := s.ManifestStore.DeleteManifest(ctx, accountID); err != nil {
 		return err
 	}
-	return s.AuthStore.DeleteSession(ctx, token)
+	return s.AuthStore.DeleteAllSessions(ctx, accountID)
 }
 
 type response struct {
@@ -42,12 +39,7 @@ type Handler struct {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	token, ok := httputil.BearerToken(r)
-	if !ok {
-		httputil.WriteError(w, http.StatusBadRequest, "missing bearer token")
-		return
-	}
-	if err := h.Service.Delete(r.Context(), auth.AccountID(r.Context()), token); err != nil {
+	if err := h.Service.Delete(r.Context(), auth.AccountID(r.Context())); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to delete account")
 		return
 	}

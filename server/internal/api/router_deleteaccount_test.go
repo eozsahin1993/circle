@@ -60,6 +60,37 @@ func TestEndToEnd_DeleteAccount_RemovesTheManifestAndRevokesTheSession(t *testin
 	}
 }
 
+// The case DeleteAllSessions exists for: a second device signed into the
+// same account must not be able to outlive the account it belonged to.
+func TestEndToEnd_DeleteAccount_RevokesEveryDevicesSession(t *testing.T) {
+	mux, google, _ := testsupport.NewRouterWithAuth(t)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	email := testsupport.UniqueEmail(t)
+	claims := validClaims(t, email, testsupport.TestGoogleClientID)
+	claims["iss"] = google.Issuer
+	deviceA := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims)))
+
+	// Same identity, a second sign-in — a second device's session.
+	claims2 := validClaims(t, email, testsupport.TestGoogleClientID)
+	claims2["iss"] = google.Issuer
+	claims2["sub"] = claims["sub"]
+	deviceB := decodeToken(t, postSignIn(t, server.URL, "/v1/auth/google", google.SignToken(t, claims2)))
+
+	deleteResp := authedRequest(t, http.MethodDelete, server.URL+"/v1/account", deviceA, "")
+	deleteResp.Body.Close()
+	if deleteResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 from DELETE, got %d", deleteResp.StatusCode)
+	}
+
+	bResp := authedRequest(t, http.MethodGet, server.URL+"/v1/account/manifest", deviceB, "")
+	defer bResp.Body.Close()
+	if bResp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected device B's session to be revoked too, got %d", bResp.StatusCode)
+	}
+}
+
 func TestEndToEnd_DeleteAccount_RequiresAuth(t *testing.T) {
 	mux := testsupport.NewRouter(t)
 	server := httptest.NewServer(mux)

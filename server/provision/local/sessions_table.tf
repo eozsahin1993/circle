@@ -10,6 +10,17 @@ resource "aws_dynamodb_table" "sessions" {
     type = "S"
   }
 
+  attribute {
+    name = "accountId"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "accountId-index"
+    hash_key        = "accountId"
+    projection_type = "KEYS_ONLY"
+  }
+
   ttl {
     attribute_name = "expiresAt"
     enabled        = true

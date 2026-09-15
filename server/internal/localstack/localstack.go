@@ -20,6 +20,7 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"circle-relay/internal/config"
+	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
 	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
 )
 
@@ -196,6 +197,9 @@ func ProvisionSet(ctx context.Context, ddb *awsdynamodb.Client, s3 *awss3.Client
 	if err := EnsureEntryIDIndex(ctx, ddb, names.LogTable); err != nil {
 		return fmt.Errorf("add entryId index to %s: %w", names.LogTable, err)
 	}
+	if err := EnsureAccountIDIndex(ctx, ddb, names.SessionsTable); err != nil {
+		return fmt.Errorf("add accountId index to %s: %w", names.SessionsTable, err)
+	}
 	if err := CreateBucket(ctx, s3, names.BlobBucket); err != nil {
 		return fmt.Errorf("create %s: %w", names.BlobBucket, err)
 	}
@@ -254,12 +258,26 @@ func CreateTable(ctx context.Context, client *awsdynamodb.Client, name string, s
 // there yet — a separate, idempotent step since CreateTable's shape is
 // shared by every table here, most needing no GSI.
 func EnsureEntryIDIndex(ctx context.Context, client *awsdynamodb.Client, tableName string) error {
+	return ensureKeysOnlyIndex(ctx, client, tableName, "entryId", logdynamodb.EntryIDIndexName)
+}
+
+// EnsureAccountIDIndex adds the accountId GSI to the sessions table if it
+// isn't there yet — see authstore/dynamodb.DeleteAllSessions.
+func EnsureAccountIDIndex(ctx context.Context, client *awsdynamodb.Client, tableName string) error {
+	return ensureKeysOnlyIndex(ctx, client, tableName, "accountId", authdynamodb.AccountIDIndexName)
+}
+
+// ensureKeysOnlyIndex adds a single-attribute, KEYS_ONLY GSI to tableName
+// if it isn't there yet — the shape every GSI in this codebase happens to
+// need so far. A separate, idempotent step since CreateTable's shape is
+// shared by every table here, most needing no GSI at all.
+func ensureKeysOnlyIndex(ctx context.Context, client *awsdynamodb.Client, tableName, attributeName, indexName string) error {
 	describe, err := client.DescribeTable(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(tableName)})
 	if err != nil {
 		return err
 	}
 	for _, gsi := range describe.Table.GlobalSecondaryIndexes {
-		if aws.ToString(gsi.IndexName) == logdynamodb.EntryIDIndexName {
+		if aws.ToString(gsi.IndexName) == indexName {
 			return nil
 		}
 	}
@@ -267,13 +285,13 @@ func EnsureEntryIDIndex(ctx context.Context, client *awsdynamodb.Client, tableNa
 	_, err = client.UpdateTable(ctx, &awsdynamodb.UpdateTableInput{
 		TableName: aws.String(tableName),
 		AttributeDefinitions: []ddbtypes.AttributeDefinition{
-			{AttributeName: aws.String("entryId"), AttributeType: ddbtypes.ScalarAttributeTypeS},
+			{AttributeName: aws.String(attributeName), AttributeType: ddbtypes.ScalarAttributeTypeS},
 		},
 		GlobalSecondaryIndexUpdates: []ddbtypes.GlobalSecondaryIndexUpdate{
 			{
 				Create: &ddbtypes.CreateGlobalSecondaryIndexAction{
-					IndexName:  aws.String(logdynamodb.EntryIDIndexName),
-					KeySchema:  []ddbtypes.KeySchemaElement{{AttributeName: aws.String("entryId"), KeyType: ddbtypes.KeyTypeHash}},
+					IndexName:  aws.String(indexName),
+					KeySchema:  []ddbtypes.KeySchemaElement{{AttributeName: aws.String(attributeName), KeyType: ddbtypes.KeyTypeHash}},
 					Projection: &ddbtypes.Projection{ProjectionType: ddbtypes.ProjectionTypeKeysOnly},
 				},
 			},
@@ -295,12 +313,12 @@ func EnsureEntryIDIndex(ctx context.Context, client *awsdynamodb.Client, tableNa
 			return err
 		}
 		for _, gsi := range describe.Table.GlobalSecondaryIndexes {
-			if aws.ToString(gsi.IndexName) == logdynamodb.EntryIDIndexName && gsi.IndexStatus == ddbtypes.IndexStatusActive {
+			if aws.ToString(gsi.IndexName) == indexName && gsi.IndexStatus == ddbtypes.IndexStatusActive {
 				return nil
 			}
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("entryId index on %s did not become active in time", tableName)
+			return fmt.Errorf("%s index on %s did not become active in time", indexName, tableName)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
