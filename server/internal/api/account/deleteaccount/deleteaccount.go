@@ -9,15 +9,14 @@ import (
 	"context"
 	"net/http"
 
-	"circle-relay/internal/api/auth"
+	"circle-relay/internal/auth"
 	"circle-relay/internal/httputil"
-	"circle-relay/internal/storage/authstore"
 	"circle-relay/internal/storage/manifeststore"
 )
 
 type Service struct {
 	ManifestStore manifeststore.Store
-	AuthStore     authstore.Store
+	AuthStore     auth.Store
 }
 
 // Delete removes the manifest first, sessions second — reversed, a

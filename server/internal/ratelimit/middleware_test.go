@@ -8,9 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"circle-relay/internal/api/auth"
+	"circle-relay/internal/auth"
 	"circle-relay/internal/ratelimit"
-	"circle-relay/internal/storage/authstore"
 	"circle-relay/internal/testsupport"
 )
 
@@ -34,7 +33,7 @@ func newAuthenticatedRequest(t *testing.T) (*http.Request, func(http.Handler) ht
 	t.Helper()
 	authStore := testsupport.NewAuthStore(t)
 	token := testsupport.UniqueAccountID(t)
-	if err := authStore.SaveSession(context.Background(), token, authstore.Session{
+	if err := authStore.SaveSession(context.Background(), token, auth.Session{
 		AccountID: testsupport.UniqueAccountID(t),
 		ExpiresAt: time.Now().Add(time.Hour),
 	}); err != nil {

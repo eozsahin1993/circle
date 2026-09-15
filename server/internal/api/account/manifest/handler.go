@@ -6,7 +6,7 @@ import (
 	"errors"
 	"net/http"
 
-	"circle-relay/internal/api/auth"
+	"circle-relay/internal/auth"
 	"circle-relay/internal/httputil"
 	"circle-relay/internal/storage/manifeststore"
 )

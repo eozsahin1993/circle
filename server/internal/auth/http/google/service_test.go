@@ -7,8 +7,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"circle-relay/internal/api/auth/google"
-	"circle-relay/internal/api/auth/oidcverify"
+	"circle-relay/internal/auth/http/google"
+	"circle-relay/internal/auth/oidcverify"
 	"circle-relay/internal/testsupport"
 )
 

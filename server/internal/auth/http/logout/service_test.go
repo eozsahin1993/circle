@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"circle-relay/internal/api/auth/logout"
-	"circle-relay/internal/storage/authstore"
+	"circle-relay/internal/auth"
+	"circle-relay/internal/auth/http/logout"
 	"circle-relay/internal/testsupport"
 )
 
@@ -16,7 +16,7 @@ func TestService_Logout_RevokesTheSession(t *testing.T) {
 	svc := &logout.Service{AuthStore: authStore}
 
 	token := testsupport.UniqueAccountID(t)
-	if err := authStore.SaveSession(ctx, token, authstore.Session{
+	if err := authStore.SaveSession(ctx, token, auth.Session{
 		AccountID: testsupport.UniqueAccountID(t),
 		ExpiresAt: time.Now().Add(time.Hour),
 	}); err != nil {

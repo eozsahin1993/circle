@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"circle-relay/internal/api"
-	"circle-relay/internal/api/auth/oidcverify"
+	"circle-relay/internal/auth/oidcverify"
 )
 
 // testRateLimitMaxRequests is deliberately huge — end-to-end router tests

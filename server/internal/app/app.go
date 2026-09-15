@@ -14,14 +14,14 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"circle-relay/internal/api"
-	"circle-relay/internal/api/auth/oidcverify"
 	"circle-relay/internal/api/push"
+	"circle-relay/internal/auth/oidcverify"
 	"circle-relay/internal/config"
 	"circle-relay/internal/push/apns"
 	"circle-relay/internal/push/fcm"
 
+	authdynamodb "circle-relay/internal/auth/dynamodb"
 	ratelimitdynamodb "circle-relay/internal/ratelimit/dynamodb"
-	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
 	blobs3 "circle-relay/internal/storage/blobstore/s3"
 	invitedynamodb "circle-relay/internal/storage/invitestore/dynamodb"
 	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"

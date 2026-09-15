@@ -17,8 +17,8 @@ import (
 
 	"circle-relay/internal/api"
 	"circle-relay/internal/app"
+	"circle-relay/internal/auth"
 	"circle-relay/internal/localstack"
-	"circle-relay/internal/storage/authstore"
 )
 
 // sessionTTL only has to outlast a test run.
@@ -83,7 +83,7 @@ func addr() string {
 // testing the fake's JWKS round-trip rather than the relay. Real provider
 // verification is covered where it belongs, by internal/api's own tests
 // against testsupport.FakeOIDCProvider.
-func registerTestOnly(mux *http.ServeMux, sessions authstore.Store) {
+func registerTestOnly(mux *http.ServeMux, sessions auth.Store) {
 	mux.HandleFunc("POST /testonly/session", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			AccountID string `json:"accountId"`
@@ -94,7 +94,7 @@ func registerTestOnly(mux *http.ServeMux, sessions authstore.Store) {
 			return
 		}
 
-		session := authstore.Session{AccountID: body.AccountID, ExpiresAt: time.Now().Add(sessionTTL)}
+		session := auth.Session{AccountID: body.AccountID, ExpiresAt: time.Now().Add(sessionTTL)}
 		if err := sessions.SaveSession(r.Context(), body.Token, session); err != nil {
 			http.Error(w, `{"error":"could not save the session"}`, http.StatusInternalServerError)
 			return

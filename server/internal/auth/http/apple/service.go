@@ -6,13 +6,12 @@ package apple
 import (
 	"context"
 
-	"circle-relay/internal/api/auth"
-	"circle-relay/internal/api/auth/oidcverify"
-	"circle-relay/internal/storage/authstore"
+	"circle-relay/internal/auth"
+	"circle-relay/internal/auth/oidcverify"
 )
 
 type Service struct {
-	AuthStore authstore.Store
+	AuthStore auth.Store
 	Verifier  *oidcverify.Verifier
 }
 

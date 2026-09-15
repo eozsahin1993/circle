@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"circle-relay/internal/httputil"
-	"circle-relay/internal/storage/authstore"
 )
 
 type contextKey int
@@ -16,7 +15,7 @@ const accountIDKey contextKey = iota
 // RequireSession gates next behind a valid, unexpired bearer token. Not
 // applied to the sign-in routes (that's how you get a token) or logout
 // (must accept an already-dead token as a no-op success).
-func RequireSession(authStore authstore.Store, next http.Handler) http.Handler {
+func RequireSession(authStore Store, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, ok := httputil.BearerToken(r)
 		if !ok {

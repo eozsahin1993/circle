@@ -11,11 +11,6 @@ import (
 	"circle-relay/internal/api/account/deleteaccount"
 	"circle-relay/internal/api/account/manifest"
 	"circle-relay/internal/api/appendlog"
-	"circle-relay/internal/api/auth"
-	"circle-relay/internal/api/auth/apple"
-	"circle-relay/internal/api/auth/google"
-	"circle-relay/internal/api/auth/logout"
-	"circle-relay/internal/api/auth/oidcverify"
 	"circle-relay/internal/api/changeauthority"
 	"circle-relay/internal/api/createlog"
 	"circle-relay/internal/api/deleteauthorcontent"
@@ -30,8 +25,12 @@ import (
 	"circle-relay/internal/api/invite"
 	"circle-relay/internal/api/push"
 	"circle-relay/internal/api/rotatelog"
+	"circle-relay/internal/auth"
+	"circle-relay/internal/auth/http/apple"
+	"circle-relay/internal/auth/http/google"
+	"circle-relay/internal/auth/http/logout"
+	"circle-relay/internal/auth/oidcverify"
 	"circle-relay/internal/ratelimit"
-	"circle-relay/internal/storage/authstore"
 	"circle-relay/internal/storage/blobstore"
 	"circle-relay/internal/storage/invitestore"
 	"circle-relay/internal/storage/logstore"
@@ -58,7 +57,7 @@ type PushDeps struct {
 type Deps struct {
 	Log      logstore.Store
 	Blob     blobstore.Store
-	Auth     authstore.Store
+	Auth     auth.Store
 	Manifest manifeststore.Store
 	Invite   invitestore.Store
 	// Writes and reads carry different budgets — see internal/ratelimit.

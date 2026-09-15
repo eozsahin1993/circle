@@ -65,7 +65,7 @@ type Store interface {
 	// DeleteJoinRequest removes a requester's row — the invite's creator
 	// dismissing a request ("not now"), permanently, before it's ever
 	// approved. Idempotent: deleting an already-gone or already-expired
-	// row succeeds, doesn't error, same convention as authstore's
+	// row succeeds, doesn't error, same convention as auth's
 	// DeleteSession.
 	DeleteJoinRequest(ctx context.Context, inviteTag, requesterID string) error
 }

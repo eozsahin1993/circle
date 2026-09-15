@@ -1,4 +1,4 @@
-// Package dynamodb implements authstore.Store against its own "sessions"
+// Package dynamodb implements auth.Store against its own "sessions"
 // table — one item per bearer token, no sort key needed since a session
 // is looked up by token for every path except account deletion (see
 // server/provision/sessions_table.tf, and its accountId-index GSI).
@@ -18,8 +18,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
+	"circle-relay/internal/auth"
 	"circle-relay/internal/dynamoutil"
-	"circle-relay/internal/storage/authstore"
 )
 
 type Store struct {
@@ -31,9 +31,9 @@ func New(client *dynamodb.Client, tableName string) *Store {
 	return &Store{client: client, tableName: tableName}
 }
 
-var _ authstore.Store = (*Store)(nil)
+var _ auth.Store = (*Store)(nil)
 
-func (s *Store) SaveSession(ctx context.Context, token string, session authstore.Session) error {
+func (s *Store) SaveSession(ctx context.Context, token string, session auth.Session) error {
 	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(s.tableName),
 		Item: map[string]types.AttributeValue{
@@ -45,7 +45,7 @@ func (s *Store) SaveSession(ctx context.Context, token string, session authstore
 	return err
 }
 
-func (s *Store) GetSession(ctx context.Context, token string) (*authstore.Session, error) {
+func (s *Store) GetSession(ctx context.Context, token string) (*auth.Session, error) {
 	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
@@ -67,7 +67,7 @@ func (s *Store) GetSession(ctx context.Context, token string) (*authstore.Sessio
 	if err != nil {
 		return nil, err
 	}
-	return &authstore.Session{AccountID: accountID, ExpiresAt: time.Unix(expiresAt, 0)}, nil
+	return &auth.Session{AccountID: accountID, ExpiresAt: time.Unix(expiresAt, 0)}, nil
 }
 
 // DeleteSession revokes token immediately — logout, or responding to a

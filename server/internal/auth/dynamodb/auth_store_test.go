@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"circle-relay/internal/storage/authstore"
+	"circle-relay/internal/auth"
 	"circle-relay/internal/testsupport"
 )
 
@@ -17,7 +17,7 @@ func TestAuthStore_SaveSessionThenGetSession_RoundTrips(t *testing.T) {
 	accountID := testsupport.UniqueAccountID(t)
 	expiresAt := time.Now().Add(time.Hour).Truncate(time.Second)
 
-	if err := store.SaveSession(ctx, token, authstore.Session{AccountID: accountID, ExpiresAt: expiresAt}); err != nil {
+	if err := store.SaveSession(ctx, token, auth.Session{AccountID: accountID, ExpiresAt: expiresAt}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -51,7 +51,7 @@ func TestAuthStore_DeleteSession_RevokesAnExistingSession(t *testing.T) {
 	store := testsupport.NewAuthStore(t)
 	token := testsupport.UniqueAccountID(t)
 
-	if err := store.SaveSession(ctx, token, authstore.Session{
+	if err := store.SaveSession(ctx, token, auth.Session{
 		AccountID: testsupport.UniqueAccountID(t),
 		ExpiresAt: time.Now().Add(time.Hour),
 	}); err != nil {
@@ -117,7 +117,7 @@ func deleteAllSessionsRevokesEveryoneOnce(t *testing.T) string {
 	tokenB := testsupport.UniqueAccountID(t)
 	tokenOther := testsupport.UniqueAccountID(t)
 	for token, id := range map[string]string{tokenA: accountID, tokenB: accountID, tokenOther: other} {
-		if err := store.SaveSession(ctx, token, authstore.Session{AccountID: id, ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
+		if err := store.SaveSession(ctx, token, auth.Session{AccountID: id, ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -7,8 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"circle-relay/internal/api/auth"
-	"circle-relay/internal/storage/authstore"
+	"circle-relay/internal/auth"
 	"circle-relay/internal/testsupport"
 )
 
@@ -50,7 +49,7 @@ func TestRequireSession_ExpiredSessionReturns401(t *testing.T) {
 	ctx := context.Background()
 	authStore := testsupport.NewAuthStore(t)
 	token := testsupport.UniqueAccountID(t)
-	if err := authStore.SaveSession(ctx, token, authstore.Session{
+	if err := authStore.SaveSession(ctx, token, auth.Session{
 		AccountID: testsupport.UniqueAccountID(t),
 		ExpiresAt: time.Now().Add(-time.Hour),
 	}); err != nil {
@@ -74,7 +73,7 @@ func TestRequireSession_ValidSessionCallsNextWithAccountID(t *testing.T) {
 	authStore := testsupport.NewAuthStore(t)
 	token := testsupport.UniqueAccountID(t)
 	accountID := testsupport.UniqueAccountID(t)
-	if err := authStore.SaveSession(ctx, token, authstore.Session{
+	if err := authStore.SaveSession(ctx, token, auth.Session{
 		AccountID: accountID,
 		ExpiresAt: time.Now().Add(time.Hour),
 	}); err != nil {

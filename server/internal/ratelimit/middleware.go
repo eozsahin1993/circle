@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 
-	"circle-relay/internal/api/auth"
+	"circle-relay/internal/auth"
 	"circle-relay/internal/httputil"
 )
 

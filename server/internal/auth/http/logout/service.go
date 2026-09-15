@@ -6,12 +6,11 @@ package logout
 import (
 	"context"
 
-	"circle-relay/internal/api/auth"
-	"circle-relay/internal/storage/authstore"
+	"circle-relay/internal/auth"
 )
 
 type Service struct {
-	AuthStore authstore.Store
+	AuthStore auth.Store
 }
 
 // Logout revokes token immediately. Idempotent, same as the underlying

@@ -31,11 +31,11 @@ import (
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
+	"circle-relay/internal/auth"
+	authdynamodb "circle-relay/internal/auth/dynamodb"
 	"circle-relay/internal/localstack"
 	"circle-relay/internal/ratelimit"
 	ratelimitdynamodb "circle-relay/internal/ratelimit/dynamodb"
-	"circle-relay/internal/storage/authstore"
-	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
 	"circle-relay/internal/storage/blobstore"
 	blobs3 "circle-relay/internal/storage/blobstore/s3"
 	"circle-relay/internal/storage/invitestore"
@@ -214,7 +214,7 @@ func NewBlobStore(t testing.TB) blobstore.Store {
 // sync.Once-guarded create-if-not-exists pattern as NewLogStore, against a
 // genuinely separate table from everything else (see
 // server/provision/sessions_table.tf).
-func NewAuthStore(t testing.TB) authstore.Store {
+func NewAuthStore(t testing.TB) auth.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())
