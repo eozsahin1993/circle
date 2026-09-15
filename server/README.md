@@ -30,20 +30,20 @@ long-lived process.
 
 ## Storage: three tables, three different reasons
 
-- **sync-log** (`internal/storage/logstore`) — one row per circle-log
+- **sync-log** (`internal/synclog`) — one row per circle-log
   entry, keyed by `circleLogId` + `epoch`. TTL'd (`LOG_RETENTION_DAYS`) —
   the relay is a sync cache, not a permanent archive; each device's local
   SQLite is the real source of truth.
-- **sessions** (`internal/storage/authstore`) — one row per bearer token.
+- **sessions** (`internal/auth`) — one row per bearer token.
   TTL'd (90 days from issuance). Looked up by token, never by account.
-- **accounts** (`internal/storage/manifeststore`) — one row per account,
+- **accounts** (`internal/account`) — one row per account,
   holding a single opaque `blob` the client encrypted itself. Never
   TTL'd. The relay only ever reads/writes ciphertext here — see
   DESIGN.md's "Account recovery" section.
 
 Each table exists because its access pattern and lifecycle genuinely
 differ from the others — see each package's own doc comment for the
-specific reasoning, and `internal/storage/dynamoutil` for the handful of
+specific reasoning, and `internal/dynamoutil` for the handful of
 attribute-encoding helpers all three share.
 
 ## Auth flow, end to end
@@ -51,9 +51,9 @@ attribute-encoding helpers all three share.
 This is the part that trips people up, so it's worth walking through
 directly rather than just reading five files in isolation.
 
-1. **Sign-in** (`internal/api/auth/google`, `.../apple`) verifies the
+1. **Sign-in** (`internal/auth/http/google`, `.../apple`) verifies the
    client's ID token against the provider's own public keys
-   (`internal/api/auth/oidcverify`), then builds an **accountId**:
+   (`internal/auth/oidcverify`), then builds an **accountId**:
    `"google:" + sub` or `"apple:" + sub`. `sub` is the OIDC subject claim
    — a permanent, provider-issued identifier, required on every token by
    spec. The `provider:` prefix exists purely so Google's and Apple's
@@ -65,7 +65,7 @@ directly rather than just reading five files in isolation.
    address gets regenerated) while `sub` can't — see DESIGN.md's
    "Account recovery" section for the full reasoning.
 
-2. **`auth.Issue`** (`internal/api/auth/session.go`) mints a random
+2. **`auth.Issue`** (`internal/auth/session.go`) mints a random
    bearer token and stores `authstore.Session{AccountID: accountID,
    ExpiresAt: ...}` in the sessions table, keyed by that token. The
    token — not the accountID — is what the client gets back and sends on
@@ -74,7 +74,7 @@ directly rather than just reading five files in isolation.
    the account itself.
 
 3. **Every request to a protected route** goes through
-   `auth.RequireSession` (`internal/api/auth/middleware.go`), which pulls
+   `auth.RequireSession` (`internal/auth/middleware.go`), which pulls
    the bearer token off the `Authorization` header, looks up its session,
    checks `ExpiresAt`, and stashes the account on the request's context:
 
@@ -119,7 +119,7 @@ recomputes it; they only ever learn your public half by reading it out of
 the circle's roster, which syncs like any other content. So `circleId`
 only has one real job: staying *stable for your own account across a lost
 device*, which is exactly what the account-recovery manifest
-(`internal/storage/manifeststore`) exists to guarantee — it's a durable,
+(`internal/account`) exists to guarantee — it's a durable,
 client-encrypted list of the circleId values your account used, so a
 recovering device reproduces the *same* keypairs the rest of the circle
 already recognizes, instead of showing up as an unrecognized stranger.

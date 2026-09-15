@@ -1,5 +1,5 @@
 # Standalone table for per-account rate-limit budgets — one item per
-# (keyPrefix, accountId) pair (see server/internal/storage/ratelimitstore/
+# (keyPrefix, accountId) pair (see server/internal/ratelimit/
 # dynamodb), no sort key needed since a budget is only ever looked up by
 # its composite partition key. No TTL: unlike sessions/invites, rows here
 # don't expire — the table's size is bounded by the number of accounts

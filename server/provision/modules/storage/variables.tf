@@ -10,7 +10,7 @@ variable "blob_glacier_transition_days" {
 }
 
 variable "invite_retention_days" {
-  description = "TTL window for invites-table rows (both the invite row and each join-request row) — see internal/storage/invitestore/dynamodb."
+  description = "TTL window for invites-table rows (both the invite row and each join-request row) — see internal/invite/dynamodb."
   type        = number
   default     = 7
 }

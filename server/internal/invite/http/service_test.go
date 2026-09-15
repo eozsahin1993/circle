@@ -5,14 +5,14 @@ import (
 	"errors"
 	"testing"
 
-	invitestore "circle-relay/internal/invite"
-	"circle-relay/internal/invite/http"
+	"circle-relay/internal/invite"
+	invitehttp "circle-relay/internal/invite/http"
 	"circle-relay/internal/testsupport"
 )
 
 func TestService_CreateInviteThenGetInvite_RoundTrips(t *testing.T) {
 	ctx := context.Background()
-	svc := &invite.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
+	svc := &invitehttp.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
 	inviteTag := testsupport.UniqueInviteTag(t)
 	preview := []byte("pretend-encrypted-preview")
 
@@ -31,7 +31,7 @@ func TestService_CreateInviteThenGetInvite_RoundTrips(t *testing.T) {
 
 func TestService_GetInvite_ReturnsNilForATagThatWasNeverCreated(t *testing.T) {
 	ctx := context.Background()
-	svc := &invite.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
+	svc := &invitehttp.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
 
 	got, err := svc.GetInvite(ctx, testsupport.UniqueInviteTag(t))
 	if err != nil {
@@ -44,7 +44,7 @@ func TestService_GetInvite_ReturnsNilForATagThatWasNeverCreated(t *testing.T) {
 
 func TestService_PutRequestThenGetRequest_RoundTrips(t *testing.T) {
 	ctx := context.Background()
-	svc := &invite.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
+	svc := &invitehttp.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
 	inviteTag := testsupport.UniqueInviteTag(t)
 	requesterID := "requester-1"
 	encryptedRequest := []byte("pretend-encrypted-join-request")
@@ -73,7 +73,7 @@ func TestService_PutRequestThenGetRequest_RoundTrips(t *testing.T) {
 
 func TestService_GetRequest_ReturnsNilForARequesterThatNeverSubmitted(t *testing.T) {
 	ctx := context.Background()
-	svc := &invite.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
+	svc := &invitehttp.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
 
 	got, err := svc.GetRequest(ctx, testsupport.UniqueInviteTag(t), "nobody")
 	if err != nil {
@@ -86,7 +86,7 @@ func TestService_GetRequest_ReturnsNilForARequesterThatNeverSubmitted(t *testing
 
 func TestService_ListRequests_ReturnsEveryRequesterUnderOneInvite(t *testing.T) {
 	ctx := context.Background()
-	svc := &invite.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
+	svc := &invitehttp.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
 	inviteTag := testsupport.UniqueInviteTag(t)
 
 	if err := svc.PutRequest(ctx, inviteTag, "requester-a", []byte("request-a")); err != nil {
@@ -118,7 +118,7 @@ func TestService_ListRequests_ReturnsEveryRequesterUnderOneInvite(t *testing.T) 
 
 func TestService_PutRequest_DuplicateSubmissionDoesNotError(t *testing.T) {
 	ctx := context.Background()
-	svc := &invite.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
+	svc := &invitehttp.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
 	inviteTag := testsupport.UniqueInviteTag(t)
 	requesterID := "requester-1"
 
@@ -145,7 +145,7 @@ func TestService_PutRequest_DuplicateSubmissionDoesNotError(t *testing.T) {
 
 func TestService_PutApprovalThenGetRequest_ShowsApproval(t *testing.T) {
 	ctx := context.Background()
-	svc := &invite.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
+	svc := &invitehttp.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
 	inviteTag := testsupport.UniqueInviteTag(t)
 	requesterID := "requester-1"
 	approval := []byte("pretend-sealed-box-approval")
@@ -171,20 +171,20 @@ func TestService_PutApprovalThenGetRequest_ShowsApproval(t *testing.T) {
 
 func TestService_PutApproval_ErrorsForANonexistentRequest(t *testing.T) {
 	ctx := context.Background()
-	svc := &invite.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
+	svc := &invitehttp.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
 
 	err := svc.PutApproval(ctx, testsupport.UniqueInviteTag(t), "nobody", []byte("approval"))
 	if err == nil {
 		t.Fatal("expected an error approving a join request that was never made")
 	}
-	if !errors.Is(err, invitestore.ErrJoinRequestNotFound) {
+	if !errors.Is(err, invite.ErrJoinRequestNotFound) {
 		t.Fatalf("expected ErrJoinRequestNotFound, got %v", err)
 	}
 }
 
 func TestService_DeleteRequestThenGetRequest_ReturnsNil(t *testing.T) {
 	ctx := context.Background()
-	svc := &invite.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
+	svc := &invitehttp.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
 	inviteTag := testsupport.UniqueInviteTag(t)
 	requesterID := "requester-1"
 
@@ -206,7 +206,7 @@ func TestService_DeleteRequestThenGetRequest_ReturnsNil(t *testing.T) {
 
 func TestService_DeleteRequest_IsIdempotentForAnUnknownRequester(t *testing.T) {
 	ctx := context.Background()
-	svc := &invite.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
+	svc := &invitehttp.Service{InviteStore: testsupport.NewInviteStore(t, 0)}
 
 	if err := svc.DeleteRequest(ctx, testsupport.UniqueInviteTag(t), "nobody"); err != nil {
 		t.Fatalf("expected deleting a never-existed request to succeed, got %v", err)

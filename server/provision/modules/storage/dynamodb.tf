@@ -75,7 +75,7 @@ resource "aws_dynamodb_table" "invites" {
 
   # Both the invite row and each request row carry their own `expiresAt`
   # (epoch seconds), set at write time from invite_retention_days —
-  # see internal/storage/invitestore/dynamodb/invite_store.go. AWS
+  # see internal/invite/dynamodb/invite_store.go. AWS
   # evicts them itself in the background; no application code deletes
   # anything.
   ttl {

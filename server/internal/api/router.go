@@ -16,8 +16,8 @@ import (
 	"circle-relay/internal/auth/http/google"
 	"circle-relay/internal/auth/http/logout"
 	"circle-relay/internal/auth/oidcverify"
-	invitestore "circle-relay/internal/invite"
-	"circle-relay/internal/invite/http"
+	"circle-relay/internal/invite"
+	invitehttp "circle-relay/internal/invite/http"
 	"circle-relay/internal/push"
 	pushhttp "circle-relay/internal/push/http"
 	"circle-relay/internal/ratelimit"
@@ -58,7 +58,7 @@ type Deps struct {
 	Blob     synclog.BlobStore
 	Auth     auth.Store
 	Manifest account.Store
-	Invite   invitestore.Store
+	Invite   invite.Store
 	// Writes and reads carry different budgets — see internal/ratelimit.
 	WriteLimit ratelimit.Store
 	ReadLimit  ratelimit.Store
@@ -119,7 +119,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	// accountID — the relay never learns who's inviting whom, only that
 	// some authenticated session is.
 	invitesMux := http.NewServeMux()
-	invite.Register(invitesMux, &invite.Service{InviteStore: deps.Invite})
+	invitehttp.Register(invitesMux, &invitehttp.Service{InviteStore: deps.Invite})
 	mux.Handle("/invites/", auth.RequireSession(deps.Auth, invitesMux))
 
 	// Not circle-scoped in the path (it spans however many circles a

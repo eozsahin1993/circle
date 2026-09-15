@@ -110,7 +110,7 @@ remembered.
 | Manifest contents, read/write, conflict retries | `app/src/domain/usecases/account/account-manifest.ts` |
 | The restore itself | `app/src/domain/usecases/account/restore-from-phrase.ts` |
 | Key derivation from the seed | `app/src/services/crypto.ts` |
-| Storage and versioned writes | `server/internal/storage/manifeststore/` |
+| Storage and versioned writes | `server/internal/account/` |
 
 `SYNC_DESIGN.md` describes a larger future replacement for the manifest — a
 per-membership discovery table keyed off the seed rather than the account,

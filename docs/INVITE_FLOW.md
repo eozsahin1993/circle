@@ -3,8 +3,8 @@
 Status: **built**, all 7 steps below — `app/src/domain/usecases/circle/join-circle.ts`
 (requester side), `invite-to-circle.ts`'s `discoverPendingRequests`/`approveJoinRequest`
 (creator side), `app/src/app/join/[code].tsx`/`join/pending.tsx` (deep-link
-handling and UI), and `server/internal/storage/invitestore` +
-`server/internal/api/invite` (the server-side table and routes this doc
+handling and UI), and `server/internal/invite` +
+`server/internal/invite/http` (the server-side table and routes this doc
 calls the "mailbox"). One addition beyond what this doc originally
 specified: the approval is also signed by the approver's own circle
 identity and verified by the requester against `createdByPublicKey` (now

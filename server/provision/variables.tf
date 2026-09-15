@@ -21,7 +21,7 @@ variable "blob_glacier_transition_days" {
 }
 
 variable "invite_retention_days" {
-  description = "TTL window for invites-table rows (the invite row and each join-request row) — DynamoDB TTL, an expiresAt attribute set at write time — see internal/storage/invitestore/dynamodb. Matches the client's INVITE_TTL_MS default of 7 days."
+  description = "TTL window for invites-table rows (the invite row and each join-request row) — DynamoDB TTL, an expiresAt attribute set at write time — see internal/invite/dynamodb. Matches the client's INVITE_TTL_MS default of 7 days."
   type        = number
   default     = 7
 }
@@ -57,13 +57,13 @@ variable "apple_client_id_ios" {
 }
 
 variable "rate_limit_write_max_requests" {
-  description = "Per-account write-budget size for the fixed window below (appendlog/rotatelog/createlog/getuploadtarget/getcoverphotouploadtarget) — see internal/storage/ratelimitstore. A starting guess sized to tolerate a large offline-catch-up burst, not a measurement; expected to be retuned from the near-limit warnings the store logs once real traffic exists."
+  description = "Per-account write-budget size for the fixed window below (appendlog/rotatelog/createlog/getuploadtarget/getcoverphotouploadtarget) — see internal/ratelimit. A starting guess sized to tolerate a large offline-catch-up burst, not a measurement; expected to be retuned from the near-limit warnings the store logs once real traffic exists."
   type        = number
   default     = 500
 }
 
 variable "rate_limit_read_max_requests" {
-  description = "Per-account read-budget size for the fixed window below (getlog/getblob) — see internal/storage/ratelimitstore. Set much higher than the write budget since ordinary sync reads far more often than it writes."
+  description = "Per-account read-budget size for the fixed window below (getlog/getblob) — see internal/ratelimit. Set much higher than the write budget since ordinary sync reads far more often than it writes."
   type        = number
   default     = 2000
 }
