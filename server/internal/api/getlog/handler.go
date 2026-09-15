@@ -17,6 +17,8 @@ type entryResponse struct {
 	KeyVersion    int64  `json:"keyVersion"`
 	EncryptedMeta string `json:"encryptedMeta"`
 	ReceivedAt    int64  `json:"receivedAt"`
+	// Optional deleted entries with empty EncryptedMeta
+	DeletedAt int64 `json:"deletedAt,omitempty"`
 }
 
 type response struct {
@@ -67,6 +69,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			KeyVersion:    e.KeyVersion,
 			EncryptedMeta: base64.StdEncoding.EncodeToString(e.EncryptedMeta),
 			ReceivedAt:    e.ReceivedAt,
+			DeletedAt:     e.DeletedAt,
 		}
 	}
 

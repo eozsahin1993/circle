@@ -70,3 +70,13 @@ export function deriveDeleteBlobMessage(syncId: string, entryId: string): Uint8A
 export function deriveDeleteCircleMessage(syncId: string, entryId: string): Uint8Array {
   return new TextEncoder().encode(`circle-relay/delete-circle/v1\x00${syncId}\x00${entryId}`);
 }
+
+/**
+ * The exact byte sequence a signature must cover to delete a post — must
+ * match the relay's own `logstore.PostDeletion.Message()` byte-for-byte.
+ * Bound to both the post and the tombstone entry id, so one signature
+ * can't be replayed against a different tombstone attempt later.
+ */
+export function deriveDeletePostMessage(syncId: string, postEntryId: string, tombstoneEntryId: string): Uint8Array {
+  return new TextEncoder().encode(`circle-relay/delete-post/v1\x00${syncId}\x00${postEntryId}\x00${tombstoneEntryId}`);
+}

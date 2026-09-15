@@ -19,6 +19,7 @@ import (
 	"circle-relay/internal/api/createlog"
 	"circle-relay/internal/api/deleteblob"
 	"circle-relay/internal/api/deletecircle"
+	"circle-relay/internal/api/deletepost"
 	"circle-relay/internal/api/getblob"
 	"circle-relay/internal/api/getcoverphotouploadtarget"
 	"circle-relay/internal/api/getepochs"
@@ -98,6 +99,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	getblob.Register(circleMux, &getblob.Service{BlobStore: deps.Blob}, readLimit)
 	getuploadtarget.Register(circleMux, &getuploadtarget.Service{BlobStore: deps.Blob, LogStore: deps.Log}, writeLimit)
 	deleteblob.Register(circleMux, &deleteblob.Service{BlobStore: deps.Blob, LogStore: deps.Log}, writeLimit)
+	deletepost.Register(circleMux, &deletepost.Service{LogStore: deps.Log, BlobStore: deps.Blob}, writeLimit)
 	getcoverphotouploadtarget.Register(circleMux, &getcoverphotouploadtarget.Service{BlobStore: deps.Blob, LogStore: deps.Log}, writeLimit)
 	mux.Handle("/circles/", auth.RequireSession(deps.Auth, circleMux))
 

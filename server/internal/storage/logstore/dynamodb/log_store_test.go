@@ -1157,3 +1157,156 @@ func TestLogStore_DeleteCircle_WithNoContentAtAll(t *testing.T) {
 		t.Fatalf("expected the circle closed to writes, got %v", err)
 	}
 }
+
+// deletePost builds a PostDeletion signed by author for postEntryID —
+// tests that want a wrong signature edit AuthorSignature after.
+func deletePost(author authorityKey, syncID, postEntryID, tombstoneEntryID, token string) logstore.PostDeletion {
+	deletion := logstore.PostDeletion{
+		SyncID:           syncID,
+		PostEntryID:      postEntryID,
+		TombstoneEntryID: tombstoneEntryID,
+		EncryptedPayload: []byte("post_delete payload"),
+		KeyVersion:       1,
+		WriteToken:       token,
+	}
+	deletion.AuthorSignature = ed25519.Sign(author.private, deletion.Message())
+	return deletion
+}
+
+func TestLogStore_DeletePost_SucceedsViaAuthorSignature(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	author := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	// Not a literal "post-1": the entryId-index GSI is global across the
+	// whole shared test table, and other tests' posts already use that.
+	postID := syncID + "-post-1"
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, postID, []byte("caption"), 1, token, author.publicKeyHex); err != nil {
+		t.Fatal(err)
+	}
+
+	commit, err := store.DeletePost(ctx, deletePost(author, syncID, postID, "tombstone-1", token))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if commit.Epoch != 2 {
+		t.Fatalf("expected the tombstone at epoch 2, got %d", commit.Epoch)
+	}
+
+	read, err := store.Read(ctx, syncID, logstore.NamespaceContent, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Entries) != 2 {
+		t.Fatalf("expected the post row to survive alongside the tombstone, got %d entries", len(read.Entries))
+	}
+	if len(read.Entries[0].EncryptedMeta) != 0 {
+		t.Fatalf("expected the post's EncryptedMeta to be gone, got %q", read.Entries[0].EncryptedMeta)
+	}
+
+	item, err := testsupport.RawItem(t, syncID, "content#000000000001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := item["deletedAt"]; !ok {
+		t.Fatal("expected deletedAt to be set on the stripped row")
+	}
+	if who, _ := item["deletedBy"].(*ddbtypes.AttributeValueMemberS); who == nil || who.Value != author.publicKeyHex {
+		t.Fatalf("expected deletedBy to be the author's key, got %+v", item["deletedBy"])
+	}
+}
+
+func TestLogStore_DeletePost_SucceedsViaAuthoritySignature(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	author := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	postID := syncID + "-post-1"
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, postID, []byte("caption"), 1, token, author.publicKeyHex); err != nil {
+		t.Fatal(err)
+	}
+
+	deletion := logstore.PostDeletion{
+		SyncID:           syncID,
+		PostEntryID:      postID,
+		TombstoneEntryID: "tombstone-1",
+		EncryptedPayload: []byte("post_delete payload"),
+		KeyVersion:       1,
+		WriteToken:       token,
+		// No AuthorSignature — an admin deleting someone else's post.
+		AuthorityPublicKey: founder.publicKeyHex,
+	}
+	deletion.AuthoritySignature = ed25519.Sign(founder.private, deletion.Message())
+
+	if _, err := store.DeletePost(ctx, deletion); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLogStore_DeletePost_RejectsWrongSignature(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	author := newAuthorityKey(t)
+	impostor := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	postID := syncID + "-post-1"
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, postID, []byte("caption"), 1, token, author.publicKeyHex); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := store.DeletePost(ctx, deletePost(impostor, syncID, postID, "tombstone-1", token)); !errors.Is(err, logstore.ErrPostNotAuthorized) {
+		t.Fatalf("expected ErrPostNotAuthorized, got %v", err)
+	}
+}
+
+func TestLogStore_DeletePost_RejectsUnknownPostEntryID(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	if _, err := store.DeletePost(ctx, deletePost(founder, syncID, "no-such-post", "tombstone-1", token)); !errors.Is(err, logstore.ErrPostNotFound) {
+		t.Fatalf("expected ErrPostNotFound, got %v", err)
+	}
+}
+
+func TestLogStore_DeletePost_RetryWithTheSameTombstoneEntryIDIsIdempotent(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	author := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	postID := syncID + "-post-1"
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, postID, []byte("caption"), 1, token, author.publicKeyHex); err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := store.DeletePost(ctx, deletePost(author, syncID, postID, "tombstone-1", token))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := store.DeletePost(ctx, deletePost(author, syncID, postID, "tombstone-1", token))
+	if err != nil {
+		t.Fatalf("a retry must converge rather than fail: %v", err)
+	}
+	if first != second {
+		t.Fatalf("expected the retry to return the original commit, got %+v then %+v", first, second)
+	}
+}

@@ -20,6 +20,7 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"circle-relay/internal/config"
+	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
 )
 
 // DefaultEndpoint is where LocalStack listens locally and in CI.
@@ -192,6 +193,9 @@ func ProvisionSet(ctx context.Context, ddb *awsdynamodb.Client, s3 *awss3.Client
 			return fmt.Errorf("create %s: %w", table.name, err)
 		}
 	}
+	if err := EnsureEntryIDIndex(ctx, ddb, names.LogTable); err != nil {
+		return fmt.Errorf("add entryId index to %s: %w", names.LogTable, err)
+	}
 	if err := CreateBucket(ctx, s3, names.BlobBucket); err != nil {
 		return fmt.Errorf("create %s: %w", names.BlobBucket, err)
 	}
@@ -244,6 +248,62 @@ func CreateTable(ctx context.Context, client *awsdynamodb.Client, name string, s
 
 	waiter := awsdynamodb.NewTableExistsWaiter(client)
 	return waiter.Wait(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(name)}, 30*time.Second)
+}
+
+// EnsureEntryIDIndex adds the entryId GSI to the log table if it isn't
+// there yet — a separate, idempotent step since CreateTable's shape is
+// shared by every table here, most needing no GSI.
+func EnsureEntryIDIndex(ctx context.Context, client *awsdynamodb.Client, tableName string) error {
+	describe, err := client.DescribeTable(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(tableName)})
+	if err != nil {
+		return err
+	}
+	for _, gsi := range describe.Table.GlobalSecondaryIndexes {
+		if aws.ToString(gsi.IndexName) == logdynamodb.EntryIDIndexName {
+			return nil
+		}
+	}
+
+	_, err = client.UpdateTable(ctx, &awsdynamodb.UpdateTableInput{
+		TableName: aws.String(tableName),
+		AttributeDefinitions: []ddbtypes.AttributeDefinition{
+			{AttributeName: aws.String("entryId"), AttributeType: ddbtypes.ScalarAttributeTypeS},
+		},
+		GlobalSecondaryIndexUpdates: []ddbtypes.GlobalSecondaryIndexUpdate{
+			{
+				Create: &ddbtypes.CreateGlobalSecondaryIndexAction{
+					IndexName:  aws.String(logdynamodb.EntryIDIndexName),
+					KeySchema:  []ddbtypes.KeySchemaElement{{AttributeName: aws.String("entryId"), KeyType: ddbtypes.KeyTypeHash}},
+					Projection: &ddbtypes.Projection{ProjectionType: ddbtypes.ProjectionTypeKeysOnly},
+				},
+			},
+		},
+	})
+	if err != nil {
+		var inUse *ddbtypes.ResourceInUseException
+		if !errors.As(err, &inUse) {
+			return err
+		}
+		// Racing test binary already adding it — fall through to the poll.
+	}
+
+	// No SDK waiter for GSI-active like NewTableExistsWaiter — poll directly.
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		describe, err := client.DescribeTable(ctx, &awsdynamodb.DescribeTableInput{TableName: aws.String(tableName)})
+		if err != nil {
+			return err
+		}
+		for _, gsi := range describe.Table.GlobalSecondaryIndexes {
+			if aws.ToString(gsi.IndexName) == logdynamodb.EntryIDIndexName && gsi.IndexStatus == ddbtypes.IndexStatusActive {
+				return nil
+			}
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("entryId index on %s did not become active in time", tableName)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 // CreateBucket creates a blob bucket. An already-owned bucket is

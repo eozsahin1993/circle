@@ -7,19 +7,22 @@ import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystor
 import { getMasterSeed } from '@/core/services/keystore/master-seed';
 import { encrypt, sign } from '@/core/crypto/primitives';
 import { deriveAuthorityKeypair } from '@/core/crypto/identity';
-import { deriveAuthorityChangeMessage, deriveDeleteBlobMessage, deriveDeleteCircleMessage } from '@/core/crypto/signed-messages';
+import {
+  deriveAuthorityChangeMessage,
+  deriveDeleteCircleMessage,
+  deriveDeletePostMessage,
+} from '@/core/crypto/signed-messages';
 import { deriveWriteToken } from '@/features/circle/crypto';
 import {
   appendEntry,
   changeAuthority,
   deleteCircleOnRelay,
+  deletePostOnRelay,
   type AppendResult,
   type Namespace,
 } from '@/core/services/log-relay';
 import {
   BlobAlreadyExistsError,
-  BlobDeleteRefusedError,
-  deleteBlob,
   getUploadTarget,
   uploadBlob,
 } from '@/core/services/blob-relay';
@@ -126,38 +129,33 @@ export function drainOutbox(circleId: string): Promise<void> {
 }
 
 /**
- * Deletes a blob whose entry has just landed, signing both as its own
- * circle identity and as an authority when this device has that key —
- * the relay accepts either signature, and needs one from anybody else
- * (see `deleteBlob`). Signing unconditionally costs nothing and saves
- * knowing, at drain time, whether this device wrote the photo: the
- * post's row is already gone by then.
- *
- * A refusal is logged and passed over rather than thrown. The bytes are
- * cleanup; the entry is the truth, and it has already landed. Throwing
- * would leave the row pending forever and block everything queued behind
- * it, which is a much worse outcome than one blob outliving its post.
+ * Pushes a queued post deletion — see `deletePost`. Signs both as this
+ * device's own circle identity and as an authority when it has that key,
+ * so the relay can accept whichever one actually authorizes it — the
+ * relay strips the post and deletes its blob itself, in one call.
  */
-async function deleteBlobFor(circleId: string, syncId: string, blobEntryId: string, writeToken: Uint8Array): Promise<void> {
+async function pushPostDeletion(
+  circleId: string,
+  syncId: string,
+  entry: OutboxEntry,
+  keyVersion: number,
+  writeToken: Uint8Array
+): Promise<AppendResult> {
+  const postEntryId = entry.blobEntryId;
+  if (!postEntryId) throw new Error('Queued post deletion is missing the post it targets.');
+
   const identity = await getCircleIdentity(circleId);
-  const uploaderSignature = identity ? sign(deriveDeleteBlobMessage(syncId, blobEntryId), identity.secretKey) : undefined;
+  const message = deriveDeletePostMessage(syncId, postEntryId, entry.entryId);
+  const authorSignature = identity ? sign(message, identity.secretKey) : undefined;
   const masterSeed = await getMasterSeed();
   const authority = masterSeed
     ? (() => {
         const keypair = deriveAuthorityKeypair(masterSeed, circleId);
-        return {
-          publicKey: keypair.publicKey,
-          signature: sign(deriveDeleteBlobMessage(syncId, blobEntryId), keypair.secretKey),
-        };
+        return { publicKey: keypair.publicKey, signature: sign(message, keypair.secretKey) };
       })()
     : undefined;
 
-  try {
-    await deleteBlob(syncId, blobEntryId, writeToken, uploaderSignature, authority);
-  } catch (err) {
-    if (!(err instanceof BlobDeleteRefusedError)) throw err;
-    console.error(`The relay refused to delete blob ${blobEntryId}`, err);
-  }
+  return deletePostOnRelay(syncId, postEntryId, entry.entryId, entry.encryptedMeta, keyVersion, writeToken, authorSignature, authority);
 }
 
 /**
@@ -262,15 +260,27 @@ async function pushPendingEntries(circleId: string): Promise<void> {
       }
     }
 
-    // Two entries can't go down the generic append path, because the relay
+    // Some entries can't go down the generic append path, because the relay
     // commits each alongside something else or not at all: an authority
-    // change with its set mutation, a deletion with the sweep behind it.
-    // Both have endpoints of their own.
-    const { epoch } = entry.authorityAction
-      ? await pushAuthorityChange(circleId, circle.syncId, entry, current.version, writeToken)
-      : entry.entryType === EntryTypes.CIRCLE_DELETED
-        ? await pushCircleDeletion(circleId, circle.syncId, entry, current.version, writeToken)
-        : await appendEntry(circle.syncId, namespace, entry.entryId, entry.encryptedMeta, current.version, writeToken, identity.publicKey);
+    // change with its set mutation, a deletion with the sweep behind it, a
+    // post deletion with the blob delete behind it. Each has an endpoint
+    // of its own.
+    let result: AppendResult;
+    if (entry.authorityAction) {
+      result = await pushAuthorityChange(circleId, circle.syncId, entry, current.version, writeToken);
+    } else {
+      switch (entry.entryType) {
+        case EntryTypes.CIRCLE_DELETED:
+          result = await pushCircleDeletion(circleId, circle.syncId, entry, current.version, writeToken);
+          break;
+        case EntryTypes.POST_DELETE:
+          result = await pushPostDeletion(circleId, circle.syncId, entry, current.version, writeToken);
+          break;
+        default:
+          result = await appendEntry(circle.syncId, namespace, entry.entryId, entry.encryptedMeta, current.version, writeToken, identity.publicKey);
+      }
+    }
+    const { epoch } = result;
 
     // Notified from here rather than from each usecase: this is the one
     // place that knows an entry actually landed, and it forwards the same
@@ -278,14 +288,6 @@ async function pushPendingEntries(circleId: string): Promise<void> {
     const category = PUSH_CATEGORIES[entry.entryType];
     if (category !== undefined) {
       notifyCircleBestEffort(circleId, category, current.version, entry.encryptedMeta);
-    }
-
-    // After the append, never before: the entry is what every device
-    // converges on, and bytes removed ahead of it would leave the photo
-    // missing with nothing in the log yet saying why. Idempotent on both
-    // sides, so a failure here just retries the whole row.
-    if (entry.blobEntryId) {
-      await deleteBlobFor(circleId, circle.syncId, entry.blobEntryId, writeToken);
     }
 
     await markOutboxEntrySynced(entry.sequenceNum, epoch);

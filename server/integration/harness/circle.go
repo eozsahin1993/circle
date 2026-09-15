@@ -87,17 +87,11 @@ func (c *Circle) CreateLog(req CreateRequest) Response {
 // AppendRequest is POST /circles/{syncId}/entries — see
 // internal/api/appendlog.
 type AppendRequest struct {
-	Namespace string `json:"namespace"`
-	EntryID   string `json:"entryId"`
-	// EncryptedMeta is ciphertext the relay never reads (SYNC_DESIGN
-	// invariant 3). Nothing about an append turns on its contents, so
-	// NewAppend fills it with random bytes; a test asserting the payload
-	// comes back intact sets its own.
-	EncryptedMeta string `json:"encryptedMeta"`
-	KeyVersion    int64  `json:"keyVersion"`
-	WriteToken    string `json:"writeToken"`
-	// AuthorIdentityPublicKey is caller-declared and unauthenticated at
-	// this stage — see internal/api/appendlog.
+	Namespace               string `json:"namespace"`
+	EntryID                 string `json:"entryId"`
+	EncryptedMeta           string `json:"encryptedMeta"`
+	KeyVersion              int64  `json:"keyVersion"`
+	WriteToken              string `json:"writeToken"`
 	AuthorIdentityPublicKey string `json:"authorIdentityPublicKey"`
 }
 
@@ -137,6 +131,7 @@ type LogEntry struct {
 	KeyVersion    int64
 	EncryptedMeta string
 	ReceivedAt    int64
+	DeletedAt     int64
 }
 
 type LogPage struct {
@@ -389,6 +384,51 @@ func (c *Circle) NewAdminDeleteBlob(entryID string, signer Authority) DeleteBlob
 
 func (c *Circle) DeleteBlob(entryID string, req DeleteBlobRequest) Response {
 	return c.Device.PostRequest(c.entryPath(entryID)+"/delete-blob", req)
+}
+
+// DeletePostRequest is POST /circles/{syncId}/entries/{postEntryId}/delete-post
+// — see internal/api/deletepost. Same author-or-admin shape as
+// DeleteBlobRequest.
+type DeletePostRequest struct {
+	WriteToken         string `json:"writeToken"`
+	TombstoneEntryID   string `json:"tombstoneEntryId"`
+	EncryptedMeta      string `json:"encryptedMeta"`
+	KeyVersion         int64  `json:"keyVersion"`
+	AuthorSignature    string `json:"authorSignature"`
+	AuthorityPublicKey string `json:"authorityPublicKey"`
+	AuthoritySignature string `json:"authoritySignature"`
+}
+
+// NewDeletePost deletes postEntryID as its own author — this device's own
+// identity key, the same one an append would have declared for it.
+func (c *Circle) NewDeletePost(postEntryID string) DeletePostRequest {
+	tombstoneEntryID := Suffix()
+	deletion := logstore.PostDeletion{SyncID: c.SyncID, PostEntryID: postEntryID, TombstoneEntryID: tombstoneEntryID}
+	return DeletePostRequest{
+		WriteToken:       c.Token.Raw,
+		TombstoneEntryID: tombstoneEntryID,
+		EncryptedMeta:    Ciphertext(),
+		KeyVersion:       1,
+		AuthorSignature:  c.Device.identity.Sign(deletion.Message()),
+	}
+}
+
+// NewAdminDeletePost deletes somebody else's post, signed by signer.
+func (c *Circle) NewAdminDeletePost(postEntryID string, signer Authority) DeletePostRequest {
+	tombstoneEntryID := Suffix()
+	deletion := logstore.PostDeletion{SyncID: c.SyncID, PostEntryID: postEntryID, TombstoneEntryID: tombstoneEntryID}
+	return DeletePostRequest{
+		WriteToken:         c.Token.Raw,
+		TombstoneEntryID:   tombstoneEntryID,
+		EncryptedMeta:      Ciphertext(),
+		KeyVersion:         1,
+		AuthorityPublicKey: signer.PublicKey(),
+		AuthoritySignature: signer.Sign(deletion.Message()),
+	}
+}
+
+func (c *Circle) DeletePost(postEntryID string, req DeletePostRequest) Response {
+	return c.Device.PostRequest(c.entryPath(postEntryID)+"/delete-post", req)
 }
 
 // CoverUploadRequest is POST /circles/{syncId}/cover-photo/upload — see

@@ -45,6 +45,11 @@ const (
 // writes to the same circle — vanishingly rare at family-circle scale.
 const maxCASAttempts = 5
 
+// EntryIDIndexName is the GSI DeletePost queries to find a post by id —
+// see modules/storage/dynamodb.tf. Exported so internal/localstack can
+// create it under the same name in tests.
+const EntryIDIndexName = "entryId-index"
+
 // batchWriteSize is DynamoDB's own hard cap on items per BatchWriteItem —
 // not a tuning knob. A larger request is rejected outright.
 const batchWriteSize = 25
@@ -419,6 +424,183 @@ func (s *Store) DeleteCircle(ctx context.Context, deletion logstore.CircleDeleti
 	return logstore.CommitResult{}, logstore.ErrConcurrentModification
 }
 
+// findPostByID resolves a content-namespace entry by id via the
+// entryId-index GSI, then fetches the full row from the base table (the
+// GSI is KEYS_ONLY). ErrPostNotFound if absent or in a different circle.
+//
+// The GSI is only eventually consistent, so a post deleted right after
+// being posted can briefly not show up yet — retried with the same
+// backoff Peek uses for its own eventually-consistent reads, rather than
+// failing a legitimate delete on timing.
+func (s *Store) findPostByID(ctx context.Context, syncID, entryID string) (logstore.LogEntry, error) {
+	var queryOut *dynamodb.QueryOutput
+	for attempt := 0; attempt < maxCASAttempts; attempt++ {
+		if attempt > 0 {
+			if err := sleepBackoff(ctx, attempt); err != nil {
+				return logstore.LogEntry{}, err
+			}
+		}
+		out, err := s.client.Query(ctx, &dynamodb.QueryInput{
+			TableName:              aws.String(s.tableName),
+			IndexName:              aws.String(EntryIDIndexName),
+			KeyConditionExpression: aws.String("entryId = :id"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":id": &types.AttributeValueMemberS{Value: entryID},
+			},
+			Limit: aws.Int32(1),
+		})
+		if err != nil {
+			return logstore.LogEntry{}, err
+		}
+		if len(out.Items) > 0 {
+			queryOut = out
+			break
+		}
+	}
+	if queryOut == nil {
+		return logstore.LogEntry{}, logstore.ErrPostNotFound
+	}
+	pk, _ := dynamoutil.AttrString(queryOut.Items[0], dynamoutil.PKAttr)
+	if pk != syncID {
+		return logstore.LogEntry{}, logstore.ErrPostNotFound
+	}
+	sk, _ := dynamoutil.AttrString(queryOut.Items[0], dynamoutil.SKAttr)
+
+	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName:      aws.String(s.tableName),
+		Key:            map[string]types.AttributeValue{dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: pk}, dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: sk}},
+		ConsistentRead: aws.Bool(true),
+	})
+	if err != nil {
+		return logstore.LogEntry{}, err
+	}
+	if out.Item == nil {
+		return logstore.LogEntry{}, logstore.ErrPostNotFound
+	}
+	epoch, err := dynamoutil.AttrInt(out.Item, "epoch")
+	if err != nil {
+		return logstore.LogEntry{}, err
+	}
+	authorIdentityPublicKey, _ := dynamoutil.AttrString(out.Item, "authorIdentityPublicKey")
+	return logstore.LogEntry{Epoch: epoch, AuthorIdentityPublicKey: authorIdentityPublicKey}, nil
+}
+
+// DeletePost strips a post's payload and appends its tombstone — see
+// logstore.Store.DeletePost.
+func (s *Store) DeletePost(ctx context.Context, deletion logstore.PostDeletion) (logstore.CommitResult, error) {
+	if existing, err := s.lookupIdempotencyMarker(ctx, deletion.SyncID, logstore.NamespaceContent, deletion.TombstoneEntryID); err != nil {
+		return logstore.CommitResult{}, err
+	} else if existing != nil {
+		return *existing, nil
+	}
+
+	post, err := s.findPostByID(ctx, deletion.SyncID, deletion.PostEntryID)
+	if err != nil {
+		return logstore.CommitResult{}, err
+	}
+
+	authorizedBy := post.AuthorIdentityPublicKey
+	if verifyAuthoritySignature(post.AuthorIdentityPublicKey, deletion.Message(), deletion.AuthorSignature) != nil {
+		if deletion.AuthorityPublicKey == "" || len(deletion.AuthoritySignature) == 0 {
+			return logstore.CommitResult{}, logstore.ErrPostNotAuthorized
+		}
+		if err := s.VerifyAuthoritySignature(ctx, deletion.SyncID, deletion.AuthorityPublicKey, deletion.Message(), deletion.AuthoritySignature); err != nil {
+			return logstore.CommitResult{}, err
+		}
+		authorizedBy = deletion.AuthorityPublicKey
+	}
+
+	expectedHash, hashErr := hashWriteToken(deletion.WriteToken)
+
+	for attempt := 0; attempt < maxCASAttempts; attempt++ {
+		control, err := s.getControlState(ctx, deletion.SyncID, true)
+		if err != nil {
+			return logstore.CommitResult{}, err
+		}
+		if hashErr != nil || control.writeTokenHash != expectedHash {
+			return logstore.CommitResult{}, logstore.ErrWriteTokenMismatch
+		}
+		if control.deleted {
+			return logstore.CommitResult{}, logstore.ErrCircleDeleted
+		}
+
+		current := control.contentCounter
+		nextEpoch := current + 1
+		receivedAt := dynamoutil.NowMillis()
+
+		items := []types.TransactWriteItem{
+			// 1. Bump the counter — same CAS condition as Append, so a stale
+			// or racing write token fails the whole transaction up front.
+			{
+				Update: &types.Update{
+					TableName:           aws.String(s.tableName),
+					Key:                 controlKey(deletion.SyncID),
+					UpdateExpression:    aws.String("SET contentCounter = :next"),
+					ConditionExpression: aws.String("writeTokenHash = :hash AND contentCounter = :current AND attribute_not_exists(deletedAt)"),
+					ExpressionAttributeValues: map[string]types.AttributeValue{
+						":hash":    &types.AttributeValueMemberS{Value: expectedHash},
+						":current": &types.AttributeValueMemberN{Value: strconv.FormatInt(current, 10)},
+						":next":    &types.AttributeValueMemberN{Value: strconv.FormatInt(nextEpoch, 10)},
+					},
+				},
+			},
+			// 2. Strip the original post.
+			{
+				Update: &types.Update{
+					TableName:        aws.String(s.tableName),
+					Key:              map[string]types.AttributeValue{dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: deletion.SyncID}, dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: entrySK(logstore.NamespaceContent, post.Epoch)}},
+					UpdateExpression: aws.String("REMOVE encryptedMeta SET deletedAt = :t, deletedBy = :who"),
+					ExpressionAttributeValues: map[string]types.AttributeValue{
+						":t":   &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
+						":who": &types.AttributeValueMemberS{Value: authorizedBy},
+					},
+				},
+			},
+			// 3. Append the tombstone, so already-synced devices hide it too.
+			{
+				Put: &types.Put{
+					TableName: aws.String(s.tableName),
+					Item: map[string]types.AttributeValue{
+						dynamoutil.PKAttr:         &types.AttributeValueMemberS{Value: deletion.SyncID},
+						dynamoutil.SKAttr:         &types.AttributeValueMemberS{Value: entrySK(logstore.NamespaceContent, nextEpoch)},
+						"epoch":                   &types.AttributeValueMemberN{Value: strconv.FormatInt(nextEpoch, 10)},
+						"keyVersion":              &types.AttributeValueMemberN{Value: strconv.FormatInt(deletion.KeyVersion, 10)},
+						"encryptedMeta":           &types.AttributeValueMemberB{Value: deletion.EncryptedPayload},
+						"receivedAt":              &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
+						"entryId":                 &types.AttributeValueMemberS{Value: deletion.TombstoneEntryID},
+						"authorIdentityPublicKey": &types.AttributeValueMemberS{Value: authorizedBy},
+					},
+				},
+			},
+			// 4. The tombstone's own idempotency marker, so a retry converges.
+			{
+				Put: &types.Put{
+					TableName: aws.String(s.tableName),
+					Item: map[string]types.AttributeValue{
+						dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: deletion.SyncID},
+						dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: idemSK(logstore.NamespaceContent, deletion.TombstoneEntryID)},
+						"epoch":           &types.AttributeValueMemberN{Value: strconv.FormatInt(nextEpoch, 10)},
+						"receivedAt":      &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
+						"expiresAt":       &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt/1000+int64(idemMarkerTTL.Seconds()), 10)},
+					},
+					ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%s)", dynamoutil.PKAttr)),
+				},
+			},
+		}
+
+		_, err = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
+		if err == nil {
+			return logstore.CommitResult{Epoch: nextEpoch, ReceivedAt: receivedAt}, nil
+		}
+		if converged, convErr := s.convergeOnRace(ctx, deletion.SyncID, logstore.NamespaceContent, deletion.TombstoneEntryID, err); convErr != nil {
+			return logstore.CommitResult{}, convErr
+		} else if converged != nil {
+			return *converged, nil
+		}
+	}
+	return logstore.CommitResult{}, logstore.ErrConcurrentModification
+}
+
 // sweepDeleted clears out a circle that has just been tombstoned: content
 // goes now, meta goes on a timer.
 //
@@ -575,6 +757,7 @@ func (s *Store) commit(ctx context.Context, syncID string, ns logstore.Namespace
 		"keyVersion":      &types.AttributeValueMemberN{Value: strconv.FormatInt(keyVersion, 10)},
 		"encryptedMeta":   &types.AttributeValueMemberB{Value: encryptedPayload},
 		"receivedAt":      &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
+		"entryId":         &types.AttributeValueMemberS{Value: entryID},
 	}
 	if authorIdentityPublicKey != "" {
 		entryItem["authorIdentityPublicKey"] = &types.AttributeValueMemberS{Value: authorIdentityPublicKey}
@@ -766,6 +949,7 @@ func (s *Store) Peek(ctx context.Context, syncIDs []string) (map[string]logstore
 // early if ctx is cancelled first — a request that's already given up
 // shouldn't hold the invocation open sleeping.
 func sleepBackoff(ctx context.Context, attempt int) error {
+	// Bitwise multiplication by 2 per attempt: 20ms, 40ms, 80ms, ... capped below.
 	delay := peekRetryBaseDelay << (attempt - 1)
 	if delay > peekRetryMaxDelay {
 		delay = peekRetryMaxDelay
@@ -862,20 +1046,27 @@ func (s *Store) Read(ctx context.Context, syncID string, ns logstore.Namespace, 
 			if err != nil {
 				return logstore.FetchResult{}, err
 			}
-			blobAttr, ok := item["encryptedMeta"].(*types.AttributeValueMemberB)
-			if !ok {
-				return logstore.FetchResult{}, fmt.Errorf("entry at epoch %d missing encryptedMeta", epoch)
+			// Absent on a DeletePost-stripped row (never on any other kind —
+			// everything else always writes it). Empty rather than an error:
+			// the client's own decrypt already treats malformed/absent
+			// ciphertext as unreadable and skips it, same as any entry it
+			// lacks the key version for.
+			var meta []byte
+			if blobAttr, ok := item["encryptedMeta"].(*types.AttributeValueMemberB); ok {
+				meta = blobAttr.Value
 			}
 			// Absent on rows written by Rotate/ChangeAuthority/DeleteCircle,
 			// and on any row from before this field existed — AttrString
 			// returns "" for both, same as commit's own omit-when-empty
 			// write side.
 			authorIdentityPublicKey, _ := dynamoutil.AttrString(item, "authorIdentityPublicKey")
+			deletedAt, _ := dynamoutil.AttrInt(item, "deletedAt")
 			entries = append(entries, logstore.LogEntry{
 				Epoch:                   epoch,
 				KeyVersion:              keyVersion,
-				EncryptedMeta:           blobAttr.Value,
+				EncryptedMeta:           meta,
 				ReceivedAt:              receivedAt,
+				DeletedAt:               deletedAt,
 				AuthorIdentityPublicKey: authorIdentityPublicKey,
 			})
 		}

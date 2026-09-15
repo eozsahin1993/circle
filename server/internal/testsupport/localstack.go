@@ -157,6 +157,9 @@ func NewLogStore(t testing.TB) logstore.Store {
 
 	tableOnce.Do(func() {
 		tableErr = localstack.CreateTable(context.Background(), client, tableName, localstack.WithSortKey)
+		if tableErr == nil {
+			tableErr = localstack.EnsureEntryIDIndex(context.Background(), client, tableName)
+		}
 	})
 	if tableErr != nil {
 		unreachable(t, "DynamoDB", tableErr)
@@ -178,6 +181,9 @@ func RawDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 
 	tableOnce.Do(func() {
 		tableErr = localstack.CreateTable(context.Background(), client, tableName, localstack.WithSortKey)
+		if tableErr == nil {
+			tableErr = localstack.EnsureEntryIDIndex(context.Background(), client, tableName)
+		}
 	})
 	if tableErr != nil {
 		unreachable(t, "DynamoDB", tableErr)

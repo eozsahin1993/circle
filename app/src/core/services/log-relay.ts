@@ -23,6 +23,8 @@ export type LogEntry = {
   keyVersion: number;
   encryptedMeta: Uint8Array;
   receivedAt: number;
+  /** Set only on a deleted post — empty `encryptedMeta`, nothing to decrypt */
+  deletedAt?: number;
 };
 
 export type FetchEntriesResult = {
@@ -214,6 +216,49 @@ export async function deleteCircleOnRelay(deletion: {
 }
 
 /**
+ * Deletes a post — POST /v1/circles/{syncId}/entries/{postEntryId}/delete-post.
+ * Strips the post's ciphertext and deletes its blob on the relay, then
+ * appends the tombstone entry (`encryptedMeta`) that already-synced
+ * devices hide it on. `authorSignature` and `authority` are optional and
+ * independent, same shape as `deleteBlob` — the post's own author sends
+ * `authorSignature` and needs nothing else; an admin deleting someone
+ * else's post sends `authority` instead.
+ */
+export async function deletePostOnRelay(
+  syncId: string,
+  postEntryId: string,
+  tombstoneEntryId: string,
+  encryptedMeta: Uint8Array,
+  keyVersion: number,
+  writeToken: Uint8Array,
+  authorSignature?: Uint8Array,
+  authority?: { publicKey: Uint8Array; signature: Uint8Array }
+): Promise<AppendResult> {
+  const response = await authorizedFetch(`/v1/circles/${syncId}/entries/${postEntryId}/delete-post`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      writeToken: bytesToHex(writeToken),
+      tombstoneEntryId,
+      encryptedMeta: Buffer.from(encryptedMeta).toString('base64'),
+      keyVersion,
+      ...(authorSignature ? { authorSignature: bytesToHex(authorSignature) } : {}),
+      ...(authority
+        ? { authorityPublicKey: bytesToHex(authority.publicKey), authoritySignature: bytesToHex(authority.signature) }
+        : {}),
+    }),
+  });
+  if (response.status === 429) {
+    throw new RateLimitedError();
+  }
+  if (!response.ok) {
+    throw new Error(await describeError(response, 'Failed to delete post'));
+  }
+  const body = await response.json();
+  return { epoch: body.epoch, receivedAt: body.receivedAt };
+}
+
+/**
  * Fetches every entry in `namespace` after `sinceEpoch` — GET
  * /v1/circles/{syncId}/entries?namespace=&sinceEpoch=.
  *
@@ -231,11 +276,14 @@ export async function fetchEntries(syncId: string, namespace: Namespace, sinceEp
   }
   const body = await response.json();
   return {
-    entries: (body.entries as { epoch: number; keyVersion: number; encryptedMeta: string; receivedAt: number }[]).map((entry) => ({
+    entries: (
+      body.entries as { epoch: number; keyVersion: number; encryptedMeta: string; receivedAt: number; deletedAt?: number }[]
+    ).map((entry) => ({
       epoch: entry.epoch,
       keyVersion: entry.keyVersion,
       encryptedMeta: new Uint8Array(Buffer.from(entry.encryptedMeta, 'base64')),
       receivedAt: entry.receivedAt,
+      deletedAt: entry.deletedAt,
     })),
     currentEpoch: body.currentEpoch,
   };

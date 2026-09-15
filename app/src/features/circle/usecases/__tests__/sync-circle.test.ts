@@ -7,14 +7,8 @@ import { decrypt, generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { buildAndEncryptLogEntry } from '@/core/sync/log-entry';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
-import {
-  BlobAlreadyExistsError,
-  BlobDeleteRefusedError,
-  deleteBlob,
-  getUploadTarget,
-  uploadBlob,
-} from '@/core/services/blob-relay';
+import { appendEntry, bootstrapCircle, deletePostOnRelay } from '@/core/services/log-relay';
+import { BlobAlreadyExistsError, getUploadTarget, uploadBlob } from '@/core/services/blob-relay';
 import {
   AttachmentKinds,
   AttachmentStatuses,
@@ -230,11 +224,11 @@ test('an entry queued while a drain is running still gets pushed by it', async (
   expect(await getPendingOutboxEntries(circleId)).toHaveLength(0);
 });
 
-describe('an entry that carries a blob to delete', () => {
+describe('an entry that deletes a post', () => {
   /**
-   * `post_delete` names the photo whose bytes should go, and the drain is
-   * what actually removes them — which is what lets a photo be deleted
-   * offline and cleaned up whenever the queue next runs.
+   * `post_delete` names the post being deleted; the drain is what actually
+   * calls the relay — which is what lets a deletion happen offline and go
+   * out whenever the queue next runs.
    */
   async function enqueueDeletion(circleId: string, postId: string) {
     const identity = (await getCircleIdentity(circleId))!;
@@ -255,45 +249,36 @@ describe('an entry that carries a blob to delete', () => {
     });
   }
 
-  test('deletes the blob after the entry lands, then marks it synced', async () => {
+  test('deletes the post on the relay, then marks it synced', async () => {
     const { circleId } = await makeCircle();
     const postId = generateUUID();
     await enqueueDeletion(circleId, postId);
-    (deleteBlob as jest.Mock).mockResolvedValue(undefined);
+    (deletePostOnRelay as jest.Mock).mockResolvedValue({ epoch: 5, receivedAt: 999 });
 
     await drainOutbox(circleId);
 
-    expect(appendEntry as jest.Mock).toHaveBeenCalled();
-    expect((deleteBlob as jest.Mock).mock.calls[0][1]).toBe(postId);
-    expect(
-      (appendEntry as jest.Mock).mock.invocationCallOrder[0]
-    ).toBeLessThan((deleteBlob as jest.Mock).mock.invocationCallOrder[0]);
+    expect(deletePostOnRelay).toHaveBeenCalledWith(
+      expect.any(String),
+      postId,
+      expect.any(String),
+      expect.any(Uint8Array),
+      expect.any(Number),
+      expect.any(Uint8Array),
+      expect.any(Uint8Array),
+      expect.objectContaining({ publicKey: expect.any(Uint8Array), signature: expect.any(Uint8Array) })
+    );
     expect(await getPendingOutboxEntries(circleId)).toHaveLength(0);
   });
 
   /** A transient failure must not lose the deletion — the row stays queued and the whole push retries. */
-  test('a failed delete leaves the entry pending', async () => {
+  test('a failed deletion leaves the entry pending', async () => {
     const { circleId } = await makeCircle();
     await enqueueDeletion(circleId, generateUUID());
-    (deleteBlob as jest.Mock).mockRejectedValue(new Error('offline'));
+    (deletePostOnRelay as jest.Mock).mockRejectedValue(new Error('offline'));
 
     await expect(drainOutbox(circleId)).rejects.toThrow('offline');
 
     expect(await getPendingOutboxEntries(circleId)).toHaveLength(1);
-  });
-
-  /**
-   * A refusal is permanent, so retrying forever would wedge everything
-   * queued behind it — the entry is the truth and has already landed.
-   */
-  test('a refused delete is passed over rather than blocking the queue', async () => {
-    const { circleId } = await makeCircle();
-    await enqueueDeletion(circleId, generateUUID());
-    (deleteBlob as jest.Mock).mockRejectedValue(new BlobDeleteRefusedError('not the uploader'));
-
-    await drainOutbox(circleId);
-
-    expect(await getPendingOutboxEntries(circleId)).toHaveLength(0);
   });
 
   test('an ordinary post deletes nothing', async () => {
@@ -304,6 +289,6 @@ describe('an entry that carries a blob to delete', () => {
 
     await drainOutbox(circleId);
 
-    expect(deleteBlob as jest.Mock).not.toHaveBeenCalled();
+    expect(deletePostOnRelay).not.toHaveBeenCalled();
   });
 });

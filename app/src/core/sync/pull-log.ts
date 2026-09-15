@@ -40,10 +40,14 @@ async function pull(circleId: string, namespace: Namespace, handlers: Record<str
 
     for (const entry of entries) {
       const key = keyMap[entry.keyVersion];
-      const envelope = key ? verifyLogEntry(entry.encryptedMeta, key) : null;
+      const envelope = key && !entry.deletedAt ? verifyLogEntry(entry.encryptedMeta, key) : null;
       const handler = envelope ? handlers[envelope.type] : undefined;
 
-      if (!key) {
+      if (entry.deletedAt) {
+        // Expected, not a failure — deletePost strips EncryptedMeta on
+        // purpose. Skip quietly rather than logging it beside a real
+        // decrypt/verify problem.
+      } else if (!key) {
         console.warn(`Skipping ${namespace} entry ${entry.epoch}: no content key for version ${entry.keyVersion}`);
       } else if (!envelope) {
         console.warn(`Skipping ${namespace} entry ${entry.epoch}: failed to decrypt or verify`);
