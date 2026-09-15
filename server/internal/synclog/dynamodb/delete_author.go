@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -118,15 +117,13 @@ func (s *Store) stripAuthorContent(ctx context.Context, syncID, authorKey string
 		go func(sk string) {
 			defer wg.Done()
 			defer func() { <-sem }()
+			key, updateExpression, values := stripEntryFields(syncID, sk, deletedAt, authorKey)
 			_, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-				TableName:           aws.String(s.tableName),
-				Key:                 map[string]types.AttributeValue{dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: syncID}, dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: sk}},
-				UpdateExpression:    aws.String("REMOVE encryptedMeta SET deletedAt = :t, deletedBy = :who"),
-				ConditionExpression: aws.String(fmt.Sprintf("attribute_exists(%s)", dynamoutil.PKAttr)),
-				ExpressionAttributeValues: map[string]types.AttributeValue{
-					":t":   &types.AttributeValueMemberN{Value: strconv.FormatInt(deletedAt, 10)},
-					":who": &types.AttributeValueMemberS{Value: authorKey},
-				},
+				TableName:                 aws.String(s.tableName),
+				Key:                       key,
+				UpdateExpression:          updateExpression,
+				ConditionExpression:       aws.String(fmt.Sprintf("attribute_exists(%s)", dynamoutil.PKAttr)),
+				ExpressionAttributeValues: values,
 			})
 			var conditionFailed *types.ConditionalCheckFailedException
 			if err != nil && !errors.As(err, &conditionFailed) {

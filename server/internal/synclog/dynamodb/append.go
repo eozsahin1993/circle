@@ -8,7 +8,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"circle-relay/internal/dynamoutil"
 	"circle-relay/internal/synclog"
 )
 
@@ -31,50 +30,35 @@ func (s *Store) Append(ctx context.Context, syncID string, ns synclog.Namespace,
 	// for "this token doesn't work."
 	expectedHash, hashErr := hashWriteToken(writeToken)
 
-	for attempt := 0; attempt < maxCASAttempts; attempt++ {
-		control, err := s.getControlState(ctx, syncID, true)
-		if err != nil {
-			return synclog.CommitResult{}, err
-		}
+	result, _, err := s.casCommit(ctx, syncID, ns, entryID, entryFields{
+		EncryptedPayload:        encryptedPayload,
+		KeyVersion:              keyVersion,
+		AuthorIdentityPublicKey: authorIdentityPublicKey,
+	}, func(control *controlState, epoch, receivedAt int64) (casPlan, error) {
 		if hashErr != nil || control.writeTokenHash != expectedHash {
-			return synclog.CommitResult{}, synclog.ErrWriteTokenMismatch
+			return casPlan{}, synclog.ErrWriteTokenMismatch
 		}
 		if control.deleted {
-			return synclog.CommitResult{}, synclog.ErrCircleDeleted
+			return casPlan{}, synclog.ErrCircleDeleted
 		}
-
-		current := control.counter(ns)
-		nextEpoch := current + 1
-		receivedAt := dynamoutil.NowMillis()
 
 		// attribute_not_exists(deletedAt) as well as the check above: a
 		// deletion landing between them bumps metaCounter, which a content
 		// append isn't watching, so the counter CAS alone wouldn't catch it.
 		counterAttr := counterAttrName(ns)
-		result, err := s.commit(ctx, syncID, ns, entryID, encryptedPayload, keyVersion, nextEpoch, receivedAt, authorIdentityPublicKey, types.Update{
+		return casPlan{Control: types.Update{
 			TableName:           aws.String(s.tableName),
 			Key:                 controlKey(syncID),
 			UpdateExpression:    aws.String(fmt.Sprintf("SET %s = :next", counterAttr)),
 			ConditionExpression: aws.String(fmt.Sprintf("writeTokenHash = :hash AND %s = :current AND attribute_not_exists(deletedAt)", counterAttr)),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":hash":    &types.AttributeValueMemberS{Value: expectedHash},
-				":current": &types.AttributeValueMemberN{Value: strconv.FormatInt(current, 10)},
-				":next":    &types.AttributeValueMemberN{Value: strconv.FormatInt(nextEpoch, 10)},
+				":current": &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch-1, 10)},
+				":next":    &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
 			},
-		})
-		if err == nil {
-			return result, nil
-		}
-		if converged, convErr := s.convergeOnRace(ctx, syncID, ns, entryID, err); convErr != nil {
-			return synclog.CommitResult{}, convErr
-		} else if converged != nil {
-			return *converged, nil
-		}
-		// Neither converged nor a hard error: #control moved under us
-		// (someone else's concurrent Append/Rotate won the race) — loop
-		// and retry against fresh state.
-	}
-	return synclog.CommitResult{}, synclog.ErrConcurrentModification
+		}}, nil
+	})
+	return result, err
 }
 
 // Rotate verifies the authority signature before touching storage at all
@@ -97,26 +81,21 @@ func (s *Store) Rotate(ctx context.Context, syncID, entryID string, encryptedPay
 	// it fails the same way a well-formed-but-wrong one does.
 	expectedCurrentHash, hashErr := hashWriteToken(currentWriteToken)
 
-	for attempt := 0; attempt < maxCASAttempts; attempt++ {
-		control, err := s.getControlState(ctx, syncID, true)
-		if err != nil {
-			return synclog.CommitResult{}, err
-		}
+	result, _, err := s.casCommit(ctx, syncID, synclog.NamespaceMeta, entryID, entryFields{
+		EncryptedPayload: encryptedPayload,
+		KeyVersion:       currentKeyVersion,
+	}, func(control *controlState, epoch, receivedAt int64) (casPlan, error) {
 		if hashErr != nil || control.writeTokenHash != expectedCurrentHash {
-			return synclog.CommitResult{}, synclog.ErrWriteTokenMismatch
+			return casPlan{}, synclog.ErrWriteTokenMismatch
 		}
 		if control.deleted {
-			return synclog.CommitResult{}, synclog.ErrCircleDeleted
+			return casPlan{}, synclog.ErrCircleDeleted
 		}
 		if !control.authoritySet[authorityPublicKey] {
-			return synclog.CommitResult{}, synclog.ErrAuthorityNotRecognized
+			return casPlan{}, synclog.ErrAuthorityNotRecognized
 		}
 
-		current := control.metaCounter
-		nextEpoch := current + 1
-		receivedAt := dynamoutil.NowMillis()
-
-		result, err := s.commit(ctx, syncID, synclog.NamespaceMeta, entryID, encryptedPayload, currentKeyVersion, nextEpoch, receivedAt, "", types.Update{
+		return casPlan{Control: types.Update{
 			TableName:           aws.String(s.tableName),
 			Key:                 controlKey(syncID),
 			UpdateExpression:    aws.String("SET writeTokenHash = :newHash, metaCounter = :next"),
@@ -124,21 +103,13 @@ func (s *Store) Rotate(ctx context.Context, syncID, entryID string, encryptedPay
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":currentHash": &types.AttributeValueMemberS{Value: expectedCurrentHash},
 				":newHash":     &types.AttributeValueMemberS{Value: newWriteTokenHash},
-				":current":     &types.AttributeValueMemberN{Value: strconv.FormatInt(current, 10)},
-				":next":        &types.AttributeValueMemberN{Value: strconv.FormatInt(nextEpoch, 10)},
+				":current":     &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch-1, 10)},
+				":next":        &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
 				":pubkey":      &types.AttributeValueMemberS{Value: authorityPublicKey},
 			},
-		})
-		if err == nil {
-			return result, nil
-		}
-		if converged, convErr := s.convergeOnRace(ctx, syncID, synclog.NamespaceMeta, entryID, err); convErr != nil {
-			return synclog.CommitResult{}, convErr
-		} else if converged != nil {
-			return *converged, nil
-		}
-	}
-	return synclog.CommitResult{}, synclog.ErrConcurrentModification
+		}}, nil
+	})
+	return result, err
 }
 
 // ChangeAuthority runs the same verify-then-CAS shape as Rotate, over
@@ -177,45 +148,32 @@ func (s *Store) ChangeAuthority(ctx context.Context, change synclog.AuthorityCha
 		values[":one"] = &types.AttributeValueMemberN{Value: "1"}
 	}
 
-	for attempt := 0; attempt < maxCASAttempts; attempt++ {
-		control, err := s.getControlState(ctx, change.SyncID, true)
-		if err != nil {
-			return synclog.CommitResult{}, err
-		}
+	result, _, err := s.casCommit(ctx, change.SyncID, synclog.NamespaceMeta, change.EntryID, entryFields{
+		EncryptedPayload: change.EncryptedPayload,
+		KeyVersion:       change.KeyVersion,
+	}, func(control *controlState, epoch, receivedAt int64) (casPlan, error) {
 		if hashErr != nil || control.writeTokenHash != expectedHash {
-			return synclog.CommitResult{}, synclog.ErrWriteTokenMismatch
+			return casPlan{}, synclog.ErrWriteTokenMismatch
 		}
 		if control.deleted {
-			return synclog.CommitResult{}, synclog.ErrCircleDeleted
+			return casPlan{}, synclog.ErrCircleDeleted
 		}
 		if !control.authoritySet[change.SignerAuthorityPublicKey] {
-			return synclog.CommitResult{}, synclog.ErrAuthorityNotRecognized
+			return casPlan{}, synclog.ErrAuthorityNotRecognized
 		}
 		if change.Action == synclog.AuthorityRemove && len(control.authoritySet) <= 1 {
-			return synclog.CommitResult{}, synclog.ErrWouldEmptyAuthoritySet
+			return casPlan{}, synclog.ErrWouldEmptyAuthoritySet
 		}
 
-		current := control.metaCounter
-		nextEpoch := current + 1
-		receivedAt := dynamoutil.NowMillis()
-
-		result, err := s.commit(ctx, change.SyncID, synclog.NamespaceMeta, change.EntryID, change.EncryptedPayload, change.KeyVersion, nextEpoch, receivedAt, "", types.Update{
+		return casPlan{Control: types.Update{
 			TableName:                 aws.String(s.tableName),
 			Key:                       controlKey(change.SyncID),
 			UpdateExpression:          aws.String(setClause),
 			ConditionExpression:       aws.String(condition),
-			ExpressionAttributeValues: withCASValues(values, expectedHash, current, nextEpoch, change),
-		})
-		if err == nil {
-			return result, nil
-		}
-		if converged, convErr := s.convergeOnRace(ctx, change.SyncID, synclog.NamespaceMeta, change.EntryID, err); convErr != nil {
-			return synclog.CommitResult{}, convErr
-		} else if converged != nil {
-			return *converged, nil
-		}
-	}
-	return synclog.CommitResult{}, synclog.ErrConcurrentModification
+			ExpressionAttributeValues: withCASValues(values, expectedHash, epoch-1, epoch, change),
+		}}, nil
+	})
+	return result, err
 }
 
 // withCASValues fills in the placeholders every ChangeAuthority attempt

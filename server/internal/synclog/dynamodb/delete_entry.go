@@ -2,7 +2,6 @@ package dynamodb
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -101,91 +100,43 @@ func (s *Store) DeleteEntry(ctx context.Context, deletion synclog.EntryDeletion)
 
 	expectedHash, hashErr := hashWriteToken(deletion.WriteToken)
 
-	for attempt := 0; attempt < maxCASAttempts; attempt++ {
-		control, err := s.getControlState(ctx, deletion.SyncID, true)
-		if err != nil {
-			return synclog.CommitResult{}, err
-		}
+	result, _, err := s.casCommit(ctx, deletion.SyncID, synclog.NamespaceContent, deletion.TombstoneEntryID, entryFields{
+		EncryptedPayload:        deletion.EncryptedPayload,
+		KeyVersion:              deletion.KeyVersion,
+		AuthorIdentityPublicKey: authorizedBy,
+	}, func(control *controlState, epoch, receivedAt int64) (casPlan, error) {
 		if hashErr != nil || control.writeTokenHash != expectedHash {
-			return synclog.CommitResult{}, synclog.ErrWriteTokenMismatch
+			return casPlan{}, synclog.ErrWriteTokenMismatch
 		}
 		if control.deleted {
-			return synclog.CommitResult{}, synclog.ErrCircleDeleted
+			return casPlan{}, synclog.ErrCircleDeleted
 		}
 
-		current := control.contentCounter
-		nextEpoch := current + 1
-		receivedAt := dynamoutil.NowMillis()
-
-		items := []types.TransactWriteItem{
-			// 1. Bump the counter — same CAS condition as Append, so a stale
-			// or racing write token fails the whole transaction up front.
-			{
-				Update: &types.Update{
-					TableName:           aws.String(s.tableName),
-					Key:                 controlKey(deletion.SyncID),
-					UpdateExpression:    aws.String("SET contentCounter = :next"),
-					ConditionExpression: aws.String("writeTokenHash = :hash AND contentCounter = :current AND attribute_not_exists(deletedAt)"),
-					ExpressionAttributeValues: map[string]types.AttributeValue{
-						":hash":    &types.AttributeValueMemberS{Value: expectedHash},
-						":current": &types.AttributeValueMemberN{Value: strconv.FormatInt(current, 10)},
-						":next":    &types.AttributeValueMemberN{Value: strconv.FormatInt(nextEpoch, 10)},
-					},
-				},
-			},
-			// 2. Strip the original post.
-			{
-				Update: &types.Update{
-					TableName:        aws.String(s.tableName),
-					Key:              map[string]types.AttributeValue{dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: deletion.SyncID}, dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: entrySK(synclog.NamespaceContent, post.Epoch)}},
-					UpdateExpression: aws.String("REMOVE encryptedMeta SET deletedAt = :t, deletedBy = :who"),
-					ExpressionAttributeValues: map[string]types.AttributeValue{
-						":t":   &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
-						":who": &types.AttributeValueMemberS{Value: authorizedBy},
-					},
-				},
-			},
-			// 3. Append the tombstone, so already-synced devices hide it too.
-			{
-				Put: &types.Put{
-					TableName: aws.String(s.tableName),
-					Item: map[string]types.AttributeValue{
-						dynamoutil.PKAttr:         &types.AttributeValueMemberS{Value: deletion.SyncID},
-						dynamoutil.SKAttr:         &types.AttributeValueMemberS{Value: entrySK(synclog.NamespaceContent, nextEpoch)},
-						"epoch":                   &types.AttributeValueMemberN{Value: strconv.FormatInt(nextEpoch, 10)},
-						"keyVersion":              &types.AttributeValueMemberN{Value: strconv.FormatInt(deletion.KeyVersion, 10)},
-						"encryptedMeta":           &types.AttributeValueMemberB{Value: deletion.EncryptedPayload},
-						"receivedAt":              &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
-						"entryId":                 &types.AttributeValueMemberS{Value: deletion.TombstoneEntryID},
-						"authorIdentityPublicKey": &types.AttributeValueMemberS{Value: authorizedBy},
-					},
-				},
-			},
-			// 4. The tombstone's own idempotency marker, so a retry converges.
-			{
-				Put: &types.Put{
-					TableName: aws.String(s.tableName),
-					Item: map[string]types.AttributeValue{
-						dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: deletion.SyncID},
-						dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: idemSK(synclog.NamespaceContent, deletion.TombstoneEntryID)},
-						"epoch":           &types.AttributeValueMemberN{Value: strconv.FormatInt(nextEpoch, 10)},
-						"receivedAt":      &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
-						"expiresAt":       &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt/1000+int64(idemMarkerTTL.Seconds()), 10)},
-					},
-					ConditionExpression: aws.String(fmt.Sprintf("attribute_not_exists(%s)", dynamoutil.PKAttr)),
-				},
+		// Same CAS condition as Append, so a stale or racing write token
+		// fails the whole transaction up front.
+		controlUpdate := types.Update{
+			TableName:           aws.String(s.tableName),
+			Key:                 controlKey(deletion.SyncID),
+			UpdateExpression:    aws.String("SET contentCounter = :next"),
+			ConditionExpression: aws.String("writeTokenHash = :hash AND contentCounter = :current AND attribute_not_exists(deletedAt)"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":hash":    &types.AttributeValueMemberS{Value: expectedHash},
+				":current": &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch-1, 10)},
+				":next":    &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
 			},
 		}
 
-		_, err = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
-		if err == nil {
-			return synclog.CommitResult{Epoch: nextEpoch, ReceivedAt: receivedAt}, nil
-		}
-		if converged, convErr := s.convergeOnRace(ctx, deletion.SyncID, synclog.NamespaceContent, deletion.TombstoneEntryID, err); convErr != nil {
-			return synclog.CommitResult{}, convErr
-		} else if converged != nil {
-			return *converged, nil
-		}
-	}
-	return synclog.CommitResult{}, synclog.ErrConcurrentModification
+		// Strip the original post, in the same transaction as the counter
+		// bump and the tombstone commit builds around this plan.
+		stripKey, stripExpr, stripValues := stripEntryFields(deletion.SyncID, entrySK(synclog.NamespaceContent, post.Epoch), receivedAt, authorizedBy)
+		strip := types.TransactWriteItem{Update: &types.Update{
+			TableName:                 aws.String(s.tableName),
+			Key:                       stripKey,
+			UpdateExpression:          stripExpr,
+			ExpressionAttributeValues: stripValues,
+		}}
+
+		return casPlan{Control: controlUpdate, Extra: []types.TransactWriteItem{strip}}, nil
+	})
+	return result, err
 }

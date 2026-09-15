@@ -39,48 +39,45 @@ func (s *Store) DeleteCircle(ctx context.Context, deletion synclog.CircleDeletio
 
 	expectedHash, hashErr := hashWriteToken(deletion.WriteToken)
 
-	for attempt := 0; attempt < maxCASAttempts; attempt++ {
-		control, err := s.getControlState(ctx, deletion.SyncID, true)
-		if err != nil {
-			return synclog.CommitResult{}, err
-		}
+	// Captured by plan on whichever attempt actually commits (or converges
+	// on someone else's), so the sweep below always has a real counter —
+	// plan runs at least once before casCommit can return without error.
+	var sweepCounter int64
+
+	result, _, err := s.casCommit(ctx, deletion.SyncID, synclog.NamespaceMeta, deletion.EntryID, entryFields{
+		EncryptedPayload: deletion.EncryptedPayload,
+		KeyVersion:       deletion.KeyVersion,
+	}, func(control *controlState, epoch, receivedAt int64) (casPlan, error) {
 		if hashErr != nil || control.writeTokenHash != expectedHash {
-			return synclog.CommitResult{}, synclog.ErrWriteTokenMismatch
+			return casPlan{}, synclog.ErrWriteTokenMismatch
 		}
 		if control.deleted {
-			return synclog.CommitResult{}, synclog.ErrCircleDeleted
+			return casPlan{}, synclog.ErrCircleDeleted
 		}
 		if !control.authoritySet[deletion.SignerAuthorityPublicKey] {
-			return synclog.CommitResult{}, synclog.ErrAuthorityNotRecognized
+			return casPlan{}, synclog.ErrAuthorityNotRecognized
 		}
 
-		current := control.metaCounter
-		nextEpoch := current + 1
-		receivedAt := dynamoutil.NowMillis()
+		sweepCounter = control.contentCounter
 
-		result, err := s.commit(ctx, deletion.SyncID, synclog.NamespaceMeta, deletion.EntryID, deletion.EncryptedPayload, deletion.KeyVersion, nextEpoch, receivedAt, "", types.Update{
+		return casPlan{Control: types.Update{
 			TableName:           aws.String(s.tableName),
 			Key:                 controlKey(deletion.SyncID),
 			UpdateExpression:    aws.String("SET metaCounter = :next, deletedAt = :deletedAt"),
 			ConditionExpression: aws.String("writeTokenHash = :hash AND metaCounter = :current AND contains(authoritySet, :signer) AND attribute_not_exists(deletedAt)"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":hash":      &types.AttributeValueMemberS{Value: expectedHash},
-				":current":   &types.AttributeValueMemberN{Value: strconv.FormatInt(current, 10)},
-				":next":      &types.AttributeValueMemberN{Value: strconv.FormatInt(nextEpoch, 10)},
+				":current":   &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch-1, 10)},
+				":next":      &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
 				":signer":    &types.AttributeValueMemberS{Value: deletion.SignerAuthorityPublicKey},
 				":deletedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
 			},
-		})
-		if err == nil {
-			return result, s.sweepDeleted(ctx, deletion.SyncID, control.contentCounter)
-		}
-		if converged, convErr := s.convergeOnRace(ctx, deletion.SyncID, synclog.NamespaceMeta, deletion.EntryID, err); convErr != nil {
-			return synclog.CommitResult{}, convErr
-		} else if converged != nil {
-			return *converged, s.sweepDeleted(ctx, deletion.SyncID, control.contentCounter)
-		}
+		}}, nil
+	})
+	if err != nil {
+		return synclog.CommitResult{}, err
 	}
-	return synclog.CommitResult{}, synclog.ErrConcurrentModification
+	return result, s.sweepDeleted(ctx, deletion.SyncID, sweepCounter)
 }
 
 // deletedMetaTTL is how long a deleted circle's meta namespace outlives
