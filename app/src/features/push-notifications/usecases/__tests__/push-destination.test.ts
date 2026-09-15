@@ -1,6 +1,6 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 jest.mock('@/features/push-notifications/services/relay');
 jest.mock('@/core/photo/image');
 
@@ -15,7 +15,7 @@ import { generateUUID, type Keypair } from '@/core/crypto/primitives';
 import { derivePushRoutingId } from '@/core/crypto/identity';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 
 beforeAll(async () => {
   await initDatabase();

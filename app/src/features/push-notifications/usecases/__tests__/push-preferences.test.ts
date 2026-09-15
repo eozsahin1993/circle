@@ -1,6 +1,6 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 jest.mock('@/features/push-notifications/services/relay');
 jest.mock('@/core/photo/image');
 jest.mock('@/core/services/settings');
@@ -21,7 +21,7 @@ import {
 import { PushCategories } from '@/features/push-notifications/usecases/push-categories';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { deletePushRouting, putPushPrefs } from '@/features/push-notifications/services/relay';
-import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 import { getAppSettings } from '@/core/services/settings';
 
 const SETTINGS = { defaultPushLevel: 'comments', themePreference: 'system' as const };

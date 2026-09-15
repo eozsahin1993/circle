@@ -1,4 +1,4 @@
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/core/services/mailbox-relay');
 jest.mock('@/features/invite/services/invite-preview-relay');
@@ -12,7 +12,7 @@ import { getOrCreateInvite } from '@/features/invite/usecases/invite-to-circle';
 import { generateIdentity, generateUUID } from '@/core/crypto/primitives';
 import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 
 beforeAll(async () => {
   await initDatabase();

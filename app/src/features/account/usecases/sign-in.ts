@@ -7,7 +7,7 @@ import {
   logout as relayLogout,
   signInWithApple as relaySignInWithApple,
   signInWithGoogle as relaySignInWithGoogle,
-} from '@/core/services/relay';
+} from '@/features/account/services/auth-relay';
 
 export type SignInOutcome = 'success' | 'cancelled';
 

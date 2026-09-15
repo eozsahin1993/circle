@@ -10,7 +10,7 @@ import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
 import { compressToThumbnail } from '@/core/photo/image';
 import { writeCoverFile } from '@/core/photo/photo-cache';
-import { bootstrapCircle, appendEntry } from '@/core/services/relay';
+import { bootstrapCircle, appendEntry } from '@/core/services/log-relay';
 import { defaultCircleMask } from '@/features/push-notifications/usecases/push-preferences';
 import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
 import { saveCircleIdentity, saveCircleKeyMap } from '@/core/services/keystore/circle-keys';

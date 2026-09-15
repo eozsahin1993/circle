@@ -33,7 +33,7 @@ import {
   putJoinRequest,
 } from '@/core/services/mailbox-relay';
 import { getInvitePreview } from '@/features/invite/services/invite-preview-relay';
-import { getBlob } from '@/core/services/relay';
+import { getBlob } from '@/core/services/blob-relay';
 
 /**
  * Fetches and decrypts the circle's cover photo, if it has one — the

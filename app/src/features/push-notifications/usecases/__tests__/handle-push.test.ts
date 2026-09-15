@@ -1,6 +1,6 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 jest.mock('@/features/push-notifications/services/relay');
 // Only the Android calls are stubbed; the channel id is a pure function
 // and is exactly what this asserts.
@@ -23,7 +23,7 @@ import { generateIdentity, generateUUID, type Keypair } from '@/core/crypto/prim
 import { derivePushRoutingId } from '@/core/crypto/identity';
 import { addCircleKeyVersion, getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 
 beforeAll(async () => {
   await initDatabase();

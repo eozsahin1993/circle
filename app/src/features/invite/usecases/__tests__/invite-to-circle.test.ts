@@ -2,7 +2,7 @@ jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/core/services/mailbox-relay');
 jest.mock('@/features/invite/services/invite-preview-relay');
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 
 import { Buffer } from 'buffer';
 
@@ -26,7 +26,7 @@ import { bytesToHex } from '@noble/curves/utils.js';
 import { deleteJoinRequest, listJoinRequests } from '@/core/services/mailbox-relay';
 import { putInvitePreview } from '@/features/invite/services/invite-preview-relay';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 
 beforeAll(async () => {
   await initDatabase();

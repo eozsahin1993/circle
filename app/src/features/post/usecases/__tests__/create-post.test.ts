@@ -1,6 +1,6 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 
 import { decrypt, generateUUID, hashBytes, verify } from '@/core/crypto/primitives';
 import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
@@ -10,7 +10,7 @@ import { createCircle } from '@/features/circle/usecases/create-circle';
 import { createPost } from '@/features/post/usecases/create-post';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { getCircleFeed } from '@/data/db/posts';
-import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 import { hexToBytes } from '@noble/curves/utils.js';
 
 beforeAll(async () => {

@@ -21,19 +21,15 @@ jest.mock('@/core/services/keystore/auth-token', () => ({
 import Constants from 'expo-constants';
 import { bytesToHex } from '@noble/curves/utils.js';
 
+import { RateLimitedError } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle, fetchEntries, fetchEpochs, rotateLog } from '@/core/services/log-relay';
 import {
-  appendEntry,
   BlobAlreadyExistsError,
-  bootstrapCircle,
-  fetchEntries,
-  fetchEpochs,
   getBlob,
   getCoverPhotoUploadTarget,
   getUploadTarget,
-  RateLimitedError,
-  rotateLog,
   uploadBlob,
-} from '@/core/services/relay';
+} from '@/core/services/blob-relay';
 
 const RELAY_URL = 'http://localhost:8080';
 const AUTH_TOKEN = 'test-session-token';

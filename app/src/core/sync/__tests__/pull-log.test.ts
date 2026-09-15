@@ -1,4 +1,4 @@
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 jest.mock('@/features/account/usecases/account-manifest');
 
 import { bytesToHex } from '@noble/curves/utils.js';
@@ -23,7 +23,7 @@ import {
   saveCircleKeyMap,
 } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle, fetchEntries, type LogEntry } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle, fetchEntries, type LogEntry } from '@/core/services/log-relay';
 import * as postsDb from '@/data/db/posts';
 import { pullContent, pullMeta } from '@/core/sync/pull-log';
 

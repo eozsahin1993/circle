@@ -1,6 +1,6 @@
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 
 import { getAllCircles, getCircleMembers, initDatabase } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
@@ -8,7 +8,7 @@ import { createPost } from '@/features/post/usecases/create-post';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { getCircleFeed } from '@/data/db/posts';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 
 beforeAll(async () => {
   await initDatabase();

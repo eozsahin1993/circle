@@ -5,7 +5,7 @@ import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { isCircleAdmin } from '@/features/invite/usecases/invite-to-circle';
 import { ensureCircleNotificationChannel } from '@/features/push-notifications/services/channels';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
-import { appendEntry } from '@/core/services/relay';
+import { appendEntry } from '@/core/services/log-relay';
 
 /**
  * Renames a circle for everyone — admin only, and the same shape as

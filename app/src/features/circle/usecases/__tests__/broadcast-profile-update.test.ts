@@ -1,4 +1,4 @@
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
 jest.mock('@/features/circle/usecases/sync-circle');
 jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/core/photo/image');
@@ -13,7 +13,7 @@ import { broadcastProfileUpdate } from '@/features/circle/usecases/broadcast-pro
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { compressToThumbnail } from '@/core/photo/image';
-import { appendEntry, bootstrapCircle } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 
 // The real compressToThumbnail runs actual image-decoding native modules —
 // tests pass plain byte arrays as "pictures", not real image files, so it's

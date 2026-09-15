@@ -1,4 +1,5 @@
-jest.mock('@/core/services/relay');
+jest.mock('@/core/services/log-relay');
+jest.mock('@/core/services/blob-relay');
 jest.mock('@/features/account/usecases/account-manifest');
 
 import { bytesToHex } from '@noble/curves/utils.js';
@@ -18,7 +19,8 @@ import type { LogEntryEnvelope } from '@/core/sync/log-entry';
 import { encrypt, generateIdentity, generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
-import { appendEntry, bootstrapCircle, getBlob } from '@/core/services/relay';
+import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
+import { getBlob } from '@/core/services/blob-relay';
 import { coverPhotoSetHandler } from '@/core/sync/entry-handlers/cover-photo-set';
 import { drainPhotoQueue } from '@/core/photo/photo-queue';
 
