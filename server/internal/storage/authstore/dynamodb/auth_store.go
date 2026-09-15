@@ -19,7 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"circle-relay/internal/storage/authstore"
-	"circle-relay/internal/storage/dynamoutil"
+	"circle-relay/internal/dynamoutil"
 )
 
 type Store struct {

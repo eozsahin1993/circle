@@ -46,7 +46,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"golang.org/x/crypto/chacha20poly1305"
 
-	"circle-relay/internal/storage/dynamoutil"
+	"circle-relay/internal/dynamoutil"
 )
 
 const nonceLength = chacha20poly1305.NonceSizeX // 24 bytes — must match app/src/services/crypto.ts's NONCE_LENGTH

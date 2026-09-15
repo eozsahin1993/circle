@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/crypto/chacha20poly1305"
 
-	"circle-relay/internal/storage/dynamoutil"
+	"circle-relay/internal/dynamoutil"
 	"circle-relay/internal/storage/logstore"
 	"circle-relay/internal/testsupport"
 )
