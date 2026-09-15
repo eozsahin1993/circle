@@ -12,7 +12,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"circle-relay/internal/api/push"
+	"circle-relay/internal/push"
 	"circle-relay/internal/testsupport"
 )
 
@@ -69,7 +69,7 @@ func sendPush(t *testing.T, serverURL string, pushRoutingIDs []string, pushFanou
 	}
 
 	// Deliberately no bearer token: this route authorizes on the fanout
-	// token instead. See push.FanoutHandler.
+	// token instead. See push/http's FanoutHandler.
 	resp, err := http.Post(serverURL+"/v1/push/send", "application/json", jsonBody(body))
 	if err != nil {
 		t.Fatal(err)

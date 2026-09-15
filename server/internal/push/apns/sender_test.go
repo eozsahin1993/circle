@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"circle-relay/internal/api/push"
+	"circle-relay/internal/push"
 )
 
 // A real key, generated per run — the JWT path is genuinely exercised

@@ -19,9 +19,9 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
+	authdynamodb "circle-relay/internal/auth/dynamodb"
 	"circle-relay/internal/config"
-	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
-	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
+	logdynamodb "circle-relay/internal/synclog/dynamodb"
 )
 
 // DefaultEndpoint is where LocalStack listens locally and in CI.
@@ -262,7 +262,7 @@ func EnsureEntryIDIndex(ctx context.Context, client *awsdynamodb.Client, tableNa
 }
 
 // EnsureAccountIDIndex adds the accountId GSI to the sessions table if it
-// isn't there yet — see authstore/dynamodb.DeleteAllSessions.
+// isn't there yet — see auth/dynamodb.DeleteAllSessions.
 func EnsureAccountIDIndex(ctx context.Context, client *awsdynamodb.Client, tableName string) error {
 	return ensureKeysOnlyIndex(ctx, client, tableName, "accountId", authdynamodb.AccountIDIndexName)
 }

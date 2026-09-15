@@ -11,8 +11,8 @@ import (
 
 	"golang.org/x/crypto/chacha20poly1305"
 
-	"circle-relay/internal/storage/dynamoutil"
-	"circle-relay/internal/storage/logstore"
+	"circle-relay/internal/dynamoutil"
+	"circle-relay/internal/synclog"
 	"circle-relay/internal/testsupport"
 )
 
@@ -66,7 +66,7 @@ func TestDecodeItem_RoundTripsARealBootstrappedAndAppendedCircle(t *testing.T) {
 		t.Fatalf("failed to encrypt test entry: %v", err)
 	}
 
-	commit, err := store.Append(ctx, syncID, logstore.NamespaceMeta, "entry-1", encrypted, 1, writeTokenHex, "test-author-key")
+	commit, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "entry-1", encrypted, 1, writeTokenHex, "test-author-key")
 	if err != nil {
 		t.Fatalf("Append: %v", err)
 	}
@@ -155,7 +155,7 @@ func TestDecodeItem_ReportsAWrongContentKeyInsteadOfFailingSilently(t *testing.T
 	if err != nil {
 		t.Fatalf("failed to encrypt test entry: %v", err)
 	}
-	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, "entry-1", encrypted, 1, hex.EncodeToString(writeToken), "test-author-key"); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "entry-1", encrypted, 1, hex.EncodeToString(writeToken), "test-author-key"); err != nil {
 		t.Fatalf("Append: %v", err)
 	}
 

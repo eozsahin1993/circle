@@ -8,63 +8,60 @@ package api
 import (
 	"net/http"
 
-	"circle-relay/internal/api/account/deleteaccount"
-	"circle-relay/internal/api/account/manifest"
-	"circle-relay/internal/api/appendlog"
-	"circle-relay/internal/api/auth"
-	"circle-relay/internal/api/auth/apple"
-	"circle-relay/internal/api/auth/google"
-	"circle-relay/internal/api/auth/logout"
-	"circle-relay/internal/api/auth/oidcverify"
-	"circle-relay/internal/api/changeauthority"
-	"circle-relay/internal/api/createlog"
-	"circle-relay/internal/api/deleteauthorcontent"
-	"circle-relay/internal/api/deleteblob"
-	"circle-relay/internal/api/deletecircle"
-	"circle-relay/internal/api/deleteentry"
-	"circle-relay/internal/api/getblob"
-	"circle-relay/internal/api/getcoverphotouploadtarget"
-	"circle-relay/internal/api/getepochs"
-	"circle-relay/internal/api/getlog"
-	"circle-relay/internal/api/getuploadtarget"
-	"circle-relay/internal/api/invite"
-	"circle-relay/internal/api/push"
-	"circle-relay/internal/api/ratelimit"
-	"circle-relay/internal/api/rotatelog"
-	"circle-relay/internal/storage/authstore"
-	"circle-relay/internal/storage/blobstore"
-	"circle-relay/internal/storage/invitestore"
-	"circle-relay/internal/storage/logstore"
-	"circle-relay/internal/storage/manifeststore"
-	"circle-relay/internal/storage/pushstore"
-	"circle-relay/internal/storage/ratelimitstore"
+	"circle-relay/internal/account"
+	"circle-relay/internal/account/http/deleteaccount"
+	"circle-relay/internal/account/http/manifest"
+	"circle-relay/internal/auth"
+	"circle-relay/internal/auth/http/apple"
+	"circle-relay/internal/auth/http/google"
+	"circle-relay/internal/auth/http/logout"
+	"circle-relay/internal/auth/oidcverify"
+	invitestore "circle-relay/internal/invite"
+	"circle-relay/internal/invite/http"
+	"circle-relay/internal/push"
+	pushhttp "circle-relay/internal/push/http"
+	"circle-relay/internal/ratelimit"
+	"circle-relay/internal/synclog"
+	"circle-relay/internal/synclog/http/appendlog"
+	"circle-relay/internal/synclog/http/changeauthority"
+	"circle-relay/internal/synclog/http/createlog"
+	"circle-relay/internal/synclog/http/deleteauthorcontent"
+	"circle-relay/internal/synclog/http/deleteblob"
+	"circle-relay/internal/synclog/http/deletecircle"
+	"circle-relay/internal/synclog/http/deleteentry"
+	"circle-relay/internal/synclog/http/getblob"
+	"circle-relay/internal/synclog/http/getcoverphotouploadtarget"
+	"circle-relay/internal/synclog/http/getepochs"
+	"circle-relay/internal/synclog/http/getlog"
+	"circle-relay/internal/synclog/http/getuploadtarget"
+	"circle-relay/internal/synclog/http/rotatelog"
 )
 
 // PushDeps groups the push slice's dependencies. A struct because
-// NewRouter already takes two ratelimitstore.Store values, and a third
+// NewRouter already takes two ratelimit.Store values, and a third
 // positional one would be easy to pass in the wrong order silently.
 type PushDeps struct {
-	Store          pushstore.Store
-	RecipientLimit ratelimitstore.Store
+	Store          push.Store
+	RecipientLimit ratelimit.Store
 	// Nil until the platform credentials exist: fanout still resolves and
 	// reports, it just drops the deliveries.
 	Dispatch func(push.Delivery, int64, []byte)
 }
 
 // Deps is everything the router wires into its endpoints, named rather
-// than positional — four fields share two types (two ratelimitstore.Store,
+// than positional — four fields share two types (two ratelimit.Store,
 // two *oidcverify.Verifier), so a positional list let a read budget stand
 // in for a write one with nothing to catch it. PushDeps was already a
 // struct for the same reason; this finishes the job.
 type Deps struct {
-	Log      logstore.Store
-	Blob     blobstore.Store
-	Auth     authstore.Store
-	Manifest manifeststore.Store
+	Log      synclog.LogStore
+	Blob     synclog.BlobStore
+	Auth     auth.Store
+	Manifest account.Store
 	Invite   invitestore.Store
-	// Writes and reads carry different budgets — see internal/api/ratelimit.
-	WriteLimit ratelimitstore.Store
-	ReadLimit  ratelimitstore.Store
+	// Writes and reads carry different budgets — see internal/ratelimit.
+	WriteLimit ratelimit.Store
+	ReadLimit  ratelimit.Store
 	Google     *oidcverify.Verifier
 	Apple      *oidcverify.Verifier
 	Push       PushDeps
@@ -87,7 +84,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	// each endpoint also checks its own write token/authority signature
 	// beyond this shared session check. Rate limiting wraps each handler
 	// individually instead of circleMux as a whole, since writes and reads
-	// carry different budgets (see internal/api/ratelimit).
+	// carry different budgets (see internal/ratelimit).
 	writeLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.WriteLimit, h) }
 	readLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.ReadLimit, h) }
 
@@ -135,21 +132,21 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	mux.Handle("/epochs/", auth.RequireSession(deps.Auth, epochsMux))
 
 	// Registration is session-gated; the send route is not, and mounts on
-	// the parent mux — see push.FanoutHandler. "POST /push/send" is more
+	// the parent mux — see pushhttp.FanoutHandler. "POST /push/send" is more
 	// specific than "/push/" so it wins the match; changing either pattern
 	// risks silently authenticating the one route that must not be.
 	if deps.Push.Store != nil {
 		pushService := &push.Service{PushStore: deps.Push.Store, RecipientLimit: deps.Push.RecipientLimit}
 
 		pushMux := http.NewServeMux()
-		push.Register(pushMux, pushService)
+		pushhttp.Register(pushMux, pushService)
 		mux.Handle("/push/", auth.RequireSession(deps.Auth, pushMux))
 
 		dispatch := deps.Push.Dispatch
 		if dispatch == nil {
 			dispatch = func(push.Delivery, int64, []byte) {}
 		}
-		push.RegisterFanout(mux, &push.FanoutHandler{Service: pushService, Dispatch: dispatch})
+		pushhttp.RegisterFanout(mux, &pushhttp.FanoutHandler{Service: pushService, Dispatch: dispatch})
 	}
 
 	google.Register(mux, &google.Service{AuthStore: deps.Auth, Verifier: deps.Google})

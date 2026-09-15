@@ -12,7 +12,7 @@
 // end-to-end encryption here exists to avoid. Entries live one partition
 // per syncId, sk-ordered "meta#"/"content#", each ciphertext holding
 // {type, payload, authorPubkey, signature} — see
-// internal/storage/logstore/dynamodb/log_store.go for the concrete shape.
+// internal/synclog/dynamodb/log_store.go for the concrete shape.
 //
 // Usage:
 //
@@ -46,7 +46,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"golang.org/x/crypto/chacha20poly1305"
 
-	"circle-relay/internal/storage/dynamoutil"
+	"circle-relay/internal/dynamoutil"
 )
 
 const nonceLength = chacha20poly1305.NonceSizeX // 24 bytes — must match app/src/services/crypto.ts's NONCE_LENGTH
@@ -217,7 +217,7 @@ func decodeItem(sk string, item map[string]types.AttributeValue, keys contentKey
 
 // decodeControlItem renders #control's attributes generically rather than
 // a typed struct — this tool only reads it for eyeballing, and a
-// hand-maintained mirror of internal/storage/logstore/dynamodb.go's
+// hand-maintained mirror of internal/synclog/dynamodb.go's
 // control-state shape would just be one more place to keep in sync.
 func decodeControlItem(item map[string]types.AttributeValue) map[string]any {
 	control := make(map[string]any, len(item))
@@ -257,7 +257,7 @@ func decrypt(ciphertext, key []byte) ([]byte, error) {
 // #control, every meta#/content# entry, and every idem# marker — oldest
 // first (DynamoDB's default Query order), following LastEvaluatedKey
 // until the whole partition's been read. Unlike the relay's own read path
-// (internal/storage/logstore/dynamodb.Read), this has no reason to cap
+// (internal/synclog/dynamodb.Read), this has no reason to cap
 // pages or split by namespace: it's meant to dump everything for
 // inspection in one shot.
 func queryAllItems(ctx context.Context, client *dynamodb.Client, tableName, syncID string) ([]map[string]types.AttributeValue, error) {

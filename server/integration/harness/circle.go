@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"circle-relay/internal/storage/logstore"
+	"circle-relay/internal/synclog"
 )
 
 // A circle and the endpoints that act on one. There is a method per
@@ -18,15 +18,15 @@ import (
 // Each request has a New* builder that fills in valid defaults. A test
 // takes one, bends the single field it's about, and sends it.
 //
-// The builders sign with real ed25519 over the message logstore itself
+// The builders sign with real ed25519 over the message synclog itself
 // builds. That means bending a signed field after building leaves a real
 // signature over a *different* request — which is exactly what the replay
 // tests need, and why they don't have to forge anything.
 
 // The two namespaces, as the wire spells them.
 const (
-	Meta    = string(logstore.NamespaceMeta)
-	Content = string(logstore.NamespaceContent)
+	Meta    = string(synclog.NamespaceMeta)
+	Content = string(synclog.NamespaceContent)
 )
 
 // Circle is one circle on the relay and everything needed to write to it.
@@ -204,7 +204,7 @@ func (c *Circle) NewRotate(next WriteToken, signer Authority) RotateRequest {
 		CurrentWriteToken:  c.Token.Raw,
 		NewWriteTokenHash:  next.Hash,
 		AuthorityPublicKey: signer.PublicKey(),
-		Signature:          signer.Sign(logstore.RotateMessage(c.SyncID, entryID, next.Hash)),
+		Signature:          signer.Sign(synclog.RotateMessage(c.SyncID, entryID, next.Hash)),
 	}
 }
 
@@ -244,9 +244,9 @@ type AuthorityRequest struct {
 
 // NewAuthorityChange is a valid move of target across the authority set,
 // signed by signer.
-func (c *Circle) NewAuthorityChange(action logstore.AuthorityAction, target string, signer Authority) AuthorityRequest {
+func (c *Circle) NewAuthorityChange(action synclog.AuthorityAction, target string, signer Authority) AuthorityRequest {
 	entryID := Suffix()
-	change := logstore.AuthorityChange{
+	change := synclog.AuthorityChange{
 		Action:                   action,
 		SyncID:                   c.SyncID,
 		EntryID:                  entryID,
@@ -271,11 +271,11 @@ func (c *Circle) ChangeAuthority(req AuthorityRequest) Response {
 // Promote and Demote are ChangeAuthority under the two names a reader of
 // a sequence actually thinks in.
 func (c *Circle) Promote(target string, signer Authority) Response {
-	return c.ChangeAuthority(c.NewAuthorityChange(logstore.AuthorityAdd, target, signer))
+	return c.ChangeAuthority(c.NewAuthorityChange(synclog.AuthorityAdd, target, signer))
 }
 
 func (c *Circle) Demote(target string, signer Authority) Response {
-	return c.ChangeAuthority(c.NewAuthorityChange(logstore.AuthorityRemove, target, signer))
+	return c.ChangeAuthority(c.NewAuthorityChange(synclog.AuthorityRemove, target, signer))
 }
 
 // DeleteRequest is POST /circles/{syncId}/delete — see
@@ -296,7 +296,7 @@ type DeleteRequest struct {
 // new write to a circle that's already gone, which the relay refuses.
 func (c *Circle) NewDelete(signer Authority) DeleteRequest {
 	entryID := Suffix()
-	deletion := logstore.CircleDeletion{SyncID: c.SyncID, EntryID: entryID}
+	deletion := synclog.CircleDeletion{SyncID: c.SyncID, EntryID: entryID}
 	return DeleteRequest{
 		EntryID:                  entryID,
 		EncryptedMeta:            Ciphertext(),
@@ -356,7 +356,7 @@ func (c *Circle) GetBlob(entryID string) Response {
 // internal/api/deleteblob. UploaderSignature and the authority fields are
 // each independently optional: the uploader sends only UploaderSignature,
 // anyone else needs AuthorityPublicKey + AuthoritySignature over
-// logstore.DeleteBlobMessage instead.
+// synclog.DeleteBlobMessage instead.
 type DeleteBlobRequest struct {
 	WriteToken         string `json:"writeToken"`
 	UploaderSignature  string `json:"uploaderSignature"`
@@ -369,7 +369,7 @@ type DeleteBlobRequest struct {
 func (c *Circle) NewDeleteBlob(entryID string) DeleteBlobRequest {
 	return DeleteBlobRequest{
 		WriteToken:        c.Token.Raw,
-		UploaderSignature: c.Device.identity.Sign(logstore.DeleteBlobMessage(c.SyncID, entryID)),
+		UploaderSignature: c.Device.identity.Sign(synclog.DeleteBlobMessage(c.SyncID, entryID)),
 	}
 }
 
@@ -378,7 +378,7 @@ func (c *Circle) NewAdminDeleteBlob(entryID string, signer Authority) DeleteBlob
 	return DeleteBlobRequest{
 		WriteToken:         c.Token.Raw,
 		AuthorityPublicKey: signer.PublicKey(),
-		AuthoritySignature: signer.Sign(logstore.DeleteBlobMessage(c.SyncID, entryID)),
+		AuthoritySignature: signer.Sign(synclog.DeleteBlobMessage(c.SyncID, entryID)),
 	}
 }
 
@@ -403,7 +403,7 @@ type DeleteEntryRequest struct {
 // identity key, the same one an append would have declared for it.
 func (c *Circle) NewDeleteEntry(entryID string) DeleteEntryRequest {
 	tombstoneEntryID := Suffix()
-	deletion := logstore.EntryDeletion{SyncID: c.SyncID, TargetEntryID: entryID, TombstoneEntryID: tombstoneEntryID}
+	deletion := synclog.EntryDeletion{SyncID: c.SyncID, TargetEntryID: entryID, TombstoneEntryID: tombstoneEntryID}
 	return DeleteEntryRequest{
 		WriteToken:       c.Token.Raw,
 		TombstoneEntryID: tombstoneEntryID,
@@ -416,7 +416,7 @@ func (c *Circle) NewDeleteEntry(entryID string) DeleteEntryRequest {
 // NewAdminDeleteEntry deletes somebody else's post, signed by signer.
 func (c *Circle) NewAdminDeleteEntry(entryID string, signer Authority) DeleteEntryRequest {
 	tombstoneEntryID := Suffix()
-	deletion := logstore.EntryDeletion{SyncID: c.SyncID, TargetEntryID: entryID, TombstoneEntryID: tombstoneEntryID}
+	deletion := synclog.EntryDeletion{SyncID: c.SyncID, TargetEntryID: entryID, TombstoneEntryID: tombstoneEntryID}
 	return DeleteEntryRequest{
 		WriteToken:         c.Token.Raw,
 		TombstoneEntryID:   tombstoneEntryID,
@@ -448,7 +448,7 @@ type DeleteAuthorContentRequest struct {
 // announcing it with a tombstone — the current-member mode.
 func (c *Circle) NewDeleteAuthorContent() DeleteAuthorContentRequest {
 	tombstoneEntryID := Suffix()
-	deletion := logstore.AuthorContentDeletion{SyncID: c.SyncID, AuthorIdentityPublicKey: c.Device.identity.PublicKey(), TombstoneEntryID: tombstoneEntryID}
+	deletion := synclog.AuthorContentDeletion{SyncID: c.SyncID, AuthorIdentityPublicKey: c.Device.identity.PublicKey(), TombstoneEntryID: tombstoneEntryID}
 	return DeleteAuthorContentRequest{
 		AuthorIdentityPublicKey: c.Device.identity.PublicKey(),
 		AuthorSignature:         c.Device.identity.Sign(deletion.Message()),
@@ -462,7 +462,7 @@ func (c *Circle) NewDeleteAuthorContent() DeleteAuthorContentRequest {
 // NewStripOnlyAuthorContent is the departed-member mode: no tombstone, no
 // write token, just the author signature.
 func (c *Circle) NewStripOnlyAuthorContent() DeleteAuthorContentRequest {
-	deletion := logstore.AuthorContentDeletion{SyncID: c.SyncID, AuthorIdentityPublicKey: c.Device.identity.PublicKey()}
+	deletion := synclog.AuthorContentDeletion{SyncID: c.SyncID, AuthorIdentityPublicKey: c.Device.identity.PublicKey()}
 	return DeleteAuthorContentRequest{
 		AuthorIdentityPublicKey: c.Device.identity.PublicKey(),
 		AuthorSignature:         c.Device.identity.Sign(deletion.Message()),
@@ -488,7 +488,7 @@ func (c *Circle) NewCoverUpload(signer Authority) CoverUploadRequest {
 	return CoverUploadRequest{
 		WriteToken:         c.Token.Raw,
 		AuthorityPublicKey: signer.PublicKey(),
-		Signature:          signer.Sign(logstore.CoverPhotoUploadMessage(c.SyncID)),
+		Signature:          signer.Sign(synclog.CoverPhotoUploadMessage(c.SyncID)),
 	}
 }
 

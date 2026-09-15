@@ -34,8 +34,8 @@ import (
 
 	"circle-relay/internal/api"
 	"circle-relay/internal/app"
+	"circle-relay/internal/auth"
 	"circle-relay/internal/localstack"
-	"circle-relay/internal/storage/authstore"
 )
 
 // sessionTTL only has to outlast one test.
@@ -58,7 +58,7 @@ type Relay struct {
 	// place. SignIn falls back to /testonly/session in that case — see
 	// registerTestOnly in cmd/testrelay, which every RELAY_URL target is
 	// expected to expose.
-	sessions authstore.Store
+	sessions auth.Store
 }
 
 // Start builds a relay of this test's own and registers its teardown.
@@ -124,7 +124,7 @@ func (r *Relay) SignIn() *Device {
 	d := &Device{relay: r, token: Suffix(), identity: NewAuthority(r.t)}
 
 	if r.sessions != nil {
-		session := authstore.Session{AccountID: accountID, ExpiresAt: time.Now().Add(sessionTTL)}
+		session := auth.Session{AccountID: accountID, ExpiresAt: time.Now().Add(sessionTTL)}
 		if err := r.sessions.SaveSession(context.Background(), d.token, session); err != nil {
 			r.t.Fatalf("failed to mint a session: %v", err)
 		}

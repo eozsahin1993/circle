@@ -8,7 +8,7 @@ import (
 )
 
 // deleteentry, end to end: the relay strips an entry's ciphertext and
-// appends its tombstone in one authorized call. internal/storage/logstore
+// appends its tombstone in one authorized call. internal/synclog
 // dynamodb's own tests already prove DeleteEntry's behavior in isolation;
 // what's missing there is the session and routing layer these tests
 // drive, the same gap blob_test.go fills for deleteblob.

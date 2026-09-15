@@ -31,21 +31,20 @@ import (
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
+	"circle-relay/internal/account"
+	manifestdynamodb "circle-relay/internal/account/dynamodb"
+	"circle-relay/internal/auth"
+	authdynamodb "circle-relay/internal/auth/dynamodb"
+	"circle-relay/internal/invite"
+	invitedynamodb "circle-relay/internal/invite/dynamodb"
 	"circle-relay/internal/localstack"
-	"circle-relay/internal/storage/authstore"
-	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
-	"circle-relay/internal/storage/blobstore"
-	blobs3 "circle-relay/internal/storage/blobstore/s3"
-	"circle-relay/internal/storage/invitestore"
-	invitedynamodb "circle-relay/internal/storage/invitestore/dynamodb"
-	"circle-relay/internal/storage/logstore"
-	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
-	"circle-relay/internal/storage/manifeststore"
-	manifestdynamodb "circle-relay/internal/storage/manifeststore/dynamodb"
-	"circle-relay/internal/storage/pushstore"
-	pushdynamodb "circle-relay/internal/storage/pushstore/dynamodb"
-	"circle-relay/internal/storage/ratelimitstore"
-	ratelimitdynamodb "circle-relay/internal/storage/ratelimitstore/dynamodb"
+	"circle-relay/internal/push"
+	pushdynamodb "circle-relay/internal/push/dynamodb"
+	"circle-relay/internal/ratelimit"
+	ratelimitdynamodb "circle-relay/internal/ratelimit/dynamodb"
+	"circle-relay/internal/synclog"
+	logdynamodb "circle-relay/internal/synclog/dynamodb"
+	blobs3 "circle-relay/internal/synclog/s3"
 )
 
 // Resource names and schemas come from internal/localstack, which
@@ -149,7 +148,7 @@ func loadConfig(t testing.TB) aws.Config {
 // creating the test table once per test binary run (shared across tests —
 // safe because tests use distinct syncID values). Skips the test if
 // LocalStack isn't reachable.
-func NewLogStore(t testing.TB) logstore.Store {
+func NewLogStore(t testing.TB) synclog.LogStore {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())
@@ -194,7 +193,7 @@ func RawDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 
 // NewBlobStore returns a real s3-backed BlobStore against LocalStack,
 // creating the test bucket once per test binary run.
-func NewBlobStore(t testing.TB) blobstore.Store {
+func NewBlobStore(t testing.TB) synclog.BlobStore {
 	t.Helper()
 	client := awss3.NewFromConfig(loadConfig(t), func(o *awss3.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())
@@ -214,7 +213,7 @@ func NewBlobStore(t testing.TB) blobstore.Store {
 // sync.Once-guarded create-if-not-exists pattern as NewLogStore, against a
 // genuinely separate table from everything else (see
 // server/provision/sessions_table.tf).
-func NewAuthStore(t testing.TB) authstore.Store {
+func NewAuthStore(t testing.TB) auth.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())
@@ -233,11 +232,11 @@ func NewAuthStore(t testing.TB) authstore.Store {
 	return authdynamodb.New(client, sessionsTableName)
 }
 
-// NewManifestStore returns a real dynamodb-backed manifeststore.Store
+// NewManifestStore returns a real dynamodb-backed account.Store
 // against LocalStack, creating the accounts table once per test binary
 // run — a genuinely separate table from sessions (see
 // server/provision/accounts_table.tf).
-func NewManifestStore(t testing.TB) manifeststore.Store {
+func NewManifestStore(t testing.TB) account.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())
@@ -253,14 +252,14 @@ func NewManifestStore(t testing.TB) manifeststore.Store {
 	return manifestdynamodb.New(client, accountsTableName)
 }
 
-// NewInviteStore returns a real dynamodb-backed invitestore.Store
+// NewInviteStore returns a real dynamodb-backed invite.Store
 // against LocalStack, creating the test table once per test binary run —
 // composite pk/sk, same key shape as NewLogStore's table (see
 // server/provision/modules/storage/dynamodb.tf's invites resource), a
 // genuinely separate table from everything else. Takes a
 // retentionDays param for the same reason NewLogStore does: tests that
 // assert on the written expiresAt need a known, non-default window.
-func NewInviteStore(t testing.TB, retentionDays int64) invitestore.Store {
+func NewInviteStore(t testing.TB, retentionDays int64) invite.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())
@@ -296,10 +295,10 @@ func RawInviteDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 	return client, inviteTableName
 }
 
-// NewPushStore returns a real dynamodb-backed pushstore.Store against
+// NewPushStore returns a real dynamodb-backed push.Store against
 // LocalStack, creating the push table once per test binary run (see
 // server/provision/push_table.tf).
-func NewPushStore(t testing.TB) pushstore.Store {
+func NewPushStore(t testing.TB) push.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())
@@ -315,12 +314,12 @@ func NewPushStore(t testing.TB) pushstore.Store {
 	return pushdynamodb.New(client, pushTableName)
 }
 
-// NewRateLimitStore returns a real dynamodb-backed ratelimitstore.Store
+// NewRateLimitStore returns a real dynamodb-backed ratelimit.Store
 // against LocalStack, creating the rate-limit table once per test binary
 // run (see server/provision/rate_limit_table.tf). Unlike the other New*
 // helpers, callers pick their own keyPrefix/maxRequests/window per test —
 // a Store instance is scoped to one particular budget.
-func NewRateLimitStore(t testing.TB, keyPrefix string, maxRequests int, window time.Duration) ratelimitstore.Store {
+func NewRateLimitStore(t testing.TB, keyPrefix string, maxRequests int, window time.Duration) ratelimit.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())
@@ -343,7 +342,7 @@ func NewRateLimitStore(t testing.TB, keyPrefix string, maxRequests int, window t
 // Lives here rather than in one package's _test.go because two packages
 // now need a blob that genuinely exists — one to read back the uploader
 // recorded on it, one to delete it.
-func UploadBlob(t testing.TB, target blobstore.UploadTarget, payload []byte) {
+func UploadBlob(t testing.TB, target synclog.UploadTarget, payload []byte) {
 	t.Helper()
 
 	var body bytes.Buffer
