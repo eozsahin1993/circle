@@ -3,7 +3,6 @@ package getuploadtarget_test
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"testing"
@@ -23,9 +22,8 @@ func newToken(t *testing.T) string {
 }
 
 func hashToken(tokenHex string) string {
-	raw, _ := hex.DecodeString(tokenHex)
-	sum := sha256.Sum256(raw)
-	return hex.EncodeToString(sum[:])
+	hash, _ := synclog.WriteTokenHash(tokenHex)
+	return hash
 }
 
 func TestService_UploadTarget_SucceedsWithTheCurrentWriteToken(t *testing.T) {

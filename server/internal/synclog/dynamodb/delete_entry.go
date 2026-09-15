@@ -88,7 +88,7 @@ func (s *Store) DeleteEntry(ctx context.Context, deletion synclog.EntryDeletion)
 	}
 
 	authorizedBy := post.AuthorIdentityPublicKey
-	if verifyAuthoritySignature(post.AuthorIdentityPublicKey, deletion.Message(), deletion.AuthorSignature) != nil {
+	if synclog.VerifySignature(post.AuthorIdentityPublicKey, deletion.Message(), deletion.AuthorSignature) != nil {
 		if deletion.AuthorityPublicKey == "" || len(deletion.AuthoritySignature) == 0 {
 			return synclog.CommitResult{}, synclog.ErrEntryNotAuthorized
 		}
@@ -98,7 +98,7 @@ func (s *Store) DeleteEntry(ctx context.Context, deletion synclog.EntryDeletion)
 		authorizedBy = deletion.AuthorityPublicKey
 	}
 
-	expectedHash, hashErr := hashWriteToken(deletion.WriteToken)
+	expectedHash, hashErr := synclog.WriteTokenHash(deletion.WriteToken)
 
 	result, _, err := s.casCommit(ctx, deletion.SyncID, synclog.NamespaceContent, deletion.TombstoneEntryID, entryFields{
 		EncryptedPayload:        deletion.EncryptedPayload,

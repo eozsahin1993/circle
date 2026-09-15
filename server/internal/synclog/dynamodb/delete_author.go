@@ -25,7 +25,7 @@ import (
 func (s *Store) DeleteAuthorContent(ctx context.Context, deletion synclog.AuthorContentDeletion) (synclog.AuthorContentResult, error) {
 	// A failed signature here is a refused credential, not a malformed
 	// request — it's the only thing authorizing the strip.
-	if err := verifyAuthoritySignature(deletion.AuthorIdentityPublicKey, deletion.Message(), deletion.AuthorSignature); err != nil {
+	if err := synclog.VerifySignature(deletion.AuthorIdentityPublicKey, deletion.Message(), deletion.AuthorSignature); err != nil {
 		if errors.Is(err, synclog.ErrInvalidSignature) {
 			return synclog.AuthorContentResult{}, synclog.ErrEntryNotAuthorized
 		}

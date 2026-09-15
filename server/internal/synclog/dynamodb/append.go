@@ -28,7 +28,7 @@ func (s *Store) Append(ctx context.Context, syncID string, ns synclog.Namespace,
 	// A malformed (non-hex) token can never be correct, so it fails the
 	// same way a well-formed-but-wrong one does — one outcome, not two,
 	// for "this token doesn't work."
-	expectedHash, hashErr := hashWriteToken(writeToken)
+	expectedHash, hashErr := synclog.WriteTokenHash(writeToken)
 
 	result, _, err := s.casCommit(ctx, syncID, ns, entryID, entryFields{
 		EncryptedPayload:        encryptedPayload,
@@ -67,7 +67,7 @@ func (s *Store) Append(ctx context.Context, syncID string, ns synclog.Namespace,
 // membership check, and swaps in the new write-token hash in the same
 // transaction as the entry write.
 func (s *Store) Rotate(ctx context.Context, syncID, entryID string, encryptedPayload []byte, currentKeyVersion int64, currentWriteToken, newWriteTokenHash, authorityPublicKey string, signature []byte) (synclog.CommitResult, error) {
-	if err := verifyAuthoritySignature(authorityPublicKey, synclog.RotateMessage(syncID, entryID, newWriteTokenHash), signature); err != nil {
+	if err := synclog.VerifySignature(authorityPublicKey, synclog.RotateMessage(syncID, entryID, newWriteTokenHash), signature); err != nil {
 		return synclog.CommitResult{}, err
 	}
 
@@ -79,7 +79,7 @@ func (s *Store) Rotate(ctx context.Context, syncID, entryID string, encryptedPay
 
 	// Same reasoning as Append: a malformed token can never be correct, so
 	// it fails the same way a well-formed-but-wrong one does.
-	expectedCurrentHash, hashErr := hashWriteToken(currentWriteToken)
+	expectedCurrentHash, hashErr := synclog.WriteTokenHash(currentWriteToken)
 
 	result, _, err := s.casCommit(ctx, syncID, synclog.NamespaceMeta, entryID, entryFields{
 		EncryptedPayload: encryptedPayload,
@@ -118,10 +118,10 @@ func (s *Store) ChangeAuthority(ctx context.Context, change synclog.AuthorityCha
 	if !change.Action.Valid() {
 		return synclog.CommitResult{}, synclog.ErrInvalidAuthorityAction
 	}
-	if !validAuthorityKeyHex(change.TargetAuthorityPublicKey) {
+	if !synclog.ValidPublicKey(change.TargetAuthorityPublicKey) {
 		return synclog.CommitResult{}, synclog.ErrInvalidAuthorityKey
 	}
-	if err := verifyAuthoritySignature(change.SignerAuthorityPublicKey, change.Message(), change.Signature); err != nil {
+	if err := synclog.VerifySignature(change.SignerAuthorityPublicKey, change.Message(), change.Signature); err != nil {
 		return synclog.CommitResult{}, err
 	}
 
@@ -131,7 +131,7 @@ func (s *Store) ChangeAuthority(ctx context.Context, change synclog.AuthorityCha
 		return *existing, nil
 	}
 
-	expectedHash, hashErr := hashWriteToken(change.WriteToken)
+	expectedHash, hashErr := synclog.WriteTokenHash(change.WriteToken)
 
 	setClause := "SET metaCounter = :next "
 	condition := "writeTokenHash = :hash AND metaCounter = :current AND contains(authoritySet, :signer) AND attribute_not_exists(deletedAt)"

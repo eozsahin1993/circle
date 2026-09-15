@@ -19,7 +19,7 @@ import (
 // stamping deletedAt instead of touching the authority set, then sweeps
 // the content namespace once the tombstone is safely down.
 func (s *Store) DeleteCircle(ctx context.Context, deletion synclog.CircleDeletion) (synclog.CommitResult, error) {
-	if err := verifyAuthoritySignature(deletion.SignerAuthorityPublicKey, deletion.Message(), deletion.Signature); err != nil {
+	if err := synclog.VerifySignature(deletion.SignerAuthorityPublicKey, deletion.Message(), deletion.Signature); err != nil {
 		return synclog.CommitResult{}, err
 	}
 
@@ -37,7 +37,7 @@ func (s *Store) DeleteCircle(ctx context.Context, deletion synclog.CircleDeletio
 		return *existing, s.sweepDeleted(ctx, deletion.SyncID, control.contentCounter)
 	}
 
-	expectedHash, hashErr := hashWriteToken(deletion.WriteToken)
+	expectedHash, hashErr := synclog.WriteTokenHash(deletion.WriteToken)
 
 	// Captured by plan on whichever attempt actually commits (or converges
 	// on someone else's), so the sweep below always has a real counter —

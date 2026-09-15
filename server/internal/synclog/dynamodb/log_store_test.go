@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -19,18 +18,13 @@ import (
 	"circle-relay/internal/testsupport"
 )
 
-// hashToken duplicates the adapter's private hashWriteToken (unexported,
-// and this is an external _test package, same reasoning as the sort-key
-// format duplication below) — sha256 over the raw bytes a hex-encoded
-// write token decodes to.
 func hashToken(t *testing.T, tokenHex string) string {
 	t.Helper()
-	raw, err := hex.DecodeString(tokenHex)
+	hash, err := synclog.WriteTokenHash(tokenHex)
 	if err != nil {
 		t.Fatalf("test token isn't valid hex: %v", err)
 	}
-	sum := sha256.Sum256(raw)
-	return hex.EncodeToString(sum[:])
+	return hash
 }
 
 // newToken returns a fresh, random hex-encoded string standing in for a

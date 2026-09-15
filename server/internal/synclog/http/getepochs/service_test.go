@@ -3,7 +3,6 @@ package getepochs_test
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"testing"
 
@@ -26,12 +25,11 @@ func newToken(t *testing.T) string {
 
 func hashToken(t *testing.T, tokenHex string) string {
 	t.Helper()
-	raw, err := hex.DecodeString(tokenHex)
+	hash, err := synclog.WriteTokenHash(tokenHex)
 	if err != nil {
 		t.Fatalf("test token isn't valid hex: %v", err)
 	}
-	sum := sha256.Sum256(raw)
-	return hex.EncodeToString(sum[:])
+	return hash
 }
 
 func TestService_Peek_DelegatesToLogStoreAcrossSeveralCircles(t *testing.T) {
