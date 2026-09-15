@@ -20,6 +20,9 @@ func (s *Store) VerifyWriteToken(ctx context.Context, syncID, writeToken string)
 	if err != nil || control.writeTokenHash != expectedHash {
 		return synclog.ErrWriteTokenMismatch
 	}
+	if control.deleted {
+		return synclog.ErrCircleDeleted
+	}
 	return nil
 }
 
@@ -36,6 +39,9 @@ func (s *Store) VerifyAuthoritySignature(ctx context.Context, syncID, authorityP
 	control, err := s.getControlState(ctx, syncID, false)
 	if err != nil {
 		return err
+	}
+	if control.deleted {
+		return synclog.ErrCircleDeleted
 	}
 	if !control.authoritySet[authorityPublicKey] {
 		return synclog.ErrAuthorityNotRecognized

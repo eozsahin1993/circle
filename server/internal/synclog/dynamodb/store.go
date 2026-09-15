@@ -117,10 +117,15 @@ func controlKey(syncID string) map[string]types.AttributeValue {
 // early if ctx is cancelled first — a request that's already given up
 // shouldn't hold the invocation open sleeping.
 func sleepBackoff(ctx context.Context, attempt int) error {
-	// Bitwise multiplication by 2 per attempt: 20ms, 40ms, 80ms, ... capped below.
-	delay := peekRetryBaseDelay << (attempt - 1)
-	if delay > peekRetryMaxDelay {
-		delay = peekRetryMaxDelay
+	// Doubles per attempt: 20ms, 40ms, 80ms, ... capped at peekRetryMaxDelay.
+	// Shift width is clamped — an unbounded shift on a sustained-throttling
+	// caller (Peek, batchDelete) would eventually overflow int64 and wrap
+	// the delay to near-zero, silently defeating the cap it's supposed to hit.
+	delay := peekRetryMaxDelay
+	if shift := attempt - 1; shift >= 0 && shift < 32 {
+		if d := peekRetryBaseDelay << shift; d < peekRetryMaxDelay {
+			delay = d
+		}
 	}
 	timer := time.NewTimer(delay)
 	defer timer.Stop()

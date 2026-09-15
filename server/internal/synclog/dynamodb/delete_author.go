@@ -94,6 +94,7 @@ func (s *Store) stripAuthorContent(ctx context.Context, syncID, authorKey string
 			":author": &types.AttributeValueMemberS{Value: authorKey},
 		},
 		ProjectionExpression: aws.String(fmt.Sprintf("%s, entryId", dynamoutil.SKAttr)),
+		ConsistentRead:       aws.Bool(true),
 	})
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(ctx)

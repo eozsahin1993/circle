@@ -2,7 +2,9 @@ package dynamodb
 
 import (
 	"context"
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -53,6 +55,12 @@ func (s *Store) findEntryByID(ctx context.Context, syncID, entryID string) (sync
 		return synclog.LogEntry{}, synclog.ErrEntryNotFound
 	}
 	sk, _ := dynamoutil.AttrString(queryOut.Items[0], dynamoutil.SKAttr)
+	// The GSI spans both namespaces, but only content entries are
+	// deletable this way — reject a meta entryId rather than let the
+	// caller strip whatever content row happens to sit at that epoch.
+	if !strings.HasPrefix(sk, string(synclog.NamespaceContent)+"#") {
+		return synclog.LogEntry{}, synclog.ErrEntryNotFound
+	}
 
 	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName:      aws.String(s.tableName),
@@ -133,6 +141,7 @@ func (s *Store) DeleteEntry(ctx context.Context, deletion synclog.EntryDeletion)
 			TableName:                 aws.String(s.tableName),
 			Key:                       stripKey,
 			UpdateExpression:          stripExpr,
+			ConditionExpression:       aws.String(fmt.Sprintf("attribute_exists(%s)", dynamoutil.PKAttr)),
 			ExpressionAttributeValues: stripValues,
 		}}
 
