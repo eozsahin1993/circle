@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"circle-relay/internal/storage/manifeststore"
+	"circle-relay/internal/account"
 	"circle-relay/internal/testsupport"
 )
 
@@ -84,7 +84,7 @@ func TestManifestStore_PutManifest_RejectsAStaleVersion(t *testing.T) {
 	}
 
 	err := store.PutManifest(ctx, accountID, []byte("racing"), 0)
-	if !errors.Is(err, manifeststore.ErrVersionMismatch) {
+	if !errors.Is(err, account.ErrVersionMismatch) {
 		t.Fatalf("expected ErrVersionMismatch, got %v", err)
 	}
 

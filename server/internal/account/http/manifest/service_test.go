@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"circle-relay/internal/api/account/manifest"
-	"circle-relay/internal/storage/manifeststore"
+	"circle-relay/internal/account"
+	"circle-relay/internal/account/http/manifest"
 	"circle-relay/internal/testsupport"
 )
 
@@ -52,7 +52,7 @@ func TestService_Put_SurfacesAVersionMismatch(t *testing.T) {
 	}
 
 	err := svc.Put(ctx, accountID, []byte("racing"), 0)
-	if !errors.Is(err, manifeststore.ErrVersionMismatch) {
+	if !errors.Is(err, account.ErrVersionMismatch) {
 		t.Fatalf("expected ErrVersionMismatch, got %v", err)
 	}
 }

@@ -1,5 +1,5 @@
 // Package dynamodb implements pushstore.Store. Same single-table shape as
-// invitestore/dynamodb: PK = pushRoutingId, SK splits prefs from device rows.
+// invite/dynamodb: PK = pushRoutingId, SK splits prefs from device rows.
 //
 // No TTL, unlike the invite table: a routing id is how a device stays
 // reachable between posts, not a handoff that expires.

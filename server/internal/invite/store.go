@@ -1,13 +1,14 @@
-// Package invitestore defines the interface domain logic depends on for
-// the invite/join-request flow — implementations live in subpackages,
-// one per backing technology (see invitestore/dynamodb). Ephemeral,
-// per-individual, TTL'd storage: rows expire on their own rather than
-// being deleted the moment they're read, so a device that polls late
-// doesn't lose its response. Invites are its first consumer, not its
-// only intended one — any future one-shot, per-person exchange can reuse
-// the same shape. The relay only ever stores and forwards ciphertext
-// here, same blind-relay property as everything else in this system.
-package invitestore
+// Package invite is the invite/join-request flow: Store is the interface
+// domain logic depends on; implementations live in subpackages, one per
+// backing technology (see invite/dynamodb). Ephemeral, per-individual,
+// TTL'd storage: rows expire on their own rather than being deleted the
+// moment they're read, so a device that polls late doesn't lose its
+// response. Invites are its first consumer, not its only intended one —
+// any future one-shot, per-person exchange can reuse the same shape. The
+// relay only ever stores and forwards ciphertext here, same blind-relay
+// property as everything else in this system. See invite/http for the
+// HTTP-facing half.
+package invite
 
 import (
 	"context"
@@ -16,9 +17,9 @@ import (
 
 // ErrJoinRequestNotFound is what ApproveJoinRequest returns when
 // (inviteTag, requesterID) has no row to approve — never made, or already
-// aged out under TTL. Callers (see api/invite) use this to
-// distinguish "nothing to approve" from a genuine storage failure.
-var ErrJoinRequestNotFound = errors.New("invitestore: join request not found")
+// aged out under TTL. Callers (see invite/http) use this to distinguish
+// "nothing to approve" from a genuine storage failure.
+var ErrJoinRequestNotFound = errors.New("invite: join request not found")
 
 // JoinRequest is one requester's row under an invite — created by the
 // requester, later updated in place by the invite's creator once approved.
@@ -32,7 +33,7 @@ type JoinRequest struct {
 // Store persists one table's worth of invite rows: an "invite" row per
 // invite tag, plus one "join request" row per requester under that tag.
 // Every row is ephemeral (TTL'd by the backing store — see
-// invitestore/dynamodb's DefaultInviteRetentionDays), never circle
+// invite/dynamodb's DefaultInviteRetentionDays), never circle
 // content itself.
 type Store interface {
 	// CreateInvite writes the sk="invite" row — the one proactive server

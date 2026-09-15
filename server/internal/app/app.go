@@ -20,12 +20,12 @@ import (
 	"circle-relay/internal/push/apns"
 	"circle-relay/internal/push/fcm"
 
+	manifestdynamodb "circle-relay/internal/account/dynamodb"
 	authdynamodb "circle-relay/internal/auth/dynamodb"
+	invitedynamodb "circle-relay/internal/invite/dynamodb"
 	ratelimitdynamodb "circle-relay/internal/ratelimit/dynamodb"
 	blobs3 "circle-relay/internal/storage/blobstore/s3"
-	invitedynamodb "circle-relay/internal/storage/invitestore/dynamodb"
 	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
-	manifestdynamodb "circle-relay/internal/storage/manifeststore/dynamodb"
 	pushdynamodb "circle-relay/internal/storage/pushstore/dynamodb"
 )
 

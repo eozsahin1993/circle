@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"circle-relay/internal/httputil"
-	"circle-relay/internal/storage/invitestore"
+	"circle-relay/internal/invite"
 )
 
 // requestResponse is the wire shape for one join-request row —
@@ -19,7 +19,7 @@ type requestResponse struct {
 	CreatedAt         int64   `json:"createdAt"`
 }
 
-func toRequestResponse(jr invitestore.JoinRequest) requestResponse {
+func toRequestResponse(jr invite.JoinRequest) requestResponse {
 	resp := requestResponse{
 		RequesterID:      jr.RequesterID,
 		EncryptedRequest: base64.StdEncoding.EncodeToString(jr.EncryptedRequest),
@@ -157,7 +157,7 @@ func (h *PutApprovalHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.Service.PutApproval(r.Context(), inviteTag, requesterID, encryptedApproval); err != nil {
-		if errors.Is(err, invitestore.ErrJoinRequestNotFound) {
+		if errors.Is(err, invite.ErrJoinRequestNotFound) {
 			httputil.WriteError(w, http.StatusNotFound, "join request not found")
 			return
 		}

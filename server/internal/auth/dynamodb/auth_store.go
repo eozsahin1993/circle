@@ -3,7 +3,7 @@
 // is looked up by token for every path except account deletion (see
 // server/provision/sessions_table.tf, and its accountId-index GSI).
 // Deliberately a different table from the account document
-// (manifeststore): token-lookup and account-lookup are different access
+// (account): token-lookup and account-lookup are different access
 // patterns, and sessions are ephemeral (TTL'd) where the account document
 // isn't.
 package dynamodb

@@ -10,11 +10,11 @@ package invite
 import (
 	"context"
 
-	"circle-relay/internal/storage/invitestore"
+	"circle-relay/internal/invite"
 )
 
 type Service struct {
-	InviteStore invitestore.Store
+	InviteStore invite.Store
 }
 
 // CreateInvite writes the sk="invite" row for inviteTag — the one
@@ -37,12 +37,12 @@ func (s *Service) PutRequest(ctx context.Context, inviteTag, requesterID string,
 
 // ListRequests returns every request row under inviteTag, for the
 // invite's creator to scan for new/approved requests.
-func (s *Service) ListRequests(ctx context.Context, inviteTag string) ([]invitestore.JoinRequest, error) {
+func (s *Service) ListRequests(ctx context.Context, inviteTag string) ([]invite.JoinRequest, error) {
 	return s.InviteStore.ListJoinRequests(ctx, inviteTag)
 }
 
 // GetRequest returns nil, nil if requesterID has no row under inviteTag.
-func (s *Service) GetRequest(ctx context.Context, inviteTag, requesterID string) (*invitestore.JoinRequest, error) {
+func (s *Service) GetRequest(ctx context.Context, inviteTag, requesterID string) (*invite.JoinRequest, error) {
 	return s.InviteStore.GetJoinRequest(ctx, inviteTag, requesterID)
 }
 

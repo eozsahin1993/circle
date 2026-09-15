@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"circle-relay/internal/api/invite"
-	"circle-relay/internal/storage/invitestore"
+	invitestore "circle-relay/internal/invite"
+	"circle-relay/internal/invite/http"
 	"circle-relay/internal/testsupport"
 )
 

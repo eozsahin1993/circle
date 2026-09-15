@@ -10,8 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
+	"circle-relay/internal/account"
 	"circle-relay/internal/dynamoutil"
-	"circle-relay/internal/storage/manifeststore"
 )
 
 type Store struct {
@@ -23,9 +23,9 @@ func New(client *dynamodb.Client, tableName string) *Store {
 	return &Store{client: client, tableName: tableName}
 }
 
-var _ manifeststore.Store = (*Store)(nil)
+var _ account.Store = (*Store)(nil)
 
-func (s *Store) GetManifest(ctx context.Context, accountID string) (manifeststore.Manifest, error) {
+func (s *Store) GetManifest(ctx context.Context, accountID string) (account.Manifest, error) {
 	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
@@ -34,14 +34,14 @@ func (s *Store) GetManifest(ctx context.Context, accountID string) (manifeststor
 		ConsistentRead: aws.Bool(true),
 	})
 	if err != nil {
-		return manifeststore.Manifest{}, err
+		return account.Manifest{}, err
 	}
 	if out.Item == nil {
-		return manifeststore.Manifest{}, nil
+		return account.Manifest{}, nil
 	}
 	blobAttr, ok := out.Item["blob"].(*types.AttributeValueMemberB)
 	if !ok {
-		return manifeststore.Manifest{}, nil
+		return account.Manifest{}, nil
 	}
 
 	// Absent version attribute reads as 0: every manifest written before
@@ -52,7 +52,7 @@ func (s *Store) GetManifest(ctx context.Context, accountID string) (manifeststor
 			version = parsed
 		}
 	}
-	return manifeststore.Manifest{Blob: blobAttr.Value, Version: version}, nil
+	return account.Manifest{Blob: blobAttr.Value, Version: version}, nil
 }
 
 func (s *Store) PutManifest(ctx context.Context, accountID string, blob []byte, expectedVersion int64) error {
@@ -80,7 +80,7 @@ func (s *Store) PutManifest(ctx context.Context, accountID string, blob []byte, 
 
 	var condFailed *types.ConditionalCheckFailedException
 	if errors.As(err, &condFailed) {
-		return manifeststore.ErrVersionMismatch
+		return account.ErrVersionMismatch
 	}
 	return err
 }

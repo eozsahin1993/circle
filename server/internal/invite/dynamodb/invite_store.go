@@ -1,4 +1,4 @@
-// Package dynamodb implements invitestore.Store against a single DynamoDB
+// Package dynamodb implements invite.Store against a single DynamoDB
 // table. Single-table design, same shape as logstore/dynamodb: PK =
 // inviteTag (hash(invite_code) — the relay never sees the code itself),
 // SK distinguishes the invite row from each requester's row.
@@ -15,7 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"circle-relay/internal/dynamoutil"
-	"circle-relay/internal/storage/invitestore"
+	"circle-relay/internal/invite"
 )
 
 // DefaultInviteRetentionDays matches the client's existing INVITE_TTL_MS
@@ -46,7 +46,7 @@ func New(client *dynamodb.Client, tableName string, retentionDays int64) *Store 
 	return &Store{client: client, tableName: tableName, retentionSeconds: retentionDays * 24 * 60 * 60}
 }
 
-var _ invitestore.Store = (*Store)(nil)
+var _ invite.Store = (*Store)(nil)
 
 // CreateInvite is the one proactive server write in the whole invite
 // flow — a plain overwrite, not conditional: it's only ever called once,
@@ -118,7 +118,7 @@ func (s *Store) PutJoinRequest(ctx context.Context, inviteTag, requesterID strin
 	return err
 }
 
-func (s *Store) ListJoinRequests(ctx context.Context, inviteTag string) ([]invitestore.JoinRequest, error) {
+func (s *Store) ListJoinRequests(ctx context.Context, inviteTag string) ([]invite.JoinRequest, error) {
 	out, err := s.client.Query(ctx, &dynamodb.QueryInput{
 		TableName:              aws.String(s.tableName),
 		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :pk AND begins_with(%s, :prefix)", dynamoutil.PKAttr, dynamoutil.SKAttr)),
@@ -131,7 +131,7 @@ func (s *Store) ListJoinRequests(ctx context.Context, inviteTag string) ([]invit
 		return nil, err
 	}
 
-	requests := make([]invitestore.JoinRequest, 0, len(out.Items))
+	requests := make([]invite.JoinRequest, 0, len(out.Items))
 	for _, item := range out.Items {
 		jr, err := itemToJoinRequest(item)
 		if err != nil {
@@ -142,7 +142,7 @@ func (s *Store) ListJoinRequests(ctx context.Context, inviteTag string) ([]invit
 	return requests, nil
 }
 
-func (s *Store) GetJoinRequest(ctx context.Context, inviteTag, requesterID string) (*invitestore.JoinRequest, error) {
+func (s *Store) GetJoinRequest(ctx context.Context, inviteTag, requesterID string) (*invite.JoinRequest, error) {
 	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
@@ -187,7 +187,7 @@ func (s *Store) ApproveJoinRequest(ctx context.Context, inviteTag, requesterID s
 	if err != nil {
 		var condFailed *types.ConditionalCheckFailedException
 		if errors.As(err, &condFailed) {
-			return invitestore.ErrJoinRequestNotFound
+			return invite.ErrJoinRequestNotFound
 		}
 		return err
 	}
@@ -209,18 +209,18 @@ func (s *Store) DeleteJoinRequest(ctx context.Context, inviteTag, requesterID st
 	return err
 }
 
-func itemToJoinRequest(item map[string]types.AttributeValue) (invitestore.JoinRequest, error) {
+func itemToJoinRequest(item map[string]types.AttributeValue) (invite.JoinRequest, error) {
 	requesterID, ok := dynamoutil.AttrString(item, "requesterId")
 	if !ok {
-		return invitestore.JoinRequest{}, errors.New("join request item missing requesterId")
+		return invite.JoinRequest{}, errors.New("join request item missing requesterId")
 	}
 	reqAttr, ok := item["encryptedRequest"].(*types.AttributeValueMemberB)
 	if !ok {
-		return invitestore.JoinRequest{}, errors.New("join request item missing encryptedRequest")
+		return invite.JoinRequest{}, errors.New("join request item missing encryptedRequest")
 	}
 	createdAt, err := dynamoutil.AttrInt(item, "createdAt")
 	if err != nil {
-		return invitestore.JoinRequest{}, err
+		return invite.JoinRequest{}, err
 	}
 
 	var encryptedApproval []byte
@@ -228,7 +228,7 @@ func itemToJoinRequest(item map[string]types.AttributeValue) (invitestore.JoinRe
 		encryptedApproval = approvalAttr.Value
 	}
 
-	return invitestore.JoinRequest{
+	return invite.JoinRequest{
 		RequesterID:       requesterID,
 		EncryptedRequest:  reqAttr.Value,
 		EncryptedApproval: encryptedApproval,

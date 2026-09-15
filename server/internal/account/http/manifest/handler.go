@@ -6,9 +6,9 @@ import (
 	"errors"
 	"net/http"
 
+	"circle-relay/internal/account"
 	"circle-relay/internal/auth"
 	"circle-relay/internal/httputil"
-	"circle-relay/internal/storage/manifeststore"
 )
 
 type getResponse struct {
@@ -72,7 +72,7 @@ func (h *PutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = h.Service.Put(r.Context(), auth.AccountID(r.Context()), blob, req.ExpectedVersion)
-	if errors.Is(err, manifeststore.ErrVersionMismatch) {
+	if errors.Is(err, account.ErrVersionMismatch) {
 		// Another of this account's devices wrote first. The client has to
 		// re-read and reapply — it can't just retry the same blob, which
 		// would drop whatever that device recorded.

@@ -1,9 +1,9 @@
-// Package manifeststore defines the interface domain logic depends on for
-// the per-account encrypted circle-membership manifest — implementations
-// live in subpackages, one per backing technology (see
-// manifeststore/dynamodb). The relay never sees plaintext here: the blob
-// is ciphertext the client encrypted under a key derived from its own
-// master seed, so only the account's own device(s) can read it.
+// Package account is the per-account encrypted circle-membership
+// manifest, plus account deletion: Store is the interface domain logic
+// depends on; implementations live in subpackages, one per backing
+// technology (see account/dynamodb). The relay never sees plaintext here:
+// the blob is ciphertext the client encrypted under a key derived from
+// its own master seed, so only the account's own device(s) can read it.
 //
 // Superseded, not yet migrated: this one-blob-per-account shape is due
 // to be replaced by a row per membership under a seed-derived (not
@@ -13,7 +13,7 @@
 // with the device) and removes the last account-keyed storage in the
 // system. Untouched by the sync-log redesign; still the live
 // implementation until that migration happens.
-package manifeststore
+package account
 
 import (
 	"context"
@@ -26,7 +26,7 @@ import (
 // writing regardless would silently drop whatever that device recorded,
 // and since the blob carries circle content keys, a lost write can cost
 // access to a circle.
-var ErrVersionMismatch = errors.New("manifeststore: manifest changed concurrently")
+var ErrVersionMismatch = errors.New("account: manifest changed concurrently")
 
 // Manifest is the stored blob and the version to quote back when writing.
 // The zero value is what an account that has never stored one reads as.

@@ -9,13 +9,13 @@ import (
 	"context"
 	"net/http"
 
+	"circle-relay/internal/account"
 	"circle-relay/internal/auth"
 	"circle-relay/internal/httputil"
-	"circle-relay/internal/storage/manifeststore"
 )
 
 type Service struct {
-	ManifestStore manifeststore.Store
+	ManifestStore account.Store
 	AuthStore     auth.Store
 }
 

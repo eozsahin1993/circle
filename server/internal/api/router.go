@@ -8,8 +8,9 @@ package api
 import (
 	"net/http"
 
-	"circle-relay/internal/api/account/deleteaccount"
-	"circle-relay/internal/api/account/manifest"
+	"circle-relay/internal/account"
+	"circle-relay/internal/account/http/deleteaccount"
+	"circle-relay/internal/account/http/manifest"
 	"circle-relay/internal/api/appendlog"
 	"circle-relay/internal/api/changeauthority"
 	"circle-relay/internal/api/createlog"
@@ -22,7 +23,6 @@ import (
 	"circle-relay/internal/api/getepochs"
 	"circle-relay/internal/api/getlog"
 	"circle-relay/internal/api/getuploadtarget"
-	"circle-relay/internal/api/invite"
 	"circle-relay/internal/api/push"
 	"circle-relay/internal/api/rotatelog"
 	"circle-relay/internal/auth"
@@ -30,11 +30,11 @@ import (
 	"circle-relay/internal/auth/http/google"
 	"circle-relay/internal/auth/http/logout"
 	"circle-relay/internal/auth/oidcverify"
+	invitestore "circle-relay/internal/invite"
+	"circle-relay/internal/invite/http"
 	"circle-relay/internal/ratelimit"
 	"circle-relay/internal/storage/blobstore"
-	"circle-relay/internal/storage/invitestore"
 	"circle-relay/internal/storage/logstore"
-	"circle-relay/internal/storage/manifeststore"
 	"circle-relay/internal/storage/pushstore"
 )
 
@@ -58,7 +58,7 @@ type Deps struct {
 	Log      logstore.Store
 	Blob     blobstore.Store
 	Auth     auth.Store
-	Manifest manifeststore.Store
+	Manifest account.Store
 	Invite   invitestore.Store
 	// Writes and reads carry different budgets — see internal/ratelimit.
 	WriteLimit ratelimit.Store

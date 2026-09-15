@@ -31,19 +31,19 @@ import (
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
+	"circle-relay/internal/account"
+	manifestdynamodb "circle-relay/internal/account/dynamodb"
 	"circle-relay/internal/auth"
 	authdynamodb "circle-relay/internal/auth/dynamodb"
+	"circle-relay/internal/invite"
+	invitedynamodb "circle-relay/internal/invite/dynamodb"
 	"circle-relay/internal/localstack"
 	"circle-relay/internal/ratelimit"
 	ratelimitdynamodb "circle-relay/internal/ratelimit/dynamodb"
 	"circle-relay/internal/storage/blobstore"
 	blobs3 "circle-relay/internal/storage/blobstore/s3"
-	"circle-relay/internal/storage/invitestore"
-	invitedynamodb "circle-relay/internal/storage/invitestore/dynamodb"
 	"circle-relay/internal/storage/logstore"
 	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
-	"circle-relay/internal/storage/manifeststore"
-	manifestdynamodb "circle-relay/internal/storage/manifeststore/dynamodb"
 	"circle-relay/internal/storage/pushstore"
 	pushdynamodb "circle-relay/internal/storage/pushstore/dynamodb"
 )
@@ -233,11 +233,11 @@ func NewAuthStore(t testing.TB) auth.Store {
 	return authdynamodb.New(client, sessionsTableName)
 }
 
-// NewManifestStore returns a real dynamodb-backed manifeststore.Store
+// NewManifestStore returns a real dynamodb-backed account.Store
 // against LocalStack, creating the accounts table once per test binary
 // run — a genuinely separate table from sessions (see
 // server/provision/accounts_table.tf).
-func NewManifestStore(t testing.TB) manifeststore.Store {
+func NewManifestStore(t testing.TB) account.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())
@@ -253,14 +253,14 @@ func NewManifestStore(t testing.TB) manifeststore.Store {
 	return manifestdynamodb.New(client, accountsTableName)
 }
 
-// NewInviteStore returns a real dynamodb-backed invitestore.Store
+// NewInviteStore returns a real dynamodb-backed invite.Store
 // against LocalStack, creating the test table once per test binary run —
 // composite pk/sk, same key shape as NewLogStore's table (see
 // server/provision/modules/storage/dynamodb.tf's invites resource), a
 // genuinely separate table from everything else. Takes a
 // retentionDays param for the same reason NewLogStore does: tests that
 // assert on the written expiresAt need a known, non-default window.
-func NewInviteStore(t testing.TB, retentionDays int64) invitestore.Store {
+func NewInviteStore(t testing.TB, retentionDays int64) invite.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())

@@ -11,7 +11,7 @@ import (
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"circle-relay/internal/storage/invitestore"
+	"circle-relay/internal/invite"
 	"circle-relay/internal/testsupport"
 )
 
@@ -144,7 +144,7 @@ func TestInviteStore_GetJoinRequest_ReturnsNilForAnUnknownRequester(t *testing.T
 }
 
 // TestInviteStore_PutJoinRequest_DuplicateIsIdempotent matches the
-// create-if-not-exists contract documented on invitestore.Store —
+// create-if-not-exists contract documented on invite.Store —
 // PutJoinRequest.
 func TestInviteStore_PutJoinRequest_DuplicateIsIdempotent(t *testing.T) {
 	ctx := context.Background()
@@ -228,7 +228,7 @@ func TestInviteStore_ApproveJoinRequest_ErrorsForANonexistentRequest(t *testing.
 	store := testsupport.NewInviteStore(t, 0)
 
 	err := store.ApproveJoinRequest(ctx, testsupport.UniqueInviteTag(t), "nobody", []byte("approval"))
-	if !errors.Is(err, invitestore.ErrJoinRequestNotFound) {
+	if !errors.Is(err, invite.ErrJoinRequestNotFound) {
 		t.Fatalf("expected ErrJoinRequestNotFound, got %v", err)
 	}
 }
