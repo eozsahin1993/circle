@@ -14,19 +14,12 @@ import (
 	"circle-relay/internal/synclog"
 )
 
-// commit runs the transaction shared by every appending operation: the
-// caller-supplied conditional update to #control (a counter bump, plus
-// whichever discretionary field the caller is changing), any extra items
-// the caller needs alongside it (DeleteEntry's payload strip is the only
-// one today), the entry Put, and the idempotency marker Put — in that
-// order, though TransactWriteItems' all-or-nothing semantics make the
-// order irrelevant to correctness. Returns the raw TransactWriteItems
-// error unexamined — callers use convergeOnRace to interpret it.
+// commit runs the shared transaction: the conditional #control update,
+// any extra items (DeleteEntry's strip), the entry Put, and the
+// idempotency marker Put. Returns the raw error; convergeOnRace interprets it.
 //
-// authorIdentityPublicKey is omitted from the entry item entirely when
-// empty (Rotate/ChangeAuthority/DeleteCircle always pass "") rather than
-// stored as an empty string — same convention as the S3 blob store's
-// uploader-metadata field.
+// authorIdentityPublicKey is omitted from the item when empty, not
+// stored as "" — same convention as the S3 blob store's uploader field.
 func (s *Store) commit(ctx context.Context, syncID string, ns synclog.Namespace, entryID string, encryptedPayload []byte, keyVersion, epoch, receivedAt int64, authorIdentityPublicKey string, controlUpdate types.Update, extra []types.TransactWriteItem) (synclog.CommitResult, error) {
 	entryItem := map[string]types.AttributeValue{
 		dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: syncID},
@@ -81,38 +74,22 @@ type entryFields struct {
 	AuthorIdentityPublicKey string
 }
 
-// casPlan is what one casCommit attempt wants to write, built fresh
-// against the control state that attempt actually read.
+// casPlan is what one casCommit attempt wants to write.
 type casPlan struct {
-	// Control is the conditional #control mutation — the counter bump
-	// plus whichever discretionary field this operation changes. Its
-	// ConditionExpression is what makes the attempt atomic.
+	// Control is the conditional #control mutation.
 	Control types.Update
-	// Extra rides in the same transaction as the entry and its
-	// idempotency marker. DeleteEntry's payload strip is the only one
-	// today.
+	// Extra rides in the same transaction. DeleteEntry's strip is the
+	// only user today.
 	Extra []types.TransactWriteItem
 }
 
 // casCommit is the read-check-transact-retry loop every appending
-// operation shares. Callers do their own upfront idempotency check and
-// any one-time setup (a signature check, a GSI lookup) before calling
-// this — those don't depend on which attempt eventually wins, so
-// repeating them per attempt would be wasted work at best and, for a
-// lookup like DeleteEntry's, an extra read on every call rather than
-// only on the rare race.
+// operation shares. Do one-time setup (signature checks, lookups)
+// before calling this, not inside plan — plan reruns per attempt.
 //
-// plan runs once per attempt, against the control state that attempt
-// just read, and returns what to write conditioned on it. An error from
-// plan aborts immediately without retrying — a policy refusal (wrong
-// write token, circle deleted, signer not authorized...) is a rejection
-// of this request, not a race worth retrying past.
-//
-// replayed reports that a concurrent identical commit won the race
-// (convergeOnRace found its marker) and result is that commit's
-// original, not a new one. DeleteCircle needs to know only that plan ran
-// at least once (to sweep with the counter it captured), not the
-// distinction itself — every other caller ignores it.
+// plan runs once per attempt against that attempt's control read. An
+// error from plan aborts without retrying — a policy refusal, not a
+// race worth retrying past.
 func (s *Store) casCommit(
 	ctx context.Context,
 	syncID string,
@@ -120,11 +97,11 @@ func (s *Store) casCommit(
 	entryID string,
 	entry entryFields,
 	plan func(control *controlState, epoch, receivedAt int64) (casPlan, error),
-) (result synclog.CommitResult, replayed bool, err error) {
+) (synclog.CommitResult, error) {
 	for attempt := 0; attempt < maxCASAttempts; attempt++ {
 		control, err := s.getControlState(ctx, syncID, true)
 		if err != nil {
-			return synclog.CommitResult{}, false, err
+			return synclog.CommitResult{}, err
 		}
 
 		epoch := control.counter(ns) + 1
@@ -132,32 +109,30 @@ func (s *Store) casCommit(
 
 		p, err := plan(control, epoch, receivedAt)
 		if err != nil {
-			return synclog.CommitResult{}, false, err
+			return synclog.CommitResult{}, err
 		}
 
 		result, err := s.commit(ctx, syncID, ns, entryID, entry.EncryptedPayload, entry.KeyVersion, epoch, receivedAt, entry.AuthorIdentityPublicKey, p.Control, p.Extra)
 		if err == nil {
-			return result, false, nil
+			return result, nil
 		}
 		converged, convErr := s.convergeOnRace(ctx, syncID, ns, entryID, err)
 		if convErr != nil {
-			return synclog.CommitResult{}, false, convErr
+			return synclog.CommitResult{}, convErr
 		}
 		if converged != nil {
-			return *converged, true, nil
+			return *converged, nil
 		}
 		// Neither converged nor a hard error: #control moved under us
 		// (someone else's concurrent Append/Rotate won the race) — loop
 		// and retry against fresh state.
 	}
-	return synclog.CommitResult{}, false, synclog.ErrConcurrentModification
+	return synclog.CommitResult{}, synclog.ErrConcurrentModification
 }
 
-// stripEntryFields is the encryptedMeta-removing, deletedAt/deletedBy-
-// stamping mutation shared by DeleteEntry (riding inside its transaction)
-// and stripAuthorContent (as a standalone conditional UpdateItem) — same
-// row shape, different transports, so this returns the pieces rather than
-// either SDK's own request type.
+// stripEntryFields is the strip mutation DeleteEntry and
+// stripAuthorContent share — returns the pieces since they ride in
+// different SDK request types (transaction item vs standalone UpdateItem).
 func stripEntryFields(syncID, sk string, deletedAt int64, deletedBy string) (key map[string]types.AttributeValue, updateExpression *string, values map[string]types.AttributeValue) {
 	return map[string]types.AttributeValue{
 			dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: syncID},

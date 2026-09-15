@@ -2,13 +2,8 @@ package synclog
 
 import "testing"
 
-// TestMessages_MatchTheClientsByteConstruction pins the literal byte
-// sequences the relay and app/src/core/crypto/signed-messages.ts must
-// build identically — nothing here calls the other side, so this is
-// paired manually with signed-messages.test.ts. A change to either file
-// that isn't mirrored in the other breaks every existing signature
-// silently: it still verifies against itself, and only fails the moment
-// the two sides actually try to talk.
+// Pins the literal bytes signed-messages.test.ts must match — paired
+// manually, since a drift here fails silently until the two sides talk.
 func TestMessages_MatchTheClientsByteConstruction(t *testing.T) {
 	cases := []struct {
 		name string

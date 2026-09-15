@@ -23,9 +23,6 @@ func newToken(t *testing.T) string {
 	return hex.EncodeToString(buf)
 }
 
-// hashToken duplicates synclog/dynamodb's own private hashWriteToken —
-// this package only needs a token whose hash it knows, to bootstrap a
-// circle it can then Append into.
 func hashToken(t *testing.T, tokenHex string) string {
 	t.Helper()
 	hash, err := synclog.WriteTokenHash(tokenHex)

@@ -44,7 +44,7 @@ func (s *Store) DeleteCircle(ctx context.Context, deletion synclog.CircleDeletio
 	// plan runs at least once before casCommit can return without error.
 	var sweepCounter int64
 
-	result, _, err := s.casCommit(ctx, deletion.SyncID, synclog.NamespaceMeta, deletion.EntryID, entryFields{
+	result, err := s.casCommit(ctx, deletion.SyncID, synclog.NamespaceMeta, deletion.EntryID, entryFields{
 		EncryptedPayload: deletion.EncryptedPayload,
 		KeyVersion:       deletion.KeyVersion,
 	}, func(control *controlState, epoch, receivedAt int64) (casPlan, error) {

@@ -100,7 +100,7 @@ func (s *Store) DeleteEntry(ctx context.Context, deletion synclog.EntryDeletion)
 
 	expectedHash, hashErr := synclog.WriteTokenHash(deletion.WriteToken)
 
-	result, _, err := s.casCommit(ctx, deletion.SyncID, synclog.NamespaceContent, deletion.TombstoneEntryID, entryFields{
+	result, err := s.casCommit(ctx, deletion.SyncID, synclog.NamespaceContent, deletion.TombstoneEntryID, entryFields{
 		EncryptedPayload:        deletion.EncryptedPayload,
 		KeyVersion:              deletion.KeyVersion,
 		AuthorIdentityPublicKey: authorizedBy,

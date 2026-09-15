@@ -10,12 +10,9 @@ import {
   deriveRotateMessage,
 } from '@/core/crypto/signed-messages';
 
-// Pins the literal byte sequences the relay's internal/synclog package
-// must build identically (see server/internal/synclog/messages_test.go).
-// Nothing here calls the Go side, so this is paired manually with that
-// file — a change to either that isn't mirrored in the other breaks
-// every existing signature silently: it still verifies against itself,
-// and only fails the moment the two sides actually try to talk.
+// Pins the literal bytes server/internal/synclog/messages_test.go must
+// match — paired manually, since a drift here fails silently until the
+// two sides talk.
 describe('signed-messages byte construction', () => {
   const encode = (s: string) => new TextEncoder().encode(s);
 

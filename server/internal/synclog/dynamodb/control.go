@@ -28,13 +28,11 @@ func (c *controlState) counter(ns synclog.Namespace) int64 {
 	return c.metaCounter
 }
 
-// getControlState is the read half of the compare-and-swap Append, Rotate
-// and ChangeAuthority build on — a separate read because
-// TransactWriteItems's Update
-// action can't hand back the value it just wrote (only standalone
-// UpdateItem supports ReturnValues). So the counter's *next* value is
-// computed from a value read beforehand, and the transaction's
-// ConditionExpression re-checks nothing moved in between.
+// getControlState is the read half of the compare-and-swap every
+// casCommit attempt runs — a separate read because TransactWriteItems's
+// Update can't hand back the value it just wrote, so the *next* value is
+// computed from a read beforehand and the transaction re-checks nothing
+// moved in between.
 func (s *Store) getControlState(ctx context.Context, syncID string, consistent bool) (*controlState, error) {
 	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName:      aws.String(s.tableName),

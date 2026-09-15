@@ -30,7 +30,7 @@ func (s *Store) Append(ctx context.Context, syncID string, ns synclog.Namespace,
 	// for "this token doesn't work."
 	expectedHash, hashErr := synclog.WriteTokenHash(writeToken)
 
-	result, _, err := s.casCommit(ctx, syncID, ns, entryID, entryFields{
+	result, err := s.casCommit(ctx, syncID, ns, entryID, entryFields{
 		EncryptedPayload:        encryptedPayload,
 		KeyVersion:              keyVersion,
 		AuthorIdentityPublicKey: authorIdentityPublicKey,
@@ -81,7 +81,7 @@ func (s *Store) Rotate(ctx context.Context, syncID, entryID string, encryptedPay
 	// it fails the same way a well-formed-but-wrong one does.
 	expectedCurrentHash, hashErr := synclog.WriteTokenHash(currentWriteToken)
 
-	result, _, err := s.casCommit(ctx, syncID, synclog.NamespaceMeta, entryID, entryFields{
+	result, err := s.casCommit(ctx, syncID, synclog.NamespaceMeta, entryID, entryFields{
 		EncryptedPayload: encryptedPayload,
 		KeyVersion:       currentKeyVersion,
 	}, func(control *controlState, epoch, receivedAt int64) (casPlan, error) {
@@ -148,7 +148,7 @@ func (s *Store) ChangeAuthority(ctx context.Context, change synclog.AuthorityCha
 		values[":one"] = &types.AttributeValueMemberN{Value: "1"}
 	}
 
-	result, _, err := s.casCommit(ctx, change.SyncID, synclog.NamespaceMeta, change.EntryID, entryFields{
+	result, err := s.casCommit(ctx, change.SyncID, synclog.NamespaceMeta, change.EntryID, entryFields{
 		EncryptedPayload: change.EncryptedPayload,
 		KeyVersion:       change.KeyVersion,
 	}, func(control *controlState, epoch, receivedAt int64) (casPlan, error) {

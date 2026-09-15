@@ -7,11 +7,8 @@ import (
 	"fmt"
 )
 
-// WriteTokenHash hashes a hex-encoded write token the same way the relay
-// compares it against what's on file — sha256 over the raw bytes the hex
-// decodes to. Exported so a test can build the exact hash a real write
-// would produce without reaching into a specific adapter's own copy of
-// this.
+// WriteTokenHash hashes a hex-encoded write token the way the relay
+// compares it against what's on file — sha256 over the decoded bytes.
 func WriteTokenHash(writeTokenHex string) (string, error) {
 	raw, err := hex.DecodeString(writeTokenHex)
 	if err != nil {
