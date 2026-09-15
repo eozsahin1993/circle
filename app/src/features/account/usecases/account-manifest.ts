@@ -203,6 +203,11 @@ async function describeLocalState(alreadyDeparted: Set<string>): Promise<Partial
     left.map(async ({ id, syncId, leftAt }) => ({
       circleId: id,
       syncId,
+      // Never actually stored once a circle is already departed —
+      // mergeCircles discards mine's keyMap entirely for an existing
+      // terminal record before ever reading it. This is just skipping a
+      // keystore read that would go nowhere; the manifest's own stored
+      // keys for that circle are untouched.
       keyMap: alreadyDeparted.has(id) ? {} : ((await describeCircle({ id, syncId }))?.keyMap ?? {}),
       leftAt,
     }))

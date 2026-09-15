@@ -72,24 +72,11 @@ async function stripDepartedCircleContent(masterSeed: Uint8Array, circleId: stri
 }
 
 /**
- * Resumable completion, mirroring `finishPendingDepartures`'s shape —
- * call this alongside it from the sync scheduler so account deletion
- * finishes over as many passes as it takes, restarts included.
- *
- * **Handles only what `deleteAccount`'s own outbox path can't reach.**
- * A currently-joined circle's content is already taken care of: its
- * `account_deleted` tombstone sits in that circle's outbox and drains
- * through the ordinary sync path (`pushAccountDeletion` in
- * `sync-circle.ts`, using the still-valid write token) — nothing here
- * pushes it. What's left for this function is every circle the manifest
- * shows as `leftAt`: no outbox, no write token, no content key anymore,
- * so it needs the signature-only strip instead (idempotent and cheap on
- * an already-stripped circle; a 404 means the circle was deleted for
- * everyone, already done). Once every strip has succeeded *and* every
- * currently-joined circle has finished leaving (`listCircles` and
- * `getLeftCircles` both empty — proof the outbox path above is done
- * too), deletes the relay account itself — the last relay call this
- * account ever makes — then wipes local state and clears the flag.
+ * Resumable completion, mirroring `finishPendingDepartures` — called
+ * alongside it from the sync scheduler. Only handles departed circles
+ * (joined ones already drain via the ordinary outbox path); once those
+ * are stripped and every circle is confirmed gone, deletes the relay
+ * account and wipes local state.
  */
 export function finishAccountDeletionIfPending(): Promise<void> {
   // `deleteAccount` kicks this off fire-and-forget, and the scheduler

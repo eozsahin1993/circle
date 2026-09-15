@@ -48,21 +48,7 @@ export function mergeManifest(stored: ManifestPayload, mine: Partial<ManifestPay
   return changed ? merged : null;
 }
 
-/**
- * Circles combine by id, and key versions within a circle, because a device
- * behind on a rotation holds an older map and one that hasn't heard of a
- * circle holds none of it. A version's key never changes, so combining can't
- * conflict.
- *
- * A departure is terminal for its id: once `leftAt` is set no later
- * contribution changes the record, which is what lets a device that hasn't
- * synced its own removal keep contributing the circle harmlessly. `leftAt`
- * is a flag, nothing else about the record changes at departure — unlike
- * the old keyless tombstone, a departure is recorded even for a circle
- * the manifest never held before: it isn't just "retiring" a prior entry
- * anymore, it's the only place account deletion can later find this
- * circle's address and keys to erase its content there.
- */
+/** A departure is terminal: once `leftAt` is set, nothing later ever changes the record. */
 function hasLeft(circle: ManifestCircle | undefined): boolean {
   return circle?.leftAt !== undefined;
 }
