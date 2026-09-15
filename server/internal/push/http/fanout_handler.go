@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"circle-relay/internal/httputil"
+	"circle-relay/internal/push"
 )
 
 type fanoutRequest struct {
@@ -35,10 +36,10 @@ type fanoutResponse struct {
 // membership by elimination — each poster's own routing id is missing from
 // their own fanout. Authorization comes from the fanout token instead.
 type FanoutHandler struct {
-	Service *Service
+	Service *push.Service
 	// Nil until the platform credentials exist. Split out so tests can run
 	// the resolution path without APNs or FCM.
-	Dispatch func(delivery Delivery, keyVersion int64, payload []byte)
+	Dispatch func(delivery push.Delivery, keyVersion int64, payload []byte)
 }
 
 func (h *FanoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +65,7 @@ func (h *FanoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.Service.Fanout(r.Context(), req.PushRoutingIDs, pushFanoutToken, req.Category)
-	if errors.Is(err, ErrTooManyTargets) {
+	if errors.Is(err, push.ErrTooManyTargets) {
 		httputil.WriteError(w, http.StatusBadRequest, "too many pushRoutingIds")
 		return
 	}

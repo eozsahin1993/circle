@@ -1,4 +1,4 @@
-// Package dynamodb implements pushstore.Store. Same single-table shape as
+// Package dynamodb implements push.Store. Same single-table shape as
 // invite/dynamodb: PK = pushRoutingId, SK splits prefs from device rows.
 //
 // No TTL, unlike the invite table: a routing id is how a device stays
@@ -17,7 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"circle-relay/internal/dynamoutil"
-	"circle-relay/internal/storage/pushstore"
+	"circle-relay/internal/push"
 )
 
 const (
@@ -38,9 +38,9 @@ func New(client *dynamodb.Client, tableName string) *Store {
 	return &Store{client: client, tableName: tableName}
 }
 
-var _ pushstore.Store = (*Store)(nil)
+var _ push.Store = (*Store)(nil)
 
-func (s *Store) PutPrefs(ctx context.Context, pushRoutingID string, prefs pushstore.Prefs) error {
+func (s *Store) PutPrefs(ctx context.Context, pushRoutingID string, prefs push.Prefs) error {
 	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(s.tableName),
 		Item: map[string]types.AttributeValue{
@@ -58,7 +58,7 @@ func (s *Store) PutPrefs(ctx context.Context, pushRoutingID string, prefs pushst
 	return nil
 }
 
-func (s *Store) GetPrefs(ctx context.Context, pushRoutingID string) (*pushstore.Prefs, error) {
+func (s *Store) GetPrefs(ctx context.Context, pushRoutingID string) (*push.Prefs, error) {
 	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
@@ -70,7 +70,7 @@ func (s *Store) GetPrefs(ctx context.Context, pushRoutingID string) (*pushstore.
 		return nil, fmt.Errorf("get push prefs: %w", err)
 	}
 	if out.Item == nil {
-		return nil, pushstore.ErrPushRoutingNotFound
+		return nil, push.ErrPushRoutingNotFound
 	}
 
 	// A row missing these wasn't written by this code — reading it as
@@ -88,7 +88,7 @@ func (s *Store) GetPrefs(ctx context.Context, pushRoutingID string) (*pushstore.
 		return nil, fmt.Errorf("push prefs row for %q: %w", pushRoutingID, err)
 	}
 
-	prefs := pushstore.Prefs{
+	prefs := push.Prefs{
 		PushFanoutHash: pushFanoutHash,
 		CategoryMask:   categoryMask,
 		KeyVersion:     keyVersion,
@@ -113,14 +113,14 @@ func (s *Store) SetSilenced(ctx context.Context, pushRoutingID string, silenced 
 	if err != nil {
 		var condFailed *types.ConditionalCheckFailedException
 		if errors.As(err, &condFailed) {
-			return pushstore.ErrPushRoutingNotFound
+			return push.ErrPushRoutingNotFound
 		}
 		return fmt.Errorf("set push silenced: %w", err)
 	}
 	return nil
 }
 
-func (s *Store) PutDevice(ctx context.Context, pushRoutingID string, device pushstore.Device) error {
+func (s *Store) PutDevice(ctx context.Context, pushRoutingID string, device push.Device) error {
 	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(s.tableName),
 		Item: map[string]types.AttributeValue{
@@ -137,7 +137,7 @@ func (s *Store) PutDevice(ctx context.Context, pushRoutingID string, device push
 	return nil
 }
 
-func (s *Store) ListDevices(ctx context.Context, pushRoutingID string) ([]pushstore.Device, error) {
+func (s *Store) ListDevices(ctx context.Context, pushRoutingID string) ([]push.Device, error) {
 	out, err := s.client.Query(ctx, &dynamodb.QueryInput{
 		TableName:              aws.String(s.tableName),
 		KeyConditionExpression: aws.String(fmt.Sprintf("%s = :pk AND begins_with(%s, :prefix)", dynamoutil.PKAttr, dynamoutil.SKAttr)),
@@ -150,7 +150,7 @@ func (s *Store) ListDevices(ctx context.Context, pushRoutingID string) ([]pushst
 		return nil, fmt.Errorf("list push devices: %w", err)
 	}
 
-	devices := make([]pushstore.Device, 0, len(out.Items))
+	devices := make([]push.Device, 0, len(out.Items))
 	for _, item := range out.Items {
 		sk, ok := dynamoutil.AttrString(item, dynamoutil.SKAttr)
 		if !ok {
@@ -161,7 +161,7 @@ func (s *Store) ListDevices(ctx context.Context, pushRoutingID string) ([]pushst
 			continue
 		}
 		platform, _ := dynamoutil.AttrString(item, "platform")
-		devices = append(devices, pushstore.Device{
+		devices = append(devices, push.Device{
 			DeviceID:  strings.TrimPrefix(sk, deviceSKPrefix),
 			PushToken: pushToken,
 			Platform:  platform,

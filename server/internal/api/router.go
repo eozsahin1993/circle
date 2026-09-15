@@ -23,7 +23,6 @@ import (
 	"circle-relay/internal/api/getepochs"
 	"circle-relay/internal/api/getlog"
 	"circle-relay/internal/api/getuploadtarget"
-	"circle-relay/internal/api/push"
 	"circle-relay/internal/api/rotatelog"
 	"circle-relay/internal/auth"
 	"circle-relay/internal/auth/http/apple"
@@ -32,17 +31,18 @@ import (
 	"circle-relay/internal/auth/oidcverify"
 	invitestore "circle-relay/internal/invite"
 	"circle-relay/internal/invite/http"
+	"circle-relay/internal/push"
+	pushhttp "circle-relay/internal/push/http"
 	"circle-relay/internal/ratelimit"
 	"circle-relay/internal/storage/blobstore"
 	"circle-relay/internal/storage/logstore"
-	"circle-relay/internal/storage/pushstore"
 )
 
 // PushDeps groups the push slice's dependencies. A struct because
 // NewRouter already takes two ratelimit.Store values, and a third
 // positional one would be easy to pass in the wrong order silently.
 type PushDeps struct {
-	Store          pushstore.Store
+	Store          push.Store
 	RecipientLimit ratelimit.Store
 	// Nil until the platform credentials exist: fanout still resolves and
 	// reports, it just drops the deliveries.
@@ -133,21 +133,21 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	mux.Handle("/epochs/", auth.RequireSession(deps.Auth, epochsMux))
 
 	// Registration is session-gated; the send route is not, and mounts on
-	// the parent mux — see push.FanoutHandler. "POST /push/send" is more
+	// the parent mux — see pushhttp.FanoutHandler. "POST /push/send" is more
 	// specific than "/push/" so it wins the match; changing either pattern
 	// risks silently authenticating the one route that must not be.
 	if deps.Push.Store != nil {
 		pushService := &push.Service{PushStore: deps.Push.Store, RecipientLimit: deps.Push.RecipientLimit}
 
 		pushMux := http.NewServeMux()
-		push.Register(pushMux, pushService)
+		pushhttp.Register(pushMux, pushService)
 		mux.Handle("/push/", auth.RequireSession(deps.Auth, pushMux))
 
 		dispatch := deps.Push.Dispatch
 		if dispatch == nil {
 			dispatch = func(push.Delivery, int64, []byte) {}
 		}
-		push.RegisterFanout(mux, &push.FanoutHandler{Service: pushService, Dispatch: dispatch})
+		pushhttp.RegisterFanout(mux, &pushhttp.FanoutHandler{Service: pushService, Dispatch: dispatch})
 	}
 
 	google.Register(mux, &google.Service{AuthStore: deps.Auth, Verifier: deps.Google})

@@ -38,14 +38,14 @@ import (
 	"circle-relay/internal/invite"
 	invitedynamodb "circle-relay/internal/invite/dynamodb"
 	"circle-relay/internal/localstack"
+	"circle-relay/internal/push"
+	pushdynamodb "circle-relay/internal/push/dynamodb"
 	"circle-relay/internal/ratelimit"
 	ratelimitdynamodb "circle-relay/internal/ratelimit/dynamodb"
 	"circle-relay/internal/storage/blobstore"
 	blobs3 "circle-relay/internal/storage/blobstore/s3"
 	"circle-relay/internal/storage/logstore"
 	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
-	"circle-relay/internal/storage/pushstore"
-	pushdynamodb "circle-relay/internal/storage/pushstore/dynamodb"
 )
 
 // Resource names and schemas come from internal/localstack, which
@@ -296,10 +296,10 @@ func RawInviteDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 	return client, inviteTableName
 }
 
-// NewPushStore returns a real dynamodb-backed pushstore.Store against
+// NewPushStore returns a real dynamodb-backed push.Store against
 // LocalStack, creating the push table once per test binary run (see
 // server/provision/push_table.tf).
-func NewPushStore(t testing.TB) pushstore.Store {
+func NewPushStore(t testing.TB) push.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())

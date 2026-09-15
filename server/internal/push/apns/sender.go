@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"circle-relay/internal/api/push"
+	"circle-relay/internal/push"
 )
 
 const (

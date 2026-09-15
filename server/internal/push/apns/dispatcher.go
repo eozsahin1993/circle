@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 
-	"circle-relay/internal/api/push"
+	"circle-relay/internal/push"
 )
 
 // NewDispatcher builds a push.Deps.Dispatch backed by APNs — the iOS

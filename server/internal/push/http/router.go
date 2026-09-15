@@ -1,10 +1,14 @@
 package push
 
-import "net/http"
+import (
+	"net/http"
+
+	"circle-relay/internal/push"
+)
 
 // Register mounts the registration routes. The fanout route is
 // deliberately not here — see RegisterFanout.
-func Register(mux *http.ServeMux, service *Service) {
+func Register(mux *http.ServeMux, service *push.Service) {
 	mux.Handle("PUT /push/{pushRoutingId}", &PutPrefsHandler{Service: service})
 	mux.Handle("DELETE /push/{pushRoutingId}", &DeleteRoutingHandler{Service: service})
 	mux.Handle("PUT /push/{pushRoutingId}/silenced", &SetSilencedHandler{Service: service})

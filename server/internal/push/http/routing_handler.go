@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"circle-relay/internal/httputil"
-	"circle-relay/internal/storage/pushstore"
+	"circle-relay/internal/push"
 )
 
 // MaxPushTokenBytes leaves room for an FCM registration token plus AEAD
@@ -25,15 +25,11 @@ type putPrefsRequest struct {
 	KeyVersion int64   `json:"keyVersion"`
 }
 
-// MaxCategory is what the storage encoding fits. Nothing here knows what
-// any category means.
-const MaxCategory = 62
-
 // packCategories folds the wire list into the mask the store keeps.
 func packCategories(categories []int64) (int64, error) {
 	var mask int64
 	for _, category := range categories {
-		if category < 0 || category > MaxCategory {
+		if category < 0 || category > push.MaxCategory {
 			return 0, fmt.Errorf("category %d out of range", category)
 		}
 		mask |= 1 << uint(category)
@@ -46,7 +42,7 @@ type okResponse struct {
 }
 
 type PutPrefsHandler struct {
-	Service *Service
+	Service *push.Service
 }
 
 func (h *PutPrefsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +71,7 @@ func (h *PutPrefsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prefs := pushstore.Prefs{PushFanoutHash: pushFanoutHash, CategoryMask: categoryMask, KeyVersion: req.KeyVersion}
+	prefs := push.Prefs{PushFanoutHash: pushFanoutHash, CategoryMask: categoryMask, KeyVersion: req.KeyVersion}
 	if err := h.Service.PutPrefs(r.Context(), pushRoutingID, prefs); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "failed to store push preferences")
 		return
@@ -92,7 +88,7 @@ type putDeviceRequest struct {
 }
 
 type PutDeviceHandler struct {
-	Service *Service
+	Service *push.Service
 }
 
 func (h *PutDeviceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -123,7 +119,7 @@ func (h *PutDeviceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	device := pushstore.Device{
+	device := push.Device{
 		DeviceID:  deviceID,
 		PushToken: pushToken,
 		Platform:  req.Platform,
@@ -144,7 +140,7 @@ type setSilencedRequest struct {
 // SetSilencedHandler flips the flag without touching the hash or
 // categories, so unsilencing needs no content key and cannot half-fail.
 type SetSilencedHandler struct {
-	Service *Service
+	Service *push.Service
 }
 
 func (h *SetSilencedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -155,7 +151,7 @@ func (h *SetSilencedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err := h.Service.SetSilenced(r.Context(), r.PathValue("pushRoutingId"), req.Silenced)
-	if errors.Is(err, pushstore.ErrPushRoutingNotFound) {
+	if errors.Is(err, push.ErrPushRoutingNotFound) {
 		httputil.WriteError(w, http.StatusNotFound, "this routing id is not registered")
 		return
 	}
@@ -168,7 +164,7 @@ func (h *SetSilencedHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type DeleteDeviceHandler struct {
-	Service *Service
+	Service *push.Service
 }
 
 func (h *DeleteDeviceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -181,7 +177,7 @@ func (h *DeleteDeviceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 // DeleteRoutingHandler silences a circle outright. Idempotent.
 type DeleteRoutingHandler struct {
-	Service *Service
+	Service *push.Service
 }
 
 func (h *DeleteRoutingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

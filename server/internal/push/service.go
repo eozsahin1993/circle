@@ -1,8 +1,3 @@
-// Package push is the vertical slice for /push/. Addressed by routing id,
-// not account: the relay holds no link between the two, so there is
-// nothing to nest under.
-//
-// Payloads arrive as ciphertext and are forwarded untouched.
 package push
 
 import (
@@ -11,7 +6,6 @@ import (
 	"errors"
 
 	"circle-relay/internal/ratelimit"
-	"circle-relay/internal/storage/pushstore"
 )
 
 // MaxFanoutTargets caps one send. A circle's membership is bounded, so a
@@ -19,7 +13,7 @@ import (
 const MaxFanoutTargets = 256
 
 type Service struct {
-	PushStore pushstore.Store
+	PushStore Store
 	// Keyed on the routing id. The only limit here protecting a person
 	// rather than the relay: verification stops an outsider, but a real
 	// member passes it every time and nothing else bounds them.
@@ -29,7 +23,7 @@ type Service struct {
 // ErrTooManyTargets is returned when a send exceeds MaxFanoutTargets.
 var ErrTooManyTargets = errors.New("push: too many fanout targets")
 
-func (s *Service) PutPrefs(ctx context.Context, pushRoutingID string, prefs pushstore.Prefs) error {
+func (s *Service) PutPrefs(ctx context.Context, pushRoutingID string, prefs Prefs) error {
 	return s.PushStore.PutPrefs(ctx, pushRoutingID, prefs)
 }
 
@@ -37,7 +31,7 @@ func (s *Service) SetSilenced(ctx context.Context, pushRoutingID string, silence
 	return s.PushStore.SetSilenced(ctx, pushRoutingID, silenced)
 }
 
-func (s *Service) PutDevice(ctx context.Context, pushRoutingID string, device pushstore.Device) error {
+func (s *Service) PutDevice(ctx context.Context, pushRoutingID string, device Device) error {
 	return s.PushStore.PutDevice(ctx, pushRoutingID, device)
 }
 
@@ -104,7 +98,7 @@ func (s *Service) Fanout(ctx context.Context, pushRoutingIDs []string, pushFanou
 // were rejected, or why.
 func (s *Service) resolve(ctx context.Context, pushRoutingID string, pushFanoutToken []byte, category int64) ([]Delivery, error) {
 	prefs, err := s.PushStore.GetPrefs(ctx, pushRoutingID)
-	if errors.Is(err, pushstore.ErrPushRoutingNotFound) {
+	if errors.Is(err, ErrPushRoutingNotFound) {
 		return nil, nil
 	}
 	if err != nil {

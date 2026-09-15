@@ -5,17 +5,17 @@ import (
 	"errors"
 	"testing"
 
-	"circle-relay/internal/storage/pushstore"
+	"circle-relay/internal/push"
 	"circle-relay/internal/testsupport"
 )
 
-func newStore(t *testing.T) pushstore.Store {
+func newStore(t *testing.T) push.Store {
 	t.Helper()
 	return testsupport.NewPushStore(t)
 }
 
-func samplePrefs() pushstore.Prefs {
-	return pushstore.Prefs{PushFanoutHash: []byte("thirty-two-bytes-of-hash-here!!!"), CategoryMask: 0b101, KeyVersion: 3}
+func samplePrefs() push.Prefs {
+	return push.Prefs{PushFanoutHash: []byte("thirty-two-bytes-of-hash-here!!!"), CategoryMask: 0b101, KeyVersion: 3}
 }
 
 func TestPrefsRoundTrip(t *testing.T) {
@@ -43,7 +43,7 @@ func TestGetPrefsUnregistered(t *testing.T) {
 	store := newStore(t)
 
 	_, err := store.GetPrefs(context.Background(), testsupport.UniqueInviteTag(t))
-	if !errors.Is(err, pushstore.ErrPushRoutingNotFound) {
+	if !errors.Is(err, push.ErrPushRoutingNotFound) {
 		t.Fatalf("expected ErrPushRoutingNotFound, got %v", err)
 	}
 }
@@ -57,7 +57,7 @@ func TestPutPrefsReplaces(t *testing.T) {
 	if err := store.PutPrefs(ctx, pushRoutingID, samplePrefs()); err != nil {
 		t.Fatal(err)
 	}
-	rotated := pushstore.Prefs{PushFanoutHash: []byte("a-completely-different-hash-here"), CategoryMask: 0b1, KeyVersion: 4}
+	rotated := push.Prefs{PushFanoutHash: []byte("a-completely-different-hash-here"), CategoryMask: 0b1, KeyVersion: 4}
 	if err := store.PutPrefs(ctx, pushRoutingID, rotated); err != nil {
 		t.Fatal(err)
 	}
@@ -76,9 +76,9 @@ func TestDevicesRoundTrip(t *testing.T) {
 	pushRoutingID := testsupport.UniqueInviteTag(t)
 	ctx := context.Background()
 
-	phone := pushstore.Device{DeviceID: "phone", PushToken: []byte("enc-phone"), Platform: "ios", Enabled: true}
-	tablet := pushstore.Device{DeviceID: "tablet", PushToken: []byte("enc-tablet"), Platform: "android", Enabled: false}
-	for _, device := range []pushstore.Device{phone, tablet} {
+	phone := push.Device{DeviceID: "phone", PushToken: []byte("enc-phone"), Platform: "ios", Enabled: true}
+	tablet := push.Device{DeviceID: "tablet", PushToken: []byte("enc-tablet"), Platform: "android", Enabled: false}
+	for _, device := range []push.Device{phone, tablet} {
 		if err := store.PutDevice(ctx, pushRoutingID, device); err != nil {
 			t.Fatal(err)
 		}
@@ -92,7 +92,7 @@ func TestDevicesRoundTrip(t *testing.T) {
 		t.Fatalf("expected 2 devices, got %d", len(devices))
 	}
 
-	byID := map[string]pushstore.Device{}
+	byID := map[string]push.Device{}
 	for _, device := range devices {
 		byID[device.DeviceID] = device
 	}
@@ -131,7 +131,7 @@ func TestListDevicesIsScopedToItsRoutingID(t *testing.T) {
 	mine, theirs := testsupport.UniqueInviteTag(t), testsupport.UniqueInviteTag(t)
 	ctx := context.Background()
 
-	if err := store.PutDevice(ctx, theirs, pushstore.Device{DeviceID: "d", PushToken: []byte("t"), Enabled: true}); err != nil {
+	if err := store.PutDevice(ctx, theirs, push.Device{DeviceID: "d", PushToken: []byte("t"), Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -149,7 +149,7 @@ func TestDeleteDevice(t *testing.T) {
 	pushRoutingID := testsupport.UniqueInviteTag(t)
 	ctx := context.Background()
 
-	if err := store.PutDevice(ctx, pushRoutingID, pushstore.Device{DeviceID: "phone", PushToken: []byte("t"), Enabled: true}); err != nil {
+	if err := store.PutDevice(ctx, pushRoutingID, push.Device{DeviceID: "phone", PushToken: []byte("t"), Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.DeleteDevice(ctx, pushRoutingID, "phone"); err != nil {
@@ -179,7 +179,7 @@ func TestDeleteRoutingRemovesPrefsAndDevices(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"phone", "tablet"} {
-		if err := store.PutDevice(ctx, pushRoutingID, pushstore.Device{DeviceID: id, PushToken: []byte("t"), Enabled: true}); err != nil {
+		if err := store.PutDevice(ctx, pushRoutingID, push.Device{DeviceID: id, PushToken: []byte("t"), Enabled: true}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -188,7 +188,7 @@ func TestDeleteRoutingRemovesPrefsAndDevices(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := store.GetPrefs(ctx, pushRoutingID); !errors.Is(err, pushstore.ErrPushRoutingNotFound) {
+	if _, err := store.GetPrefs(ctx, pushRoutingID); !errors.Is(err, push.ErrPushRoutingNotFound) {
 		t.Fatalf("expected the prefs row gone, got %v", err)
 	}
 	devices, err := store.ListDevices(ctx, pushRoutingID)
@@ -241,7 +241,7 @@ func TestSetSilencedUnregistered(t *testing.T) {
 	store := newStore(t)
 
 	err := store.SetSilenced(context.Background(), testsupport.UniqueInviteTag(t), true)
-	if !errors.Is(err, pushstore.ErrPushRoutingNotFound) {
+	if !errors.Is(err, push.ErrPushRoutingNotFound) {
 		t.Fatalf("expected ErrPushRoutingNotFound, got %v", err)
 	}
 }
@@ -256,7 +256,7 @@ func TestPutDeviceLeavesPrefsAlone(t *testing.T) {
 	if err := store.PutPrefs(ctx, pushRoutingID, samplePrefs()); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.PutDevice(ctx, pushRoutingID, pushstore.Device{DeviceID: "phone", PushToken: []byte("t"), Enabled: true}); err != nil {
+	if err := store.PutDevice(ctx, pushRoutingID, push.Device{DeviceID: "phone", PushToken: []byte("t"), Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
 

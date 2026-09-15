@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"circle-relay/internal/api/push"
+	"circle-relay/internal/push"
 )
 
 // A real key, generated per run — the assertion is genuinely signed, so

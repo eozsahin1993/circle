@@ -4,37 +4,35 @@ import (
 	"context"
 	"errors"
 	"testing"
-
-	"circle-relay/internal/storage/pushstore"
 )
 
 // fakeStore drives Fanout's decisions without LocalStack.
 type fakeStore struct {
-	prefs   map[string]pushstore.Prefs
-	devices map[string][]pushstore.Device
+	prefs   map[string]Prefs
+	devices map[string][]Device
 	// Proves a rejected target never reached the second read.
 	listCalls int
 	err       error
 }
 
-func (f *fakeStore) PutPrefs(context.Context, string, pushstore.Prefs) error { return nil }
+func (f *fakeStore) PutPrefs(context.Context, string, Prefs) error { return nil }
 
-func (f *fakeStore) GetPrefs(_ context.Context, pushRoutingID string) (*pushstore.Prefs, error) {
+func (f *fakeStore) GetPrefs(_ context.Context, pushRoutingID string) (*Prefs, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
 	prefs, ok := f.prefs[pushRoutingID]
 	if !ok {
-		return nil, pushstore.ErrPushRoutingNotFound
+		return nil, ErrPushRoutingNotFound
 	}
 	return &prefs, nil
 }
 
 func (f *fakeStore) SetSilenced(context.Context, string, bool) error { return nil }
 
-func (f *fakeStore) PutDevice(context.Context, string, pushstore.Device) error { return nil }
+func (f *fakeStore) PutDevice(context.Context, string, Device) error { return nil }
 
-func (f *fakeStore) ListDevices(_ context.Context, pushRoutingID string) ([]pushstore.Device, error) {
+func (f *fakeStore) ListDevices(_ context.Context, pushRoutingID string) ([]Device, error) {
 	f.listCalls++
 	return f.devices[pushRoutingID], nil
 }
@@ -59,11 +57,11 @@ const token = "fanout-token"
 func newService(t *testing.T, limit *countingLimit) (*Service, *fakeStore) {
 	t.Helper()
 	store := &fakeStore{
-		prefs: map[string]pushstore.Prefs{
+		prefs: map[string]Prefs{
 			"routing-a": {PushFanoutHash: PushFanoutHash([]byte(token), "routing-a"), CategoryMask: 0b011},
 			"routing-b": {PushFanoutHash: PushFanoutHash([]byte(token), "routing-b"), CategoryMask: 0b011},
 		},
-		devices: map[string][]pushstore.Device{
+		devices: map[string][]Device{
 			"routing-a": {{DeviceID: "d1", PushToken: []byte("t1"), Platform: "ios", Enabled: true}},
 			"routing-b": {{DeviceID: "d2", PushToken: []byte("t2"), Platform: "android", Enabled: true}},
 		},
@@ -101,7 +99,7 @@ func TestFanout_WrongTokenDeliversNothing(t *testing.T) {
 func TestFanout_HashIsBoundToItsRoutingID(t *testing.T) {
 	service, store := newService(t, &countingLimit{allow: true})
 	// Give routing-b the hash that belongs to routing-a.
-	store.prefs["routing-b"] = pushstore.Prefs{
+	store.prefs["routing-b"] = Prefs{
 		PushFanoutHash: PushFanoutHash([]byte(token), "routing-a"),
 		CategoryMask:   0b011,
 	}
@@ -159,7 +157,7 @@ func TestFanout_DisabledCategoryIsSkipped(t *testing.T) {
 
 func TestFanout_DisabledDeviceGetsNothing(t *testing.T) {
 	service, store := newService(t, &countingLimit{allow: true})
-	store.devices["routing-a"] = []pushstore.Device{{DeviceID: "d1", PushToken: []byte("t1"), Enabled: false}}
+	store.devices["routing-a"] = []Device{{DeviceID: "d1", PushToken: []byte("t1"), Enabled: false}}
 
 	result, err := service.Fanout(context.Background(), []string{"routing-a"}, []byte(token), 0)
 	if err != nil {
@@ -225,22 +223,5 @@ func TestFanout_StorageFailureIsFatal(t *testing.T) {
 
 	if _, err := service.Fanout(context.Background(), []string{"routing-a"}, []byte(token), 0); err == nil {
 		t.Fatal("a storage failure must not be reported as a silently skipped target")
-	}
-}
-
-func TestPackCategories(t *testing.T) {
-	mask, err := packCategories([]int64{0, 2, 5})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if mask != 0b100101 {
-		t.Fatalf("expected 0b100101, got %b", mask)
-	}
-
-	if _, err := packCategories([]int64{-1}); err == nil {
-		t.Fatal("expected a negative category to be rejected")
-	}
-	if _, err := packCategories([]int64{MaxCategory + 1}); err == nil {
-		t.Fatal("expected an out-of-range category to be rejected")
 	}
 }

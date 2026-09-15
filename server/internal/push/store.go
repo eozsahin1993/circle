@@ -1,11 +1,17 @@
-// Package pushstore defines the interface domain logic depends on for push
-// routing state.
+// Package push is mobile push notifications, addressed by routing id, not
+// account: the relay holds no link between the two, so there is nothing
+// to nest under. Store is the interface domain logic depends on for push
+// routing state; implementations live in subpackages, one per backing
+// technology (see push/dynamodb). Fanout and routing logic live in
+// service.go — payloads arrive as ciphertext and are forwarded untouched
+// — platform dispatch in push/apns and push/fcm, and the HTTP-facing half
+// in push/http.
 //
 // No account ids, circle ids, or lists of which routing ids belong
 // together, anywhere in here. There is deliberately no method that could
 // write one: a durable circle-to-routing-id table would hand the relay
 // exactly the group membership this design exists to keep it blind to.
-package pushstore
+package push
 
 import (
 	"context"
@@ -14,7 +20,11 @@ import (
 
 // ErrPushRoutingNotFound means a routing id has no prefs row. Distinct from a
 // storage failure so a send to a stale id skips rather than fails.
-var ErrPushRoutingNotFound = errors.New("pushstore: routing id not registered")
+var ErrPushRoutingNotFound = errors.New("push: routing id not registered")
+
+// MaxCategory is what CategoryMask's bitmask encoding fits. Nothing here
+// knows what any category means.
+const MaxCategory = 62
 
 // Prefs is one routing id's control row.
 type Prefs struct {
