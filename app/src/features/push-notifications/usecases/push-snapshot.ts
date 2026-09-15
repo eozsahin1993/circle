@@ -2,7 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { getAllCircles, getCircleMembers } from '@/data/db';
-import { APP_GROUP } from '@/core/services/app-group';
+import { APP_GROUP } from '@/features/push-notifications/app-group';
 
 export const PUSH_SNAPSHOT_FILE = 'push-snapshot.json';
 

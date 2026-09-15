@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-import { APP_GROUP } from '@/core/services/app-group';
+import { APP_GROUP } from '@/features/push-notifications/app-group';
 
 /**
  * iOS secrets live in the shared App Group keychain so the notification
