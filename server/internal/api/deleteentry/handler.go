@@ -88,7 +88,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.Service.Delete(r.Context(), logstore.EntryDeletion{
 		SyncID:             syncID,
-		TargetEntryID:        entryID,
+		TargetEntryID:      entryID,
 		TombstoneEntryID:   req.TombstoneEntryID,
 		EncryptedPayload:   encryptedMeta,
 		KeyVersion:         req.KeyVersion,
