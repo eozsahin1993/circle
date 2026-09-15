@@ -66,7 +66,7 @@ func TestDecodeItem_RoundTripsARealBootstrappedAndAppendedCircle(t *testing.T) {
 		t.Fatalf("failed to encrypt test entry: %v", err)
 	}
 
-	commit, err := store.Append(ctx, syncID, logstore.NamespaceMeta, "entry-1", encrypted, 1, writeTokenHex)
+	commit, err := store.Append(ctx, syncID, logstore.NamespaceMeta, "entry-1", encrypted, 1, writeTokenHex, "test-author-key")
 	if err != nil {
 		t.Fatalf("Append: %v", err)
 	}
@@ -155,7 +155,7 @@ func TestDecodeItem_ReportsAWrongContentKeyInsteadOfFailingSilently(t *testing.T
 	if err != nil {
 		t.Fatalf("failed to encrypt test entry: %v", err)
 	}
-	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, "entry-1", encrypted, 1, hex.EncodeToString(writeToken)); err != nil {
+	if _, err := store.Append(ctx, syncID, logstore.NamespaceContent, "entry-1", encrypted, 1, hex.EncodeToString(writeToken), "test-author-key"); err != nil {
 		t.Fatalf("Append: %v", err)
 	}
 

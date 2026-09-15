@@ -233,6 +233,7 @@ func TestAnAppendWithAFieldWrongIsRejected(t *testing.T) {
 		"a zero key version":          func(a *harness.AppendRequest) { a.KeyVersion = 0 },
 		"a negative key version":      func(a *harness.AppendRequest) { a.KeyVersion = -1 },
 		"no write token":              func(a *harness.AppendRequest) { a.WriteToken = "" },
+		"no author identity key":      func(a *harness.AppendRequest) { a.AuthorIdentityPublicKey = "" },
 		"a payload that isn't base64": func(a *harness.AppendRequest) { a.EncryptedMeta = "not base64!" },
 	}
 

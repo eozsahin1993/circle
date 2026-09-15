@@ -19,6 +19,9 @@ type request struct {
 	KeyVersion int64 `json:"keyVersion"`
 	// WriteToken is the raw (not pre-hashed) hex-encoded token — see logstore.Store.Append.
 	WriteToken string `json:"writeToken"`
+	// AuthorIdentityPublicKey is the hex circle-identity key the caller
+	// declares as this entry's author
+	AuthorIdentityPublicKey string `json:"authorIdentityPublicKey"`
 }
 
 type response struct {
@@ -55,6 +58,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusBadRequest, "writeToken is required")
 		return
 	}
+	if req.AuthorIdentityPublicKey == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "authorIdentityPublicKey is required")
+		return
+	}
 
 	encryptedMeta, err := base64.StdEncoding.DecodeString(req.EncryptedMeta)
 	if err != nil {
@@ -62,7 +69,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.Service.Append(r.Context(), syncID, ns, req.EntryID, encryptedMeta, req.KeyVersion, req.WriteToken)
+	result, err := h.Service.Append(r.Context(), syncID, ns, req.EntryID, encryptedMeta, req.KeyVersion, req.WriteToken, req.AuthorIdentityPublicKey)
 	if err != nil {
 		status, message := circleerrors.Status(err)
 		httputil.WriteError(w, status, message)

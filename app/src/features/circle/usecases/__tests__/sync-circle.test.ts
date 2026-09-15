@@ -111,7 +111,7 @@ test('drainOutbox obtains an upload target, uploads the blob, appends the entry,
   const appendOrder = (appendEntry as jest.Mock).mock.invocationCallOrder[0];
   expect(uploadOrder).toBeLessThan(appendOrder);
 
-  expect(appendEntry).toHaveBeenCalledWith(expect.any(String), 'content', post.id, expect.any(Uint8Array), 1, expect.any(Uint8Array));
+  expect(appendEntry).toHaveBeenCalledWith(expect.any(String), 'content', post.id, expect.any(Uint8Array), 1, expect.any(Uint8Array), expect.any(Uint8Array));
   await expect(getPendingOutboxEntries(circleId)).resolves.toEqual([]);
 });
 
@@ -138,7 +138,7 @@ test('a retry that finds the blob already uploaded skips straight to the append'
   await drainOutbox(circleId);
 
   expect(uploadBlob).not.toHaveBeenCalled();
-  expect(appendEntry).toHaveBeenCalledWith(expect.any(String), 'content', post.id, expect.any(Uint8Array), 1, expect.any(Uint8Array));
+  expect(appendEntry).toHaveBeenCalledWith(expect.any(String), 'content', post.id, expect.any(Uint8Array), 1, expect.any(Uint8Array), expect.any(Uint8Array));
   await expect(getPendingOutboxEntries(circleId)).resolves.toEqual([]);
 });
 

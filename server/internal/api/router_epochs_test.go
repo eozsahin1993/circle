@@ -36,7 +36,7 @@ func TestEndToEnd_Epochs_ReportsCurrentEpochsAndOmitsAnUnknownCircle(t *testing.
 	}
 
 	appendBody := `{"namespace":"content","entryId":"post-1","keyVersion":1,"encryptedMeta":"` +
-		base64.StdEncoding.EncodeToString([]byte("ciphertext")) + `","writeToken":"` + writeToken + `"}`
+		base64.StdEncoding.EncodeToString([]byte("ciphertext")) + `","writeToken":"` + writeToken + `","authorIdentityPublicKey":"` + founderPubHex + `"}`
 	appendResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/entries", authToken, appendBody)
 	defer appendResp.Body.Close()
 	if appendResp.StatusCode != http.StatusOK {

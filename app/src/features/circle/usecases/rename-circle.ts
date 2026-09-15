@@ -42,7 +42,8 @@ export async function renameCircle(circleId: string, name: string): Promise<void
     generateUUID(),
     entry,
     current.version,
-    deriveWriteToken(current.key)
+    deriveWriteToken(current.key),
+    identity.publicKey
   );
 
   await updateCircleName(circleId, trimmed);

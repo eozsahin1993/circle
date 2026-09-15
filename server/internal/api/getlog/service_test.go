@@ -47,7 +47,7 @@ func TestService_Fetch_DelegatesToLogStoreForTheRequestedNamespace(t *testing.T)
 		t.Fatal(err)
 	}
 
-	commit, err := logStore.Append(ctx, syncID, logstore.NamespaceContent, "post-1", []byte("ciphertext"), 1, token)
+	commit, err := logStore.Append(ctx, syncID, logstore.NamespaceContent, "post-1", []byte("ciphertext"), 1, token, "test-author-key")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -100,6 +100,12 @@ type LogEntry struct {
 	KeyVersion    int64
 	EncryptedMeta []byte
 	ReceivedAt    int64
+	// AuthorIdentityPublicKey is the hex circle-identity key the writer
+	// declared itself as — unauthenticated at this stage, nothing verifies
+	// it against the signature inside EncryptedMeta. Empty for entries
+	// written by Rotate, ChangeAuthority, or DeleteCircle, which have no
+	// content author in this sense.
+	AuthorIdentityPublicKey string
 }
 
 // CommitResult is what a successful (or idempotently-retried) write hands
@@ -199,7 +205,13 @@ type Store interface {
 	// alongside the entry (see LogEntry) — the caller's responsibility to
 	// get right; the relay stores it as-is and never verifies it (it
 	// can't — the content is opaque).
-	Append(ctx context.Context, syncID string, ns Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeToken string) (CommitResult, error)
+	//
+	// authorIdentityPublicKey is likewise recorded as plaintext and
+	// unauthenticated — caller-declared, same trust level as
+	// blobstore.Store.GetUploadTarget's uploaderPublicKey. Nothing checks
+	// it against EncryptedMeta's signature yet; it exists so a future
+	// capability can verify one before authorizing a redaction.
+	Append(ctx context.Context, syncID string, ns Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeToken, authorIdentityPublicKey string) (CommitResult, error)
 
 	// Rotate is the capability-gated write path for a key rotation —
 	// always a meta-namespace entry. Atomically: verifies

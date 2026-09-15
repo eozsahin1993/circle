@@ -85,7 +85,7 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
     identity,
     contentKey
   );
-  await appendEntry(syncId, 'meta', generateUUID(), memberAddedEntry, 1, writeToken);
+  await appendEntry(syncId, 'meta', generateUUID(), memberAddedEntry, 1, writeToken, identity.publicKey);
 
   await saveCircleIdentity(circleId, { ...identity, memberId });
   await saveCircleKeyMap(circleId, { 1: contentKey });

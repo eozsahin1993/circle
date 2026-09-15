@@ -90,7 +90,7 @@ func TestEndToEnd_BootstrapAppendFetchRotateAndDownload(t *testing.T) {
 	// 2. Append a content entry with the founder's write token.
 	plaintext := "caption and photo bytes, pretend-encrypted"
 	appendBody := `{"namespace":"content","entryId":"post-1","keyVersion":1,"encryptedMeta":"` +
-		base64.StdEncoding.EncodeToString([]byte(plaintext)) + `","writeToken":"` + writeToken + `"}`
+		base64.StdEncoding.EncodeToString([]byte(plaintext)) + `","writeToken":"` + writeToken + `","authorIdentityPublicKey":"` + founderPubHex + `"}`
 	appendResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/entries", authToken, appendBody)
 	defer appendResp.Body.Close()
 	if appendResp.StatusCode != http.StatusOK {
@@ -107,7 +107,7 @@ func TestEndToEnd_BootstrapAppendFetchRotateAndDownload(t *testing.T) {
 	// An append with the wrong write token must be rejected, not silently
 	// accepted or consume an epoch.
 	wrongTokenBody := `{"namespace":"content","entryId":"post-2","keyVersion":1,"encryptedMeta":"` +
-		base64.StdEncoding.EncodeToString([]byte("x")) + `","writeToken":"` + randomHex(t, 32) + `"}`
+		base64.StdEncoding.EncodeToString([]byte("x")) + `","writeToken":"` + randomHex(t, 32) + `","authorIdentityPublicKey":"` + founderPubHex + `"}`
 	wrongTokenResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/entries", authToken, wrongTokenBody)
 	defer wrongTokenResp.Body.Close()
 	if wrongTokenResp.StatusCode != http.StatusForbidden {
@@ -173,14 +173,14 @@ func TestEndToEnd_BootstrapAppendFetchRotateAndDownload(t *testing.T) {
 
 	// The old token must now be rejected...
 	staleResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/entries", authToken,
-		`{"namespace":"content","entryId":"post-after-rotation-old-token","keyVersion":1,"encryptedMeta":"YQ==","writeToken":"`+writeToken+`"}`)
+		`{"namespace":"content","entryId":"post-after-rotation-old-token","keyVersion":1,"encryptedMeta":"YQ==","writeToken":"`+writeToken+`","authorIdentityPublicKey":"`+founderPubHex+`"}`)
 	defer staleResp.Body.Close()
 	if staleResp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected 403 for the pre-rotation write token, got %d", staleResp.StatusCode)
 	}
 	// ...and the new one must work.
 	postRotationResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/entries", authToken,
-		`{"namespace":"content","entryId":"post-after-rotation-new-token","keyVersion":2,"encryptedMeta":"YQ==","writeToken":"`+newWriteToken+`"}`)
+		`{"namespace":"content","entryId":"post-after-rotation-new-token","keyVersion":2,"encryptedMeta":"YQ==","writeToken":"`+newWriteToken+`","authorIdentityPublicKey":"`+founderPubHex+`"}`)
 	defer postRotationResp.Body.Close()
 	if postRotationResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 for the post-rotation write token, got %d", postRotationResp.StatusCode)
@@ -412,7 +412,7 @@ func TestEndToEnd_DeleteCircleTombstonesAndSweeps(t *testing.T) {
 	appendEntry := func(entryID, namespace string) *http.Response {
 		return authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/entries", authToken,
 			`{"namespace":"`+namespace+`","entryId":"`+entryID+`","keyVersion":1,"encryptedMeta":"`+
-				base64.StdEncoding.EncodeToString([]byte(namespace+" payload"))+`","writeToken":"`+writeToken+`"}`)
+				base64.StdEncoding.EncodeToString([]byte(namespace+" payload"))+`","writeToken":"`+writeToken+`","authorIdentityPublicKey":"`+founderPubHex+`"}`)
 	}
 	for _, entry := range []struct{ id, ns string }{{"member-1", "meta"}, {"post-1", "content"}, {"post-2", "content"}} {
 		resp := appendEntry(entry.id, entry.ns)

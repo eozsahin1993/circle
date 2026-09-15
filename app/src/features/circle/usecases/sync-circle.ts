@@ -270,7 +270,7 @@ async function pushPendingEntries(circleId: string): Promise<void> {
       ? await pushAuthorityChange(circleId, circle.syncId, entry, current.version, writeToken)
       : entry.entryType === EntryTypes.CIRCLE_DELETED
         ? await pushCircleDeletion(circleId, circle.syncId, entry, current.version, writeToken)
-        : await appendEntry(circle.syncId, namespace, entry.entryId, entry.encryptedMeta, current.version, writeToken);
+        : await appendEntry(circle.syncId, namespace, entry.entryId, entry.encryptedMeta, current.version, writeToken, identity.publicKey);
 
     // Notified from here rather than from each usecase: this is the one
     // place that knows an entry actually landed, and it forwards the same

@@ -55,7 +55,7 @@ func newService(t *testing.T) (*appendlog.Service, string, string) {
 func TestService_Append_SucceedsAfterBootstrapAndAssignsEpoch(t *testing.T) {
 	service, syncID, token := newService(t)
 
-	result, err := service.Append(context.Background(), syncID, logstore.NamespaceContent, "post-1", []byte("ciphertext"), 1, token)
+	result, err := service.Append(context.Background(), syncID, logstore.NamespaceContent, "post-1", []byte("ciphertext"), 1, token, "test-author-key")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,11 +68,11 @@ func TestService_Append_RetryingSameEntryIDConverges(t *testing.T) {
 	service, syncID, token := newService(t)
 	ctx := context.Background()
 
-	first, err := service.Append(ctx, syncID, logstore.NamespaceContent, "post-1", []byte("ciphertext"), 1, token)
+	first, err := service.Append(ctx, syncID, logstore.NamespaceContent, "post-1", []byte("ciphertext"), 1, token, "test-author-key")
 	if err != nil {
 		t.Fatal(err)
 	}
-	retry, err := service.Append(ctx, syncID, logstore.NamespaceContent, "post-1", []byte("ciphertext"), 1, token)
+	retry, err := service.Append(ctx, syncID, logstore.NamespaceContent, "post-1", []byte("ciphertext"), 1, token, "test-author-key")
 	if err != nil {
 		t.Fatal(err)
 	}

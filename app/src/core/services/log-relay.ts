@@ -62,7 +62,8 @@ export async function appendEntry(
   entryId: string,
   encryptedMeta: Uint8Array,
   keyVersion: number,
-  writeToken: Uint8Array
+  writeToken: Uint8Array,
+  authorIdentityPublicKey: Uint8Array
 ): Promise<AppendResult> {
   const response = await authorizedFetch(`/v1/circles/${syncId}/entries`, {
     method: 'POST',
@@ -73,6 +74,7 @@ export async function appendEntry(
       encryptedMeta: Buffer.from(encryptedMeta).toString('base64'),
       keyVersion,
       writeToken: bytesToHex(writeToken),
+      authorIdentityPublicKey: bytesToHex(authorIdentityPublicKey),
     }),
   });
   if (response.status === 429) {

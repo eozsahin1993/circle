@@ -96,16 +96,20 @@ type AppendRequest struct {
 	EncryptedMeta string `json:"encryptedMeta"`
 	KeyVersion    int64  `json:"keyVersion"`
 	WriteToken    string `json:"writeToken"`
+	// AuthorIdentityPublicKey is caller-declared and unauthenticated at
+	// this stage — see internal/api/appendlog.
+	AuthorIdentityPublicKey string `json:"authorIdentityPublicKey"`
 }
 
 // NewAppend is a valid append of one new entry to ns.
 func (c *Circle) NewAppend(ns string) AppendRequest {
 	return AppendRequest{
-		Namespace:     ns,
-		EntryID:       Suffix(),
-		EncryptedMeta: Ciphertext(),
-		KeyVersion:    1,
-		WriteToken:    c.Token.Raw,
+		Namespace:               ns,
+		EntryID:                 Suffix(),
+		EncryptedMeta:           Ciphertext(),
+		KeyVersion:              1,
+		WriteToken:              c.Token.Raw,
+		AuthorIdentityPublicKey: c.Device.identity.PublicKey(),
 	}
 }
 

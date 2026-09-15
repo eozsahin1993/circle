@@ -100,11 +100,12 @@ describe('bootstrapCircle', () => {
 });
 
 describe('appendEntry', () => {
-  test('POSTs namespace, base64-encoded encryptedMeta, keyVersion, and the hex-encoded write token', async () => {
+  test('POSTs namespace, base64-encoded encryptedMeta, keyVersion, the hex-encoded write token, and the hex-encoded author identity key', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ epoch: 3, receivedAt: 12345 }));
     const writeToken = new Uint8Array([9, 9]);
+    const authorIdentityPublicKey = new Uint8Array([7, 7]);
 
-    const result = await appendEntry('sync-a', 'content', 'post-1', new Uint8Array([1, 2, 3]), 2, writeToken);
+    const result = await appendEntry('sync-a', 'content', 'post-1', new Uint8Array([1, 2, 3]), 2, writeToken, authorIdentityPublicKey);
 
     expect(result).toEqual({ epoch: 3, receivedAt: 12345 });
     const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
@@ -117,28 +118,33 @@ describe('appendEntry', () => {
       encryptedMeta: Buffer.from([1, 2, 3]).toString('base64'),
       keyVersion: 2,
       writeToken: bytesToHex(writeToken),
+      authorIdentityPublicKey: bytesToHex(authorIdentityPublicKey),
     });
   });
 
   test('throws when the relay responds with an error status', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 500));
 
-    await expect(appendEntry('sync-a', 'content', 'post-1', new Uint8Array([1]), 1, new Uint8Array([1]))).rejects.toThrow();
+    await expect(
+      appendEntry('sync-a', 'content', 'post-1', new Uint8Array([1]), 1, new Uint8Array([1]), new Uint8Array([1]))
+    ).rejects.toThrow();
   });
 
   test('throws without calling fetch when there is no stored session', async () => {
     mockGetAuthToken.mockResolvedValue(null);
 
-    await expect(appendEntry('sync-a', 'content', 'post-1', new Uint8Array([1]), 1, new Uint8Array([1]))).rejects.toThrow('Not signed in.');
+    await expect(
+      appendEntry('sync-a', 'content', 'post-1', new Uint8Array([1]), 1, new Uint8Array([1]), new Uint8Array([1]))
+    ).rejects.toThrow('Not signed in.');
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
   test('throws RateLimitedError specifically on a 429', async () => {
     (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
 
-    await expect(appendEntry('sync-a', 'content', 'post-1', new Uint8Array([1]), 1, new Uint8Array([1]))).rejects.toBeInstanceOf(
-      RateLimitedError
-    );
+    await expect(
+      appendEntry('sync-a', 'content', 'post-1', new Uint8Array([1]), 1, new Uint8Array([1]), new Uint8Array([1]))
+    ).rejects.toBeInstanceOf(RateLimitedError);
   });
 });
 

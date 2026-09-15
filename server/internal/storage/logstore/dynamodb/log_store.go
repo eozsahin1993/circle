@@ -149,7 +149,7 @@ func (s *Store) Bootstrap(ctx context.Context, syncID, founderAuthorityPublicKey
 // atomically, then writes the entry and its idempotency marker in the
 // same transaction. See getControlState's doc comment for why this is a
 // read-then-compare-and-swap rather than one unconditional transaction.
-func (s *Store) Append(ctx context.Context, syncID string, ns logstore.Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeToken string) (logstore.CommitResult, error) {
+func (s *Store) Append(ctx context.Context, syncID string, ns logstore.Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeToken, authorIdentityPublicKey string) (logstore.CommitResult, error) {
 	if !ns.Valid() {
 		return logstore.CommitResult{}, logstore.ErrInvalidNamespace
 	}
@@ -184,7 +184,7 @@ func (s *Store) Append(ctx context.Context, syncID string, ns logstore.Namespace
 		// deletion landing between them bumps metaCounter, which a content
 		// append isn't watching, so the counter CAS alone wouldn't catch it.
 		counterAttr := counterAttrName(ns)
-		result, err := s.commit(ctx, syncID, ns, entryID, encryptedPayload, keyVersion, nextEpoch, receivedAt, types.Update{
+		result, err := s.commit(ctx, syncID, ns, entryID, encryptedPayload, keyVersion, nextEpoch, receivedAt, authorIdentityPublicKey, types.Update{
 			TableName:           aws.String(s.tableName),
 			Key:                 controlKey(syncID),
 			UpdateExpression:    aws.String(fmt.Sprintf("SET %s = :next", counterAttr)),
@@ -249,7 +249,7 @@ func (s *Store) Rotate(ctx context.Context, syncID, entryID string, encryptedPay
 		nextEpoch := current + 1
 		receivedAt := dynamoutil.NowMillis()
 
-		result, err := s.commit(ctx, syncID, logstore.NamespaceMeta, entryID, encryptedPayload, currentKeyVersion, nextEpoch, receivedAt, types.Update{
+		result, err := s.commit(ctx, syncID, logstore.NamespaceMeta, entryID, encryptedPayload, currentKeyVersion, nextEpoch, receivedAt, "", types.Update{
 			TableName:           aws.String(s.tableName),
 			Key:                 controlKey(syncID),
 			UpdateExpression:    aws.String("SET writeTokenHash = :newHash, metaCounter = :next"),
@@ -332,7 +332,7 @@ func (s *Store) ChangeAuthority(ctx context.Context, change logstore.AuthorityCh
 		nextEpoch := current + 1
 		receivedAt := dynamoutil.NowMillis()
 
-		result, err := s.commit(ctx, change.SyncID, logstore.NamespaceMeta, change.EntryID, change.EncryptedPayload, change.KeyVersion, nextEpoch, receivedAt, types.Update{
+		result, err := s.commit(ctx, change.SyncID, logstore.NamespaceMeta, change.EntryID, change.EncryptedPayload, change.KeyVersion, nextEpoch, receivedAt, "", types.Update{
 			TableName:                 aws.String(s.tableName),
 			Key:                       controlKey(change.SyncID),
 			UpdateExpression:          aws.String(setClause),
@@ -394,7 +394,7 @@ func (s *Store) DeleteCircle(ctx context.Context, deletion logstore.CircleDeleti
 		nextEpoch := current + 1
 		receivedAt := dynamoutil.NowMillis()
 
-		result, err := s.commit(ctx, deletion.SyncID, logstore.NamespaceMeta, deletion.EntryID, deletion.EncryptedPayload, deletion.KeyVersion, nextEpoch, receivedAt, types.Update{
+		result, err := s.commit(ctx, deletion.SyncID, logstore.NamespaceMeta, deletion.EntryID, deletion.EncryptedPayload, deletion.KeyVersion, nextEpoch, receivedAt, "", types.Update{
 			TableName:           aws.String(s.tableName),
 			Key:                 controlKey(deletion.SyncID),
 			UpdateExpression:    aws.String("SET metaCounter = :next, deletedAt = :deletedAt"),
@@ -556,27 +556,37 @@ func (s *Store) batchDelete(ctx context.Context, requests []types.WriteRequest) 
 	return nil
 }
 
-// commit runs the three-item transaction shared by Append, Rotate and
-// ChangeAuthority: the caller-supplied conditional update to #control (a
-// counter bump, plus whichever discretionary field the caller is
-// changing), the entry Put, and the idempotency marker Put. Returns the
-// raw TransactWriteItems error unexamined — callers use convergeOnRace to
-// interpret it.
-func (s *Store) commit(ctx context.Context, syncID string, ns logstore.Namespace, entryID string, encryptedPayload []byte, keyVersion, epoch, receivedAt int64, controlUpdate types.Update) (logstore.CommitResult, error) {
+// commit runs the three-item transaction shared by Append, Rotate,
+// ChangeAuthority and DeleteCircle: the caller-supplied conditional update
+// to #control (a counter bump, plus whichever discretionary field the
+// caller is changing), the entry Put, and the idempotency marker Put.
+// Returns the raw TransactWriteItems error unexamined — callers use
+// convergeOnRace to interpret it.
+//
+// authorIdentityPublicKey is omitted from the entry item entirely when
+// empty (Rotate/ChangeAuthority/DeleteCircle always pass "") rather than
+// stored as an empty string — same convention as the S3 blob store's
+// uploader-metadata field.
+func (s *Store) commit(ctx context.Context, syncID string, ns logstore.Namespace, entryID string, encryptedPayload []byte, keyVersion, epoch, receivedAt int64, authorIdentityPublicKey string, controlUpdate types.Update) (logstore.CommitResult, error) {
+	entryItem := map[string]types.AttributeValue{
+		dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: syncID},
+		dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: entrySK(ns, epoch)},
+		"epoch":           &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
+		"keyVersion":      &types.AttributeValueMemberN{Value: strconv.FormatInt(keyVersion, 10)},
+		"encryptedMeta":   &types.AttributeValueMemberB{Value: encryptedPayload},
+		"receivedAt":      &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
+	}
+	if authorIdentityPublicKey != "" {
+		entryItem["authorIdentityPublicKey"] = &types.AttributeValueMemberS{Value: authorIdentityPublicKey}
+	}
+
 	_, err := s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
 		TransactItems: []types.TransactWriteItem{
 			{Update: &controlUpdate},
 			{
 				Put: &types.Put{
 					TableName: aws.String(s.tableName),
-					Item: map[string]types.AttributeValue{
-						dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: syncID},
-						dynamoutil.SKAttr: &types.AttributeValueMemberS{Value: entrySK(ns, epoch)},
-						"epoch":           &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
-						"keyVersion":      &types.AttributeValueMemberN{Value: strconv.FormatInt(keyVersion, 10)},
-						"encryptedMeta":   &types.AttributeValueMemberB{Value: encryptedPayload},
-						"receivedAt":      &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
-					},
+					Item:      entryItem,
 				},
 			},
 			{
@@ -856,7 +866,18 @@ func (s *Store) Read(ctx context.Context, syncID string, ns logstore.Namespace, 
 			if !ok {
 				return logstore.FetchResult{}, fmt.Errorf("entry at epoch %d missing encryptedMeta", epoch)
 			}
-			entries = append(entries, logstore.LogEntry{Epoch: epoch, KeyVersion: keyVersion, EncryptedMeta: blobAttr.Value, ReceivedAt: receivedAt})
+			// Absent on rows written by Rotate/ChangeAuthority/DeleteCircle,
+			// and on any row from before this field existed — AttrString
+			// returns "" for both, same as commit's own omit-when-empty
+			// write side.
+			authorIdentityPublicKey, _ := dynamoutil.AttrString(item, "authorIdentityPublicKey")
+			entries = append(entries, logstore.LogEntry{
+				Epoch:                   epoch,
+				KeyVersion:              keyVersion,
+				EncryptedMeta:           blobAttr.Value,
+				ReceivedAt:              receivedAt,
+				AuthorIdentityPublicKey: authorIdentityPublicKey,
+			})
 		}
 
 		if queryOut.LastEvaluatedKey == nil {

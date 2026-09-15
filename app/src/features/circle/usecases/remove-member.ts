@@ -84,7 +84,7 @@ export async function removeMember(circleId: string, identityPublicKey: string):
   // `currentWriteToken` dies the moment it lands and the two calls have
   // to be one sequence, not two entries a drain pushes minutes apart.
   // leave-circle.ts queues the same entry type because it doesn't rotate.
-  await appendEntry(circle.syncId, 'meta', generateUUID(), removedEntry, current.version, currentWriteToken);
+  await appendEntry(circle.syncId, 'meta', generateUUID(), removedEntry, current.version, currentWriteToken, identity.publicKey);
   await rotateLog(circle.syncId, rotationEntryId, rotationEntry, current.version, currentWriteToken, newWriteTokenHash, authorityKeypair.publicKey, signature);
 
   await recordMemberRemovedLocally({ circleId, subjectPublicKey: identityPublicKey, removedAt });

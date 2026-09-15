@@ -42,7 +42,7 @@ export async function setCoverPhoto(circleId: string, photo: Uint8Array): Promis
   await uploadBlob(target, encrypt(photo, current.key));
 
   const entry = buildAndEncryptLogEntry(EntryTypes.COVER_PHOTO_SET, { photoHash: hashBytes(photo), keyVersion: current.version }, identity, current.key);
-  await appendEntry(circle.syncId, 'meta', generateUUID(), entry, current.version, writeToken);
+  await appendEntry(circle.syncId, 'meta', generateUUID(), entry, current.version, writeToken, identity.publicKey);
 
   await updateCirclePicture(circleId, photo);
   writeCoverFile(circleId, photo);
