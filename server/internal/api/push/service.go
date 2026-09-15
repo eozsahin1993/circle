@@ -10,8 +10,8 @@ import (
 	"crypto/hmac"
 	"errors"
 
+	"circle-relay/internal/ratelimit"
 	"circle-relay/internal/storage/pushstore"
-	"circle-relay/internal/storage/ratelimitstore"
 )
 
 // MaxFanoutTargets caps one send. A circle's membership is bounded, so a
@@ -23,7 +23,7 @@ type Service struct {
 	// Keyed on the routing id. The only limit here protecting a person
 	// rather than the relay: verification stops an outsider, but a real
 	// member passes it every time and nothing else bounds them.
-	RecipientLimit ratelimitstore.Store
+	RecipientLimit ratelimit.Store
 }
 
 // ErrTooManyTargets is returned when a send exceeds MaxFanoutTargets.

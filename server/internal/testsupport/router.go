@@ -11,7 +11,7 @@ import (
 
 // testRateLimitMaxRequests is deliberately huge — end-to-end router tests
 // exercise real request flows, not the rate limiter itself (that's
-// ratelimitstore/dynamodb's own tests), so it should never trip here.
+// ratelimit/dynamodb's own tests), so it should never trip here.
 const testRateLimitMaxRequests = 1_000_000
 
 // NewRouterWithAuth builds the full api.NewRouter against real

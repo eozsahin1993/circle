@@ -32,6 +32,8 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"circle-relay/internal/localstack"
+	"circle-relay/internal/ratelimit"
+	ratelimitdynamodb "circle-relay/internal/ratelimit/dynamodb"
 	"circle-relay/internal/storage/authstore"
 	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
 	"circle-relay/internal/storage/blobstore"
@@ -44,8 +46,6 @@ import (
 	manifestdynamodb "circle-relay/internal/storage/manifeststore/dynamodb"
 	"circle-relay/internal/storage/pushstore"
 	pushdynamodb "circle-relay/internal/storage/pushstore/dynamodb"
-	"circle-relay/internal/storage/ratelimitstore"
-	ratelimitdynamodb "circle-relay/internal/storage/ratelimitstore/dynamodb"
 )
 
 // Resource names and schemas come from internal/localstack, which
@@ -315,12 +315,12 @@ func NewPushStore(t testing.TB) pushstore.Store {
 	return pushdynamodb.New(client, pushTableName)
 }
 
-// NewRateLimitStore returns a real dynamodb-backed ratelimitstore.Store
+// NewRateLimitStore returns a real dynamodb-backed ratelimit.Store
 // against LocalStack, creating the rate-limit table once per test binary
 // run (see server/provision/rate_limit_table.tf). Unlike the other New*
 // helpers, callers pick their own keyPrefix/maxRequests/window per test —
 // a Store instance is scoped to one particular budget.
-func NewRateLimitStore(t testing.TB, keyPrefix string, maxRequests int, window time.Duration) ratelimitstore.Store {
+func NewRateLimitStore(t testing.TB, keyPrefix string, maxRequests int, window time.Duration) ratelimit.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())

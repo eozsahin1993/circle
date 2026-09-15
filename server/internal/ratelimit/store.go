@@ -1,8 +1,9 @@
-// Package ratelimitstore defines the interface domain logic depends on for
-// per-account request budgets — implementations live in subpackages, one
-// per backing technology (see ratelimitstore/dynamodb). Nothing storage- or
-// runtime-specific is allowed to leak past this package.
-package ratelimitstore
+// Package ratelimit gates HTTP handlers behind a per-account request
+// budget. Store is the interface domain logic depends on; implementations
+// live in subpackages, one per backing technology (see ratelimit/dynamodb).
+// Nothing storage- or runtime-specific is allowed to leak past this
+// package. See middleware.go for the HTTP-facing half.
+package ratelimit
 
 import "context"
 
@@ -15,7 +16,6 @@ import "context"
 type Store interface {
 	// Allow atomically consumes one unit of key's budget for the current
 	// window and reports whether the request may proceed. key is
-	// caller-defined — server/internal/api/ratelimit's middleware passes
-	// the authenticated accountID.
+	// caller-defined — Require passes the authenticated accountID.
 	Allow(ctx context.Context, key string) (bool, error)
 }

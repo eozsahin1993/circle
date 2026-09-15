@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"circle-relay/internal/api/auth"
-	"circle-relay/internal/api/ratelimit"
+	"circle-relay/internal/ratelimit"
 	"circle-relay/internal/storage/authstore"
 	"circle-relay/internal/testsupport"
 )
 
-// fakeStore is a canned ratelimitstore.Store — the real dynamodb adapter's
-// own CAS behavior is covered by ratelimitstore/dynamodb's own tests; this
+// fakeStore is a canned Store — the real dynamodb adapter's
+// own CAS behavior is covered by ratelimit/dynamodb's own tests; this
 // test only cares how the middleware reacts to Allow's outcome.
 type fakeStore struct {
 	allowed bool

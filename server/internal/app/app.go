@@ -20,13 +20,13 @@ import (
 	"circle-relay/internal/push/apns"
 	"circle-relay/internal/push/fcm"
 
+	ratelimitdynamodb "circle-relay/internal/ratelimit/dynamodb"
 	authdynamodb "circle-relay/internal/storage/authstore/dynamodb"
 	blobs3 "circle-relay/internal/storage/blobstore/s3"
 	invitedynamodb "circle-relay/internal/storage/invitestore/dynamodb"
 	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
 	manifestdynamodb "circle-relay/internal/storage/manifeststore/dynamodb"
 	pushdynamodb "circle-relay/internal/storage/pushstore/dynamodb"
-	ratelimitdynamodb "circle-relay/internal/storage/ratelimitstore/dynamodb"
 )
 
 const (

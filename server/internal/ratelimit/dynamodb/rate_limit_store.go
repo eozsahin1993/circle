@@ -1,4 +1,4 @@
-// Package dynamodb implements ratelimitstore.Store against a single
+// Package dynamodb implements ratelimit.Store against a single
 // "rate_limit" table shared by every configured Store instance (see
 // server/provision/rate_limit_table.tf) — one item per (keyPrefix, key)
 // pair, distinguished by prefixing the partition key rather than by a
@@ -18,7 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"circle-relay/internal/dynamoutil"
-	"circle-relay/internal/storage/ratelimitstore"
+	"circle-relay/internal/ratelimit"
 )
 
 // nearLimitWarningThreshold is the fraction of a key's budget at which
@@ -41,10 +41,10 @@ func New(client *dynamodb.Client, tableName, keyPrefix string, maxRequests int, 
 	return &Store{client: client, tableName: tableName, keyPrefix: keyPrefix, maxRequests: maxRequests, window: window}
 }
 
-var _ ratelimitstore.Store = (*Store)(nil)
+var _ ratelimit.Store = (*Store)(nil)
 
 // Allow is a two-attempt conditional UpdateItem, no preceding read (see
-// ratelimitstore.Store's doc comment for why one Store is only ever one
+// ratelimit.Store's doc comment for why one Store is only ever one
 // budget). Attempt 1 is the common case — increment within an active
 // window. If it fails, the failure is ambiguous (expired window, or over
 // budget); attempt 2 disambiguates by trying to reset instead, which only

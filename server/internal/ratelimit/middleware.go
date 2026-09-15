@@ -1,5 +1,3 @@
-// Package ratelimit gates handlers behind a per-account request budget.
-// See server/internal/storage/ratelimitstore for the storage side.
 package ratelimit
 
 import (
@@ -8,7 +6,6 @@ import (
 
 	"circle-relay/internal/api/auth"
 	"circle-relay/internal/httputil"
-	"circle-relay/internal/storage/ratelimitstore"
 )
 
 // Require gates next behind store's budget for the request's authenticated
@@ -19,7 +16,7 @@ import (
 // Fails open (allows the request, logs the error) if the store itself
 // errors — a rate-limit store outage shouldn't turn into a write outage
 // for every account.
-func Require(store ratelimitstore.Store, next http.Handler) http.Handler {
+func Require(store Store, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		accountID := auth.AccountID(r.Context())
 

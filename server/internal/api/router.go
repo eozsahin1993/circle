@@ -29,30 +29,29 @@ import (
 	"circle-relay/internal/api/getuploadtarget"
 	"circle-relay/internal/api/invite"
 	"circle-relay/internal/api/push"
-	"circle-relay/internal/api/ratelimit"
 	"circle-relay/internal/api/rotatelog"
+	"circle-relay/internal/ratelimit"
 	"circle-relay/internal/storage/authstore"
 	"circle-relay/internal/storage/blobstore"
 	"circle-relay/internal/storage/invitestore"
 	"circle-relay/internal/storage/logstore"
 	"circle-relay/internal/storage/manifeststore"
 	"circle-relay/internal/storage/pushstore"
-	"circle-relay/internal/storage/ratelimitstore"
 )
 
 // PushDeps groups the push slice's dependencies. A struct because
-// NewRouter already takes two ratelimitstore.Store values, and a third
+// NewRouter already takes two ratelimit.Store values, and a third
 // positional one would be easy to pass in the wrong order silently.
 type PushDeps struct {
 	Store          pushstore.Store
-	RecipientLimit ratelimitstore.Store
+	RecipientLimit ratelimit.Store
 	// Nil until the platform credentials exist: fanout still resolves and
 	// reports, it just drops the deliveries.
 	Dispatch func(push.Delivery, int64, []byte)
 }
 
 // Deps is everything the router wires into its endpoints, named rather
-// than positional — four fields share two types (two ratelimitstore.Store,
+// than positional — four fields share two types (two ratelimit.Store,
 // two *oidcverify.Verifier), so a positional list let a read budget stand
 // in for a write one with nothing to catch it. PushDeps was already a
 // struct for the same reason; this finishes the job.
@@ -62,9 +61,9 @@ type Deps struct {
 	Auth     authstore.Store
 	Manifest manifeststore.Store
 	Invite   invitestore.Store
-	// Writes and reads carry different budgets — see internal/api/ratelimit.
-	WriteLimit ratelimitstore.Store
-	ReadLimit  ratelimitstore.Store
+	// Writes and reads carry different budgets — see internal/ratelimit.
+	WriteLimit ratelimit.Store
+	ReadLimit  ratelimit.Store
 	Google     *oidcverify.Verifier
 	Apple      *oidcverify.Verifier
 	Push       PushDeps
@@ -87,7 +86,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	// each endpoint also checks its own write token/authority signature
 	// beyond this shared session check. Rate limiting wraps each handler
 	// individually instead of circleMux as a whole, since writes and reads
-	// carry different budgets (see internal/api/ratelimit).
+	// carry different budgets (see internal/ratelimit).
 	writeLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.WriteLimit, h) }
 	readLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.ReadLimit, h) }
 
