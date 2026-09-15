@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	"circle-relay/internal/storage/logstore"
+	"circle-relay/internal/synclog"
 	"circle-relay/internal/testsupport"
 )
 
@@ -160,7 +160,7 @@ func TestEndToEnd_BootstrapAppendFetchRotateAndDownload(t *testing.T) {
 	// 4. Rotate: swap the write token, signed by the founder's authority key.
 	newWriteToken := randomHex(t, 32)
 	newWriteTokenHash := hashToken(newWriteToken)
-	sig := ed25519.Sign(founderPriv, logstore.RotateMessage(syncID, "rotate-1", newWriteTokenHash))
+	sig := ed25519.Sign(founderPriv, synclog.RotateMessage(syncID, "rotate-1", newWriteTokenHash))
 	rotateBody := `{"entryId":"rotate-1","currentKeyVersion":1,"encryptedMeta":"` + base64.StdEncoding.EncodeToString([]byte("key_rotation payload")) +
 		`","currentWriteToken":"` + writeToken + `","newWriteTokenHash":"` + newWriteTokenHash +
 		`","authorityPublicKey":"` + founderPubHex + `","signature":"` + hex.EncodeToString(sig) + `"}`
@@ -189,10 +189,10 @@ func TestEndToEnd_BootstrapAppendFetchRotateAndDownload(t *testing.T) {
 	// 5. Cover-photo upload target — dual-gated by the (post-rotation,
 	// still current) write token *and* an authority signature, since the
 	// object it points at has no per-upload existence check to fall back
-	// on (see blobstore.Store.GetCoverPhotoUploadTarget). POST with every
+	// on (see synclog.BlobStore.GetCoverPhotoUploadTarget). POST with every
 	// credential in the body, not a query param — see
 	// getcoverphotouploadtarget/handler.go's doc comment for why.
-	coverSig := ed25519.Sign(founderPriv, logstore.CoverPhotoUploadMessage(syncID))
+	coverSig := ed25519.Sign(founderPriv, synclog.CoverPhotoUploadMessage(syncID))
 	coverBody := `{"writeToken":"` + newWriteToken + `","authorityPublicKey":"` + founderPubHex + `","signature":"` + hex.EncodeToString(coverSig) + `"}`
 	coverResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/cover-photo/upload", authToken, coverBody)
 	defer coverResp.Body.Close()
@@ -214,7 +214,7 @@ func TestEndToEnd_BootstrapAppendFetchRotateAndDownload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	strangerSig := ed25519.Sign(strangerPriv, logstore.CoverPhotoUploadMessage(syncID))
+	strangerSig := ed25519.Sign(strangerPriv, synclog.CoverPhotoUploadMessage(syncID))
 	strangerBody := `{"writeToken":"` + newWriteToken + `","authorityPublicKey":"` + hex.EncodeToString(strangerPub) + `","signature":"` + hex.EncodeToString(strangerSig) + `"}`
 	strangerResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/cover-photo/upload", authToken, strangerBody)
 	defer strangerResp.Body.Close()
@@ -293,10 +293,10 @@ func TestEndToEnd_PromoteAdminThenHandOverGovernance(t *testing.T) {
 	}
 
 	authorityBody := func(entryID, action, target, signer string, priv ed25519.PrivateKey, token string) string {
-		change := logstore.AuthorityChange{
+		change := synclog.AuthorityChange{
 			SyncID:                   syncID,
 			EntryID:                  entryID,
-			Action:                   logstore.AuthorityAction(action),
+			Action:                   synclog.AuthorityAction(action),
 			TargetAuthorityPublicKey: target,
 		}
 		sig := ed25519.Sign(priv, change.Message())
@@ -327,7 +327,7 @@ func TestEndToEnd_PromoteAdminThenHandOverGovernance(t *testing.T) {
 	// The promoted admin's authority is real: they can rotate.
 	newWriteToken := randomHex(t, 32)
 	newWriteTokenHash := hashToken(newWriteToken)
-	rotateSig := ed25519.Sign(promotedPriv, logstore.RotateMessage(syncID, "rotate-1", newWriteTokenHash))
+	rotateSig := ed25519.Sign(promotedPriv, synclog.RotateMessage(syncID, "rotate-1", newWriteTokenHash))
 	rotateResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/rotate", authToken,
 		`{"entryId":"rotate-1","currentKeyVersion":1,"encryptedMeta":"`+base64.StdEncoding.EncodeToString([]byte("key_rotation payload"))+
 			`","currentWriteToken":"`+writeToken+`","newWriteTokenHash":"`+newWriteTokenHash+
@@ -346,7 +346,7 @@ func TestEndToEnd_PromoteAdminThenHandOverGovernance(t *testing.T) {
 
 	// The founder is now an ordinary member as far as the relay cares.
 	strandedHash := hashToken(randomHex(t, 32))
-	strandedSig := ed25519.Sign(founderPriv, logstore.RotateMessage(syncID, "rotate-2", strandedHash))
+	strandedSig := ed25519.Sign(founderPriv, synclog.RotateMessage(syncID, "rotate-2", strandedHash))
 	strandedResp := authedRequest(t, http.MethodPost, server.URL+"/v1/circles/"+syncID+"/rotate", authToken,
 		`{"entryId":"rotate-2","currentKeyVersion":2,"encryptedMeta":"`+base64.StdEncoding.EncodeToString([]byte("x"))+
 			`","currentWriteToken":"`+newWriteToken+`","newWriteTokenHash":"`+strandedHash+
@@ -423,7 +423,7 @@ func TestEndToEnd_DeleteCircleTombstonesAndSweeps(t *testing.T) {
 	}
 
 	deleteBody := func(entryID, signer string, priv ed25519.PrivateKey) string {
-		deletion := logstore.CircleDeletion{SyncID: syncID, EntryID: entryID}
+		deletion := synclog.CircleDeletion{SyncID: syncID, EntryID: entryID}
 		sig := ed25519.Sign(priv, deletion.Message())
 		return `{"entryId":"` + entryID + `","keyVersion":1,"encryptedMeta":"` +
 			base64.StdEncoding.EncodeToString([]byte("circle_deleted payload")) +

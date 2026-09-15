@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"circle-relay/integration/harness"
-	"circle-relay/internal/storage/logstore"
+	"circle-relay/internal/synclog"
 )
 
 // getuploadtarget, getblob, deleteblob and getcoverphotouploadtarget, end
@@ -18,7 +18,7 @@ import (
 // off the relay's own compute and bandwidth, and the presigned URL is
 // still gated behind the same write-token check that mints it), then read
 // back through the relay's own redirect and deleted through it.
-// internal/storage/blobstore/s3's own tests already prove the store's
+// internal/synclog/s3's own tests already prove the store's
 // behaviour in isolation; what's missing there is the session,
 // write-token and authority-signature gates in front of it, which only
 // exist in the API layer these tests drive.
@@ -86,7 +86,7 @@ func TestBlobRoundTrip_UploadThenDownloadReturnsTheSameBytes(t *testing.T) {
 	payload := []byte("a real photo's ciphertext, or close enough")
 
 	// Nothing uploaded yet. GetDownloadURL always signs successfully — it's
-	// pure local signing, never checks existence (see blobstore.Store's doc
+	// pure local signing, never checks existence (see synclog.BlobStore's doc
 	// comment) — so this 404 comes from S3 itself once the relay's redirect
 	// is followed, not from the relay refusing outright.
 	c.GetBlob(entryID).Expect(http.StatusNotFound)
@@ -104,7 +104,7 @@ func TestBlobRoundTrip_ASecondUploadTargetForTheSameEntryIsRefused(t *testing.T)
 
 	putBlob(t, c, entryID, []byte("first"))
 
-	// First-upload-wins (see blobstore.Store.GetUploadTarget): once
+	// First-upload-wins (see synclog.BlobStore.GetUploadTarget): once
 	// something has actually landed, a second target for the same entry
 	// would let any current member overwrite another's upload.
 	c.GetUploadTarget(entryID, c.NewUpload()).Expect(http.StatusConflict)
@@ -178,7 +178,7 @@ func TestDeleteBlob_KnowingTheUploaderPublicKeyDoesNotLetAnotherMemberForgeTheSi
 	// A different member, with their own genuine identity key, can see
 	// exactly which public key to target but has no way to sign for it.
 	impostor := harness.NewAuthority(t)
-	forgedSignature := impostor.Sign(logstore.DeleteBlobMessage(c.SyncID, entryID))
+	forgedSignature := impostor.Sign(synclog.DeleteBlobMessage(c.SyncID, entryID))
 	c.DeleteBlob(entryID, harness.DeleteBlobRequest{
 		WriteToken:        c.Token.Raw,
 		UploaderSignature: forgedSignature,
@@ -279,7 +279,7 @@ func TestDeleteCircle_SweepsItsBlobsToo(t *testing.T) {
 	c.DeleteCircle(c.NewDelete(c.Admin)).Expect(http.StatusOK)
 
 	// The tombstone entry stays — meta survives a deletion (see
-	// logstore.Store.DeleteCircle) — but the ciphertext behind this blob
+	// synclog.LogStore.DeleteCircle) — but the ciphertext behind this blob
 	// must not. This is deletecircle's own call into BlobStore.DeleteCircle,
 	// exercised here through the real HTTP surface rather than the store
 	// directly (blob_store_test.go already covers the store's sweep itself

@@ -126,7 +126,7 @@ func TestService_PutRequest_DuplicateSubmissionDoesNotError(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A retry of the same requesterID must converge, not error — same
-	// idempotent-retry contract as logstore.Store.CommitEntry.
+	// idempotent-retry contract as synclog.LogStore.Append's entryID.
 	if err := svc.PutRequest(ctx, inviteTag, requesterID, []byte("first-submission")); err != nil {
 		t.Fatalf("expected duplicate PutRequest to succeed idempotently, got %v", err)
 	}

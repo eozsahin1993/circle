@@ -25,8 +25,8 @@ import (
 	invitedynamodb "circle-relay/internal/invite/dynamodb"
 	pushdynamodb "circle-relay/internal/push/dynamodb"
 	ratelimitdynamodb "circle-relay/internal/ratelimit/dynamodb"
-	blobs3 "circle-relay/internal/storage/blobstore/s3"
-	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
+	logdynamodb "circle-relay/internal/synclog/dynamodb"
+	blobs3 "circle-relay/internal/synclog/s3"
 )
 
 const (

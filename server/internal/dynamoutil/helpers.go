@@ -1,9 +1,9 @@
 // Package dynamoutil holds the handful of DynamoDB-attribute helpers shared
-// by every DynamoDB-backed store (storage/logstore/dynamodb,
-// auth/dynamodb) — split out so those two stay independent packages
-// (different domains, genuinely separable) without duplicating this
-// plumbing. Same category as internal/httputil: shared technology-
-// specific plumbing, not a domain of its own.
+// by every DynamoDB-backed store (synclog/dynamodb, auth/dynamodb) — split
+// out so those two stay independent packages (different domains, genuinely
+// separable) without duplicating this plumbing. Same category as
+// internal/httputil: shared technology-specific plumbing, not a domain of
+// its own.
 package dynamoutil
 
 import (

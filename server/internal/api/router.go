@@ -11,19 +11,6 @@ import (
 	"circle-relay/internal/account"
 	"circle-relay/internal/account/http/deleteaccount"
 	"circle-relay/internal/account/http/manifest"
-	"circle-relay/internal/api/appendlog"
-	"circle-relay/internal/api/changeauthority"
-	"circle-relay/internal/api/createlog"
-	"circle-relay/internal/api/deleteauthorcontent"
-	"circle-relay/internal/api/deleteblob"
-	"circle-relay/internal/api/deletecircle"
-	"circle-relay/internal/api/deleteentry"
-	"circle-relay/internal/api/getblob"
-	"circle-relay/internal/api/getcoverphotouploadtarget"
-	"circle-relay/internal/api/getepochs"
-	"circle-relay/internal/api/getlog"
-	"circle-relay/internal/api/getuploadtarget"
-	"circle-relay/internal/api/rotatelog"
 	"circle-relay/internal/auth"
 	"circle-relay/internal/auth/http/apple"
 	"circle-relay/internal/auth/http/google"
@@ -34,8 +21,20 @@ import (
 	"circle-relay/internal/push"
 	pushhttp "circle-relay/internal/push/http"
 	"circle-relay/internal/ratelimit"
-	"circle-relay/internal/storage/blobstore"
-	"circle-relay/internal/storage/logstore"
+	"circle-relay/internal/synclog"
+	"circle-relay/internal/synclog/http/appendlog"
+	"circle-relay/internal/synclog/http/changeauthority"
+	"circle-relay/internal/synclog/http/createlog"
+	"circle-relay/internal/synclog/http/deleteauthorcontent"
+	"circle-relay/internal/synclog/http/deleteblob"
+	"circle-relay/internal/synclog/http/deletecircle"
+	"circle-relay/internal/synclog/http/deleteentry"
+	"circle-relay/internal/synclog/http/getblob"
+	"circle-relay/internal/synclog/http/getcoverphotouploadtarget"
+	"circle-relay/internal/synclog/http/getepochs"
+	"circle-relay/internal/synclog/http/getlog"
+	"circle-relay/internal/synclog/http/getuploadtarget"
+	"circle-relay/internal/synclog/http/rotatelog"
 )
 
 // PushDeps groups the push slice's dependencies. A struct because
@@ -55,8 +54,8 @@ type PushDeps struct {
 // in for a write one with nothing to catch it. PushDeps was already a
 // struct for the same reason; this finishes the job.
 type Deps struct {
-	Log      logstore.Store
-	Blob     blobstore.Store
+	Log      synclog.LogStore
+	Blob     synclog.BlobStore
 	Auth     auth.Store
 	Manifest account.Store
 	Invite   invitestore.Store

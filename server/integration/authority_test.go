@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"circle-relay/integration/harness"
-	"circle-relay/internal/storage/logstore"
+	"circle-relay/internal/synclog"
 )
 
 // rotatelog, changeauthority and deletecircle, end to end — the three
@@ -88,7 +88,7 @@ func TestARotationSignatureOnlyAuthorizesThatRotation(t *testing.T) {
 	c := harness.NewCircle(t, r)
 
 	// The signature covers the circle, the entry and the new token hash
-	// together (logstore.RotateMessage). Move any one of them after
+	// together (synclog.RotateMessage). Move any one of them after
 	// NewRotate has signed and what's left is an admin's real signature
 	// over a *different* rotation — which must be worth nothing here, or
 	// one captured rotation could be replayed to install a token of the
@@ -101,7 +101,7 @@ func TestARotationSignatureOnlyAuthorizesThatRotation(t *testing.T) {
 			req.EntryID = harness.Suffix()
 		},
 		"another circle": func(req *harness.RotateRequest) {
-			req.Signature = c.Admin.Sign(logstore.RotateMessage(harness.Suffix(), req.EntryID, req.NewWriteTokenHash))
+			req.Signature = c.Admin.Sign(synclog.RotateMessage(harness.Suffix(), req.EntryID, req.NewWriteTokenHash))
 		},
 	}
 

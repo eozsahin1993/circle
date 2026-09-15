@@ -42,10 +42,9 @@ import (
 	pushdynamodb "circle-relay/internal/push/dynamodb"
 	"circle-relay/internal/ratelimit"
 	ratelimitdynamodb "circle-relay/internal/ratelimit/dynamodb"
-	"circle-relay/internal/storage/blobstore"
-	blobs3 "circle-relay/internal/storage/blobstore/s3"
-	"circle-relay/internal/storage/logstore"
-	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
+	"circle-relay/internal/synclog"
+	logdynamodb "circle-relay/internal/synclog/dynamodb"
+	blobs3 "circle-relay/internal/synclog/s3"
 )
 
 // Resource names and schemas come from internal/localstack, which
@@ -149,7 +148,7 @@ func loadConfig(t testing.TB) aws.Config {
 // creating the test table once per test binary run (shared across tests —
 // safe because tests use distinct syncID values). Skips the test if
 // LocalStack isn't reachable.
-func NewLogStore(t testing.TB) logstore.Store {
+func NewLogStore(t testing.TB) synclog.LogStore {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())
@@ -194,7 +193,7 @@ func RawDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 
 // NewBlobStore returns a real s3-backed BlobStore against LocalStack,
 // creating the test bucket once per test binary run.
-func NewBlobStore(t testing.TB) blobstore.Store {
+func NewBlobStore(t testing.TB) synclog.BlobStore {
 	t.Helper()
 	client := awss3.NewFromConfig(loadConfig(t), func(o *awss3.Options) {
 		o.BaseEndpoint = aws.String(localstack.Endpoint())
@@ -343,7 +342,7 @@ func NewRateLimitStore(t testing.TB, keyPrefix string, maxRequests int, window t
 // Lives here rather than in one package's _test.go because two packages
 // now need a blob that genuinely exists — one to read back the uploader
 // recorded on it, one to delete it.
-func UploadBlob(t testing.TB, target blobstore.UploadTarget, payload []byte) {
+func UploadBlob(t testing.TB, target synclog.UploadTarget, payload []byte) {
 	t.Helper()
 
 	var body bytes.Buffer

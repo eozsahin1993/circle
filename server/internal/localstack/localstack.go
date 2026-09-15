@@ -21,7 +21,7 @@ import (
 
 	authdynamodb "circle-relay/internal/auth/dynamodb"
 	"circle-relay/internal/config"
-	logdynamodb "circle-relay/internal/storage/logstore/dynamodb"
+	logdynamodb "circle-relay/internal/synclog/dynamodb"
 )
 
 // DefaultEndpoint is where LocalStack listens locally and in CI.
