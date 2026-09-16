@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"circle-relay/internal/httputil"
 	"circle-relay/internal/synclog/http/circleerrors"
+	"circle-relay/internal/util/httputil"
 )
 
 // request carries every credential in the body, not query params — see

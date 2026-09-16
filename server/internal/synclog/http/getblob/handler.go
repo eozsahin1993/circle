@@ -3,7 +3,7 @@ package getblob
 import (
 	"net/http"
 
-	"circle-relay/internal/httputil"
+	"circle-relay/internal/util/httputil"
 )
 
 type Handler struct {

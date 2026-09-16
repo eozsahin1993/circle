@@ -27,8 +27,8 @@ backing technology (`dynamodb/`, `s3/`):
 `internal/api/` holds only `router.go` (the composition root — the one
 place that imports every column and wires stores into services) and its
 test suite. `internal/app/app.go` builds the real AWS-backed adapters.
-`internal/httputil`, `internal/dynamoutil`, `internal/config`,
-`internal/localstack`, and `internal/testsupport` are cross-cutting
+`internal/util/httputil`, `internal/util/dynamoutil`, `internal/config`,
+`internal/util/localstack`, and `internal/util/testsupport` are cross-cutting
 plumbing shared by every column, not owned by any one of them — don't
 move them into a column, and don't add a new cross-cutting package
 without a real reason more than one column needs it.
@@ -51,7 +51,7 @@ go test -race ./integration/...                                            # int
 ```
 
 Both need LocalStack (DynamoDB + S3) reachable at `localhost:4566` — see
-`internal/localstack` and `internal/testsupport`. Without it, tests skip
+`internal/util/localstack` and `internal/util/testsupport`. Without it, tests skip
 rather than fail; set `REQUIRE_LOCALSTACK=1` (what CI does) to make a
 missing LocalStack a hard failure instead of a silent green run.
 

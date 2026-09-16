@@ -19,7 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"circle-relay/internal/auth"
-	"circle-relay/internal/dynamoutil"
+	"circle-relay/internal/util/dynamoutil"
 )
 
 type Store struct {
@@ -86,7 +86,7 @@ func (s *Store) DeleteSession(ctx context.Context, token string) error {
 
 // AccountIDIndexName is the GSI DeleteAllSessions queries to find every
 // session for an account — see provision/sessions_table.tf. Exported so
-// internal/localstack can create it under the same name in tests.
+// internal/util/localstack can create it under the same name in tests.
 const AccountIDIndexName = "accountId-index"
 
 // deleteAllSessionsPasses: the GSI is only eventually consistent, so a

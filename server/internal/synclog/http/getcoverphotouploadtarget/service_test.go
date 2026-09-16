@@ -10,7 +10,7 @@ import (
 
 	"circle-relay/internal/synclog"
 	"circle-relay/internal/synclog/http/getcoverphotouploadtarget"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 func newToken(t *testing.T) string {

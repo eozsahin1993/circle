@@ -17,7 +17,7 @@ import (
 	"testing"
 
 	"circle-relay/internal/synclog"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 // authedRequest sets the bearer token circle content routes require —

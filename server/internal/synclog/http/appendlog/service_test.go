@@ -8,7 +8,7 @@ import (
 
 	"circle-relay/internal/synclog"
 	"circle-relay/internal/synclog/http/appendlog"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 // newToken returns a fresh, random hex-encoded string standing in for a

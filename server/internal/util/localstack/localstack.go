@@ -1,5 +1,5 @@
 // Package localstack names the AWS resources a local LocalStack instance
-// holds, and creates them — shared by internal/testsupport and
+// holds, and creates them — shared by internal/util/testsupport and
 // cmd/testrelay so neither can drift onto a table shape the other isn't
 // actually using.
 package localstack
@@ -67,7 +67,7 @@ type Names struct {
 	BlobBucket     string
 }
 
-// Shared is the fixed set. internal/testsupport uses it for the whole Go
+// Shared is the fixed set. internal/util/testsupport uses it for the whole Go
 // suite at once, which is safe because those tests pick distinct syncIDs
 // and every table is partitioned by one.
 func Shared() Names {

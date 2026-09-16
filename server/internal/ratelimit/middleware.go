@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"circle-relay/internal/auth"
-	"circle-relay/internal/httputil"
+	"circle-relay/internal/util/httputil"
 )
 
 // Require gates next behind store's budget for the request's authenticated

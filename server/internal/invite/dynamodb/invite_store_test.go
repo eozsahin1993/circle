@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"circle-relay/internal/invite"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 func getRawItem(t *testing.T, client *awsdynamodb.Client, table, pk, sk string) map[string]types.AttributeValue {

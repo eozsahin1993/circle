@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"circle-relay/internal/httputil"
+	"circle-relay/internal/util/httputil"
 )
 
 type contextKey int

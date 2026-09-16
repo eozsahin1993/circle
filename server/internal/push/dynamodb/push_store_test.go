@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"circle-relay/internal/push"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 func newStore(t *testing.T) push.Store {

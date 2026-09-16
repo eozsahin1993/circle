@@ -9,7 +9,7 @@ import (
 
 	"circle-relay/internal/auth/http/google"
 	"circle-relay/internal/auth/oidcverify"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 func TestService_SignIn_ValidTokenIssuesASession(t *testing.T) {

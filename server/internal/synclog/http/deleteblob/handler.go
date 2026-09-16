@@ -6,8 +6,8 @@ import (
 	"errors"
 	"net/http"
 
-	"circle-relay/internal/httputil"
 	"circle-relay/internal/synclog/http/circleerrors"
+	"circle-relay/internal/util/httputil"
 )
 
 // Credentials in the body — see getuploadtarget's handler.go for why.

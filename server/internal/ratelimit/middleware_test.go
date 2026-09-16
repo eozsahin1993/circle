@@ -10,7 +10,7 @@ import (
 
 	"circle-relay/internal/auth"
 	"circle-relay/internal/ratelimit"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 // fakeStore is a canned Store — the real dynamodb adapter's

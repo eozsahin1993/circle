@@ -37,7 +37,6 @@ import (
 	authdynamodb "circle-relay/internal/auth/dynamodb"
 	"circle-relay/internal/invite"
 	invitedynamodb "circle-relay/internal/invite/dynamodb"
-	"circle-relay/internal/localstack"
 	"circle-relay/internal/push"
 	pushdynamodb "circle-relay/internal/push/dynamodb"
 	"circle-relay/internal/ratelimit"
@@ -45,9 +44,10 @@ import (
 	"circle-relay/internal/synclog"
 	logdynamodb "circle-relay/internal/synclog/dynamodb"
 	blobs3 "circle-relay/internal/synclog/s3"
+	"circle-relay/internal/util/localstack"
 )
 
-// Resource names and schemas come from internal/localstack, which
+// Resource names and schemas come from internal/util/localstack, which
 // cmd/testrelay uses too — one definition, so a table this suite creates
 // can't differ in shape from the one the relay is served against.
 const (

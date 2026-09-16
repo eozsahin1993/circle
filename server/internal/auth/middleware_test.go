@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"circle-relay/internal/auth"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 func newTestRequest(token string) *http.Request {

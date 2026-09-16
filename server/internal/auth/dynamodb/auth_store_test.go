@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"circle-relay/internal/auth"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 func TestAuthStore_SaveSessionThenGetSession_RoundTrips(t *testing.T) {

@@ -14,8 +14,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"circle-relay/internal/dynamoutil"
 	"circle-relay/internal/invite"
+	"circle-relay/internal/util/dynamoutil"
 )
 
 // DefaultInviteRetentionDays matches the client's existing INVITE_TTL_MS

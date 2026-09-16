@@ -7,7 +7,7 @@ import (
 
 	"circle-relay/internal/invite"
 	invitehttp "circle-relay/internal/invite/http"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 func TestService_CreateInviteThenGetInvite_RoundTrips(t *testing.T) {

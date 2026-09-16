@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"circle-relay/internal/account"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 func TestManifestStore_PutManifestThenGetManifest_RoundTrips(t *testing.T) {

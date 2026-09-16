@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"circle-relay/internal/httputil"
+	"circle-relay/internal/util/httputil"
 )
 
 type request struct {

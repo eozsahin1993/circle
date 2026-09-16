@@ -10,7 +10,7 @@ import (
 
 	"circle-relay/internal/synclog"
 	"circle-relay/internal/synclog/http/deleteblob"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 const entryID = "entry-1"

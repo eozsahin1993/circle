@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"circle-relay/internal/synclog"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 // GetUploadTarget refuses a second target once a blob has actually landed

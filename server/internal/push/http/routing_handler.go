@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"circle-relay/internal/httputil"
 	"circle-relay/internal/push"
+	"circle-relay/internal/util/httputil"
 )
 
 // MaxPushTokenBytes leaves room for an FCM registration token plus AEAD

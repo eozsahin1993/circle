@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 func TestRateLimitStore_Allow_AllowsTheFirstRequestForANewKey(t *testing.T) {

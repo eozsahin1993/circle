@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"circle-relay/internal/httputil"
 	"circle-relay/internal/synclog/http/circleerrors"
+	"circle-relay/internal/util/httputil"
 )
 
 type request struct {

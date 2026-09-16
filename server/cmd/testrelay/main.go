@@ -18,7 +18,7 @@ import (
 	"circle-relay/internal/api"
 	"circle-relay/internal/app"
 	"circle-relay/internal/auth"
-	"circle-relay/internal/localstack"
+	"circle-relay/internal/util/localstack"
 )
 
 // sessionTTL only has to outlast a test run.
@@ -41,7 +41,7 @@ func main() {
 
 	// Shared() rather than Unique(): this process lives for the run, not
 	// one test, so there's nothing to isolate it from — and its tables are
-	// the ones internal/testsupport already expects to find.
+	// the ones internal/util/testsupport already expects to find.
 	deps := app.Deps(localstack.RelayConfig(localstack.Shared()), awsCfg)
 	mux := api.NewRouter(deps)
 	registerTestOnly(mux, deps.Auth)

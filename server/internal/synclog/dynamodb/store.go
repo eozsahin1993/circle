@@ -12,8 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"circle-relay/internal/dynamoutil"
 	"circle-relay/internal/synclog"
+	"circle-relay/internal/util/dynamoutil"
 )
 
 // readPageSize caps how many entries a single Read call returns — an
@@ -39,7 +39,7 @@ const (
 const maxCASAttempts = 5
 
 // EntryIDIndexName is the GSI DeleteEntry queries to find a post by id —
-// see modules/storage/dynamodb.tf. Exported so internal/localstack can
+// see modules/storage/dynamodb.tf. Exported so internal/util/localstack can
 // create it under the same name in tests.
 const EntryIDIndexName = "entryId-index"
 

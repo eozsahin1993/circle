@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"circle-relay/internal/synclog/http/getblob"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 func TestService_DownloadURL_DerivedFromSyncIDAndEntryID(t *testing.T) {

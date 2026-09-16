@@ -2,7 +2,7 @@
 // by every DynamoDB-backed store (synclog/dynamodb, auth/dynamodb) — split
 // out so those two stay independent packages (different domains, genuinely
 // separable) without duplicating this plumbing. Same category as
-// internal/httputil: shared technology-specific plumbing, not a domain of
+// internal/util/httputil: shared technology-specific plumbing, not a domain of
 // its own.
 package dynamoutil
 

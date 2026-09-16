@@ -17,8 +17,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"circle-relay/internal/dynamoutil"
 	"circle-relay/internal/ratelimit"
+	"circle-relay/internal/util/dynamoutil"
 )
 
 // nearLimitWarningThreshold is the fraction of a key's budget at which

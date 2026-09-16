@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"circle-relay/internal/push"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 func b64(b []byte) string { return base64.StdEncoding.EncodeToString(b) }

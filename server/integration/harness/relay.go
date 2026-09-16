@@ -35,7 +35,7 @@ import (
 	"circle-relay/internal/api"
 	"circle-relay/internal/app"
 	"circle-relay/internal/auth"
-	"circle-relay/internal/localstack"
+	"circle-relay/internal/util/localstack"
 )
 
 // sessionTTL only has to outlast one test.
@@ -98,7 +98,7 @@ func Start(t *testing.T) *Relay {
 
 // unreachable skips, or fails when the environment says a missing
 // LocalStack is a broken pipeline — see localstack.Required, which
-// internal/testsupport consults for the same decision.
+// internal/util/testsupport consults for the same decision.
 func unreachable(t *testing.T, err error) {
 	t.Helper()
 	if localstack.Required() {

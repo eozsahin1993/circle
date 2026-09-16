@@ -8,7 +8,7 @@ import (
 
 	"circle-relay/internal/synclog"
 	"circle-relay/internal/synclog/http/getepochs"
-	"circle-relay/internal/testsupport"
+	"circle-relay/internal/util/testsupport"
 )
 
 // newToken/hashToken duplicate getlog_test's own helpers — same reasoning:

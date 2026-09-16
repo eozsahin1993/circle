@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"circle-relay/internal/httputil"
 	"circle-relay/internal/synclog"
 	"circle-relay/internal/synclog/http/circleerrors"
+	"circle-relay/internal/util/httputil"
 )
 
 // The tombstone fields travel together: TombstoneEntryID present means a

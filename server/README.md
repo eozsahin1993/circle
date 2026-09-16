@@ -43,7 +43,7 @@ long-lived process.
 
 Each table exists because its access pattern and lifecycle genuinely
 differ from the others — see each package's own doc comment for the
-specific reasoning, and `internal/dynamoutil` for the handful of
+specific reasoning, and `internal/util/dynamoutil` for the handful of
 attribute-encoding helpers all three share.
 
 ## Auth flow, end to end

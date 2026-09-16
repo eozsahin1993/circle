@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"circle-relay/internal/httputil"
 	"circle-relay/internal/synclog"
 	"circle-relay/internal/synclog/http/circleerrors"
+	"circle-relay/internal/util/httputil"
 )
 
 type entryResponse struct {

@@ -8,7 +8,7 @@ import (
 
 	"circle-relay/internal/account"
 	"circle-relay/internal/auth"
-	"circle-relay/internal/httputil"
+	"circle-relay/internal/util/httputil"
 )
 
 type getResponse struct {
