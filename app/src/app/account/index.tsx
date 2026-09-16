@@ -107,6 +107,16 @@ export default function AccountScreen() {
       ],
     },
     {
+      title: 'About',
+      rows: [
+        {
+          label: 'Credits & attribution',
+          control: { kind: 'navigate' },
+          onPress: () => router.push('/account/credits'),
+        },
+      ],
+    },
+    {
       title: 'Developer',
       rows: [
         __DEV__ && {
@@ -149,7 +159,7 @@ export default function AccountScreen() {
   function handleSignOut() {
     Alert.alert(
       'Sign out?',
-      'Your circles and photos stay on this device — signing back in picks up right where you left off.',
+      'Your circles and photos stay on this device. Signing back in picks up right where you left off.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
