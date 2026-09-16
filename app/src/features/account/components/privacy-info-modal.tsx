@@ -15,11 +15,15 @@ export type PrivacyInfoModalProps = {
 
 // This describes the intended end-to-end design, not everything that's
 // actually running today — see the conversation this was added in.
-// Notably: content isn't encrypted before storage yet, and leaving a
-// circle doesn't currently rotate the shared secret. Revisit this copy as
-// those land for real. "What we can see" is the exception — worded to
-// match what the relay actually does today (verified against server/
-// directly), not the intended design.
+// Notably: leaving a circle doesn't currently rotate the shared secret
+// (only an admin removing someone does). Revisit this copy once that
+// lands for real. "What we can see" is the exception — worded to match
+// what the relay actually does today (verified against server/
+// directly), not the intended design. That includes authorIdentityPublicKey,
+// stored plaintext on every entry since account deletion needs it to find
+// everything one identity posted — the relay can tell two entries in the
+// same circle share an author, though never who that author is or
+// whether they're active in any other circle.
 const SECTIONS = [
   {
     label: 'Your content',
@@ -31,7 +35,7 @@ const SECTIONS = [
   },
   {
     label: 'What we can see',
-    body: 'At rest, we cannot tell whether two items, even in the same circle, came from the same person. We only see that a circle exists, how active it is, and that requests happen, never who or what.',
+    body: "At rest, we can tell when two entries in the same circle came from the same person — it's what lets us find and erase everything you posted if you delete your account — but never who that person is, and never whether they're in any of your other circles. Beyond that, we only see that a circle exists, how active it is, and that requests happen, never who or what.",
   },
   {
     label: 'If someone leaves',
