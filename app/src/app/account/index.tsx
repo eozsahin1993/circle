@@ -278,7 +278,7 @@ export default function AccountScreen() {
               colorSeed={ownColorSeed}
             />
             <View style={styles.profileText}>
-              <ThemedText type="screenTitle" numberOfLines={1}>
+              <ThemedText type="cardTitle" numberOfLines={1}>
                 {profile?.name || 'Add your name'}
               </ThemedText>
               <ThemedText type="meta" themeColor="muted">
