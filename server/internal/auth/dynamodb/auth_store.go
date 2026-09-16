@@ -92,17 +92,21 @@ const AccountIDIndexName = "accountId-index"
 // deleteAllSessionsPasses: the GSI is only eventually consistent, so a
 // session saved moments before this runs (a second device signing in
 // right as the first deletes the account) can miss the first pass.
-// Sweeping a few times with a growing wait between closes that window;
+// Sweeping a few times with a growing wait between narrows that window;
 // a pass that finds nothing to delete is cheap, so repeating it costs
 // little even when nothing was missed. Same shape as findEntryByID's own
 // GSI-lag retry (dynamoutil doesn't export sleepBackoff — small enough to
 // repeat here rather than reach across an unrelated storage package for).
-const deleteAllSessionsPasses = 8
+// Deliberately capped well under the tens-of-seconds it'd take to fully
+// close the window: this runs synchronously inside DELETE /account, and a
+// stray session surviving a couple more seconds than a device that raced
+// the deletion isn't worth a multi-second hang on every account deletion.
+const deleteAllSessionsPasses = 5
 
 func deleteAllSessionsBackoff(ctx context.Context, attempt int) error {
 	delay := 100 * time.Millisecond << (attempt - 1)
-	if delay > 2*time.Second {
-		delay = 2 * time.Second
+	if delay > 700*time.Millisecond {
+		delay = 700 * time.Millisecond
 	}
 	timer := time.NewTimer(delay)
 	defer timer.Stop()

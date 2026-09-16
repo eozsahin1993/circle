@@ -1,10 +1,11 @@
 import Constants from 'expo-constants';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
+import { LoadingModal } from '@/ui/components/loading-modal';
 import { OptionSheet } from '@/ui/components/option-sheet';
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
 import { ReactionChip } from '@/features/post/components/reaction-chip';
@@ -21,7 +22,7 @@ import { signOut } from '@/features/account/usecases/sign-in';
 import { PushLevels, type PushLevelId } from '@/features/push-notifications/usecases/push-preferences';
 import { useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
-import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
+import { useTints } from '@/ui/theme/hooks/use-theme';
 import { bytesToDataUri } from '@/core/photo/image';
 import type { ThemePreference } from '@/core/services/settings';
 
@@ -43,7 +44,6 @@ const APPEARANCE_OPTIONS: { value: ThemePreference; label: string }[] = [
 
 export default function AccountScreen() {
   const { settings, updateSettings } = useAppSettings();
-  const theme = useTheme();
   const tints = useTints();
   const ownColorSeed = useOwnColorSeed();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -153,10 +153,6 @@ export default function AccountScreen() {
           control: { kind: 'navigate' },
           onPress: () => router.push('/account/credits'),
         },
-        {
-          label: 'Version',
-          control: { kind: 'value', text: appVersion },
-        },
       ],
     },
     {
@@ -175,27 +171,31 @@ export default function AccountScreen() {
         },
       ],
     },
-    // Always last — developer tools shouldn't sit above real settings.
-    {
-      title: 'Developer',
-      rows: [
-        __DEV__ && {
-          label: resettingDevData ? 'Resetting…' : 'Reset all local data',
-          description:
-            '__DEV__ only. Wipes circles, keys, the master seed, and the database schema, so a changed migration actually re-runs.',
-          destructive: true,
-          disabled: resettingDevData,
-          onPress: handleDevReset,
-        },
-        __DEV__ && {
-          label: 'Log a test push payload',
-          description: '__DEV__ only. Logs a simctl push payload this device can decrypt, for testing the iOS notification extension.',
-          control: { kind: 'navigate' as const },
-          onPress: () => void logTestPushPayload(),
-        },
-      ],
-    },
   ];
+
+  // Its own group, kept separate from settingsGroups: not actionable, so
+  // it isn't a row, and it belongs after every real setting but ahead of
+  // developer tools — sandwiched between two renders of SettingsGroups
+  // rather than sortable into one flat list.
+  const developerGroup: SettingsGroup = {
+    title: 'Developer',
+    rows: [
+      __DEV__ && {
+        label: resettingDevData ? 'Resetting…' : 'Reset all local data',
+        description:
+          '__DEV__ only. Wipes circles, keys, the master seed, and the database schema, so a changed migration actually re-runs.',
+        destructive: true,
+        disabled: resettingDevData,
+        onPress: handleDevReset,
+      },
+      __DEV__ && {
+        label: 'Log a test push payload',
+        description: '__DEV__ only. Logs a simctl push payload this device can decrypt, for testing the iOS notification extension.',
+        control: { kind: 'navigate' as const },
+        onPress: () => void logTestPushPayload(),
+      },
+    ],
+  };
 
   function handleDevReset() {
     Alert.alert('Reset all local data? (dev only)', 'Wipes every circle, key, the master seed, and the database itself. No undo.', [
@@ -264,20 +264,6 @@ export default function AccountScreen() {
     );
   }
 
-  if (deletingAccount) {
-    return (
-      <ThemedView style={[styles.screen, styles.deletingScreen]}>
-        <ActivityIndicator size="large" color={theme.accent} />
-        <ThemedText type="screenTitle" style={styles.deletingTitle}>
-          Deleting your account…
-        </ThemedText>
-        <ThemedText type="captionFeed" themeColor="secondary" style={styles.deletingBody}>
-          This can take a moment. Don&apos;t close the app.
-        </ThemedText>
-      </ThemedView>
-    );
-  }
-
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
@@ -326,6 +312,12 @@ export default function AccountScreen() {
           </View>
 
           <SettingsGroups groups={settingsGroups} />
+
+          <ThemedText type="meta" themeColor="faint" style={styles.version}>
+            Murami v{appVersion}
+          </ThemedText>
+
+          <SettingsGroups groups={[developerGroup]} />
         </ScrollView>
       </ThemedSafeAreaView>
 
@@ -342,6 +334,12 @@ export default function AccountScreen() {
       />
 
       <PrivacyInfoModal visible={privacyVisible} onClose={() => setPrivacyVisible(false)} />
+
+      <LoadingModal
+        visible={deletingAccount}
+        label="Deleting your account…"
+        sublabel="This can take a moment. Don't close the app."
+      />
     </ThemedView>
   );
 }
@@ -387,17 +385,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  deletingScreen: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.screenPadding,
-    gap: 10,
-  },
-  deletingTitle: {
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  deletingBody: {
+  version: {
     textAlign: 'center',
   },
 });
