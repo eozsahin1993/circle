@@ -36,7 +36,7 @@ export default function NewCircleScreen() {
       router.replace({ pathname: '/circle/feed', params: { circleId: circle.id } });
     } catch (err) {
       console.error('Failed to create circle', err);
-      setError("Couldn't create the circle — try again.");
+      setError("Couldn't create the circle. Try again.");
       setCreating(false);
     }
   }

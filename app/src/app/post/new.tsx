@@ -50,7 +50,7 @@ export default function NewPostScreen() {
       router.back();
     } catch (err) {
       console.error('Failed to create post', err);
-      setError("Couldn't post — try again.");
+      setError("Couldn't post. Try again.");
       setPosting(false);
     }
   }

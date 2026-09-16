@@ -261,7 +261,7 @@ export default function CircleListScreen() {
                   No circles yet
                 </ThemedText>
                 <ThemedText type="captionFeed" themeColor="muted" style={styles.emptyBody}>
-                  Create one to share memories with the people in it — or join with a key someone
+                  Create one to share memories with the people in it, or join with a key someone
                   sent you.
                 </ThemedText>
               </View>

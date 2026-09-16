@@ -61,7 +61,7 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
       } catch (err) {
         console.error('Failed to load invite preview', err);
         if (stale) return;
-        setError("This invite doesn't work anymore — ask for a new one.");
+        setError("This invite doesn't work anymore. Ask for a new one.");
         setPhase('error');
       }
     })();
@@ -118,7 +118,7 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
 
             <ThemedText type="meta" themeColor="muted">
               {phase === 'waiting'
-                ? `You've asked to join — ${inviterName || 'whoever sent the key'} hasn't answered yet.`
+                ? `You've asked to join. ${inviterName || 'Whoever sent the key'} hasn't answered yet.`
                 : `${inviterName || 'Whoever shared this key'} still has to approve you before you're in.`}
             </ThemedText>
 

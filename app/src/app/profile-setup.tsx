@@ -82,7 +82,7 @@ export default function ProfileSetupScreen() {
       await goPostAuth(router);
     } catch (err) {
       console.error('Failed to save profile', err);
-      setError("Couldn't save your profile — try again.");
+      setError("Couldn't save your profile. Try again.");
       setSaving(false);
     }
   }
@@ -96,7 +96,7 @@ export default function ProfileSetupScreen() {
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
             <ThemedText type="onboardingHeadline">Who are you, to the people in your circles?</ThemedText>
             <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
-              A picture and a name. That is the whole profile — no username, no bio, no email, no
+              A picture and a name. That is the whole profile: no username, no bio, no email, no
               phone number. There is nothing else to collect.
             </ThemedText>
 
