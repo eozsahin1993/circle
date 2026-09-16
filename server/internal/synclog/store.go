@@ -266,8 +266,9 @@ type LogStore interface {
 	Bootstrap(ctx context.Context, syncID, founderAuthorityPublicKey, initialWriteTokenHash string) error
 
 	// Append is the possession-gated write path shared by every ordinary
-	// entry in either namespace. writeToken is the raw (not pre-hashed)
-	// token — Append hashes it and compares against what's on file.
+	// entry in either namespace. writeTokenHash is compared against
+	// what's on file — hashing the raw token is Service.Append's job, not
+	// this adapter's.
 	//
 	// entryID makes retries safe: an entryID already recorded for this
 	// (syncID, ns) returns the *original* CommitResult rather than
@@ -281,41 +282,35 @@ type LogStore interface {
 	// BlobStore.GetUploadTarget's uploaderPublicKey. Nothing checks
 	// it against EncryptedMeta's signature yet; it exists so a future
 	// capability can verify one before authorizing a redaction.
-	Append(ctx context.Context, syncID string, ns Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeToken, authorIdentityPublicKey string) (CommitResult, error)
+	Append(ctx context.Context, syncID string, ns Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash, authorIdentityPublicKey string) (CommitResult, error)
 
-	// Rotate is the capability-gated write path for a key rotation —
-	// always a meta-namespace entry. Atomically: verifies
-	// currentWriteToken, verifies authorityPublicKey is in the authority
-	// set, appends the entry, and swaps in newWriteTokenHash — all or
-	// none.
+	// Rotate is the capability-gated write path for a key rotation.
+	// Atomically: verifies currentWriteTokenHash and authoritySet
+	// membership, appends the entry, and swaps in newWriteTokenHash.
+	// currentKeyVersion is the *pre*-rotation version.
 	//
-	// signature must verify against authorityPublicKey for
-	// RotateMessage(syncID, entryID, newWriteTokenHash) — checked before
-	// any storage call, so a forged signature never touches control
-	// state. currentKeyVersion is the *pre*-rotation version: the
-	// key_rotation entry itself is encrypted under the key being rotated
-	// away from, not the new one.
-	Rotate(ctx context.Context, syncID, entryID string, encryptedPayload []byte, currentKeyVersion int64, currentWriteToken, newWriteTokenHash, authorityPublicKey string, signature []byte) (CommitResult, error)
+	// Signature verification happens in Service.Rotate, not here — it
+	// doesn't depend on live state, unlike authoritySet membership, which
+	// is re-checked atomically as part of the transaction.
+	Rotate(ctx context.Context, syncID, entryID string, encryptedPayload []byte, currentKeyVersion int64, currentWriteTokenHash, newWriteTokenHash, authorityPublicKey string) (CommitResult, error)
 
 	// ChangeAuthority is the capability-gated write path for a promotion or
 	// demotion — always a meta-namespace entry. Atomically: verifies
-	// WriteToken, verifies SignerAuthorityPublicKey is in the authority
-	// set, appends the entry, and adds or removes
-	// TargetAuthorityPublicKey — all or none. Both halves commit together
-	// because the circle keeps two records of who governs it, the set and
-	// the log, and nothing repairs a disagreement between them from the
-	// log alone.
+	// writeTokenHash, verifies signerAuthorityPublicKey is in the
+	// authority set, appends the entry, and adds or removes
+	// targetAuthorityPublicKey — all or none, since the circle keeps two
+	// records of who governs it (the set and the log) and nothing repairs
+	// a disagreement between them from the log alone.
 	//
-	// Signature must verify against SignerAuthorityPublicKey for the
-	// change's Message() — checked before any storage call, so a forged
-	// signature never touches control state. Authority only ever comes
-	// from authority: nothing seeds the set but a key already in it.
+	// Validation (action, target key shape) and signature verification
+	// happen in Service.ChangeAuthority, not here — see Rotate's doc
+	// comment for why.
 	//
 	// A signer may remove their own key — that's how leaving hands back
 	// authority — but never the last one (ErrWouldEmptyAuthoritySet):
 	// DynamoDB drops a string set attribute once its last element goes,
 	// leaving nothing to add a key back to.
-	ChangeAuthority(ctx context.Context, change AuthorityChange) (CommitResult, error)
+	ChangeAuthority(ctx context.Context, syncID, entryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash string, action AuthorityAction, targetAuthorityPublicKey, signerAuthorityPublicKey string) (CommitResult, error)
 
 	// DeleteCircle ends a circle: appends the tombstone and stamps
 	// deletedAt on control state in one transaction, then deletes every
@@ -331,27 +326,48 @@ type LogStore interface {
 	// transaction holds. The ordering is the point: a tombstone with
 	// entries still under it is a retry, entries with no tombstone are
 	// silent data loss.
-	DeleteCircle(ctx context.Context, deletion CircleDeletion) (CommitResult, error)
+	//
+	// Signature verification happens in Service.DeleteCircle, not here —
+	// see Rotate's doc comment for why.
+	DeleteCircle(ctx context.Context, syncID, entryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash string, signerAuthorityPublicKey string) (CommitResult, error)
 
-	// DeleteEntry strips a post's EncryptedMeta, stamps deletedAt/deletedBy,
-	// and appends the tombstone entry — the row itself survives, since
-	// comments/reactions reference it by id. Finds the post via a GSI on
-	// entryId, not anything the caller supplies. AuthorSignature is
-	// checked against the found row's own AuthorIdentityPublicKey first,
-	// falling back to AuthorityPublicKey/AuthoritySignature — same
-	// author-or-admin shape as deleteblob, relay-enforced here instead of
-	// left to every client's own predicate.
-	DeleteEntry(ctx context.Context, deletion EntryDeletion) (CommitResult, error)
+	// FindEntry resolves a content-namespace entry by id via a GSI on
+	// entryId, not anything else the caller supplies — ErrEntryNotFound if
+	// absent, in a different circle, or in the meta namespace instead.
+	// Service.DeleteEntry calls this first to learn the post's epoch and
+	// AuthorIdentityPublicKey before deciding whether the delete is
+	// authorized.
+	FindEntry(ctx context.Context, syncID, entryID string) (LogEntry, error)
+
+	// DeleteEntry strips targetEpoch's EncryptedMeta, stamps
+	// deletedAt/deletedBy with authorizedBy, and appends the tombstone
+	// entry at tombstoneEntryID — the row itself survives, since
+	// comments/reactions reference it by id.
+	//
+	// requiredAuthorityPublicKey is empty when authorizedBy is the post's
+	// own author (no live-state check needed beyond writeTokenHash), or
+	// set to the admin's key when Service.DeleteEntry authorized the
+	// delete via an authority signature instead — in that case,
+	// authoritySet membership is re-checked atomically inside this same
+	// commit, not against state read before it, since (unlike
+	// VerifyAuthoritySignature) this authorizes a write rather than a
+	// plain read.
+	DeleteEntry(ctx context.Context, syncID, tombstoneEntryID string, targetEpoch int64, encryptedPayload []byte, keyVersion int64, writeTokenHash, authorizedBy, requiredAuthorityPublicKey string) (CommitResult, error)
 
 	// DeleteAuthorContent strips every content entry authored by
-	// AuthorIdentityPublicKey — the same per-row mutation as DeleteEntry,
+	// authorIdentityPublicKey — the same per-row mutation as DeleteEntry,
 	// found by a paged query over the circle's content range rather than
 	// an index (rare operation, deliberately unindexed). With a
-	// TombstoneEntryID it then appends the tombstone through the ordinary
-	// possession-gated path; without one it strips and stops. Idempotent
-	// end to end: a re-run finds nothing left to strip and the tombstone
-	// converges on its idempotency marker.
-	DeleteAuthorContent(ctx context.Context, deletion AuthorContentDeletion) (AuthorContentResult, error)
+	// tombstoneEntryID it then appends the tombstone through the ordinary
+	// possession-gated path (writeTokenHash checked before stripping, and
+	// again atomically when the tombstone commits); without one it strips
+	// and stops, and writeTokenHash is ignored. Idempotent end to end: a
+	// re-run finds nothing left to strip and the tombstone converges on
+	// its idempotency marker.
+	//
+	// Signature verification happens in Service.DeleteAuthorContent, not
+	// here — see Rotate's doc comment for why.
+	DeleteAuthorContent(ctx context.Context, syncID, authorIdentityPublicKey, tombstoneEntryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash string) (AuthorContentResult, error)
 
 	// Read never deletes or evicts — retention is permanent (invariant 1).
 	// sinceEpoch is a position in ns's sequence, not a timestamp; entries

@@ -42,7 +42,7 @@ func TestService_Peek_DelegatesToLogStoreAcrossSeveralCircles(t *testing.T) {
 	if err := logStore.Bootstrap(ctx, syncIDA, placeholderAuthorityKey, hashToken(t, tokenA)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := logStore.Append(ctx, syncIDA, synclog.NamespaceContent, "post-1", []byte("c"), 1, tokenA, "test-author-key"); err != nil {
+	if _, err := logStore.Append(ctx, syncIDA, synclog.NamespaceContent, "post-1", []byte("c"), 1, hashToken(t, tokenA), "test-author-key"); err != nil {
 		t.Fatal(err)
 	}
 

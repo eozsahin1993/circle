@@ -5,7 +5,7 @@
 // Unlike deleteblob, the row itself isn't removed — comments/reactions
 // reference it by id, and removing it would break their replay for
 // everyone, not just erase the deleter's own content. All the lookup and
-// author-or-admin verification lives in synclog.LogStore.DeleteEntry; this
+// author-or-admin verification lives in synclog.Service.DeleteEntry; this
 // package is routing and error mapping only.
 package deleteentry
 
@@ -17,7 +17,7 @@ import (
 )
 
 type Service struct {
-	LogStore  synclog.LogStore
+	Log       *synclog.Service
 	BlobStore synclog.BlobStore
 }
 
@@ -28,7 +28,7 @@ type Service struct {
 // tombstone already committed and is the truth clients act on, the same
 // reasoning deleteBlobFor uses client-side for this exact cleanup.
 func (s *Service) Delete(ctx context.Context, deletion synclog.EntryDeletion) (synclog.CommitResult, error) {
-	result, err := s.LogStore.DeleteEntry(ctx, deletion)
+	result, err := s.Log.DeleteEntry(ctx, deletion)
 	if err != nil {
 		return synclog.CommitResult{}, err
 	}

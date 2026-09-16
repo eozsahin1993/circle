@@ -17,7 +17,7 @@ import (
 )
 
 type Service struct {
-	LogStore  synclog.LogStore
+	Log       *synclog.Service
 	BlobStore synclog.BlobStore
 }
 
@@ -30,7 +30,7 @@ type Service struct {
 // the circle is deleted either way — clients act on the entry, not on
 // this response.
 func (s *Service) DeleteCircle(ctx context.Context, deletion synclog.CircleDeletion) (synclog.CommitResult, error) {
-	result, err := s.LogStore.DeleteCircle(ctx, deletion)
+	result, err := s.Log.DeleteCircle(ctx, deletion)
 	if err != nil {
 		return synclog.CommitResult{}, err
 	}

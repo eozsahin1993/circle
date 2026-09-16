@@ -14,7 +14,7 @@ import (
 	"circle-relay/internal/synclog"
 )
 
-// findEntryByID resolves a content-namespace entry by id via the
+// FindEntry resolves a content-namespace entry by id via the
 // entryId-index GSI, then fetches the full row from the base table (the
 // GSI is KEYS_ONLY). ErrEntryNotFound if absent or in a different circle.
 //
@@ -22,7 +22,7 @@ import (
 // being posted can briefly not show up yet — retried with the same
 // backoff Peek uses for its own eventually-consistent reads, rather than
 // failing a legitimate delete on timing.
-func (s *Store) findEntryByID(ctx context.Context, syncID, entryID string) (synclog.LogEntry, error) {
+func (s *Store) FindEntry(ctx context.Context, syncID, entryID string) (synclog.LogEntry, error) {
 	var queryOut *dynamodb.QueryOutput
 	for attempt := 0; attempt < maxCASAttempts; attempt++ {
 		if attempt > 0 {
@@ -81,62 +81,57 @@ func (s *Store) findEntryByID(ctx context.Context, syncID, entryID string) (sync
 	return synclog.LogEntry{Epoch: epoch, AuthorIdentityPublicKey: authorIdentityPublicKey}, nil
 }
 
-// DeleteEntry strips a post's payload and appends its tombstone — see
-// synclog.LogStore.DeleteEntry.
-func (s *Store) DeleteEntry(ctx context.Context, deletion synclog.EntryDeletion) (synclog.CommitResult, error) {
-	if existing, err := s.lookupIdempotencyMarker(ctx, deletion.SyncID, synclog.NamespaceContent, deletion.TombstoneEntryID); err != nil {
+// DeleteEntry strips targetEpoch's payload and appends its tombstone —
+// see LogStore.DeleteEntry for why requiredAuthorityPublicKey is checked
+// here rather than by the caller.
+func (s *Store) DeleteEntry(ctx context.Context, syncID, tombstoneEntryID string, targetEpoch int64, encryptedPayload []byte, keyVersion int64, writeTokenHash, authorizedBy, requiredAuthorityPublicKey string) (synclog.CommitResult, error) {
+	if existing, err := s.lookupIdempotencyMarker(ctx, syncID, synclog.NamespaceContent, tombstoneEntryID); err != nil {
 		return synclog.CommitResult{}, err
 	} else if existing != nil {
 		return *existing, nil
 	}
 
-	post, err := s.findEntryByID(ctx, deletion.SyncID, deletion.TargetEntryID)
-	if err != nil {
-		return synclog.CommitResult{}, err
-	}
-
-	authorizedBy := post.AuthorIdentityPublicKey
-	if synclog.VerifySignature(post.AuthorIdentityPublicKey, deletion.Message(), deletion.AuthorSignature) != nil {
-		if deletion.AuthorityPublicKey == "" || len(deletion.AuthoritySignature) == 0 {
-			return synclog.CommitResult{}, synclog.ErrEntryNotAuthorized
-		}
-		if err := s.VerifyAuthoritySignature(ctx, deletion.SyncID, deletion.AuthorityPublicKey, deletion.Message(), deletion.AuthoritySignature); err != nil {
-			return synclog.CommitResult{}, err
-		}
-		authorizedBy = deletion.AuthorityPublicKey
-	}
-
-	expectedHash, hashErr := synclog.WriteTokenHash(deletion.WriteToken)
-
-	result, err := s.casCommit(ctx, deletion.SyncID, synclog.NamespaceContent, deletion.TombstoneEntryID, entryFields{
-		EncryptedPayload:        deletion.EncryptedPayload,
-		KeyVersion:              deletion.KeyVersion,
+	result, err := s.casCommit(ctx, syncID, synclog.NamespaceContent, tombstoneEntryID, entryFields{
+		EncryptedPayload:        encryptedPayload,
+		KeyVersion:              keyVersion,
 		AuthorIdentityPublicKey: authorizedBy,
 	}, func(control *controlState, epoch, receivedAt int64) (casPlan, error) {
-		if hashErr != nil || control.writeTokenHash != expectedHash {
+		if control.writeTokenHash != writeTokenHash {
 			return casPlan{}, synclog.ErrWriteTokenMismatch
 		}
 		if control.deleted {
 			return casPlan{}, synclog.ErrCircleDeleted
 		}
+		if requiredAuthorityPublicKey != "" && !control.authoritySet[requiredAuthorityPublicKey] {
+			return casPlan{}, synclog.ErrAuthorityNotRecognized
+		}
 
 		// Same CAS condition as Append, so a stale or racing write token
-		// fails the whole transaction up front.
+		// fails the whole transaction up front. The admin path adds an
+		// authoritySet check re-verified atomically alongside it, since a
+		// key that was demoted between Service's checks and this commit
+		// must not still land the tombstone.
+		condition := "writeTokenHash = :hash AND contentCounter = :current AND attribute_not_exists(deletedAt)"
+		values := map[string]types.AttributeValue{
+			":hash":    &types.AttributeValueMemberS{Value: writeTokenHash},
+			":current": &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch-1, 10)},
+			":next":    &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
+		}
+		if requiredAuthorityPublicKey != "" {
+			condition += " AND contains(authoritySet, :signer)"
+			values[":signer"] = &types.AttributeValueMemberS{Value: requiredAuthorityPublicKey}
+		}
 		controlUpdate := types.Update{
-			TableName:           aws.String(s.tableName),
-			Key:                 controlKey(deletion.SyncID),
-			UpdateExpression:    aws.String("SET contentCounter = :next"),
-			ConditionExpression: aws.String("writeTokenHash = :hash AND contentCounter = :current AND attribute_not_exists(deletedAt)"),
-			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":hash":    &types.AttributeValueMemberS{Value: expectedHash},
-				":current": &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch-1, 10)},
-				":next":    &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
-			},
+			TableName:                 aws.String(s.tableName),
+			Key:                       controlKey(syncID),
+			UpdateExpression:          aws.String("SET contentCounter = :next"),
+			ConditionExpression:       aws.String(condition),
+			ExpressionAttributeValues: values,
 		}
 
 		// Strip the original post, in the same transaction as the counter
 		// bump and the tombstone commit builds around this plan.
-		stripKey, stripExpr, stripValues := stripEntryFields(deletion.SyncID, entrySK(synclog.NamespaceContent, post.Epoch), receivedAt, authorizedBy)
+		stripKey, stripExpr, stripValues := stripEntryFields(syncID, entrySK(synclog.NamespaceContent, targetEpoch), receivedAt, authorizedBy)
 		strip := types.TransactWriteItem{Update: &types.Update{
 			TableName:                 aws.String(s.tableName),
 			Key:                       stripKey,

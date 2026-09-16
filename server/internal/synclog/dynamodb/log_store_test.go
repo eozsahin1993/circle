@@ -77,12 +77,21 @@ func authorityChange(signer authorityKey, syncID, entryID string, action synclog
 	return change
 }
 
+// changeAuthority calls the narrowed LogStore.ChangeAuthority with a
+// fully-built AuthorityChange, hashing its WriteToken the way
+// Service.ChangeAuthority does — so tests keep building requests the same
+// way while the store itself never sees a raw token or a signature.
+func changeAuthority(t *testing.T, store synclog.LogStore, ctx context.Context, change synclog.AuthorityChange) (synclog.CommitResult, error) {
+	t.Helper()
+	return store.ChangeAuthority(ctx, change.SyncID, change.EntryID, change.EncryptedPayload, change.KeyVersion, hashToken(t, change.WriteToken), change.Action, change.TargetAuthorityPublicKey, change.SignerAuthorityPublicKey)
+}
+
 // grant promotes target by adding its key to syncID's authority set,
 // signed by signer — the setup step for every test that needs a second
 // admin, which nothing but ChangeAuthority can produce.
 func grant(t *testing.T, store synclog.LogStore, syncID, entryID string, signer, target authorityKey, token string) {
 	t.Helper()
-	if _, err := store.ChangeAuthority(context.Background(), authorityChange(signer, syncID, entryID, synclog.AuthorityAdd, target.publicKeyHex, token)); err != nil {
+	if _, err := changeAuthority(t, store, context.Background(), authorityChange(signer, syncID, entryID, synclog.AuthorityAdd, target.publicKeyHex, token)); err != nil {
 		t.Fatalf("granting authority failed: %v", err)
 	}
 }
@@ -116,7 +125,7 @@ func TestLogStore_Append_SucceedsWithTheCurrentWriteTokenAndAssignsSequentialEpo
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	first, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "entry-1", []byte("ciphertext"), 1, token, "test-author-key")
+	first, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "entry-1", []byte("ciphertext"), 1, hashToken(t, token), "test-author-key")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +133,7 @@ func TestLogStore_Append_SucceedsWithTheCurrentWriteTokenAndAssignsSequentialEpo
 		t.Fatalf("expected first entry to land at epoch 1, got %d", first.Epoch)
 	}
 
-	second, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "entry-2", []byte("ciphertext"), 1, token, "test-author-key")
+	second, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "entry-2", []byte("ciphertext"), 1, hashToken(t, token), "test-author-key")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,14 +150,14 @@ func TestLogStore_Append_RejectsWrongWriteTokenAndLeavesCounterUntouched(t *test
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	_, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "entry-1", []byte("ciphertext"), 1, "not-the-real-token-hex", "test-author-key")
+	_, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "entry-1", []byte("ciphertext"), 1, hashToken(t, newToken(t)), "test-author-key")
 	if !errors.Is(err, synclog.ErrWriteTokenMismatch) {
 		t.Fatalf("expected ErrWriteTokenMismatch, got %v", err)
 	}
 
 	// A wrong token must never burn an epoch — the first entry with the
 	// *correct* token still lands at epoch 1, not 2.
-	commit, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "entry-2", []byte("ciphertext"), 1, token, "test-author-key")
+	commit, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "entry-2", []byte("ciphertext"), 1, hashToken(t, token), "test-author-key")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +170,7 @@ func TestLogStore_Append_UnknownSyncIDIsDistinctFromWrongToken(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
 
-	_, err := store.Append(ctx, testsupport.UniqueSyncID(t), synclog.NamespaceMeta, "entry-1", []byte("ciphertext"), 1, newToken(t), "test-author-key")
+	_, err := store.Append(ctx, testsupport.UniqueSyncID(t), synclog.NamespaceMeta, "entry-1", []byte("ciphertext"), 1, hashToken(t, newToken(t)), "test-author-key")
 	if !errors.Is(err, synclog.ErrCircleNotFound) {
 		t.Fatalf("expected ErrCircleNotFound for a never-bootstrapped syncID, got %v", err)
 	}
@@ -175,15 +184,15 @@ func TestLogStore_Append_MetaAndContentCountersAreIndependent(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	metaCommit, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "meta-1", []byte("m"), 1, token, "test-author-key")
+	metaCommit, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "meta-1", []byte("m"), 1, hashToken(t, token), "test-author-key")
 	if err != nil {
 		t.Fatal(err)
 	}
-	content1, err := store.Append(ctx, syncID, synclog.NamespaceContent, "content-1", []byte("c1"), 1, token, "test-author-key")
+	content1, err := store.Append(ctx, syncID, synclog.NamespaceContent, "content-1", []byte("c1"), 1, hashToken(t, token), "test-author-key")
 	if err != nil {
 		t.Fatal(err)
 	}
-	content2, err := store.Append(ctx, syncID, synclog.NamespaceContent, "content-2", []byte("c2"), 1, token, "test-author-key")
+	content2, err := store.Append(ctx, syncID, synclog.NamespaceContent, "content-2", []byte("c2"), 1, hashToken(t, token), "test-author-key")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +229,7 @@ func TestLogStore_Append_RecordsAuthorIdentityPublicKeyAndReadReturnsIt(t *testi
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("ciphertext"), 1, token, "declared-author-key"); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("ciphertext"), 1, hashToken(t, token), "declared-author-key"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -245,7 +254,7 @@ func TestLogStore_Rotate_LeavesAuthorIdentityPublicKeyEmpty(t *testing.T) {
 	bootstrap(t, store, syncID, founder, token)
 
 	newHash := hashToken(t, newToken(t))
-	if _, err := store.Rotate(ctx, syncID, "rotation-1", []byte("ciphertext"), 1, token, newHash, founder.publicKeyHex, founder.sign(syncID, "rotation-1", newHash)); err != nil {
+	if _, err := store.Rotate(ctx, syncID, "rotation-1", []byte("ciphertext"), 1, hashToken(t, token), newHash, founder.publicKeyHex); err != nil {
 		t.Fatal(err)
 	}
 
@@ -281,7 +290,7 @@ func TestLogStore_Append_ConcurrentDuplicateEntryIDsConvergeToSameEpoch(t *testi
 	for i := range concurrency {
 		go func() {
 			defer wg.Done()
-			results[i], errs[i] = store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("ciphertext"), 1, token, "test-author-key")
+			results[i], errs[i] = store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("ciphertext"), 1, hashToken(t, token), "test-author-key")
 		}()
 	}
 	wg.Wait()
@@ -309,8 +318,7 @@ func TestLogStore_Rotate_SwapsWriteTokenAndAppendsMetaEntryAtomically(t *testing
 	newHash := hashToken(t, newTokenValue)
 	bootstrap(t, store, syncID, founder, oldToken)
 
-	sig := founder.sign(syncID, "rotate-1", newHash)
-	commit, err := store.Rotate(ctx, syncID, "rotate-1", []byte("key_rotation payload"), 1, oldToken, newHash, founder.publicKeyHex, sig)
+	commit, err := store.Rotate(ctx, syncID, "rotate-1", []byte("key_rotation payload"), 1, hashToken(t, oldToken), newHash, founder.publicKeyHex)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,11 +327,11 @@ func TestLogStore_Rotate_SwapsWriteTokenAndAppendsMetaEntryAtomically(t *testing
 	}
 
 	// The old token must no longer work...
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-with-old-token", []byte("c"), 1, oldToken, "test-author-key"); !errors.Is(err, synclog.ErrWriteTokenMismatch) {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-with-old-token", []byte("c"), 1, hashToken(t, oldToken), "test-author-key"); !errors.Is(err, synclog.ErrWriteTokenMismatch) {
 		t.Fatalf("expected old write token to be rejected after rotation, got %v", err)
 	}
 	// ...and the new one must.
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-with-new-token", []byte("c"), 1, newTokenValue, "test-author-key"); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-with-new-token", []byte("c"), 1, hashToken(t, newTokenValue), "test-author-key"); err != nil {
 		t.Fatalf("expected new write token to work after rotation: %v", err)
 	}
 
@@ -336,7 +344,7 @@ func TestLogStore_Rotate_SwapsWriteTokenAndAppendsMetaEntryAtomically(t *testing
 	}
 }
 
-func TestLogStore_Rotate_RejectsSignatureFromAKeyNotInTheAuthoritySet(t *testing.T) {
+func TestLogStore_Rotate_RejectsAKeyNotInTheAuthoritySet(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
 	syncID := testsupport.UniqueSyncID(t)
@@ -346,38 +354,14 @@ func TestLogStore_Rotate_RejectsSignatureFromAKeyNotInTheAuthoritySet(t *testing
 	bootstrap(t, store, syncID, founder, token)
 
 	newHash := hashToken(t, newToken(t))
-	sig := impostor.sign(syncID, "rotate-1", newHash)
 
-	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, impostor.publicKeyHex, sig)
+	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, hashToken(t, token), newHash, impostor.publicKeyHex)
 	if !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
-		t.Fatalf("expected ErrAuthorityNotRecognized for a validly-signed but unrecognized authority key, got %v", err)
+		t.Fatalf("expected ErrAuthorityNotRecognized for an unrecognized authority key, got %v", err)
 	}
 
 	// Nothing should have moved: the original token still works.
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("c"), 1, token, "test-author-key"); err != nil {
-		t.Fatalf("expected the original write token to still work after a rejected rotation: %v", err)
-	}
-}
-
-func TestLogStore_Rotate_RejectsAnInvalidSignatureBeforeTouchingStorage(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	syncID := testsupport.UniqueSyncID(t)
-	founder := newAuthorityKey(t)
-	token := newToken(t)
-	bootstrap(t, store, syncID, founder, token)
-
-	newHash := hashToken(t, newToken(t))
-	// Correct, recognized public key, but a signature over the wrong
-	// message (as if forged, or replayed from a different rotation).
-	badSig := founder.sign(syncID, "some-other-entry-id", newHash)
-
-	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, founder.publicKeyHex, badSig)
-	if !errors.Is(err, synclog.ErrInvalidSignature) {
-		t.Fatalf("expected ErrInvalidSignature, got %v", err)
-	}
-
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("c"), 1, token, "test-author-key"); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("c"), 1, hashToken(t, token), "test-author-key"); err != nil {
 		t.Fatalf("expected the original write token to still work after a rejected rotation: %v", err)
 	}
 }
@@ -391,11 +375,10 @@ func TestLogStore_Rotate_RejectsAStaleCurrentWriteToken(t *testing.T) {
 	bootstrap(t, store, syncID, founder, token)
 
 	newHash := hashToken(t, newToken(t))
-	sig := founder.sign(syncID, "rotate-1", newHash)
 
-	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, "stale-token-not-the-real-one", newHash, founder.publicKeyHex, sig)
+	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, hashToken(t, newToken(t)), newHash, founder.publicKeyHex)
 	if !errors.Is(err, synclog.ErrWriteTokenMismatch) {
-		t.Fatalf("expected ErrWriteTokenMismatch for a stale currentWriteToken, got %v", err)
+		t.Fatalf("expected ErrWriteTokenMismatch for a stale currentWriteTokenHash, got %v", err)
 	}
 }
 
@@ -431,7 +414,7 @@ func TestLogStore_Read_PaginatesPastASinglePageAndResumesCorrectly(t *testing.T)
 
 	const totalEntries = readPageSize + 50
 	for i := range totalEntries {
-		if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, fmt.Sprintf("post-%d", i), []byte("ciphertext"), 1, token, "test-author-key"); err != nil {
+		if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, fmt.Sprintf("post-%d", i), []byte("ciphertext"), 1, hashToken(t, token), "test-author-key"); err != nil {
 			t.Fatalf("append %d failed: %v", i, err)
 		}
 	}
@@ -478,20 +461,20 @@ func TestLogStore_Peek_ReportsCurrentEpochsAcrossMultipleCircles(t *testing.T) {
 	syncIDA := testsupport.UniqueSyncID(t)
 	tokenA := newToken(t)
 	bootstrap(t, store, syncIDA, founder, tokenA)
-	if _, err := store.Append(ctx, syncIDA, synclog.NamespaceMeta, "a-meta-1", []byte("m"), 1, tokenA, "test-author-key"); err != nil {
+	if _, err := store.Append(ctx, syncIDA, synclog.NamespaceMeta, "a-meta-1", []byte("m"), 1, hashToken(t, tokenA), "test-author-key"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.Append(ctx, syncIDA, synclog.NamespaceContent, "a-content-1", []byte("c"), 1, tokenA, "test-author-key"); err != nil {
+	if _, err := store.Append(ctx, syncIDA, synclog.NamespaceContent, "a-content-1", []byte("c"), 1, hashToken(t, tokenA), "test-author-key"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.Append(ctx, syncIDA, synclog.NamespaceContent, "a-content-2", []byte("c"), 1, tokenA, "test-author-key"); err != nil {
+	if _, err := store.Append(ctx, syncIDA, synclog.NamespaceContent, "a-content-2", []byte("c"), 1, hashToken(t, tokenA), "test-author-key"); err != nil {
 		t.Fatal(err)
 	}
 
 	syncIDB := testsupport.UniqueSyncID(t)
 	tokenB := newToken(t)
 	bootstrap(t, store, syncIDB, founder, tokenB)
-	if _, err := store.Append(ctx, syncIDB, synclog.NamespaceMeta, "b-meta-1", []byte("m"), 1, tokenB, "test-author-key"); err != nil {
+	if _, err := store.Append(ctx, syncIDB, synclog.NamespaceMeta, "b-meta-1", []byte("m"), 1, hashToken(t, tokenB), "test-author-key"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -517,7 +500,7 @@ func TestLogStore_Peek_OmitsAnUnknownSyncIDWithoutErroringTheWholeBatch(t *testi
 	knownSyncID := testsupport.UniqueSyncID(t)
 	token := newToken(t)
 	bootstrap(t, store, knownSyncID, founder, token)
-	if _, err := store.Append(ctx, knownSyncID, synclog.NamespaceMeta, "m-1", []byte("m"), 1, token, "test-author-key"); err != nil {
+	if _, err := store.Append(ctx, knownSyncID, synclog.NamespaceMeta, "m-1", []byte("m"), 1, hashToken(t, token), "test-author-key"); err != nil {
 		t.Fatal(err)
 	}
 	unknownSyncID := testsupport.UniqueSyncID(t)
@@ -547,7 +530,7 @@ func TestLogStore_Peek_ToleratesRepeatedSyncIDs(t *testing.T) {
 	syncID := testsupport.UniqueSyncID(t)
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "m-1", []byte("m"), 1, token, "test-author-key"); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "m-1", []byte("m"), 1, hashToken(t, token), "test-author-key"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -590,7 +573,7 @@ func TestLogStore_ChangeAuthority_AddedKeyCanThenRotate(t *testing.T) {
 
 	// Before the promotion, the promotee is nobody.
 	rejectedHash := hashToken(t, newToken(t))
-	_, err := store.Rotate(ctx, syncID, "rotate-early", []byte("payload"), 1, token, rejectedHash, promoted.publicKeyHex, promoted.sign(syncID, "rotate-early", rejectedHash))
+	_, err := store.Rotate(ctx, syncID, "rotate-early", []byte("payload"), 1, hashToken(t, token), rejectedHash, promoted.publicKeyHex)
 	if !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
 		t.Fatalf("expected an unpromoted key to be rejected, got %v", err)
 	}
@@ -599,14 +582,14 @@ func TestLogStore_ChangeAuthority_AddedKeyCanThenRotate(t *testing.T) {
 
 	newTokenValue := newToken(t)
 	newHash := hashToken(t, newTokenValue)
-	commit, err := store.Rotate(ctx, syncID, "rotate-1", []byte("key_rotation payload"), 1, token, newHash, promoted.publicKeyHex, promoted.sign(syncID, "rotate-1", newHash))
+	commit, err := store.Rotate(ctx, syncID, "rotate-1", []byte("key_rotation payload"), 1, hashToken(t, token), newHash, promoted.publicKeyHex)
 	if err != nil {
 		t.Fatalf("a promoted admin must be able to rotate: %v", err)
 	}
 	if commit.Epoch != 2 {
 		t.Fatalf("expected the rotation at meta epoch 2 (behind the promotion's own entry), got %d", commit.Epoch)
 	}
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("c"), 2, newTokenValue, "test-author-key"); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("c"), 2, hashToken(t, newTokenValue), "test-author-key"); err != nil {
 		t.Fatalf("expected the promoted admin's new write token to work: %v", err)
 	}
 }
@@ -620,7 +603,7 @@ func TestLogStore_ChangeAuthority_AppendsItsEntryInTheSameTransaction(t *testing
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	commit, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-1", synclog.AuthorityAdd, promoted.publicKeyHex, token))
+	commit, err := changeAuthority(t, store, ctx, authorityChange(founder, syncID, "promote-1", synclog.AuthorityAdd, promoted.publicKeyHex, token))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -647,18 +630,18 @@ func TestLogStore_ChangeAuthority_RemovedKeyCanNoLongerRotate(t *testing.T) {
 	bootstrap(t, store, syncID, founder, token)
 	grant(t, store, syncID, "promote-1", founder, promoted, token)
 
-	if _, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "demote-1", synclog.AuthorityRemove, promoted.publicKeyHex, token)); err != nil {
+	if _, err := changeAuthority(t, store, ctx, authorityChange(founder, syncID, "demote-1", synclog.AuthorityRemove, promoted.publicKeyHex, token)); err != nil {
 		t.Fatal(err)
 	}
 
 	newHash := hashToken(t, newToken(t))
-	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, promoted.publicKeyHex, promoted.sign(syncID, "rotate-1", newHash))
+	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, hashToken(t, token), newHash, promoted.publicKeyHex)
 	if !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
 		t.Fatalf("expected a demoted admin's rotate to be rejected, got %v", err)
 	}
 	// A demotion that left relay powers behind would be worse than no
 	// demotion at all — the founder must still be able to rotate.
-	if _, err := store.Rotate(ctx, syncID, "rotate-2", []byte("payload"), 1, token, newHash, founder.publicKeyHex, founder.sign(syncID, "rotate-2", newHash)); err != nil {
+	if _, err := store.Rotate(ctx, syncID, "rotate-2", []byte("payload"), 1, hashToken(t, token), newHash, founder.publicKeyHex); err != nil {
 		t.Fatalf("the founder must still hold authority after demoting someone else: %v", err)
 	}
 }
@@ -673,56 +656,14 @@ func TestLogStore_ChangeAuthority_RejectsASignerOutsideTheSet(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	_, err := store.ChangeAuthority(ctx, authorityChange(impostor, syncID, "promote-1", synclog.AuthorityAdd, accomplice.publicKeyHex, token))
+	_, err := changeAuthority(t, store, ctx, authorityChange(impostor, syncID, "promote-1", synclog.AuthorityAdd, accomplice.publicKeyHex, token))
 	if !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
 		t.Fatalf("expected ErrAuthorityNotRecognized for a non-authority signer, got %v", err)
 	}
 
 	newHash := hashToken(t, newToken(t))
-	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, accomplice.publicKeyHex, accomplice.sign(syncID, "rotate-1", newHash)); !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
+	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, hashToken(t, token), newHash, accomplice.publicKeyHex); !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
 		t.Fatalf("a rejected promotion must not have added the key anyway, got %v", err)
-	}
-}
-
-// The signature covers the action, so authorizing a promotion can't be
-// turned into the demotion of the same person by editing one field.
-func TestLogStore_ChangeAuthority_SignatureDoesNotCarryAcrossActions(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	syncID := testsupport.UniqueSyncID(t)
-	founder := newAuthorityKey(t)
-	promoted := newAuthorityKey(t)
-	token := newToken(t)
-	bootstrap(t, store, syncID, founder, token)
-	grant(t, store, syncID, "promote-1", founder, promoted, token)
-
-	change := authorityChange(founder, syncID, "demote-1", synclog.AuthorityAdd, promoted.publicKeyHex, token)
-	change.Action = synclog.AuthorityRemove
-	_, err := store.ChangeAuthority(ctx, change)
-	if !errors.Is(err, synclog.ErrInvalidSignature) {
-		t.Fatalf("expected an add signature to be useless for a remove, got %v", err)
-	}
-}
-
-// ...nor across circles, which is what binding the message to syncID buys.
-func TestLogStore_ChangeAuthority_SignatureDoesNotCarryAcrossCircles(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	founder := newAuthorityKey(t)
-	promoted := newAuthorityKey(t)
-
-	tokenA := newToken(t)
-	syncA := testsupport.UniqueSyncID(t) + "-a"
-	bootstrap(t, store, syncA, founder, tokenA)
-	tokenB := newToken(t)
-	syncB := testsupport.UniqueSyncID(t) + "-b"
-	bootstrap(t, store, syncB, founder, tokenB)
-
-	change := authorityChange(founder, syncA, "promote-1", synclog.AuthorityAdd, promoted.publicKeyHex, tokenB)
-	change.SyncID = syncB
-	_, err := store.ChangeAuthority(ctx, change)
-	if !errors.Is(err, synclog.ErrInvalidSignature) {
-		t.Fatalf("expected a signature bound to another circle to be rejected, got %v", err)
 	}
 }
 
@@ -737,22 +678,22 @@ func TestLogStore_ChangeAuthority_SignerMayRemoveTheirOwnKeyButNotTheLast(t *tes
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	_, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "resign-early", synclog.AuthorityRemove, founder.publicKeyHex, token))
+	_, err := changeAuthority(t, store, ctx, authorityChange(founder, syncID, "resign-early", synclog.AuthorityRemove, founder.publicKeyHex, token))
 	if !errors.Is(err, synclog.ErrWouldEmptyAuthoritySet) {
 		t.Fatalf("expected the sole authority's resignation to be refused, got %v", err)
 	}
 
 	// With a successor in place it goes through — this is the handover.
 	grant(t, store, syncID, "promote-1", founder, promoted, token)
-	if _, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "resign-1", synclog.AuthorityRemove, founder.publicKeyHex, token)); err != nil {
+	if _, err := changeAuthority(t, store, ctx, authorityChange(founder, syncID, "resign-1", synclog.AuthorityRemove, founder.publicKeyHex, token)); err != nil {
 		t.Fatalf("a departing authority must be able to remove their own key: %v", err)
 	}
 
 	newHash := hashToken(t, newToken(t))
-	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, founder.publicKeyHex, founder.sign(syncID, "rotate-1", newHash)); !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
+	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, hashToken(t, token), newHash, founder.publicKeyHex); !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
 		t.Fatalf("a resigned authority must lose its powers, got %v", err)
 	}
-	if _, err := store.Rotate(ctx, syncID, "rotate-2", []byte("payload"), 1, token, newHash, promoted.publicKeyHex, promoted.sign(syncID, "rotate-2", newHash)); err != nil {
+	if _, err := store.Rotate(ctx, syncID, "rotate-2", []byte("payload"), 1, hashToken(t, token), newHash, promoted.publicKeyHex); err != nil {
 		t.Fatalf("the successor must still be able to govern: %v", err)
 	}
 }
@@ -770,52 +711,18 @@ func TestLogStore_ChangeAuthority_RefusesToDemoteDownToAnEmptySet(t *testing.T) 
 	grant(t, store, syncID, "promote-1", founder, promoted, token)
 
 	// Two in the set, so demoting the founder is fine.
-	if _, err := store.ChangeAuthority(ctx, authorityChange(promoted, syncID, "demote-1", synclog.AuthorityRemove, founder.publicKeyHex, token)); err != nil {
+	if _, err := changeAuthority(t, store, ctx, authorityChange(promoted, syncID, "demote-1", synclog.AuthorityRemove, founder.publicKeyHex, token)); err != nil {
 		t.Fatal(err)
 	}
 	// One left, so there is nowhere further down to go.
-	_, err := store.ChangeAuthority(ctx, authorityChange(promoted, syncID, "demote-2", synclog.AuthorityRemove, promoted.publicKeyHex, token))
+	_, err := changeAuthority(t, store, ctx, authorityChange(promoted, syncID, "demote-2", synclog.AuthorityRemove, promoted.publicKeyHex, token))
 	if !errors.Is(err, synclog.ErrWouldEmptyAuthoritySet) {
 		t.Fatalf("expected ErrWouldEmptyAuthoritySet, got %v", err)
 	}
 
 	newHash := hashToken(t, newToken(t))
-	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, promoted.publicKeyHex, promoted.sign(syncID, "rotate-1", newHash)); err != nil {
+	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, hashToken(t, token), newHash, promoted.publicKeyHex); err != nil {
 		t.Fatalf("the circle must still be governable: %v", err)
-	}
-}
-
-func TestLogStore_ChangeAuthority_RejectsAMalformedTargetKey(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	syncID := testsupport.UniqueSyncID(t)
-	founder := newAuthorityKey(t)
-	token := newToken(t)
-	bootstrap(t, store, syncID, founder, token)
-
-	for name, target := range map[string]string{
-		"not hex":    "zzzz",
-		"wrong size": "aabbcc",
-	} {
-		_, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-"+name, synclog.AuthorityAdd, target, token))
-		if !errors.Is(err, synclog.ErrInvalidAuthorityKey) {
-			t.Fatalf("%s: expected ErrInvalidAuthorityKey, got %v", name, err)
-		}
-	}
-}
-
-func TestLogStore_ChangeAuthority_RejectsAnUnknownAction(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	syncID := testsupport.UniqueSyncID(t)
-	founder := newAuthorityKey(t)
-	promoted := newAuthorityKey(t)
-	token := newToken(t)
-	bootstrap(t, store, syncID, founder, token)
-
-	_, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-1", "replace", promoted.publicKeyHex, token))
-	if !errors.Is(err, synclog.ErrInvalidAuthorityAction) {
-		t.Fatalf("expected ErrInvalidAuthorityAction, got %v", err)
 	}
 }
 
@@ -830,7 +737,7 @@ func TestLogStore_ChangeAuthority_RejectsAStaleWriteToken(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	_, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-1", synclog.AuthorityAdd, promoted.publicKeyHex, newToken(t)))
+	_, err := changeAuthority(t, store, ctx, authorityChange(founder, syncID, "promote-1", synclog.AuthorityAdd, promoted.publicKeyHex, newToken(t)))
 	if !errors.Is(err, synclog.ErrWriteTokenMismatch) {
 		t.Fatalf("expected ErrWriteTokenMismatch, got %v", err)
 	}
@@ -846,11 +753,11 @@ func TestLogStore_ChangeAuthority_RetryWithTheSameEntryIDIsIdempotent(t *testing
 	bootstrap(t, store, syncID, founder, token)
 
 	change := authorityChange(founder, syncID, "promote-1", synclog.AuthorityAdd, promoted.publicKeyHex, token)
-	first, err := store.ChangeAuthority(ctx, change)
+	first, err := changeAuthority(t, store, ctx, change)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := store.ChangeAuthority(ctx, change)
+	second, err := changeAuthority(t, store, ctx, change)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -882,6 +789,15 @@ func circleDeletion(signer authorityKey, syncID, entryID, token string) synclog.
 	return deletion
 }
 
+// deleteCircle calls the narrowed LogStore.DeleteCircle with a
+// fully-built CircleDeletion, hashing its WriteToken the way
+// Service.DeleteCircle does — so tests keep building requests the same
+// way while the store itself never sees a raw token or a signature.
+func deleteCircle(t *testing.T, store synclog.LogStore, ctx context.Context, deletion synclog.CircleDeletion) (synclog.CommitResult, error) {
+	t.Helper()
+	return store.DeleteCircle(ctx, deletion.SyncID, deletion.EntryID, deletion.EncryptedPayload, deletion.KeyVersion, hashToken(t, deletion.WriteToken), deletion.SignerAuthorityPublicKey)
+}
+
 func TestLogStore_DeleteCircle_SweepsContentButKeepsMetaAndTheTombstone(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
@@ -890,16 +806,16 @@ func TestLogStore_DeleteCircle_SweepsContentButKeepsMetaAndTheTombstone(t *testi
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "member-1", []byte("member_added"), 1, token, "test-author-key"); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "member-1", []byte("member_added"), 1, hashToken(t, token), "test-author-key"); err != nil {
 		t.Fatal(err)
 	}
 	for _, entryID := range []string{"post-1", "post-2", "post-3"} {
-		if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, entryID, []byte("post"), 1, token, "test-author-key"); err != nil {
+		if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, entryID, []byte("post"), 1, hashToken(t, token), "test-author-key"); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	commit, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token))
+	commit, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token))
 	if err != nil {
 		t.Fatalf("deleting the circle failed: %v", err)
 	}
@@ -938,25 +854,25 @@ func TestLogStore_DeleteCircle_RefusesEveryLaterWrite(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-after", []byte("post"), 1, token, "test-author-key"); !errors.Is(err, synclog.ErrCircleDeleted) {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-after", []byte("post"), 1, hashToken(t, token), "test-author-key"); !errors.Is(err, synclog.ErrCircleDeleted) {
 		t.Fatalf("expected a content append to be refused, got %v", err)
 	}
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "meta-after", []byte("meta"), 1, token, "test-author-key"); !errors.Is(err, synclog.ErrCircleDeleted) {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "meta-after", []byte("meta"), 1, hashToken(t, token), "test-author-key"); !errors.Is(err, synclog.ErrCircleDeleted) {
 		t.Fatalf("expected a meta append to be refused, got %v", err)
 	}
 
 	newHash := hashToken(t, newToken(t))
-	if _, err := store.Rotate(ctx, syncID, "rotate-after", []byte("k"), 1, token, newHash, founder.publicKeyHex, founder.sign(syncID, "rotate-after", newHash)); !errors.Is(err, synclog.ErrCircleDeleted) {
+	if _, err := store.Rotate(ctx, syncID, "rotate-after", []byte("k"), 1, hashToken(t, token), newHash, founder.publicKeyHex); !errors.Is(err, synclog.ErrCircleDeleted) {
 		t.Fatalf("expected a rotation to be refused, got %v", err)
 	}
-	if _, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-after", synclog.AuthorityAdd, promoted.publicKeyHex, token)); !errors.Is(err, synclog.ErrCircleDeleted) {
+	if _, err := changeAuthority(t, store, ctx, authorityChange(founder, syncID, "promote-after", synclog.AuthorityAdd, promoted.publicKeyHex, token)); !errors.Is(err, synclog.ErrCircleDeleted) {
 		t.Fatalf("expected an authority change to be refused, got %v", err)
 	}
-	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-2", token)); !errors.Is(err, synclog.ErrCircleDeleted) {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-2", token)); !errors.Is(err, synclog.ErrCircleDeleted) {
 		t.Fatalf("expected a second deletion to be refused, got %v", err)
 	}
 }
@@ -969,7 +885,7 @@ func TestLogStore_DeleteCircle_RefusesLaterVerification(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -994,7 +910,7 @@ func TestLogStore_DeleteCircle_KeepsServingReads(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1025,28 +941,11 @@ func TestLogStore_DeleteCircle_RejectsASignerOutsideTheSet(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.DeleteCircle(ctx, circleDeletion(outsider, syncID, "tombstone-1", token)); !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(outsider, syncID, "tombstone-1", token)); !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
 		t.Fatalf("expected a non-authority to be refused, got %v", err)
 	}
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("post"), 1, token, "test-author-key"); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("post"), 1, hashToken(t, token), "test-author-key"); err != nil {
 		t.Fatalf("a refused deletion must leave the circle writable: %v", err)
-	}
-}
-
-func TestLogStore_DeleteCircle_SignatureDoesNotCarryAcrossCircles(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	founder := newAuthorityKey(t)
-	token := newToken(t)
-	target := testsupport.UniqueSyncID(t)
-	other := testsupport.UniqueSyncID(t)
-	bootstrap(t, store, target, founder, token)
-	bootstrap(t, store, other, founder, token)
-
-	deletion := circleDeletion(founder, other, "tombstone-1", token)
-	deletion.SyncID = target
-	if _, err := store.DeleteCircle(ctx, deletion); !errors.Is(err, synclog.ErrInvalidSignature) {
-		t.Fatalf("expected a signature for another circle to be refused, got %v", err)
 	}
 }
 
@@ -1058,13 +957,13 @@ func TestLogStore_DeleteCircle_RetryWithTheSameEntryIDIsIdempotent(t *testing.T)
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	first, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token))
+	first, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token))
 	if err != nil {
 		t.Fatal(err)
 	}
 	// The same entryID is a retry of a call whose response was lost, not a
 	// second deletion — it re-runs the sweep and returns the original commit.
-	second, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token))
+	second, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token))
 	if err != nil {
 		t.Fatalf("a retry must converge rather than fail: %v", err)
 	}
@@ -1085,12 +984,12 @@ func TestLogStore_DeleteCircle_SweepsPastOneBatch(t *testing.T) {
 
 	const entries = 30
 	for i := range entries {
-		if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, fmt.Sprintf("post-%d", i), []byte("post"), 1, token, "test-author-key"); err != nil {
+		if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, fmt.Sprintf("post-%d", i), []byte("post"), 1, hashToken(t, token), "test-author-key"); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1114,10 +1013,10 @@ func TestLogStore_DeleteCircle_StampsMetaForExpiryWithoutDeletingIt(t *testing.T
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "member-1", []byte("member_added"), 1, token, "test-author-key"); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "member-1", []byte("member_added"), 1, hashToken(t, token), "test-author-key"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1161,7 +1060,7 @@ func TestLogStore_DeleteCircle_WithNoContentAtAll(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
 		t.Fatalf("deleting an empty circle failed: %v", err)
 	}
 
@@ -1172,7 +1071,7 @@ func TestLogStore_DeleteCircle_WithNoContentAtAll(t *testing.T) {
 	if len(read.Entries) != 1 {
 		t.Fatalf("expected just the tombstone, got %d entries", len(read.Entries))
 	}
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("post"), 1, token, "test-author-key"); !errors.Is(err, synclog.ErrCircleDeleted) {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("post"), 1, hashToken(t, token), "test-author-key"); !errors.Is(err, synclog.ErrCircleDeleted) {
 		t.Fatalf("expected the circle closed to writes, got %v", err)
 	}
 }
@@ -1192,6 +1091,34 @@ func deleteEntry(author authorityKey, syncID, entryID, tombstoneEntryID, token s
 	return deletion
 }
 
+// callDeleteEntry calls the narrowed LogStore.DeleteEntry, replicating
+// Service.DeleteEntry's find-then-authorize steps: try the author
+// signature first, falling back to the authority signature, exactly as
+// the domain layer does — so tests keep building an EntryDeletion the
+// same way while the store itself never sees a raw token or a signature.
+func callDeleteEntry(t *testing.T, store synclog.LogStore, ctx context.Context, deletion synclog.EntryDeletion) (synclog.CommitResult, error) {
+	t.Helper()
+	post, err := store.FindEntry(ctx, deletion.SyncID, deletion.TargetEntryID)
+	if err != nil {
+		return synclog.CommitResult{}, err
+	}
+
+	authorizedBy := post.AuthorIdentityPublicKey
+	var requiredAuthorityPublicKey string
+	if synclog.VerifySignature(post.AuthorIdentityPublicKey, deletion.Message(), deletion.AuthorSignature) != nil {
+		if deletion.AuthorityPublicKey == "" || len(deletion.AuthoritySignature) == 0 {
+			return synclog.CommitResult{}, synclog.ErrEntryNotAuthorized
+		}
+		if err := synclog.VerifySignature(deletion.AuthorityPublicKey, deletion.Message(), deletion.AuthoritySignature); err != nil {
+			return synclog.CommitResult{}, err
+		}
+		authorizedBy = deletion.AuthorityPublicKey
+		requiredAuthorityPublicKey = deletion.AuthorityPublicKey
+	}
+
+	return store.DeleteEntry(ctx, deletion.SyncID, deletion.TombstoneEntryID, post.Epoch, deletion.EncryptedPayload, deletion.KeyVersion, hashToken(t, deletion.WriteToken), authorizedBy, requiredAuthorityPublicKey)
+}
+
 func TestLogStore_DeleteEntry_SucceedsViaAuthorSignature(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
@@ -1204,11 +1131,11 @@ func TestLogStore_DeleteEntry_SucceedsViaAuthorSignature(t *testing.T) {
 	// Not a literal "post-1": the entryId-index GSI is global across the
 	// whole shared test table, and other tests' posts already use that.
 	postID := syncID + "-post-1"
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, postID, []byte("caption"), 1, token, author.publicKeyHex); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, postID, []byte("caption"), 1, hashToken(t, token), author.publicKeyHex); err != nil {
 		t.Fatal(err)
 	}
 
-	commit, err := store.DeleteEntry(ctx, deleteEntry(author, syncID, postID, "tombstone-1", token))
+	commit, err := callDeleteEntry(t, store, ctx, deleteEntry(author, syncID, postID, "tombstone-1", token))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1249,7 +1176,7 @@ func TestLogStore_DeleteEntry_SucceedsViaAuthoritySignature(t *testing.T) {
 	bootstrap(t, store, syncID, founder, token)
 
 	postID := syncID + "-post-1"
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, postID, []byte("caption"), 1, token, author.publicKeyHex); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, postID, []byte("caption"), 1, hashToken(t, token), author.publicKeyHex); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1265,32 +1192,12 @@ func TestLogStore_DeleteEntry_SucceedsViaAuthoritySignature(t *testing.T) {
 	}
 	deletion.AuthoritySignature = ed25519.Sign(founder.private, deletion.Message())
 
-	if _, err := store.DeleteEntry(ctx, deletion); err != nil {
+	if _, err := callDeleteEntry(t, store, ctx, deletion); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestLogStore_DeleteEntry_RejectsWrongSignature(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	syncID := testsupport.UniqueSyncID(t)
-	founder := newAuthorityKey(t)
-	author := newAuthorityKey(t)
-	impostor := newAuthorityKey(t)
-	token := newToken(t)
-	bootstrap(t, store, syncID, founder, token)
-
-	postID := syncID + "-post-1"
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, postID, []byte("caption"), 1, token, author.publicKeyHex); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := store.DeleteEntry(ctx, deleteEntry(impostor, syncID, postID, "tombstone-1", token)); !errors.Is(err, synclog.ErrEntryNotAuthorized) {
-		t.Fatalf("expected ErrEntryNotAuthorized, got %v", err)
-	}
-}
-
-func TestLogStore_DeleteEntry_RejectsUnknownTargetEntryID(t *testing.T) {
+func TestLogStore_FindEntry_RejectsAnUnknownEntryID(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
 	syncID := testsupport.UniqueSyncID(t)
@@ -1298,12 +1205,12 @@ func TestLogStore_DeleteEntry_RejectsUnknownTargetEntryID(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.DeleteEntry(ctx, deleteEntry(founder, syncID, "no-such-post", "tombstone-1", token)); !errors.Is(err, synclog.ErrEntryNotFound) {
+	if _, err := store.FindEntry(ctx, syncID, "no-such-post"); !errors.Is(err, synclog.ErrEntryNotFound) {
 		t.Fatalf("expected ErrEntryNotFound, got %v", err)
 	}
 }
 
-func TestLogStore_DeleteEntry_RejectsAMetaNamespaceTargetEntryID(t *testing.T) {
+func TestLogStore_FindEntry_RejectsAMetaNamespaceEntryID(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
 	syncID := testsupport.UniqueSyncID(t)
@@ -1312,15 +1219,14 @@ func TestLogStore_DeleteEntry_RejectsAMetaNamespaceTargetEntryID(t *testing.T) {
 	bootstrap(t, store, syncID, founder, token)
 
 	// The entryId-index GSI spans both namespaces, so a meta entry's id is
-	// findable the same way a content entry's is. DeleteEntry must still
-	// refuse it rather than strip whatever content row happens to sit at
-	// that resolved epoch.
+	// findable the same way a content entry's is. FindEntry must still
+	// refuse it — only content entries are deletable this way.
 	metaEntryID := syncID + "-meta-entry"
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceMeta, metaEntryID, []byte("meta"), 1, token, founder.publicKeyHex); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceMeta, metaEntryID, []byte("meta"), 1, hashToken(t, token), founder.publicKeyHex); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := store.DeleteEntry(ctx, deleteEntry(founder, syncID, metaEntryID, "tombstone-1", token)); !errors.Is(err, synclog.ErrEntryNotFound) {
+	if _, err := store.FindEntry(ctx, syncID, metaEntryID); !errors.Is(err, synclog.ErrEntryNotFound) {
 		t.Fatalf("expected ErrEntryNotFound for a meta-namespace target, got %v", err)
 	}
 }
@@ -1335,20 +1241,59 @@ func TestLogStore_DeleteEntry_RetryWithTheSameTombstoneEntryIDIsIdempotent(t *te
 	bootstrap(t, store, syncID, founder, token)
 
 	postID := syncID + "-post-1"
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, postID, []byte("caption"), 1, token, author.publicKeyHex); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, postID, []byte("caption"), 1, hashToken(t, token), author.publicKeyHex); err != nil {
 		t.Fatal(err)
 	}
 
-	first, err := store.DeleteEntry(ctx, deleteEntry(author, syncID, postID, "tombstone-1", token))
+	first, err := callDeleteEntry(t, store, ctx, deleteEntry(author, syncID, postID, "tombstone-1", token))
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := store.DeleteEntry(ctx, deleteEntry(author, syncID, postID, "tombstone-1", token))
+	second, err := callDeleteEntry(t, store, ctx, deleteEntry(author, syncID, postID, "tombstone-1", token))
 	if err != nil {
 		t.Fatalf("a retry must converge rather than fail: %v", err)
 	}
 	if first != second {
 		t.Fatalf("expected the retry to return the original commit, got %+v then %+v", first, second)
+	}
+}
+
+func TestLogStore_DeleteEntry_RejectsADemotedAdmin(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	promoted := newAuthorityKey(t)
+	author := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+	grant(t, store, syncID, "promote-1", founder, promoted, token)
+
+	postID := syncID + "-post-1"
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, postID, []byte("caption"), 1, hashToken(t, token), author.publicKeyHex); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := changeAuthority(t, store, ctx, authorityChange(founder, syncID, "demote-1", synclog.AuthorityRemove, promoted.publicKeyHex, token)); err != nil {
+		t.Fatal(err)
+	}
+
+	// promoted's signature is still cryptographically valid, but the key
+	// is no longer an authority — the CAS condition re-checking
+	// authoritySet at commit time is what catches this, not a check made
+	// once before the commit and trusted afterward.
+	deletion := synclog.EntryDeletion{
+		SyncID:             syncID,
+		TargetEntryID:      postID,
+		TombstoneEntryID:   "tombstone-1",
+		EncryptedPayload:   []byte("post_delete payload"),
+		KeyVersion:         1,
+		WriteToken:         token,
+		AuthorityPublicKey: promoted.publicKeyHex,
+	}
+	deletion.AuthoritySignature = ed25519.Sign(promoted.private, deletion.Message())
+
+	if _, err := callDeleteEntry(t, store, ctx, deletion); !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
+		t.Fatalf("expected a demoted admin's delete to be rejected, got %v", err)
 	}
 }
 
@@ -1369,6 +1314,25 @@ func authorContentDeletion(author authorityKey, syncID, tombstoneEntryID, token 
 	return deletion
 }
 
+// callDeleteAuthorContent calls the narrowed LogStore.DeleteAuthorContent,
+// replicating Service.DeleteAuthorContent's verify-then-hash steps — so
+// tests keep building an AuthorContentDeletion the same way while the
+// store itself never sees a raw token or a signature.
+func callDeleteAuthorContent(t *testing.T, store synclog.LogStore, ctx context.Context, deletion synclog.AuthorContentDeletion) (synclog.AuthorContentResult, error) {
+	t.Helper()
+	if err := synclog.VerifySignature(deletion.AuthorIdentityPublicKey, deletion.Message(), deletion.AuthorSignature); err != nil {
+		if errors.Is(err, synclog.ErrInvalidSignature) {
+			return synclog.AuthorContentResult{}, synclog.ErrEntryNotAuthorized
+		}
+		return synclog.AuthorContentResult{}, err
+	}
+	var writeTokenHash string
+	if deletion.TombstoneEntryID != "" {
+		writeTokenHash = hashToken(t, deletion.WriteToken)
+	}
+	return store.DeleteAuthorContent(ctx, deletion.SyncID, deletion.AuthorIdentityPublicKey, deletion.TombstoneEntryID, deletion.EncryptedPayload, deletion.KeyVersion, writeTokenHash)
+}
+
 func TestLogStore_DeleteAuthorContent_StripsTheAuthorsRowsAndAppendsTheTombstone(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
@@ -1380,18 +1344,18 @@ func TestLogStore_DeleteAuthorContent_StripsTheAuthorsRowsAndAppendsTheTombstone
 	bootstrap(t, store, syncID, founder, token)
 
 	for i, id := range []string{"-a1", "-a2", "-a3"} {
-		if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, syncID+id, []byte(fmt.Sprintf("author content %d", i)), 1, token, author.publicKeyHex); err != nil {
+		if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, syncID+id, []byte(fmt.Sprintf("author content %d", i)), 1, hashToken(t, token), author.publicKeyHex); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, syncID+"-b1", []byte("other content"), 1, token, other.publicKeyHex); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, syncID+"-b1", []byte("other content"), 1, hashToken(t, token), other.publicKeyHex); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceMeta, syncID+"-m1", []byte("member_added"), 1, token, author.publicKeyHex); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceMeta, syncID+"-m1", []byte("member_added"), 1, hashToken(t, token), author.publicKeyHex); err != nil {
 		t.Fatal(err)
 	}
 
-	result, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
+	result, err := callDeleteAuthorContent(t, store, ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1444,12 +1408,12 @@ func TestLogStore_DeleteAuthorContent_StripOnlyModeAppendsNothing(t *testing.T) 
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, syncID+"-a1", []byte("caption"), 1, token, author.publicKeyHex); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, syncID+"-a1", []byte("caption"), 1, hashToken(t, token), author.publicKeyHex); err != nil {
 		t.Fatal(err)
 	}
 
 	// No tombstone and no write token — a departed member's erase.
-	result, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, "", ""))
+	result, err := callDeleteAuthorContent(t, store, ctx, authorContentDeletion(author, syncID, "", ""))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1466,36 +1430,6 @@ func TestLogStore_DeleteAuthorContent_StripOnlyModeAppendsNothing(t *testing.T) 
 	}
 }
 
-func TestLogStore_DeleteAuthorContent_RejectsAWrongSignature(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	syncID := testsupport.UniqueSyncID(t)
-	founder := newAuthorityKey(t)
-	author := newAuthorityKey(t)
-	impostor := newAuthorityKey(t)
-	token := newToken(t)
-	bootstrap(t, store, syncID, founder, token)
-
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, syncID+"-a1", []byte("caption"), 1, token, author.publicKeyHex); err != nil {
-		t.Fatal(err)
-	}
-
-	// The impostor claims the author's key but can't sign for it.
-	deletion := authorContentDeletion(impostor, syncID, "", "")
-	deletion.AuthorIdentityPublicKey = author.publicKeyHex
-	if _, err := store.DeleteAuthorContent(ctx, deletion); !errors.Is(err, synclog.ErrEntryNotAuthorized) {
-		t.Fatalf("expected ErrEntryNotAuthorized, got %v", err)
-	}
-
-	read, err := store.Read(ctx, syncID, synclog.NamespaceContent, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(read.Entries[0].EncryptedMeta) == 0 {
-		t.Fatal("expected the row to survive a refused erase")
-	}
-}
-
 func TestLogStore_DeleteAuthorContent_RetryConvergesWithoutStrippingTheTombstone(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
@@ -1505,18 +1439,18 @@ func TestLogStore_DeleteAuthorContent_RetryConvergesWithoutStrippingTheTombstone
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, syncID+"-a1", []byte("caption"), 1, token, author.publicKeyHex); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, syncID+"-a1", []byte("caption"), 1, hashToken(t, token), author.publicKeyHex); err != nil {
 		t.Fatal(err)
 	}
 
-	first, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
+	first, err := callDeleteAuthorContent(t, store, ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
 	if err != nil {
 		t.Fatal(err)
 	}
 	// The tombstone is authored by the same key — a retry must not treat
 	// it as content to strip (it's meta, outside the range paged here,
 	// regardless).
-	second, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
+	second, err := callDeleteAuthorContent(t, store, ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
 	if err != nil {
 		t.Fatalf("a retry must converge rather than fail: %v", err)
 	}
@@ -1553,7 +1487,7 @@ func TestLogStore_DeleteAuthorContent_UnknownCircleIsNotFound(t *testing.T) {
 	store := testsupport.NewLogStore(t)
 	author := newAuthorityKey(t)
 
-	if _, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, testsupport.UniqueSyncID(t), "", "")); !errors.Is(err, synclog.ErrCircleNotFound) {
+	if _, err := callDeleteAuthorContent(t, store, ctx, authorContentDeletion(author, testsupport.UniqueSyncID(t), "", "")); !errors.Is(err, synclog.ErrCircleNotFound) {
 		t.Fatalf("expected ErrCircleNotFound, got %v", err)
 	}
 }
@@ -1567,11 +1501,11 @@ func TestLogStore_DeleteAuthorContent_StaleTokenFailsBeforeAnythingIsStripped(t 
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, syncID+"-a1", []byte("caption"), 1, token, author.publicKeyHex); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, syncID+"-a1", []byte("caption"), 1, hashToken(t, token), author.publicKeyHex); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, syncID+"-tomb", newToken(t))); !errors.Is(err, synclog.ErrWriteTokenMismatch) {
+	if _, err := callDeleteAuthorContent(t, store, ctx, authorContentDeletion(author, syncID, syncID+"-tomb", newToken(t))); !errors.Is(err, synclog.ErrWriteTokenMismatch) {
 		t.Fatalf("expected ErrWriteTokenMismatch, got %v", err)
 	}
 

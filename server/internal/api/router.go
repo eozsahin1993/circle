@@ -88,18 +88,23 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	writeLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.WriteLimit, h) }
 	readLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.ReadLimit, h) }
 
+	// The domain layer wrapping deps.Log — holds the capability checks
+	// (signature verification, write-token hashing) LogStore's own
+	// methods used to do themselves. See internal/synclog.Service.
+	logService := &synclog.Service{Log: deps.Log}
+
 	circleMux := http.NewServeMux()
 	createlog.Register(circleMux, &createlog.Service{LogStore: deps.Log}, writeLimit)
-	appendlog.Register(circleMux, &appendlog.Service{LogStore: deps.Log}, writeLimit)
-	rotatelog.Register(circleMux, &rotatelog.Service{LogStore: deps.Log}, writeLimit)
-	changeauthority.Register(circleMux, &changeauthority.Service{LogStore: deps.Log}, writeLimit)
-	deletecircle.Register(circleMux, &deletecircle.Service{LogStore: deps.Log, BlobStore: deps.Blob}, writeLimit)
+	appendlog.Register(circleMux, &appendlog.Service{Log: logService}, writeLimit)
+	rotatelog.Register(circleMux, &rotatelog.Service{Log: logService}, writeLimit)
+	changeauthority.Register(circleMux, &changeauthority.Service{Log: logService}, writeLimit)
+	deletecircle.Register(circleMux, &deletecircle.Service{Log: logService, BlobStore: deps.Blob}, writeLimit)
 	getlog.Register(circleMux, &getlog.Service{LogStore: deps.Log}, readLimit)
 	getblob.Register(circleMux, &getblob.Service{BlobStore: deps.Blob}, readLimit)
 	getuploadtarget.Register(circleMux, &getuploadtarget.Service{BlobStore: deps.Blob, LogStore: deps.Log}, writeLimit)
 	deleteblob.Register(circleMux, &deleteblob.Service{BlobStore: deps.Blob, LogStore: deps.Log}, writeLimit)
-	deleteentry.Register(circleMux, &deleteentry.Service{LogStore: deps.Log, BlobStore: deps.Blob}, writeLimit)
-	deleteauthorcontent.Register(circleMux, &deleteauthorcontent.Service{LogStore: deps.Log, BlobStore: deps.Blob}, writeLimit)
+	deleteentry.Register(circleMux, &deleteentry.Service{Log: logService, BlobStore: deps.Blob}, writeLimit)
+	deleteauthorcontent.Register(circleMux, &deleteauthorcontent.Service{Log: logService, BlobStore: deps.Blob}, writeLimit)
 	getcoverphotouploadtarget.Register(circleMux, &getcoverphotouploadtarget.Service{BlobStore: deps.Blob, LogStore: deps.Log}, writeLimit)
 	mux.Handle("/circles/", auth.RequireSession(deps.Auth, circleMux))
 

@@ -17,44 +17,39 @@ import (
 
 // DeleteCircle runs the same verify-then-CAS shape as ChangeAuthority,
 // stamping deletedAt instead of touching the authority set, then sweeps
-// the content namespace once the tombstone is safely down.
-func (s *Store) DeleteCircle(ctx context.Context, deletion synclog.CircleDeletion) (synclog.CommitResult, error) {
-	if err := synclog.VerifySignature(deletion.SignerAuthorityPublicKey, deletion.Message(), deletion.Signature); err != nil {
-		return synclog.CommitResult{}, err
-	}
-
-	if existing, err := s.lookupIdempotencyMarker(ctx, deletion.SyncID, synclog.NamespaceMeta, deletion.EntryID); err != nil {
+// the content namespace once the tombstone is safely down. See
+// LogStore.DeleteCircle for why signature verification isn't done here.
+func (s *Store) DeleteCircle(ctx context.Context, syncID, entryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash string, signerAuthorityPublicKey string) (synclog.CommitResult, error) {
+	if existing, err := s.lookupIdempotencyMarker(ctx, syncID, synclog.NamespaceMeta, entryID); err != nil {
 		return synclog.CommitResult{}, err
 	} else if existing != nil {
 		// The tombstone is already down, but the sweep behind it may have
 		// died partway. Re-running it is what makes the whole operation
 		// safe to retry — and it needs the counter the sweep addresses by,
 		// which on this path hasn't been read yet.
-		control, err := s.getControlState(ctx, deletion.SyncID, true)
+		control, err := s.getControlState(ctx, syncID, true)
 		if err != nil {
 			return synclog.CommitResult{}, err
 		}
-		return *existing, s.sweepDeleted(ctx, deletion.SyncID, control.contentCounter)
+		return *existing, s.sweepDeleted(ctx, syncID, control.contentCounter)
 	}
-
-	expectedHash, hashErr := synclog.WriteTokenHash(deletion.WriteToken)
 
 	// Captured by plan on whichever attempt actually commits (or converges
 	// on someone else's), so the sweep below always has a real counter —
 	// plan runs at least once before casCommit can return without error.
 	var sweepCounter int64
 
-	result, err := s.casCommit(ctx, deletion.SyncID, synclog.NamespaceMeta, deletion.EntryID, entryFields{
-		EncryptedPayload: deletion.EncryptedPayload,
-		KeyVersion:       deletion.KeyVersion,
+	result, err := s.casCommit(ctx, syncID, synclog.NamespaceMeta, entryID, entryFields{
+		EncryptedPayload: encryptedPayload,
+		KeyVersion:       keyVersion,
 	}, func(control *controlState, epoch, receivedAt int64) (casPlan, error) {
-		if hashErr != nil || control.writeTokenHash != expectedHash {
+		if control.writeTokenHash != writeTokenHash {
 			return casPlan{}, synclog.ErrWriteTokenMismatch
 		}
 		if control.deleted {
 			return casPlan{}, synclog.ErrCircleDeleted
 		}
-		if !control.authoritySet[deletion.SignerAuthorityPublicKey] {
+		if !control.authoritySet[signerAuthorityPublicKey] {
 			return casPlan{}, synclog.ErrAuthorityNotRecognized
 		}
 
@@ -62,14 +57,14 @@ func (s *Store) DeleteCircle(ctx context.Context, deletion synclog.CircleDeletio
 
 		return casPlan{Control: types.Update{
 			TableName:           aws.String(s.tableName),
-			Key:                 controlKey(deletion.SyncID),
+			Key:                 controlKey(syncID),
 			UpdateExpression:    aws.String("SET metaCounter = :next, deletedAt = :deletedAt"),
 			ConditionExpression: aws.String("writeTokenHash = :hash AND metaCounter = :current AND contains(authoritySet, :signer) AND attribute_not_exists(deletedAt)"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":hash":      &types.AttributeValueMemberS{Value: expectedHash},
+				":hash":      &types.AttributeValueMemberS{Value: writeTokenHash},
 				":current":   &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch-1, 10)},
 				":next":      &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
-				":signer":    &types.AttributeValueMemberS{Value: deletion.SignerAuthorityPublicKey},
+				":signer":    &types.AttributeValueMemberS{Value: signerAuthorityPublicKey},
 				":deletedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(receivedAt, 10)},
 			},
 		}}, nil
@@ -77,7 +72,7 @@ func (s *Store) DeleteCircle(ctx context.Context, deletion synclog.CircleDeletio
 	if err != nil {
 		return synclog.CommitResult{}, err
 	}
-	return result, s.sweepDeleted(ctx, deletion.SyncID, sweepCounter)
+	return result, s.sweepDeleted(ctx, syncID, sweepCounter)
 }
 
 // deletedMetaTTL is how long a deleted circle's meta namespace outlives
