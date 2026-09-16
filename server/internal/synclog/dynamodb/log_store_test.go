@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -19,18 +18,13 @@ import (
 	"circle-relay/internal/testsupport"
 )
 
-// hashToken duplicates the adapter's private hashWriteToken (unexported,
-// and this is an external _test package, same reasoning as the sort-key
-// format duplication below) — sha256 over the raw bytes a hex-encoded
-// write token decodes to.
 func hashToken(t *testing.T, tokenHex string) string {
 	t.Helper()
-	raw, err := hex.DecodeString(tokenHex)
+	hash, err := synclog.WriteTokenHash(tokenHex)
 	if err != nil {
 		t.Fatalf("test token isn't valid hex: %v", err)
 	}
-	sum := sha256.Sum256(raw)
-	return hex.EncodeToString(sum[:])
+	return hash
 }
 
 // newToken returns a fresh, random hex-encoded string standing in for a
@@ -967,6 +961,31 @@ func TestLogStore_DeleteCircle_RefusesEveryLaterWrite(t *testing.T) {
 	}
 }
 
+func TestLogStore_DeleteCircle_RefusesLaterVerification(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+		t.Fatal(err)
+	}
+
+	// A still-valid write token or authority signature must not keep
+	// gating blob operations (upload targets, blob deletes) after the
+	// circle they belong to is gone.
+	if err := store.VerifyWriteToken(ctx, syncID, token); !errors.Is(err, synclog.ErrCircleDeleted) {
+		t.Fatalf("expected VerifyWriteToken to refuse a deleted circle, got %v", err)
+	}
+	message := []byte("arbitrary-message")
+	signature := ed25519.Sign(founder.private, message)
+	if err := store.VerifyAuthoritySignature(ctx, syncID, founder.publicKeyHex, message, signature); !errors.Is(err, synclog.ErrCircleDeleted) {
+		t.Fatalf("expected VerifyAuthoritySignature to refuse a deleted circle, got %v", err)
+	}
+}
+
 func TestLogStore_DeleteCircle_KeepsServingReads(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
@@ -1281,6 +1300,28 @@ func TestLogStore_DeleteEntry_RejectsUnknownTargetEntryID(t *testing.T) {
 
 	if _, err := store.DeleteEntry(ctx, deleteEntry(founder, syncID, "no-such-post", "tombstone-1", token)); !errors.Is(err, synclog.ErrEntryNotFound) {
 		t.Fatalf("expected ErrEntryNotFound, got %v", err)
+	}
+}
+
+func TestLogStore_DeleteEntry_RejectsAMetaNamespaceTargetEntryID(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+
+	// The entryId-index GSI spans both namespaces, so a meta entry's id is
+	// findable the same way a content entry's is. DeleteEntry must still
+	// refuse it rather than strip whatever content row happens to sit at
+	// that resolved epoch.
+	metaEntryID := syncID + "-meta-entry"
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceMeta, metaEntryID, []byte("meta"), 1, token, founder.publicKeyHex); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := store.DeleteEntry(ctx, deleteEntry(founder, syncID, metaEntryID, "tombstone-1", token)); !errors.Is(err, synclog.ErrEntryNotFound) {
+		t.Fatalf("expected ErrEntryNotFound for a meta-namespace target, got %v", err)
 	}
 }
 

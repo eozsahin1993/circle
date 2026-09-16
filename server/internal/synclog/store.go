@@ -165,16 +165,10 @@ type AuthorityChange struct {
 	Signature                []byte
 }
 
-// Message is the exact byte sequence Signature must cover — same
-// version-prefixed, null-byte-joined construction as RotateMessage, and
-// bound to every part of what it authorizes: the circle, the action (so a
-// promotion's signature can't be replayed as the demotion of the same
-// person), the target key, and the entry (so one signature moves the set
-// exactly once).
-//
-// Both the relay and every client must construct this identically.
+// Message is the exact byte sequence Signature must cover — see
+// authorityChangeMessage in messages.go.
 func (c AuthorityChange) Message() []byte {
-	return []byte("circle-relay/authority-change/v1\x00" + string(c.Action) + "\x00" + c.SyncID + "\x00" + c.EntryID + "\x00" + c.TargetAuthorityPublicKey)
+	return authorityChangeMessage(c.Action, c.SyncID, c.EntryID, c.TargetAuthorityPublicKey)
 }
 
 // CircleDeletion is one circle being deleted — the tombstone entry
@@ -190,8 +184,10 @@ type CircleDeletion struct {
 	Signature                []byte
 }
 
+// Message is the exact byte sequence Signature must cover — see
+// circleDeletionMessage in messages.go.
 func (d CircleDeletion) Message() []byte {
-	return []byte("circle-relay/delete-circle/v1\x00" + d.SyncID + "\x00" + d.EntryID)
+	return circleDeletionMessage(d.SyncID, d.EntryID)
 }
 
 // EntryDeletion is one post being deleted — the tombstone entry, and the
@@ -213,10 +209,10 @@ type EntryDeletion struct {
 	AuthoritySignature []byte
 }
 
-// Message binds the circle, the post, and the tombstone entry — not the
-// lookup, which is never signed.
+// Message is the exact byte sequence signed against — see
+// entryDeletionMessage in messages.go.
 func (d EntryDeletion) Message() []byte {
-	return []byte("circle-relay/delete-entry/v1\x00" + d.SyncID + "\x00" + d.TargetEntryID + "\x00" + d.TombstoneEntryID)
+	return entryDeletionMessage(d.SyncID, d.TargetEntryID, d.TombstoneEntryID)
 }
 
 // AuthorContentDeletion is every content entry one identity authored in
@@ -240,10 +236,10 @@ type AuthorContentDeletion struct {
 	AuthorSignature []byte
 }
 
-// Message binds the circle, the author, and the tombstone entry ("" in
-// strip-only mode) — same construction as every other signed message.
+// Message is the exact byte sequence AuthorSignature must cover — see
+// authorContentDeletionMessage in messages.go.
 func (d AuthorContentDeletion) Message() []byte {
-	return []byte("circle-relay/delete-author-content/v1\x00" + d.SyncID + "\x00" + d.AuthorIdentityPublicKey + "\x00" + d.TombstoneEntryID)
+	return authorContentDeletionMessage(d.SyncID, d.AuthorIdentityPublicKey, d.TombstoneEntryID)
 }
 
 // AuthorContentResult is what DeleteAuthorContent hands back:
@@ -388,35 +384,4 @@ type LogStore interface {
 	// per-upload existence check to fall back on (see
 	// BlobStore.GetCoverPhotoUploadTarget).
 	VerifyAuthoritySignature(ctx context.Context, syncID, authorityPublicKey string, message []byte, signature []byte) error
-}
-
-// RotateMessage is the exact byte sequence an authority signature must
-// cover for a Rotate call — version-prefixed and null-byte-joined (not
-// concatenated directly) so no combination of field values can be
-// reinterpreted as a different message, e.g. syncID="ab"+entryID="c"
-// can't collide with syncID="a"+entryID="bc". Bound to newWriteTokenHash
-// so it's meaningless for any rotation but this exact one.
-//
-// Both the relay and every client must construct this identically.
-func RotateMessage(syncID, entryID, newWriteTokenHash string) []byte {
-	return []byte("circle-relay/rotate/v1\x00" + syncID + "\x00" + entryID + "\x00" + newWriteTokenHash)
-}
-
-// CoverPhotoUploadMessage is the exact byte sequence an authority
-// signature must cover to obtain a cover-photo upload URL — see
-// getcoverphotouploadtarget. Same version-prefixed, null-byte-joined
-// construction as RotateMessage, and for the same reason: it's what makes
-// the signature mean "I am authorizing a cover-photo upload for this
-// circle" specifically, not reinterpretable as authorization for anything
-// else this same admin key might sign.
-func CoverPhotoUploadMessage(syncID string) []byte {
-	return []byte("circle-relay/cover-photo-upload/v1\x00" + syncID)
-}
-
-// DeleteBlobMessage is the exact byte sequence an authority signature
-// must cover to delete a blob the admin did not upload themselves. Same
-// construction as the two above, bound to the entry so one signature
-// destroys one object rather than any blob in the circle.
-func DeleteBlobMessage(syncID, entryID string) []byte {
-	return []byte("circle-relay/delete-blob/v1\x00" + syncID + "\x00" + entryID)
 }

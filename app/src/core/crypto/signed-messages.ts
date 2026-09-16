@@ -1,6 +1,6 @@
 /**
  * The exact byte sequence an authority signature must cover for a rotate
- * call — must match the relay's own `logstore.RotateMessage` byte-for-byte.
+ * call — must match the relay's own `synclog.RotateMessage` byte-for-byte.
  */
 export function deriveRotateMessage(syncId: string, entryId: string, newWriteTokenHash: string): Uint8Array {
   return new TextEncoder().encode(`circle-relay/rotate/v1\x00${syncId}\x00${entryId}\x00${newWriteTokenHash}`);
@@ -14,7 +14,7 @@ export type AuthorityAction = (typeof AuthorityActions)[keyof typeof AuthorityAc
 /**
  * The exact byte sequence an authority signature must cover to add or
  * remove a key from a circle's authority set — must match the relay's own
- * `logstore.AuthorityChange.Message` byte-for-byte. Bound to the action
+ * `synclog.AuthorityChange.Message` byte-for-byte. Bound to the action
  * as well as the target, so a promotion's signature can't be turned into
  * the demotion of the same person.
  */
@@ -45,7 +45,7 @@ export function deriveAuthorityKeyProofMessage(identityPublicKey: string): Uint8
 /**
  * The exact byte sequence an authority signature must cover to obtain a
  * cover-photo upload URL — must match the relay's own
- * `logstore.CoverPhotoUploadMessage` byte-for-byte.
+ * `synclog.CoverPhotoUploadMessage` byte-for-byte.
  */
 export function deriveCoverPhotoUploadMessage(syncId: string): Uint8Array {
   return new TextEncoder().encode(`circle-relay/cover-photo-upload/v1\x00${syncId}`);
@@ -54,7 +54,7 @@ export function deriveCoverPhotoUploadMessage(syncId: string): Uint8Array {
 /**
  * The exact byte sequence an authority signature must cover to delete a
  * blob this device didn't upload — must match the relay's own
- * `logstore.DeleteBlobMessage` byte-for-byte. Bound to the entry, so one
+ * `synclog.DeleteBlobMessage` byte-for-byte. Bound to the entry, so one
  * signature authorizes destroying one photo.
  */
 export function deriveDeleteBlobMessage(syncId: string, entryId: string): Uint8Array {
@@ -63,7 +63,7 @@ export function deriveDeleteBlobMessage(syncId: string, entryId: string): Uint8A
 
 /**
  * The exact byte sequence an authority signature must cover to delete a
- * circle — must match the relay's own `logstore.CircleDeletion.Message()`
+ * circle — must match the relay's own `synclog.CircleDeletion.Message()`
  * byte-for-byte. Bound to the tombstone's entry id, so one signature ends
  * one circle rather than authorizing a deletion the caller can replay.
  */
@@ -73,7 +73,7 @@ export function deriveDeleteCircleMessage(syncId: string, entryId: string): Uint
 
 /**
  * The exact byte sequence a signature must cover to delete a post — must
- * match the relay's own `logstore.PostDeletion.Message()` byte-for-byte.
+ * match the relay's own `synclog.EntryDeletion.Message()` byte-for-byte.
  * Bound to both the post and the tombstone entry id, so one signature
  * can't be replayed against a different tombstone attempt later.
  */
@@ -84,7 +84,7 @@ export function deriveDeleteEntryMessage(syncId: string, entryId: string, tombst
 /**
  * The exact byte sequence a signature must cover to erase everything one
  * identity authored in a circle — must match the relay's
- * `logstore.AuthorContentDeletion.Message()` byte-for-byte.
+ * `synclog.AuthorContentDeletion.Message()` byte-for-byte.
  * `tombstoneEntryId` is the empty string in strip-only mode (a circle
  * already departed, where no tombstone can be appended).
  */

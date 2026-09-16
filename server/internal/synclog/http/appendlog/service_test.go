@@ -3,7 +3,6 @@ package appendlog_test
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"testing"
 
@@ -24,17 +23,13 @@ func newToken(t *testing.T) string {
 	return hex.EncodeToString(buf)
 }
 
-// hashToken duplicates synclog/dynamodb's own private hashWriteToken —
-// this package only needs a token whose hash it knows, to bootstrap a
-// circle it can then Append into.
 func hashToken(t *testing.T, tokenHex string) string {
 	t.Helper()
-	raw, err := hex.DecodeString(tokenHex)
+	hash, err := synclog.WriteTokenHash(tokenHex)
 	if err != nil {
 		t.Fatalf("test token isn't valid hex: %v", err)
 	}
-	sum := sha256.Sum256(raw)
-	return hex.EncodeToString(sum[:])
+	return hash
 }
 
 func newService(t *testing.T) (*appendlog.Service, string, string) {

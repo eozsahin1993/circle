@@ -8,7 +8,6 @@ package api_test
 import (
 	"crypto/ed25519"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -50,9 +49,8 @@ func randomHex(t *testing.T, n int) string {
 }
 
 func hashToken(tokenHex string) string {
-	raw, _ := hex.DecodeString(tokenHex)
-	sum := sha256.Sum256(raw)
-	return hex.EncodeToString(sum[:])
+	hash, _ := synclog.WriteTokenHash(tokenHex)
+	return hash
 }
 
 func TestEndToEnd_BootstrapAppendFetchRotateAndDownload(t *testing.T) {
