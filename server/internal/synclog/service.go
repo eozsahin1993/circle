@@ -9,6 +9,17 @@ type Service struct {
 	Log LogStore
 }
 
+// Append hashes writeToken and calls LogStore.Append — the
+// possession-gated write path shared by every ordinary entry, with no
+// signature to verify.
+func (s *Service) Append(ctx context.Context, syncID string, ns Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeToken, authorIdentityPublicKey string) (CommitResult, error) {
+	writeTokenHash, err := WriteTokenHash(writeToken)
+	if err != nil {
+		return CommitResult{}, ErrWriteTokenMismatch
+	}
+	return s.Log.Append(ctx, syncID, ns, entryID, encryptedPayload, keyVersion, writeTokenHash, authorIdentityPublicKey)
+}
+
 // Rotate verifies the signature before hashing currentWriteToken and
 // calling LogStore.Rotate.
 func (s *Service) Rotate(ctx context.Context, syncID, entryID string, encryptedPayload []byte, currentKeyVersion int64, currentWriteToken, newWriteTokenHash, authorityPublicKey string, signature []byte) (CommitResult, error) {

@@ -32,6 +32,10 @@ type fakeLogStore struct {
 	deleteEntryCalls []deleteEntryCall
 	deleteEntryOut   synclog.CommitResult
 	deleteEntryErr   error
+
+	appendCalls []appendCall
+	appendOut   synclog.CommitResult
+	appendErr   error
 }
 
 type rotateCall struct {
@@ -63,8 +67,19 @@ func (f *fakeLogStore) ChangeAuthority(ctx context.Context, syncID, entryID stri
 func (f *fakeLogStore) Bootstrap(ctx context.Context, syncID, founderAuthorityPublicKey, initialWriteTokenHash string) error {
 	panic("fakeLogStore: Bootstrap not implemented")
 }
-func (f *fakeLogStore) Append(ctx context.Context, syncID string, ns synclog.Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeToken, authorIdentityPublicKey string) (synclog.CommitResult, error) {
-	panic("fakeLogStore: Append not implemented")
+
+type appendCall struct {
+	syncID                                  string
+	ns                                      synclog.Namespace
+	entryID                                 string
+	encryptedPayload                        []byte
+	keyVersion                              int64
+	writeTokenHash, authorIdentityPublicKey string
+}
+
+func (f *fakeLogStore) Append(ctx context.Context, syncID string, ns synclog.Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash, authorIdentityPublicKey string) (synclog.CommitResult, error) {
+	f.appendCalls = append(f.appendCalls, appendCall{syncID, ns, entryID, encryptedPayload, keyVersion, writeTokenHash, authorIdentityPublicKey})
+	return f.appendOut, f.appendErr
 }
 
 type deleteCircleCall struct {
@@ -529,5 +544,42 @@ func TestService_DeleteEntry_PropagatesFindEntryError(t *testing.T) {
 	}
 	if len(log.deleteEntryCalls) != 0 {
 		t.Fatalf("expected LogStore.DeleteEntry never called, got %d calls", len(log.deleteEntryCalls))
+	}
+}
+
+func TestService_Append_RejectsAMalformedWriteToken(t *testing.T) {
+	log := &fakeLogStore{}
+	svc := &synclog.Service{Log: log}
+	_, err := svc.Append(context.Background(), "sync-1", synclog.NamespaceContent, "post-1", []byte("ciphertext"), 1, "not-hex", "author-key")
+	if !errors.Is(err, synclog.ErrWriteTokenMismatch) {
+		t.Fatalf("expected ErrWriteTokenMismatch for a malformed token, got %v", err)
+	}
+	if len(log.appendCalls) != 0 {
+		t.Fatalf("expected LogStore.Append never called, got %d calls", len(log.appendCalls))
+	}
+}
+
+func TestService_Append_HashesTheWriteTokenBeforeCallingLogStore(t *testing.T) {
+	log := &fakeLogStore{appendOut: synclog.CommitResult{Epoch: 1, ReceivedAt: 100}}
+	svc := &synclog.Service{Log: log}
+	result, err := svc.Append(context.Background(), "sync-1", synclog.NamespaceContent, "post-1", []byte("ciphertext"), 1, "deadbeef", "author-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != log.appendOut {
+		t.Fatalf("expected the LogStore's result passed through unchanged, got %+v", result)
+	}
+	if len(log.appendCalls) != 1 {
+		t.Fatalf("expected exactly one LogStore.Append call, got %d", len(log.appendCalls))
+	}
+	wantHash, err := synclog.WriteTokenHash("deadbeef")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := log.appendCalls[0].writeTokenHash; got != wantHash {
+		t.Fatalf("expected the raw token hashed before reaching LogStore, got %q want %q", got, wantHash)
+	}
+	if got := log.appendCalls[0].authorIdentityPublicKey; got != "author-key" {
+		t.Fatalf("expected authorIdentityPublicKey passed through, got %q", got)
 	}
 }

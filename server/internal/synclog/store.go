@@ -266,8 +266,9 @@ type LogStore interface {
 	Bootstrap(ctx context.Context, syncID, founderAuthorityPublicKey, initialWriteTokenHash string) error
 
 	// Append is the possession-gated write path shared by every ordinary
-	// entry in either namespace. writeToken is the raw (not pre-hashed)
-	// token — Append hashes it and compares against what's on file.
+	// entry in either namespace. writeTokenHash is compared against
+	// what's on file — hashing the raw token is Service.Append's job, not
+	// this adapter's.
 	//
 	// entryID makes retries safe: an entryID already recorded for this
 	// (syncID, ns) returns the *original* CommitResult rather than
@@ -281,7 +282,7 @@ type LogStore interface {
 	// BlobStore.GetUploadTarget's uploaderPublicKey. Nothing checks
 	// it against EncryptedMeta's signature yet; it exists so a future
 	// capability can verify one before authorizing a redaction.
-	Append(ctx context.Context, syncID string, ns Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeToken, authorIdentityPublicKey string) (CommitResult, error)
+	Append(ctx context.Context, syncID string, ns Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash, authorIdentityPublicKey string) (CommitResult, error)
 
 	// Rotate is the capability-gated write path for a key rotation.
 	// Atomically: verifies currentWriteTokenHash and authoritySet

@@ -51,7 +51,11 @@ func (s *Store) DeleteAuthorContent(ctx context.Context, deletion synclog.Author
 
 	result := synclog.AuthorContentResult{StrippedEntryIDs: stripped}
 	if withTombstone {
-		commit, err := s.Append(ctx, deletion.SyncID, synclog.NamespaceMeta, deletion.TombstoneEntryID, deletion.EncryptedPayload, deletion.KeyVersion, deletion.WriteToken, deletion.AuthorIdentityPublicKey)
+		writeTokenHash, err := synclog.WriteTokenHash(deletion.WriteToken)
+		if err != nil {
+			return synclog.AuthorContentResult{}, err
+		}
+		commit, err := s.Append(ctx, deletion.SyncID, synclog.NamespaceMeta, deletion.TombstoneEntryID, deletion.EncryptedPayload, deletion.KeyVersion, writeTokenHash, deletion.AuthorIdentityPublicKey)
 		if err != nil {
 			return synclog.AuthorContentResult{}, err
 		}

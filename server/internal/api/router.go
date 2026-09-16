@@ -95,7 +95,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 
 	circleMux := http.NewServeMux()
 	createlog.Register(circleMux, &createlog.Service{LogStore: deps.Log}, writeLimit)
-	appendlog.Register(circleMux, &appendlog.Service{LogStore: deps.Log}, writeLimit)
+	appendlog.Register(circleMux, &appendlog.Service{Log: logService}, writeLimit)
 	rotatelog.Register(circleMux, &rotatelog.Service{Log: logService}, writeLimit)
 	changeauthority.Register(circleMux, &changeauthority.Service{Log: logService}, writeLimit)
 	deletecircle.Register(circleMux, &deletecircle.Service{Log: logService, BlobStore: deps.Blob}, writeLimit)

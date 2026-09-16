@@ -43,7 +43,6 @@ func TestDecodeItem_RoundTripsARealBootstrappedAndAppendedCircle(t *testing.T) {
 	if _, err := rand.Read(writeToken); err != nil {
 		t.Fatalf("failed to generate write token: %v", err)
 	}
-	writeTokenHex := hex.EncodeToString(writeToken)
 	writeTokenHashSum := sha256.Sum256(writeToken)
 	writeTokenHashHex := hex.EncodeToString(writeTokenHashSum[:])
 
@@ -66,7 +65,7 @@ func TestDecodeItem_RoundTripsARealBootstrappedAndAppendedCircle(t *testing.T) {
 		t.Fatalf("failed to encrypt test entry: %v", err)
 	}
 
-	commit, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "entry-1", encrypted, 1, writeTokenHex, "test-author-key")
+	commit, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "entry-1", encrypted, 1, writeTokenHashHex, "test-author-key")
 	if err != nil {
 		t.Fatalf("Append: %v", err)
 	}
@@ -155,7 +154,7 @@ func TestDecodeItem_ReportsAWrongContentKeyInsteadOfFailingSilently(t *testing.T
 	if err != nil {
 		t.Fatalf("failed to encrypt test entry: %v", err)
 	}
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "entry-1", encrypted, 1, hex.EncodeToString(writeToken), "test-author-key"); err != nil {
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "entry-1", encrypted, 1, hex.EncodeToString(writeTokenHashSum[:]), "test-author-key"); err != nil {
 		t.Fatalf("Append: %v", err)
 	}
 

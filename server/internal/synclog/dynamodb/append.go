@@ -15,7 +15,7 @@ import (
 // atomically, then writes the entry and its idempotency marker in the
 // same transaction. See getControlState's doc comment for why this is a
 // read-then-compare-and-swap rather than one unconditional transaction.
-func (s *Store) Append(ctx context.Context, syncID string, ns synclog.Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeToken, authorIdentityPublicKey string) (synclog.CommitResult, error) {
+func (s *Store) Append(ctx context.Context, syncID string, ns synclog.Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash, authorIdentityPublicKey string) (synclog.CommitResult, error) {
 	if !ns.Valid() {
 		return synclog.CommitResult{}, synclog.ErrInvalidNamespace
 	}
@@ -25,17 +25,12 @@ func (s *Store) Append(ctx context.Context, syncID string, ns synclog.Namespace,
 		return *existing, nil
 	}
 
-	// A malformed (non-hex) token can never be correct, so it fails the
-	// same way a well-formed-but-wrong one does — one outcome, not two,
-	// for "this token doesn't work."
-	expectedHash, hashErr := synclog.WriteTokenHash(writeToken)
-
 	result, err := s.casCommit(ctx, syncID, ns, entryID, entryFields{
 		EncryptedPayload:        encryptedPayload,
 		KeyVersion:              keyVersion,
 		AuthorIdentityPublicKey: authorIdentityPublicKey,
 	}, func(control *controlState, epoch, receivedAt int64) (casPlan, error) {
-		if hashErr != nil || control.writeTokenHash != expectedHash {
+		if control.writeTokenHash != writeTokenHash {
 			return casPlan{}, synclog.ErrWriteTokenMismatch
 		}
 		if control.deleted {
@@ -52,7 +47,7 @@ func (s *Store) Append(ctx context.Context, syncID string, ns synclog.Namespace,
 			UpdateExpression:    aws.String(fmt.Sprintf("SET %s = :next", counterAttr)),
 			ConditionExpression: aws.String(fmt.Sprintf("writeTokenHash = :hash AND %s = :current AND attribute_not_exists(deletedAt)", counterAttr)),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":hash":    &types.AttributeValueMemberS{Value: expectedHash},
+				":hash":    &types.AttributeValueMemberS{Value: writeTokenHash},
 				":current": &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch-1, 10)},
 				":next":    &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},
 			},

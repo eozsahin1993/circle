@@ -44,7 +44,7 @@ func newService(t *testing.T) (*appendlog.Service, string, string) {
 	if err := logStore.Bootstrap(ctx, syncID, placeholderAuthorityKey, hashToken(t, token)); err != nil {
 		t.Fatalf("bootstrap failed: %v", err)
 	}
-	return &appendlog.Service{LogStore: logStore}, syncID, token
+	return &appendlog.Service{Log: &synclog.Service{Log: logStore}}, syncID, token
 }
 
 func TestService_Append_SucceedsAfterBootstrapAndAssignsEpoch(t *testing.T) {

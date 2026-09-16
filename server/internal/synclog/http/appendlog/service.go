@@ -12,12 +12,12 @@ import (
 )
 
 type Service struct {
-	LogStore synclog.LogStore
+	Log *synclog.Service
 }
 
 // Append is the possession-gated write path — see
 // synclog.LogStore.Append's doc comment for the write-token check and
 // idempotency guarantee this passes straight through.
 func (s *Service) Append(ctx context.Context, syncID string, ns synclog.Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeToken, authorIdentityPublicKey string) (synclog.CommitResult, error) {
-	return s.LogStore.Append(ctx, syncID, ns, entryID, encryptedPayload, keyVersion, writeToken, authorIdentityPublicKey)
+	return s.Log.Append(ctx, syncID, ns, entryID, encryptedPayload, keyVersion, writeToken, authorIdentityPublicKey)
 }
