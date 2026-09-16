@@ -1,11 +1,10 @@
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { KeyboardAvoider } from '@/ui/components/keyboard-avoider';
-import { PhotoPlaceholder } from '@/ui/components/photo-placeholder';
+import { PhotoPicker } from '@/ui/components/photo-picker';
 import { PrimaryButton } from '@/ui/components/buttons/primary-button';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
@@ -44,46 +43,35 @@ export default function NewCircleScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="New circle" />
+        <ScreenHeader variant="close" />
 
         <KeyboardAvoider style={styles.form}>
-          <ThemedText type="screenTitle">Name your circle</ThemedText>
-
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="e.g. The Andersons"
-            placeholderTextColor={theme.faint}
-            style={[styles.input, { color: theme.text, borderColor: tints.secondaryButtonBorder }]}
-          />
+          <ThemedText type="screenTitle">Create circle</ThemedText>
 
           <View>
-            <ThemedText type="eyebrow" style={styles.coverLabel}>
-              Cover
+            <ThemedText type="eyebrow" style={styles.fieldLabel}>
+              Name
             </ThemedText>
-            <Pressable onPress={handlePickCover}>
-              {cover ? (
-                <Image source={{ uri: cover.uri }} style={styles.cover} contentFit="cover" />
-              ) : (
-                <PhotoPlaceholder style={styles.cover}>
-                  <ThemedText type="eyebrow" style={styles.coverOverlay}>
-                    Tap to choose a photo
-                  </ThemedText>
-                </PhotoPlaceholder>
-              )}
-            </Pressable>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="e.g. Sunday Dinners"
+              placeholderTextColor={theme.faint}
+              style={[styles.input, { color: theme.text, borderColor: tints.secondaryButtonBorder }]}
+            />
           </View>
 
-          <ThemedView
-            style={[styles.notice, { backgroundColor: tints.privacyWashBg, borderColor: tints.privacyWashBorder }]}>
-            <ThemedText type="captionFeed" themeColor="accent">
-              Only the people you invite can see this circle. Everyone in it sees the same feed,
-              in the same order. Nothing is ranked, and nothing is ever auto-deleted.
+          <View>
+            <ThemedText type="eyebrow" style={styles.fieldLabel}>
+              Cover
             </ThemedText>
-            <ThemedText type="captionFeed" themeColor="accentBright" style={styles.noticeLink}>
-              How the privacy works →
-            </ThemedText>
-          </ThemedView>
+            <PhotoPicker
+              uri={cover?.uri}
+              aspectRatio={PhotoAspect.cover}
+              label="Tap to choose a photo"
+              onPress={handlePickCover}
+            />
+          </View>
 
           {error ? (
             <ThemedText type="captionFeed" themeColor="accent" style={styles.error}>
@@ -91,15 +79,11 @@ export default function NewCircleScreen() {
             </ThemedText>
           ) : null}
 
-          <PrimaryButton
-            label="Create and invite people"
-            disabled={!name.trim() || creating}
-            onPress={handleCreate}
-          />
+          <PrimaryButton label="Create circle" disabled={!name.trim() || creating} onPress={handleCreate} />
 
           <ThemedText type="meta" themeColor="faint" style={styles.footnote}>
-            Who can invite, and what happens to the photos over time, is in the circle&apos;s
-            settings later.
+            Only the people you invite can see this circle, and everyone sees the same feed in
+            the same order.
           </ThemedText>
         </KeyboardAvoider>
       </ThemedSafeAreaView>
@@ -127,25 +111,8 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.serif,
     fontSize: 18,
   },
-  coverLabel: {
+  fieldLabel: {
     marginBottom: 10,
-  },
-  cover: {
-    aspectRatio: PhotoAspect.cover,
-    borderRadius: Radius.panel,
-    justifyContent: 'flex-end',
-  },
-  coverOverlay: {
-    padding: Spacing.screenPadding,
-  },
-  notice: {
-    borderWidth: 1,
-    borderRadius: Radius.notice,
-    padding: Spacing.screenPadding,
-    gap: 12,
-  },
-  noticeLink: {
-    fontFamily: Fonts.sansMedium,
   },
   footnote: {
     textAlign: 'center',

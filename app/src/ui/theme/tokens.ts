@@ -16,6 +16,7 @@ import CircleAlert from 'lucide-react-native/icons/circle-alert';
 import CloudDownload from 'lucide-react-native/icons/cloud-download';
 import Ellipsis from 'lucide-react-native/icons/ellipsis';
 import Heart from 'lucide-react-native/icons/heart';
+import ImagePlus from 'lucide-react-native/icons/image-plus';
 import Info from 'lucide-react-native/icons/info';
 import Link from 'lucide-react-native/icons/link';
 import Lock from 'lucide-react-native/icons/lock';
@@ -245,6 +246,8 @@ export const Icons = {
   inviteCode: QrCode,
   /** Retires the key in circulation and mints a fresh one. */
   replaceKey: RefreshCw,
+  /** Centered over an empty photo/cover picker — a plain `add` reads as "add a row," not "add a photo." */
+  addPhoto: ImagePlus,
 } as const satisfies Record<string, IconGlyph>;
 
 export const Radius = {

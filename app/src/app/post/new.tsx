@@ -1,11 +1,10 @@
-import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, Switch, TextInput, View, StyleSheet } from 'react-native';
+import { ScrollView, Switch, TextInput, View, StyleSheet } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { KeyboardAvoider } from '@/ui/components/keyboard-avoider';
-import { PhotoPlaceholder } from '@/ui/components/photo-placeholder';
+import { PhotoPicker } from '@/ui/components/photo-picker';
 import { PrimaryButton } from '@/ui/components/buttons/primary-button';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
@@ -72,17 +71,12 @@ export default function NewPostScreen() {
 
         <KeyboardAvoider style={styles.form}>
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-            <Pressable onPress={handlePickPhoto}>
-              {picture ? (
-                <Image source={{ uri: picture.uri }} style={styles.photo} contentFit="cover" />
-              ) : (
-                <PhotoPlaceholder style={styles.photo}>
-                  <ThemedText type="eyebrow" style={styles.photoOverlay}>
-                    Tap to pick from your library
-                  </ThemedText>
-                </PhotoPlaceholder>
-              )}
-            </Pressable>
+            <PhotoPicker
+              uri={picture?.uri}
+              aspectRatio={PhotoAspect.post}
+              label="Tap to pick from your library"
+              onPress={handlePickPhoto}
+            />
 
             <TextInput
               value={caption}
@@ -148,14 +142,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     gap: Spacing.cardListGap,
     paddingBottom: Spacing.cardListGap,
-  },
-  photo: {
-    aspectRatio: PhotoAspect.post,
-    borderRadius: Radius.panel,
-    justifyContent: 'flex-end',
-  },
-  photoOverlay: {
-    padding: Spacing.screenPadding,
   },
   captionInput: {
     minHeight: 60,
