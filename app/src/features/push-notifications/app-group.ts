@@ -5,4 +5,4 @@
  * (usecases/push-snapshot.ts). Must match the entitlements in app.json and
  * targets/notification-service.
  */
-export const APP_GROUP = 'group.com.eozsahin.circle';
+export const APP_GROUP = 'group.com.eozsahin.mimoza';

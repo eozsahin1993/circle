@@ -11,7 +11,7 @@ import { join } from 'path';
 
 const composers = [
   join(__dirname, '..', 'handle-push.ts'),
-  join(__dirname, '..', '..', '..', '..', '..', 'targets', 'CircleNotificationService', 'NotificationService.swift'),
+  join(__dirname, '..', '..', '..', '..', '..', 'targets', 'MimozaNotificationService', 'NotificationService.swift'),
 ];
 
 const copyFragments = [

@@ -181,9 +181,9 @@ record of what used to gate this flow, not a current TODO list:
   now includes `'member_added'`; `join-circle.ts`'s `completeJoin` enqueues
   one. Existing members won't actually *see* it until `pullCircle` exists
   (same gap as above), but the push side works today.
-- ~~Deep-link handling~~ — built. `circle://join/<code>` auto-routes to
+- ~~Deep-link handling~~ — built. `mimoza://join/<code>` auto-routes to
   `app/src/app/join/[code].tsx` via Expo Router's file-based routing and
-  `app.json`'s existing `"scheme": "circle"` — no manual `Linking` code
+  `app.json`'s existing `"scheme": "mimoza"` — no manual `Linking` code
   needed. A tap before sign-in/profile-setup is complete is handled too
   (`app/src/services/pending-deep-link.ts` remembers the code and resumes
   the flow once onboarding finishes).

@@ -1,7 +1,7 @@
 /** @type {import('@bacons/apple-targets/app.plugin').ConfigFunction} */
 module.exports = (config) => ({
   type: 'notification-service',
-  name: 'CircleNotificationService',
+  name: 'MimozaNotificationService',
   bundleIdentifier: '.notification-service',
   // Matches the app's own deployment target (Expo SDK 57 default).
   deploymentTarget: '15.1',

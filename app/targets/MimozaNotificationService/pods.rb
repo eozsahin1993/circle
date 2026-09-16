@@ -4,4 +4,4 @@
 # swift-sodium: XChaCha20-Poly1305, which CryptoKit doesn't have. Via a
 # local renamed podspec — see SwiftSodium.podspec.json for why the
 # upstream pod can't link inside a static-library target.
-pod 'SwiftSodium', :podspec => '../targets/CircleNotificationService/SwiftSodium.podspec.json'
+pod 'SwiftSodium', :podspec => '../targets/MimozaNotificationService/SwiftSodium.podspec.json'

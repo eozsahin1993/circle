@@ -39,7 +39,7 @@ import { showDone, showError } from '@/core/services/messages';
 import { bytesToDataUri, pickAndCompressImage } from '@/core/photo/image';
 
 function inviteLink(code: string): string {
-  return `circle://join/${code}`;
+  return `mimoza://join/${code}`;
 }
 
 function formatJoined(joinedAt: number): string {

@@ -381,7 +381,7 @@ default. Retention on whatever remains should be short.
   The crypto port (XChaCha20-Poly1305 via swift-sodium; HKDF and Ed25519
   via CryptoKit) is pinned against the JS side by
   `app/src/services/__tests__/push-crypto-vectors.test.ts`.
-- The App Group `group.com.eozsahin.circle` doubles as the shared
+- The App Group `group.com.eozsahin.mimoza` doubles as the shared
   Keychain access group and the shared container. `keystore.ts` writes
   every secret there with `keychainAccessible: AFTER_FIRST_UNLOCK` — the
   default `WHEN_UNLOCKED` is unreadable from an extension on a locked

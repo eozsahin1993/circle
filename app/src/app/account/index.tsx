@@ -314,7 +314,7 @@ export default function AccountScreen() {
           <SettingsGroups groups={settingsGroups} />
 
           <ThemedText type="meta" themeColor="faint" style={styles.version}>
-            Murami v{appVersion}
+            Mimoza v{appVersion}
           </ThemedText>
 
           <SettingsGroups groups={[developerGroup]} />
