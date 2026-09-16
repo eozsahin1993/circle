@@ -88,10 +88,15 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	writeLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.WriteLimit, h) }
 	readLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.ReadLimit, h) }
 
+	// The domain layer wrapping deps.Log — grows to cover more operations
+	// as they migrate off LogStore's own now-narrowing capability checks.
+	// See internal/synclog.Service.
+	logService := &synclog.Service{Log: deps.Log}
+
 	circleMux := http.NewServeMux()
 	createlog.Register(circleMux, &createlog.Service{LogStore: deps.Log}, writeLimit)
 	appendlog.Register(circleMux, &appendlog.Service{LogStore: deps.Log}, writeLimit)
-	rotatelog.Register(circleMux, &rotatelog.Service{LogStore: deps.Log}, writeLimit)
+	rotatelog.Register(circleMux, &rotatelog.Service{Log: logService}, writeLimit)
 	changeauthority.Register(circleMux, &changeauthority.Service{LogStore: deps.Log}, writeLimit)
 	deletecircle.Register(circleMux, &deletecircle.Service{LogStore: deps.Log, BlobStore: deps.Blob}, writeLimit)
 	getlog.Register(circleMux, &getlog.Service{LogStore: deps.Log}, readLimit)

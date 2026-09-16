@@ -283,19 +283,15 @@ type LogStore interface {
 	// capability can verify one before authorizing a redaction.
 	Append(ctx context.Context, syncID string, ns Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeToken, authorIdentityPublicKey string) (CommitResult, error)
 
-	// Rotate is the capability-gated write path for a key rotation —
-	// always a meta-namespace entry. Atomically: verifies
-	// currentWriteToken, verifies authorityPublicKey is in the authority
-	// set, appends the entry, and swaps in newWriteTokenHash — all or
-	// none.
+	// Rotate is the capability-gated write path for a key rotation.
+	// Atomically: verifies currentWriteTokenHash and authoritySet
+	// membership, appends the entry, and swaps in newWriteTokenHash.
+	// currentKeyVersion is the *pre*-rotation version.
 	//
-	// signature must verify against authorityPublicKey for
-	// RotateMessage(syncID, entryID, newWriteTokenHash) — checked before
-	// any storage call, so a forged signature never touches control
-	// state. currentKeyVersion is the *pre*-rotation version: the
-	// key_rotation entry itself is encrypted under the key being rotated
-	// away from, not the new one.
-	Rotate(ctx context.Context, syncID, entryID string, encryptedPayload []byte, currentKeyVersion int64, currentWriteToken, newWriteTokenHash, authorityPublicKey string, signature []byte) (CommitResult, error)
+	// Signature verification happens in Service.Rotate, not here — it
+	// doesn't depend on live state, unlike authoritySet membership, which
+	// is re-checked atomically as part of the transaction.
+	Rotate(ctx context.Context, syncID, entryID string, encryptedPayload []byte, currentKeyVersion int64, currentWriteTokenHash, newWriteTokenHash, authorityPublicKey string) (CommitResult, error)
 
 	// ChangeAuthority is the capability-gated write path for a promotion or
 	// demotion — always a meta-namespace entry. Atomically: verifies

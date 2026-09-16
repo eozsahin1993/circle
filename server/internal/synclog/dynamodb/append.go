@@ -61,31 +61,22 @@ func (s *Store) Append(ctx context.Context, syncID string, ns synclog.Namespace,
 	return result, err
 }
 
-// Rotate verifies the authority signature before touching storage at all
-// — a forged signature must never attempt a mutation — then runs the
-// same possession-check-and-CAS pattern as Append, plus an authority-set
-// membership check, and swaps in the new write-token hash in the same
-// transaction as the entry write.
-func (s *Store) Rotate(ctx context.Context, syncID, entryID string, encryptedPayload []byte, currentKeyVersion int64, currentWriteToken, newWriteTokenHash, authorityPublicKey string, signature []byte) (synclog.CommitResult, error) {
-	if err := synclog.VerifySignature(authorityPublicKey, synclog.RotateMessage(syncID, entryID, newWriteTokenHash), signature); err != nil {
-		return synclog.CommitResult{}, err
-	}
-
+// Rotate runs the possession-check-and-CAS pattern Append does, plus an
+// authority-set membership check, and swaps in the new write-token hash
+// in the same transaction as the entry write. See LogStore.Rotate for
+// why the signature itself isn't checked here.
+func (s *Store) Rotate(ctx context.Context, syncID, entryID string, encryptedPayload []byte, currentKeyVersion int64, currentWriteTokenHash, newWriteTokenHash, authorityPublicKey string) (synclog.CommitResult, error) {
 	if existing, err := s.lookupIdempotencyMarker(ctx, syncID, synclog.NamespaceMeta, entryID); err != nil {
 		return synclog.CommitResult{}, err
 	} else if existing != nil {
 		return *existing, nil
 	}
 
-	// Same reasoning as Append: a malformed token can never be correct, so
-	// it fails the same way a well-formed-but-wrong one does.
-	expectedCurrentHash, hashErr := synclog.WriteTokenHash(currentWriteToken)
-
 	result, err := s.casCommit(ctx, syncID, synclog.NamespaceMeta, entryID, entryFields{
 		EncryptedPayload: encryptedPayload,
 		KeyVersion:       currentKeyVersion,
 	}, func(control *controlState, epoch, receivedAt int64) (casPlan, error) {
-		if hashErr != nil || control.writeTokenHash != expectedCurrentHash {
+		if control.writeTokenHash != currentWriteTokenHash {
 			return casPlan{}, synclog.ErrWriteTokenMismatch
 		}
 		if control.deleted {
@@ -101,7 +92,7 @@ func (s *Store) Rotate(ctx context.Context, syncID, entryID string, encryptedPay
 			UpdateExpression:    aws.String("SET writeTokenHash = :newHash, metaCounter = :next"),
 			ConditionExpression: aws.String("writeTokenHash = :currentHash AND metaCounter = :current AND contains(authoritySet, :pubkey) AND attribute_not_exists(deletedAt)"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":currentHash": &types.AttributeValueMemberS{Value: expectedCurrentHash},
+				":currentHash": &types.AttributeValueMemberS{Value: currentWriteTokenHash},
 				":newHash":     &types.AttributeValueMemberS{Value: newWriteTokenHash},
 				":current":     &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch-1, 10)},
 				":next":        &types.AttributeValueMemberN{Value: strconv.FormatInt(epoch, 10)},

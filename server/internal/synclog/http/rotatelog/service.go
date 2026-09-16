@@ -13,9 +13,9 @@ import (
 )
 
 type Service struct {
-	LogStore synclog.LogStore
+	Log *synclog.Service
 }
 
 func (s *Service) Rotate(ctx context.Context, syncID, entryID string, encryptedPayload []byte, currentKeyVersion int64, currentWriteToken, newWriteTokenHash, authorityPublicKey string, signature []byte) (synclog.CommitResult, error) {
-	return s.LogStore.Rotate(ctx, syncID, entryID, encryptedPayload, currentKeyVersion, currentWriteToken, newWriteTokenHash, authorityPublicKey, signature)
+	return s.Log.Rotate(ctx, syncID, entryID, encryptedPayload, currentKeyVersion, currentWriteToken, newWriteTokenHash, authorityPublicKey, signature)
 }

@@ -245,7 +245,7 @@ func TestLogStore_Rotate_LeavesAuthorIdentityPublicKeyEmpty(t *testing.T) {
 	bootstrap(t, store, syncID, founder, token)
 
 	newHash := hashToken(t, newToken(t))
-	if _, err := store.Rotate(ctx, syncID, "rotation-1", []byte("ciphertext"), 1, token, newHash, founder.publicKeyHex, founder.sign(syncID, "rotation-1", newHash)); err != nil {
+	if _, err := store.Rotate(ctx, syncID, "rotation-1", []byte("ciphertext"), 1, hashToken(t, token), newHash, founder.publicKeyHex); err != nil {
 		t.Fatal(err)
 	}
 
@@ -309,8 +309,7 @@ func TestLogStore_Rotate_SwapsWriteTokenAndAppendsMetaEntryAtomically(t *testing
 	newHash := hashToken(t, newTokenValue)
 	bootstrap(t, store, syncID, founder, oldToken)
 
-	sig := founder.sign(syncID, "rotate-1", newHash)
-	commit, err := store.Rotate(ctx, syncID, "rotate-1", []byte("key_rotation payload"), 1, oldToken, newHash, founder.publicKeyHex, sig)
+	commit, err := store.Rotate(ctx, syncID, "rotate-1", []byte("key_rotation payload"), 1, hashToken(t, oldToken), newHash, founder.publicKeyHex)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,7 +335,7 @@ func TestLogStore_Rotate_SwapsWriteTokenAndAppendsMetaEntryAtomically(t *testing
 	}
 }
 
-func TestLogStore_Rotate_RejectsSignatureFromAKeyNotInTheAuthoritySet(t *testing.T) {
+func TestLogStore_Rotate_RejectsAKeyNotInTheAuthoritySet(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
 	syncID := testsupport.UniqueSyncID(t)
@@ -346,37 +345,13 @@ func TestLogStore_Rotate_RejectsSignatureFromAKeyNotInTheAuthoritySet(t *testing
 	bootstrap(t, store, syncID, founder, token)
 
 	newHash := hashToken(t, newToken(t))
-	sig := impostor.sign(syncID, "rotate-1", newHash)
 
-	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, impostor.publicKeyHex, sig)
+	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, hashToken(t, token), newHash, impostor.publicKeyHex)
 	if !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
-		t.Fatalf("expected ErrAuthorityNotRecognized for a validly-signed but unrecognized authority key, got %v", err)
+		t.Fatalf("expected ErrAuthorityNotRecognized for an unrecognized authority key, got %v", err)
 	}
 
 	// Nothing should have moved: the original token still works.
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("c"), 1, token, "test-author-key"); err != nil {
-		t.Fatalf("expected the original write token to still work after a rejected rotation: %v", err)
-	}
-}
-
-func TestLogStore_Rotate_RejectsAnInvalidSignatureBeforeTouchingStorage(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	syncID := testsupport.UniqueSyncID(t)
-	founder := newAuthorityKey(t)
-	token := newToken(t)
-	bootstrap(t, store, syncID, founder, token)
-
-	newHash := hashToken(t, newToken(t))
-	// Correct, recognized public key, but a signature over the wrong
-	// message (as if forged, or replayed from a different rotation).
-	badSig := founder.sign(syncID, "some-other-entry-id", newHash)
-
-	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, founder.publicKeyHex, badSig)
-	if !errors.Is(err, synclog.ErrInvalidSignature) {
-		t.Fatalf("expected ErrInvalidSignature, got %v", err)
-	}
-
 	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("c"), 1, token, "test-author-key"); err != nil {
 		t.Fatalf("expected the original write token to still work after a rejected rotation: %v", err)
 	}
@@ -391,11 +366,10 @@ func TestLogStore_Rotate_RejectsAStaleCurrentWriteToken(t *testing.T) {
 	bootstrap(t, store, syncID, founder, token)
 
 	newHash := hashToken(t, newToken(t))
-	sig := founder.sign(syncID, "rotate-1", newHash)
 
-	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, "stale-token-not-the-real-one", newHash, founder.publicKeyHex, sig)
+	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, hashToken(t, newToken(t)), newHash, founder.publicKeyHex)
 	if !errors.Is(err, synclog.ErrWriteTokenMismatch) {
-		t.Fatalf("expected ErrWriteTokenMismatch for a stale currentWriteToken, got %v", err)
+		t.Fatalf("expected ErrWriteTokenMismatch for a stale currentWriteTokenHash, got %v", err)
 	}
 }
 
@@ -590,7 +564,7 @@ func TestLogStore_ChangeAuthority_AddedKeyCanThenRotate(t *testing.T) {
 
 	// Before the promotion, the promotee is nobody.
 	rejectedHash := hashToken(t, newToken(t))
-	_, err := store.Rotate(ctx, syncID, "rotate-early", []byte("payload"), 1, token, rejectedHash, promoted.publicKeyHex, promoted.sign(syncID, "rotate-early", rejectedHash))
+	_, err := store.Rotate(ctx, syncID, "rotate-early", []byte("payload"), 1, hashToken(t, token), rejectedHash, promoted.publicKeyHex)
 	if !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
 		t.Fatalf("expected an unpromoted key to be rejected, got %v", err)
 	}
@@ -599,7 +573,7 @@ func TestLogStore_ChangeAuthority_AddedKeyCanThenRotate(t *testing.T) {
 
 	newTokenValue := newToken(t)
 	newHash := hashToken(t, newTokenValue)
-	commit, err := store.Rotate(ctx, syncID, "rotate-1", []byte("key_rotation payload"), 1, token, newHash, promoted.publicKeyHex, promoted.sign(syncID, "rotate-1", newHash))
+	commit, err := store.Rotate(ctx, syncID, "rotate-1", []byte("key_rotation payload"), 1, hashToken(t, token), newHash, promoted.publicKeyHex)
 	if err != nil {
 		t.Fatalf("a promoted admin must be able to rotate: %v", err)
 	}
@@ -652,13 +626,13 @@ func TestLogStore_ChangeAuthority_RemovedKeyCanNoLongerRotate(t *testing.T) {
 	}
 
 	newHash := hashToken(t, newToken(t))
-	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, promoted.publicKeyHex, promoted.sign(syncID, "rotate-1", newHash))
+	_, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, hashToken(t, token), newHash, promoted.publicKeyHex)
 	if !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
 		t.Fatalf("expected a demoted admin's rotate to be rejected, got %v", err)
 	}
 	// A demotion that left relay powers behind would be worse than no
 	// demotion at all — the founder must still be able to rotate.
-	if _, err := store.Rotate(ctx, syncID, "rotate-2", []byte("payload"), 1, token, newHash, founder.publicKeyHex, founder.sign(syncID, "rotate-2", newHash)); err != nil {
+	if _, err := store.Rotate(ctx, syncID, "rotate-2", []byte("payload"), 1, hashToken(t, token), newHash, founder.publicKeyHex); err != nil {
 		t.Fatalf("the founder must still hold authority after demoting someone else: %v", err)
 	}
 }
@@ -679,7 +653,7 @@ func TestLogStore_ChangeAuthority_RejectsASignerOutsideTheSet(t *testing.T) {
 	}
 
 	newHash := hashToken(t, newToken(t))
-	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, accomplice.publicKeyHex, accomplice.sign(syncID, "rotate-1", newHash)); !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
+	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, hashToken(t, token), newHash, accomplice.publicKeyHex); !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
 		t.Fatalf("a rejected promotion must not have added the key anyway, got %v", err)
 	}
 }
@@ -749,10 +723,10 @@ func TestLogStore_ChangeAuthority_SignerMayRemoveTheirOwnKeyButNotTheLast(t *tes
 	}
 
 	newHash := hashToken(t, newToken(t))
-	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, founder.publicKeyHex, founder.sign(syncID, "rotate-1", newHash)); !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
+	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, hashToken(t, token), newHash, founder.publicKeyHex); !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
 		t.Fatalf("a resigned authority must lose its powers, got %v", err)
 	}
-	if _, err := store.Rotate(ctx, syncID, "rotate-2", []byte("payload"), 1, token, newHash, promoted.publicKeyHex, promoted.sign(syncID, "rotate-2", newHash)); err != nil {
+	if _, err := store.Rotate(ctx, syncID, "rotate-2", []byte("payload"), 1, hashToken(t, token), newHash, promoted.publicKeyHex); err != nil {
 		t.Fatalf("the successor must still be able to govern: %v", err)
 	}
 }
@@ -780,7 +754,7 @@ func TestLogStore_ChangeAuthority_RefusesToDemoteDownToAnEmptySet(t *testing.T) 
 	}
 
 	newHash := hashToken(t, newToken(t))
-	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, token, newHash, promoted.publicKeyHex, promoted.sign(syncID, "rotate-1", newHash)); err != nil {
+	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, hashToken(t, token), newHash, promoted.publicKeyHex); err != nil {
 		t.Fatalf("the circle must still be governable: %v", err)
 	}
 }
@@ -950,7 +924,7 @@ func TestLogStore_DeleteCircle_RefusesEveryLaterWrite(t *testing.T) {
 	}
 
 	newHash := hashToken(t, newToken(t))
-	if _, err := store.Rotate(ctx, syncID, "rotate-after", []byte("k"), 1, token, newHash, founder.publicKeyHex, founder.sign(syncID, "rotate-after", newHash)); !errors.Is(err, synclog.ErrCircleDeleted) {
+	if _, err := store.Rotate(ctx, syncID, "rotate-after", []byte("k"), 1, hashToken(t, token), newHash, founder.publicKeyHex); !errors.Is(err, synclog.ErrCircleDeleted) {
 		t.Fatalf("expected a rotation to be refused, got %v", err)
 	}
 	if _, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-after", synclog.AuthorityAdd, promoted.publicKeyHex, token)); !errors.Is(err, synclog.ErrCircleDeleted) {
