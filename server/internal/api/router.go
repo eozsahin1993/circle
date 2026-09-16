@@ -88,9 +88,9 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	writeLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.WriteLimit, h) }
 	readLimit := func(h http.Handler) http.Handler { return ratelimit.Require(deps.ReadLimit, h) }
 
-	// The domain layer wrapping deps.Log — grows to cover more operations
-	// as they migrate off LogStore's own now-narrowing capability checks.
-	// See internal/synclog.Service.
+	// The domain layer wrapping deps.Log — holds the capability checks
+	// (signature verification, write-token hashing) LogStore's own
+	// methods used to do themselves. See internal/synclog.Service.
 	logService := &synclog.Service{Log: deps.Log}
 
 	circleMux := http.NewServeMux()
