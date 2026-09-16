@@ -3,7 +3,7 @@
 // Account deletion's per-circle call: with the tombstone fields it's a
 // current member's erase-and-announce; without them it's a departed
 // member's strip-only erase, authorized purely by the author signature.
-// All verification lives in synclog.LogStore.DeleteAuthorContent; this
+// All verification lives in synclog.Service.DeleteAuthorContent; this
 // package is routing, error mapping, and the blob cleanup behind it.
 package deleteauthorcontent
 
@@ -15,7 +15,7 @@ import (
 )
 
 type Service struct {
-	LogStore  synclog.LogStore
+	Log       *synclog.Service
 	BlobStore synclog.BlobStore
 }
 
@@ -24,7 +24,7 @@ type Service struct {
 // committed and is the truth clients act on, so a blob failure is
 // logged, not returned.
 func (s *Service) Delete(ctx context.Context, deletion synclog.AuthorContentDeletion) (synclog.AuthorContentResult, error) {
-	result, err := s.LogStore.DeleteAuthorContent(ctx, deletion)
+	result, err := s.Log.DeleteAuthorContent(ctx, deletion)
 	if err != nil {
 		return synclog.AuthorContentResult{}, err
 	}

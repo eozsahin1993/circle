@@ -36,6 +36,10 @@ type fakeLogStore struct {
 	appendCalls []appendCall
 	appendOut   synclog.CommitResult
 	appendErr   error
+
+	deleteAuthorContentCalls []deleteAuthorContentCall
+	deleteAuthorContentOut   synclog.AuthorContentResult
+	deleteAuthorContentErr   error
 }
 
 type rotateCall struct {
@@ -111,8 +115,17 @@ func (f *fakeLogStore) DeleteEntry(ctx context.Context, syncID, tombstoneEntryID
 	f.deleteEntryCalls = append(f.deleteEntryCalls, deleteEntryCall{syncID, tombstoneEntryID, targetEpoch, encryptedPayload, keyVersion, writeTokenHash, authorizedBy, requiredAuthorityPublicKey})
 	return f.deleteEntryOut, f.deleteEntryErr
 }
-func (f *fakeLogStore) DeleteAuthorContent(ctx context.Context, deletion synclog.AuthorContentDeletion) (synclog.AuthorContentResult, error) {
-	panic("fakeLogStore: DeleteAuthorContent not implemented")
+
+type deleteAuthorContentCall struct {
+	syncID, authorIdentityPublicKey, tombstoneEntryID string
+	encryptedPayload                                  []byte
+	keyVersion                                        int64
+	writeTokenHash                                    string
+}
+
+func (f *fakeLogStore) DeleteAuthorContent(ctx context.Context, syncID, authorIdentityPublicKey, tombstoneEntryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash string) (synclog.AuthorContentResult, error) {
+	f.deleteAuthorContentCalls = append(f.deleteAuthorContentCalls, deleteAuthorContentCall{syncID, authorIdentityPublicKey, tombstoneEntryID, encryptedPayload, keyVersion, writeTokenHash})
+	return f.deleteAuthorContentOut, f.deleteAuthorContentErr
 }
 func (f *fakeLogStore) Read(ctx context.Context, syncID string, ns synclog.Namespace, sinceEpoch int64) (synclog.FetchResult, error) {
 	panic("fakeLogStore: Read not implemented")
@@ -581,5 +594,98 @@ func TestService_Append_HashesTheWriteTokenBeforeCallingLogStore(t *testing.T) {
 	}
 	if got := log.appendCalls[0].authorIdentityPublicKey; got != "author-key" {
 		t.Fatalf("expected authorIdentityPublicKey passed through, got %q", got)
+	}
+}
+
+// newTestAuthorContentDeletion builds an AuthorContentDeletion signed by
+// authorPriv — tombstoneEntryID "" means strip-only mode, which also
+// sends no token, same convention as the dynamodb package's own builder.
+func newTestAuthorContentDeletion(authorPub string, authorPriv ed25519.PrivateKey, syncID, tombstoneEntryID, token string) synclog.AuthorContentDeletion {
+	deletion := synclog.AuthorContentDeletion{
+		SyncID:                  syncID,
+		AuthorIdentityPublicKey: authorPub,
+		TombstoneEntryID:        tombstoneEntryID,
+	}
+	if tombstoneEntryID != "" {
+		deletion.EncryptedPayload = []byte("account_deleted payload")
+		deletion.KeyVersion = 1
+		deletion.WriteToken = token
+	}
+	deletion.AuthorSignature = ed25519.Sign(authorPriv, deletion.Message())
+	return deletion
+}
+
+// The impostor's signature doesn't match the claimed author — no admin
+// fallback exists for this operation, unlike DeleteEntry.
+func TestService_DeleteAuthorContent_RejectsWrongSignature(t *testing.T) {
+	authorPub, _ := newTestAuthorityKey(t)
+	_, impostorPriv := newTestAuthorityKey(t)
+	deletion := newTestAuthorContentDeletion(authorPub, impostorPriv, "sync-1", "", "")
+
+	log := &fakeLogStore{}
+	svc := &synclog.Service{Log: log}
+	_, err := svc.DeleteAuthorContent(context.Background(), deletion)
+	if !errors.Is(err, synclog.ErrEntryNotAuthorized) {
+		t.Fatalf("expected ErrEntryNotAuthorized, got %v", err)
+	}
+	if len(log.deleteAuthorContentCalls) != 0 {
+		t.Fatalf("expected LogStore.DeleteAuthorContent never called, got %d calls", len(log.deleteAuthorContentCalls))
+	}
+}
+
+func TestService_DeleteAuthorContent_StripOnlyModeSkipsWriteTokenHashing(t *testing.T) {
+	authorPub, authorPriv := newTestAuthorityKey(t)
+	deletion := newTestAuthorContentDeletion(authorPub, authorPriv, "sync-1", "", "")
+
+	log := &fakeLogStore{}
+	svc := &synclog.Service{Log: log}
+	if _, err := svc.DeleteAuthorContent(context.Background(), deletion); err != nil {
+		t.Fatal(err)
+	}
+	if len(log.deleteAuthorContentCalls) != 1 {
+		t.Fatalf("expected exactly one LogStore.DeleteAuthorContent call, got %d", len(log.deleteAuthorContentCalls))
+	}
+	if got := log.deleteAuthorContentCalls[0].writeTokenHash; got != "" {
+		t.Fatalf("expected no write token hashed in strip-only mode, got %q", got)
+	}
+}
+
+func TestService_DeleteAuthorContent_RejectsAMalformedWriteToken(t *testing.T) {
+	authorPub, authorPriv := newTestAuthorityKey(t)
+	deletion := newTestAuthorContentDeletion(authorPub, authorPriv, "sync-1", "tombstone-1", "not-hex")
+
+	log := &fakeLogStore{}
+	svc := &synclog.Service{Log: log}
+	_, err := svc.DeleteAuthorContent(context.Background(), deletion)
+	if !errors.Is(err, synclog.ErrWriteTokenMismatch) {
+		t.Fatalf("expected ErrWriteTokenMismatch for a malformed token, got %v", err)
+	}
+	if len(log.deleteAuthorContentCalls) != 0 {
+		t.Fatalf("expected LogStore.DeleteAuthorContent never called, got %d calls", len(log.deleteAuthorContentCalls))
+	}
+}
+
+func TestService_DeleteAuthorContent_HashesTheWriteTokenBeforeCallingLogStore(t *testing.T) {
+	authorPub, authorPriv := newTestAuthorityKey(t)
+	deletion := newTestAuthorContentDeletion(authorPub, authorPriv, "sync-1", "tombstone-1", "deadbeef")
+
+	log := &fakeLogStore{deleteAuthorContentOut: synclog.AuthorContentResult{CommitResult: synclog.CommitResult{Epoch: 5, ReceivedAt: 600}}}
+	svc := &synclog.Service{Log: log}
+	result, err := svc.DeleteAuthorContent(context.Background(), deletion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.CommitResult != log.deleteAuthorContentOut.CommitResult {
+		t.Fatalf("expected the LogStore's result passed through unchanged, got %+v", result)
+	}
+	if len(log.deleteAuthorContentCalls) != 1 {
+		t.Fatalf("expected exactly one LogStore.DeleteAuthorContent call, got %d", len(log.deleteAuthorContentCalls))
+	}
+	wantHash, err := synclog.WriteTokenHash("deadbeef")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := log.deleteAuthorContentCalls[0].writeTokenHash; got != wantHash {
+		t.Fatalf("expected the raw token hashed before reaching LogStore, got %q want %q", got, wantHash)
 	}
 }

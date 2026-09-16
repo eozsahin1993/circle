@@ -355,14 +355,19 @@ type LogStore interface {
 	DeleteEntry(ctx context.Context, syncID, tombstoneEntryID string, targetEpoch int64, encryptedPayload []byte, keyVersion int64, writeTokenHash, authorizedBy, requiredAuthorityPublicKey string) (CommitResult, error)
 
 	// DeleteAuthorContent strips every content entry authored by
-	// AuthorIdentityPublicKey — the same per-row mutation as DeleteEntry,
+	// authorIdentityPublicKey — the same per-row mutation as DeleteEntry,
 	// found by a paged query over the circle's content range rather than
 	// an index (rare operation, deliberately unindexed). With a
-	// TombstoneEntryID it then appends the tombstone through the ordinary
-	// possession-gated path; without one it strips and stops. Idempotent
-	// end to end: a re-run finds nothing left to strip and the tombstone
-	// converges on its idempotency marker.
-	DeleteAuthorContent(ctx context.Context, deletion AuthorContentDeletion) (AuthorContentResult, error)
+	// tombstoneEntryID it then appends the tombstone through the ordinary
+	// possession-gated path (writeTokenHash checked before stripping, and
+	// again atomically when the tombstone commits); without one it strips
+	// and stops, and writeTokenHash is ignored. Idempotent end to end: a
+	// re-run finds nothing left to strip and the tombstone converges on
+	// its idempotency marker.
+	//
+	// Signature verification happens in Service.DeleteAuthorContent, not
+	// here — see Rotate's doc comment for why.
+	DeleteAuthorContent(ctx context.Context, syncID, authorIdentityPublicKey, tombstoneEntryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash string) (AuthorContentResult, error)
 
 	// Read never deletes or evicts — retention is permanent (invariant 1).
 	// sinceEpoch is a position in ns's sequence, not a timestamp; entries

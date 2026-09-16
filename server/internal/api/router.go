@@ -104,7 +104,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	getuploadtarget.Register(circleMux, &getuploadtarget.Service{BlobStore: deps.Blob, LogStore: deps.Log}, writeLimit)
 	deleteblob.Register(circleMux, &deleteblob.Service{BlobStore: deps.Blob, LogStore: deps.Log}, writeLimit)
 	deleteentry.Register(circleMux, &deleteentry.Service{Log: logService, BlobStore: deps.Blob}, writeLimit)
-	deleteauthorcontent.Register(circleMux, &deleteauthorcontent.Service{LogStore: deps.Log, BlobStore: deps.Blob}, writeLimit)
+	deleteauthorcontent.Register(circleMux, &deleteauthorcontent.Service{Log: logService, BlobStore: deps.Blob}, writeLimit)
 	getcoverphotouploadtarget.Register(circleMux, &getcoverphotouploadtarget.Service{BlobStore: deps.Blob, LogStore: deps.Log}, writeLimit)
 	mux.Handle("/circles/", auth.RequireSession(deps.Auth, circleMux))
 

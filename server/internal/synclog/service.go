@@ -1,6 +1,9 @@
 package synclog
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // Service holds the capability checks that don't depend on live circle
 // state — a forged signature never reaches LogStore. HTTP endpoints call
@@ -99,4 +102,28 @@ func (s *Service) DeleteEntry(ctx context.Context, deletion EntryDeletion) (Comm
 		return CommitResult{}, ErrWriteTokenMismatch
 	}
 	return s.Log.DeleteEntry(ctx, deletion.SyncID, deletion.TombstoneEntryID, post.Epoch, deletion.EncryptedPayload, deletion.KeyVersion, writeTokenHash, authorizedBy, requiredAuthorityPublicKey)
+}
+
+// DeleteAuthorContent verifies AuthorSignature proves control of
+// AuthorIdentityPublicKey — the only capability this authorizes by, no
+// admin fallback — then, when a tombstone is requested, hashes
+// WriteToken before calling LogStore.DeleteAuthorContent.
+func (s *Service) DeleteAuthorContent(ctx context.Context, deletion AuthorContentDeletion) (AuthorContentResult, error) {
+	if err := VerifySignature(deletion.AuthorIdentityPublicKey, deletion.Message(), deletion.AuthorSignature); err != nil {
+		if errors.Is(err, ErrInvalidSignature) {
+			return AuthorContentResult{}, ErrEntryNotAuthorized
+		}
+		return AuthorContentResult{}, err
+	}
+
+	var writeTokenHash string
+	if deletion.TombstoneEntryID != "" {
+		hash, err := WriteTokenHash(deletion.WriteToken)
+		if err != nil {
+			return AuthorContentResult{}, ErrWriteTokenMismatch
+		}
+		writeTokenHash = hash
+	}
+
+	return s.Log.DeleteAuthorContent(ctx, deletion.SyncID, deletion.AuthorIdentityPublicKey, deletion.TombstoneEntryID, deletion.EncryptedPayload, deletion.KeyVersion, writeTokenHash)
 }

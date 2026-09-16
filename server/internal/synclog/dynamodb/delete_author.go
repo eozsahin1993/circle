@@ -15,47 +15,42 @@ import (
 )
 
 // DeleteAuthorContent strips every content entry one identity authored —
-// see synclog.LogStore.DeleteAuthorContent.
+// see LogStore.DeleteAuthorContent for why signature verification isn't
+// done here.
 //
 // The strip itself carries no control-state CAS: it appends nothing and
 // each row mutation is idempotent, so concurrent appends don't need
 // fencing out. Only the optional tombstone goes through Append's usual
 // gate. Re-running after a partial failure converges — stripped rows no
 // longer match the query's attribute_exists(encryptedMeta) filter.
-func (s *Store) DeleteAuthorContent(ctx context.Context, deletion synclog.AuthorContentDeletion) (synclog.AuthorContentResult, error) {
-	// A failed signature here is a refused credential, not a malformed
-	// request — it's the only thing authorizing the strip.
-	if err := synclog.VerifySignature(deletion.AuthorIdentityPublicKey, deletion.Message(), deletion.AuthorSignature); err != nil {
-		if errors.Is(err, synclog.ErrInvalidSignature) {
-			return synclog.AuthorContentResult{}, synclog.ErrEntryNotAuthorized
-		}
-		return synclog.AuthorContentResult{}, err
-	}
-
-	withTombstone := deletion.TombstoneEntryID != ""
+func (s *Store) DeleteAuthorContent(ctx context.Context, syncID, authorIdentityPublicKey, tombstoneEntryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash string) (synclog.AuthorContentResult, error) {
+	withTombstone := tombstoneEntryID != ""
 	if withTombstone {
 		// Checked before the strip so a stale token fails the whole call
 		// up front rather than after rows are already gone. Append below
 		// re-checks it atomically.
-		if err := s.VerifyWriteToken(ctx, deletion.SyncID, deletion.WriteToken); err != nil {
+		control, err := s.getControlState(ctx, syncID, false)
+		if err != nil {
 			return synclog.AuthorContentResult{}, err
 		}
-	} else if _, err := s.getControlState(ctx, deletion.SyncID, false); err != nil {
+		if control.writeTokenHash != writeTokenHash {
+			return synclog.AuthorContentResult{}, synclog.ErrWriteTokenMismatch
+		}
+		if control.deleted {
+			return synclog.AuthorContentResult{}, synclog.ErrCircleDeleted
+		}
+	} else if _, err := s.getControlState(ctx, syncID, false); err != nil {
 		return synclog.AuthorContentResult{}, err
 	}
 
-	stripped, err := s.stripAuthorContent(ctx, deletion.SyncID, deletion.AuthorIdentityPublicKey)
+	stripped, err := s.stripAuthorContent(ctx, syncID, authorIdentityPublicKey)
 	if err != nil {
 		return synclog.AuthorContentResult{}, err
 	}
 
 	result := synclog.AuthorContentResult{StrippedEntryIDs: stripped}
 	if withTombstone {
-		writeTokenHash, err := synclog.WriteTokenHash(deletion.WriteToken)
-		if err != nil {
-			return synclog.AuthorContentResult{}, err
-		}
-		commit, err := s.Append(ctx, deletion.SyncID, synclog.NamespaceMeta, deletion.TombstoneEntryID, deletion.EncryptedPayload, deletion.KeyVersion, writeTokenHash, deletion.AuthorIdentityPublicKey)
+		commit, err := s.Append(ctx, syncID, synclog.NamespaceMeta, tombstoneEntryID, encryptedPayload, keyVersion, writeTokenHash, authorIdentityPublicKey)
 		if err != nil {
 			return synclog.AuthorContentResult{}, err
 		}

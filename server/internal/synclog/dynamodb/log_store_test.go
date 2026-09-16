@@ -1314,6 +1314,25 @@ func authorContentDeletion(author authorityKey, syncID, tombstoneEntryID, token 
 	return deletion
 }
 
+// callDeleteAuthorContent calls the narrowed LogStore.DeleteAuthorContent,
+// replicating Service.DeleteAuthorContent's verify-then-hash steps — so
+// tests keep building an AuthorContentDeletion the same way while the
+// store itself never sees a raw token or a signature.
+func callDeleteAuthorContent(t *testing.T, store synclog.LogStore, ctx context.Context, deletion synclog.AuthorContentDeletion) (synclog.AuthorContentResult, error) {
+	t.Helper()
+	if err := synclog.VerifySignature(deletion.AuthorIdentityPublicKey, deletion.Message(), deletion.AuthorSignature); err != nil {
+		if errors.Is(err, synclog.ErrInvalidSignature) {
+			return synclog.AuthorContentResult{}, synclog.ErrEntryNotAuthorized
+		}
+		return synclog.AuthorContentResult{}, err
+	}
+	var writeTokenHash string
+	if deletion.TombstoneEntryID != "" {
+		writeTokenHash = hashToken(t, deletion.WriteToken)
+	}
+	return store.DeleteAuthorContent(ctx, deletion.SyncID, deletion.AuthorIdentityPublicKey, deletion.TombstoneEntryID, deletion.EncryptedPayload, deletion.KeyVersion, writeTokenHash)
+}
+
 func TestLogStore_DeleteAuthorContent_StripsTheAuthorsRowsAndAppendsTheTombstone(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
@@ -1336,7 +1355,7 @@ func TestLogStore_DeleteAuthorContent_StripsTheAuthorsRowsAndAppendsTheTombstone
 		t.Fatal(err)
 	}
 
-	result, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
+	result, err := callDeleteAuthorContent(t, store, ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1394,7 +1413,7 @@ func TestLogStore_DeleteAuthorContent_StripOnlyModeAppendsNothing(t *testing.T) 
 	}
 
 	// No tombstone and no write token — a departed member's erase.
-	result, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, "", ""))
+	result, err := callDeleteAuthorContent(t, store, ctx, authorContentDeletion(author, syncID, "", ""))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1411,36 +1430,6 @@ func TestLogStore_DeleteAuthorContent_StripOnlyModeAppendsNothing(t *testing.T) 
 	}
 }
 
-func TestLogStore_DeleteAuthorContent_RejectsAWrongSignature(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	syncID := testsupport.UniqueSyncID(t)
-	founder := newAuthorityKey(t)
-	author := newAuthorityKey(t)
-	impostor := newAuthorityKey(t)
-	token := newToken(t)
-	bootstrap(t, store, syncID, founder, token)
-
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, syncID+"-a1", []byte("caption"), 1, hashToken(t, token), author.publicKeyHex); err != nil {
-		t.Fatal(err)
-	}
-
-	// The impostor claims the author's key but can't sign for it.
-	deletion := authorContentDeletion(impostor, syncID, "", "")
-	deletion.AuthorIdentityPublicKey = author.publicKeyHex
-	if _, err := store.DeleteAuthorContent(ctx, deletion); !errors.Is(err, synclog.ErrEntryNotAuthorized) {
-		t.Fatalf("expected ErrEntryNotAuthorized, got %v", err)
-	}
-
-	read, err := store.Read(ctx, syncID, synclog.NamespaceContent, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(read.Entries[0].EncryptedMeta) == 0 {
-		t.Fatal("expected the row to survive a refused erase")
-	}
-}
-
 func TestLogStore_DeleteAuthorContent_RetryConvergesWithoutStrippingTheTombstone(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
@@ -1454,14 +1443,14 @@ func TestLogStore_DeleteAuthorContent_RetryConvergesWithoutStrippingTheTombstone
 		t.Fatal(err)
 	}
 
-	first, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
+	first, err := callDeleteAuthorContent(t, store, ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
 	if err != nil {
 		t.Fatal(err)
 	}
 	// The tombstone is authored by the same key — a retry must not treat
 	// it as content to strip (it's meta, outside the range paged here,
 	// regardless).
-	second, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
+	second, err := callDeleteAuthorContent(t, store, ctx, authorContentDeletion(author, syncID, syncID+"-tomb", token))
 	if err != nil {
 		t.Fatalf("a retry must converge rather than fail: %v", err)
 	}
@@ -1498,7 +1487,7 @@ func TestLogStore_DeleteAuthorContent_UnknownCircleIsNotFound(t *testing.T) {
 	store := testsupport.NewLogStore(t)
 	author := newAuthorityKey(t)
 
-	if _, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, testsupport.UniqueSyncID(t), "", "")); !errors.Is(err, synclog.ErrCircleNotFound) {
+	if _, err := callDeleteAuthorContent(t, store, ctx, authorContentDeletion(author, testsupport.UniqueSyncID(t), "", "")); !errors.Is(err, synclog.ErrCircleNotFound) {
 		t.Fatalf("expected ErrCircleNotFound, got %v", err)
 	}
 }
@@ -1516,7 +1505,7 @@ func TestLogStore_DeleteAuthorContent_StaleTokenFailsBeforeAnythingIsStripped(t 
 		t.Fatal(err)
 	}
 
-	if _, err := store.DeleteAuthorContent(ctx, authorContentDeletion(author, syncID, syncID+"-tomb", newToken(t))); !errors.Is(err, synclog.ErrWriteTokenMismatch) {
+	if _, err := callDeleteAuthorContent(t, store, ctx, authorContentDeletion(author, syncID, syncID+"-tomb", newToken(t))); !errors.Is(err, synclog.ErrWriteTokenMismatch) {
 		t.Fatalf("expected ErrWriteTokenMismatch, got %v", err)
 	}
 
