@@ -325,7 +325,10 @@ type LogStore interface {
 	// transaction holds. The ordering is the point: a tombstone with
 	// entries still under it is a retry, entries with no tombstone are
 	// silent data loss.
-	DeleteCircle(ctx context.Context, deletion CircleDeletion) (CommitResult, error)
+	//
+	// Signature verification happens in Service.DeleteCircle, not here —
+	// see Rotate's doc comment for why.
+	DeleteCircle(ctx context.Context, syncID, entryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash string, signerAuthorityPublicKey string) (CommitResult, error)
 
 	// DeleteEntry strips a post's EncryptedMeta, stamps deletedAt/deletedBy,
 	// and appends the tombstone entry — the row itself survives, since

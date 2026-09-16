@@ -43,3 +43,16 @@ func (s *Service) ChangeAuthority(ctx context.Context, change AuthorityChange) (
 	}
 	return s.Log.ChangeAuthority(ctx, change.SyncID, change.EntryID, change.EncryptedPayload, change.KeyVersion, writeTokenHash, change.Action, change.TargetAuthorityPublicKey, change.SignerAuthorityPublicKey)
 }
+
+// DeleteCircle verifies the signer's signature over deletion.Message(),
+// then hashes deletion.WriteToken and calls LogStore.DeleteCircle.
+func (s *Service) DeleteCircle(ctx context.Context, deletion CircleDeletion) (CommitResult, error) {
+	if err := VerifySignature(deletion.SignerAuthorityPublicKey, deletion.Message(), deletion.Signature); err != nil {
+		return CommitResult{}, err
+	}
+	writeTokenHash, err := WriteTokenHash(deletion.WriteToken)
+	if err != nil {
+		return CommitResult{}, ErrWriteTokenMismatch
+	}
+	return s.Log.DeleteCircle(ctx, deletion.SyncID, deletion.EntryID, deletion.EncryptedPayload, deletion.KeyVersion, writeTokenHash, deletion.SignerAuthorityPublicKey)
+}

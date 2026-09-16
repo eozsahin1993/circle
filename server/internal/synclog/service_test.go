@@ -11,8 +11,8 @@ import (
 )
 
 // fakeLogStore drives Service's own decisions without LocalStack — each
-// method records its call and returns a canned result. Only Rotate has a
-// real body; the rest panic until their operations migrate.
+// migrated method records its call and returns a canned result; the rest
+// panic until their operations migrate.
 type fakeLogStore struct {
 	rotateCalls []rotateCall
 	rotateOut   synclog.CommitResult
@@ -21,6 +21,10 @@ type fakeLogStore struct {
 	changeAuthorityCalls []changeAuthorityCall
 	changeAuthorityOut   synclog.CommitResult
 	changeAuthorityErr   error
+
+	deleteCircleCalls []deleteCircleCall
+	deleteCircleOut   synclog.CommitResult
+	deleteCircleErr   error
 }
 
 type rotateCall struct {
@@ -55,8 +59,18 @@ func (f *fakeLogStore) Bootstrap(ctx context.Context, syncID, founderAuthorityPu
 func (f *fakeLogStore) Append(ctx context.Context, syncID string, ns synclog.Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeToken, authorIdentityPublicKey string) (synclog.CommitResult, error) {
 	panic("fakeLogStore: Append not implemented")
 }
-func (f *fakeLogStore) DeleteCircle(ctx context.Context, deletion synclog.CircleDeletion) (synclog.CommitResult, error) {
-	panic("fakeLogStore: DeleteCircle not implemented")
+
+type deleteCircleCall struct {
+	syncID, entryID          string
+	encryptedPayload         []byte
+	keyVersion               int64
+	writeTokenHash           string
+	signerAuthorityPublicKey string
+}
+
+func (f *fakeLogStore) DeleteCircle(ctx context.Context, syncID, entryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash string, signerAuthorityPublicKey string) (synclog.CommitResult, error) {
+	f.deleteCircleCalls = append(f.deleteCircleCalls, deleteCircleCall{syncID, entryID, encryptedPayload, keyVersion, writeTokenHash, signerAuthorityPublicKey})
+	return f.deleteCircleOut, f.deleteCircleErr
 }
 func (f *fakeLogStore) DeleteEntry(ctx context.Context, deletion synclog.EntryDeletion) (synclog.CommitResult, error) {
 	panic("fakeLogStore: DeleteEntry not implemented")
@@ -258,6 +272,78 @@ func TestService_ChangeAuthority_HashesTheWriteTokenBeforeCallingLogStore(t *tes
 		t.Fatal(err)
 	}
 	if got := log.changeAuthorityCalls[0].writeTokenHash; got != wantHash {
+		t.Fatalf("expected the raw token hashed before reaching LogStore, got %q want %q", got, wantHash)
+	}
+}
+
+// newTestCircleDeletion builds a fully, correctly signed CircleDeletion —
+// same convention as newTestAuthorityChange.
+func newTestCircleDeletion(signerPub string, signerPriv ed25519.PrivateKey, syncID, entryID, token string) synclog.CircleDeletion {
+	deletion := synclog.CircleDeletion{
+		SyncID:                   syncID,
+		EntryID:                  entryID,
+		EncryptedPayload:         []byte("circle_deleted payload"),
+		KeyVersion:               1,
+		WriteToken:               token,
+		SignerAuthorityPublicKey: signerPub,
+	}
+	deletion.Signature = ed25519.Sign(signerPriv, deletion.Message())
+	return deletion
+}
+
+func TestService_DeleteCircle_RejectsAMalformedWriteToken(t *testing.T) {
+	pubKey, priv := newTestAuthorityKey(t)
+	deletion := newTestCircleDeletion(pubKey, priv, "sync-1", "tombstone-1", "not-hex")
+
+	log := &fakeLogStore{}
+	svc := &synclog.Service{Log: log}
+	_, err := svc.DeleteCircle(context.Background(), deletion)
+	if !errors.Is(err, synclog.ErrWriteTokenMismatch) {
+		t.Fatalf("expected ErrWriteTokenMismatch for a malformed token, got %v", err)
+	}
+	if len(log.deleteCircleCalls) != 0 {
+		t.Fatalf("expected LogStore.DeleteCircle never called, got %d calls", len(log.deleteCircleCalls))
+	}
+}
+
+// A signature made for one circle must not authorize deleting another.
+func TestService_DeleteCircle_SignatureDoesNotCarryAcrossCircles(t *testing.T) {
+	pubKey, priv := newTestAuthorityKey(t)
+	deletion := newTestCircleDeletion(pubKey, priv, "sync-a", "tombstone-1", "deadbeef")
+	deletion.SyncID = "sync-b"
+
+	log := &fakeLogStore{}
+	svc := &synclog.Service{Log: log}
+	_, err := svc.DeleteCircle(context.Background(), deletion)
+	if !errors.Is(err, synclog.ErrInvalidSignature) {
+		t.Fatalf("expected a signature bound to another circle to be rejected, got %v", err)
+	}
+	if len(log.deleteCircleCalls) != 0 {
+		t.Fatalf("expected LogStore.DeleteCircle never called, got %d calls", len(log.deleteCircleCalls))
+	}
+}
+
+func TestService_DeleteCircle_HashesTheWriteTokenBeforeCallingLogStore(t *testing.T) {
+	pubKey, priv := newTestAuthorityKey(t)
+	deletion := newTestCircleDeletion(pubKey, priv, "sync-1", "tombstone-1", "deadbeef")
+
+	log := &fakeLogStore{deleteCircleOut: synclog.CommitResult{Epoch: 4, ReceivedAt: 300}}
+	svc := &synclog.Service{Log: log}
+	result, err := svc.DeleteCircle(context.Background(), deletion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != log.deleteCircleOut {
+		t.Fatalf("expected the LogStore's result passed through unchanged, got %+v", result)
+	}
+	if len(log.deleteCircleCalls) != 1 {
+		t.Fatalf("expected exactly one LogStore.DeleteCircle call, got %d", len(log.deleteCircleCalls))
+	}
+	wantHash, err := synclog.WriteTokenHash("deadbeef")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := log.deleteCircleCalls[0].writeTokenHash; got != wantHash {
 		t.Fatalf("expected the raw token hashed before reaching LogStore, got %q want %q", got, wantHash)
 	}
 }

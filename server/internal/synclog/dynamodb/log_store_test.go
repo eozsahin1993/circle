@@ -789,6 +789,15 @@ func circleDeletion(signer authorityKey, syncID, entryID, token string) synclog.
 	return deletion
 }
 
+// deleteCircle calls the narrowed LogStore.DeleteCircle with a
+// fully-built CircleDeletion, hashing its WriteToken the way
+// Service.DeleteCircle does — so tests keep building requests the same
+// way while the store itself never sees a raw token or a signature.
+func deleteCircle(t *testing.T, store synclog.LogStore, ctx context.Context, deletion synclog.CircleDeletion) (synclog.CommitResult, error) {
+	t.Helper()
+	return store.DeleteCircle(ctx, deletion.SyncID, deletion.EntryID, deletion.EncryptedPayload, deletion.KeyVersion, hashToken(t, deletion.WriteToken), deletion.SignerAuthorityPublicKey)
+}
+
 func TestLogStore_DeleteCircle_SweepsContentButKeepsMetaAndTheTombstone(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
@@ -806,7 +815,7 @@ func TestLogStore_DeleteCircle_SweepsContentButKeepsMetaAndTheTombstone(t *testi
 		}
 	}
 
-	commit, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token))
+	commit, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token))
 	if err != nil {
 		t.Fatalf("deleting the circle failed: %v", err)
 	}
@@ -845,7 +854,7 @@ func TestLogStore_DeleteCircle_RefusesEveryLaterWrite(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -863,7 +872,7 @@ func TestLogStore_DeleteCircle_RefusesEveryLaterWrite(t *testing.T) {
 	if _, err := changeAuthority(t, store, ctx, authorityChange(founder, syncID, "promote-after", synclog.AuthorityAdd, promoted.publicKeyHex, token)); !errors.Is(err, synclog.ErrCircleDeleted) {
 		t.Fatalf("expected an authority change to be refused, got %v", err)
 	}
-	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-2", token)); !errors.Is(err, synclog.ErrCircleDeleted) {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-2", token)); !errors.Is(err, synclog.ErrCircleDeleted) {
 		t.Fatalf("expected a second deletion to be refused, got %v", err)
 	}
 }
@@ -876,7 +885,7 @@ func TestLogStore_DeleteCircle_RefusesLaterVerification(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -901,7 +910,7 @@ func TestLogStore_DeleteCircle_KeepsServingReads(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -932,28 +941,11 @@ func TestLogStore_DeleteCircle_RejectsASignerOutsideTheSet(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.DeleteCircle(ctx, circleDeletion(outsider, syncID, "tombstone-1", token)); !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(outsider, syncID, "tombstone-1", token)); !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
 		t.Fatalf("expected a non-authority to be refused, got %v", err)
 	}
 	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, "post-1", []byte("post"), 1, token, "test-author-key"); err != nil {
 		t.Fatalf("a refused deletion must leave the circle writable: %v", err)
-	}
-}
-
-func TestLogStore_DeleteCircle_SignatureDoesNotCarryAcrossCircles(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	founder := newAuthorityKey(t)
-	token := newToken(t)
-	target := testsupport.UniqueSyncID(t)
-	other := testsupport.UniqueSyncID(t)
-	bootstrap(t, store, target, founder, token)
-	bootstrap(t, store, other, founder, token)
-
-	deletion := circleDeletion(founder, other, "tombstone-1", token)
-	deletion.SyncID = target
-	if _, err := store.DeleteCircle(ctx, deletion); !errors.Is(err, synclog.ErrInvalidSignature) {
-		t.Fatalf("expected a signature for another circle to be refused, got %v", err)
 	}
 }
 
@@ -965,13 +957,13 @@ func TestLogStore_DeleteCircle_RetryWithTheSameEntryIDIsIdempotent(t *testing.T)
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	first, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token))
+	first, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token))
 	if err != nil {
 		t.Fatal(err)
 	}
 	// The same entryID is a retry of a call whose response was lost, not a
 	// second deletion — it re-runs the sweep and returns the original commit.
-	second, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token))
+	second, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token))
 	if err != nil {
 		t.Fatalf("a retry must converge rather than fail: %v", err)
 	}
@@ -997,7 +989,7 @@ func TestLogStore_DeleteCircle_SweepsPastOneBatch(t *testing.T) {
 		}
 	}
 
-	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1024,7 +1016,7 @@ func TestLogStore_DeleteCircle_StampsMetaForExpiryWithoutDeletingIt(t *testing.T
 	if _, err := store.Append(ctx, syncID, synclog.NamespaceMeta, "member-1", []byte("member_added"), 1, token, "test-author-key"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1068,7 +1060,7 @@ func TestLogStore_DeleteCircle_WithNoContentAtAll(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
+	if _, err := deleteCircle(t, store, ctx, circleDeletion(founder, syncID, "tombstone-1", token)); err != nil {
 		t.Fatalf("deleting an empty circle failed: %v", err)
 	}
 
