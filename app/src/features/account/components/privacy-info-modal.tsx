@@ -35,7 +35,7 @@ const SECTIONS = [
   },
   {
     label: 'What we can see',
-    body: "At rest, we can tell when two entries in the same circle came from the same person — it's what lets us find and erase everything you posted if you delete your account — but never who that person is, and never whether they're in any of your other circles. Beyond that, we only see that a circle exists, how active it is, and that requests happen, never who or what.",
+    body: 'At rest, we can determine that two entries in the same circle share an author, but never who that person is. We see only that a circle exists, how active it is, and that requests occur, never who made them or what they contain.',
   },
   {
     label: 'If someone leaves',
