@@ -90,6 +90,10 @@ export default function CircleDetailsScreen() {
    * fact, so promoting a second admin first is the only fix there is.
    */
   const soleAdmin = admin && members.filter((member) => member.role === MemberRoles.admin).length === 1;
+  // A sole member's "leave" actually runs `deleteCircleForEveryone`, so
+  // the row and the alert say Delete to match. `leaveCircle` re-checks
+  // against a fresh roster before deleting; this only picks the words.
+  const lastMember = members.length === 1;
 
   const reload = useCallback(async () => {
     if (!circleId) return;
@@ -266,21 +270,17 @@ export default function CircleDetailsScreen() {
     // hands the circle to someone, and this is where that can be
     // cancelled and overridden with "Make admin" on someone else.
     const successor = await departingSuccessor(circleId).catch(() => null);
-    // Nobody left to invite you back, so this one really is final — worth
-    // saying outright rather than letting "you will need a new key" imply
-    // a way back that doesn't exist.
-    const lastMember = members.length === 1;
     Alert.alert(
-      `Leave ${circle?.name ?? 'this circle'}?`,
+      lastMember ? `Delete ${circle?.name ?? 'this circle'}?` : `Leave ${circle?.name ?? 'this circle'}?`,
       lastMember
-        ? `You are the only one left. Leaving removes ${circle?.name ?? 'this circle'} and every photo in it from this phone, and there is nobody who could invite you back.`
+        ? `You are the only one left. This deletes ${circle?.name ?? 'this circle'} and every photo in it for good, and there is nobody who could invite you back.`
         : successor
           ? `The circle disappears from this phone, and ${successor.name || 'the longest-standing member'} becomes admin.`
           : 'The circle disappears from this phone, and you will need a new key to come back.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Leave',
+          text: lastMember ? 'Delete' : 'Leave',
           style: 'destructive',
           onPress: async () => {
             // All local: the entry announcing the departure is queued, not
@@ -289,7 +289,7 @@ export default function CircleDetailsScreen() {
               await leaveCircle(circleId);
             } catch (err) {
               console.error('Failed to leave circle', err);
-              showError('Could not leave the circle');
+              showError(lastMember ? 'Could not delete the circle' : 'Could not leave the circle');
               return;
             }
             router.dismissTo('/circle');
@@ -429,15 +429,24 @@ export default function CircleDetailsScreen() {
       title: 'Careful',
       destructive: true,
       rows: [
-        {
-          label: `Leave ${circle?.name ?? 'this circle'}`,
-          // Not "you keep the photos": `markCircleLeft` is a soft delete and
-          // the bytes do survive, but every list filters left circles out,
-          // so there is no screen that can still show them.
-          description: 'The circle disappears from this phone. You will need a new key to come back.',
-          destructive: true,
-          onPress: handleLeave,
-        },
+        lastMember
+          ? {
+              // What actually happens: a sole member's departure runs
+              // `deleteCircleForEveryone`, not a plain leave.
+              label: `Delete ${circle?.name ?? 'this circle'}`,
+              description: 'You are the only one here. The circle and every photo in it are removed for good.',
+              destructive: true,
+              onPress: handleLeave,
+            }
+          : {
+              label: `Leave ${circle?.name ?? 'this circle'}`,
+              // Not "you keep the photos": `markCircleLeft` is a soft delete and
+              // the bytes do survive, but every list filters left circles out,
+              // so there is no screen that can still show them.
+              description: 'The circle disappears from this phone. You will need a new key to come back.',
+              destructive: true,
+              onPress: handleLeave,
+            },
       ],
     },
   ];
