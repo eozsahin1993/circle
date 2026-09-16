@@ -1,6 +1,6 @@
-# circle-relay
+# mimoza-relay
 
-The relay server for the Circle app — a blind relay for encrypted circle
+The relay server for the Mimoza app — a blind relay for encrypted circle
 content, plus account auth/recovery plumbing. It never sees plaintext
 content and is designed to infer as little as possible about circle
 membership or social structure. See [DESIGN.md](../docs/DESIGN.md) for the

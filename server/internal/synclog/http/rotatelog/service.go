@@ -9,7 +9,7 @@ package rotatelog
 import (
 	"context"
 
-	"circle-relay/internal/synclog"
+	"mimoza-relay/internal/synclog"
 )
 
 type Service struct {

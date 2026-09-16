@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"circle-relay/internal/push"
+	"mimoza-relay/internal/push"
 )
 
 // A real key, generated per run — the JWT path is genuinely exercised
@@ -53,7 +53,7 @@ func TestSendPostsAnAlertWithMutableContent(t *testing.T) {
 	}))
 	defer apnsAPI.Close()
 
-	sender := New(testKey(t), "com.circle.app", false)
+	sender := New(testKey(t), "com.eozsahin.mimoza", false)
 	sender.Client.Transport = redirectTo(apnsAPI.URL)
 
 	if err := sender.Send(context.Background(), "device-token", "routing-1", 3, []byte("ciphertext")); err != nil {
@@ -63,7 +63,7 @@ func TestSendPostsAnAlertWithMutableContent(t *testing.T) {
 	if !strings.HasPrefix(headers.Get("Authorization"), "bearer ") {
 		t.Fatalf("expected a bearer provider token, got %q", headers.Get("Authorization"))
 	}
-	if headers.Get("Apns-Topic") != "com.circle.app" {
+	if headers.Get("Apns-Topic") != "com.eozsahin.mimoza" {
 		t.Fatalf("wrong topic: %q", headers.Get("Apns-Topic"))
 	}
 	if headers.Get("Apns-Push-Type") != "alert" {
@@ -96,7 +96,7 @@ func TestProviderTokenIsReusedAcrossSends(t *testing.T) {
 	}))
 	defer apnsAPI.Close()
 
-	sender := New(testKey(t), "com.circle.app", false)
+	sender := New(testKey(t), "com.eozsahin.mimoza", false)
 	sender.Client.Transport = redirectTo(apnsAPI.URL)
 
 	for range 2 {
@@ -120,7 +120,7 @@ func TestAnExpiredProviderTokenIsReminted(t *testing.T) {
 	}))
 	defer apnsAPI.Close()
 
-	sender := New(testKey(t), "com.circle.app", false)
+	sender := New(testKey(t), "com.eozsahin.mimoza", false)
 	sender.Client.Transport = redirectTo(apnsAPI.URL)
 
 	if err := sender.Send(context.Background(), "device-token", "routing-1", 3, []byte("x")); err != nil {
@@ -142,7 +142,7 @@ func TestSendReportsAFailedStatus(t *testing.T) {
 	}))
 	defer apnsAPI.Close()
 
-	sender := New(testKey(t), "com.circle.app", false)
+	sender := New(testKey(t), "com.eozsahin.mimoza", false)
 	sender.Client.Transport = redirectTo(apnsAPI.URL)
 
 	err := sender.Send(context.Background(), "device-token", "routing-1", 3, []byte("x"))
@@ -161,7 +161,7 @@ func TestAMalformedKeyDoesNotLeakItself(t *testing.T) {
 		PrivateKey: "-----BEGIN PRIVATE KEY-----\nnot-a-key\n-----END PRIVATE KEY-----\n",
 	}
 
-	err := New(key, "com.circle.app", false).Send(context.Background(), "device-token", "routing-1", 3, []byte("x"))
+	err := New(key, "com.eozsahin.mimoza", false).Send(context.Background(), "device-token", "routing-1", 3, []byte("x"))
 	if err == nil {
 		t.Fatal("expected an error")
 	}

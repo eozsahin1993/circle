@@ -1,6 +1,6 @@
 # Design docs
 
-Architecture and design decisions for Circle, kept separate from the
+Architecture and design decisions for Mimoza, kept separate from the
 `server/` and `app/` code they describe so neither directory's README has
 to double as both a map of the code and a design history.
 

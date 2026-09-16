@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"circle-relay/internal/auth"
-	"circle-relay/internal/ratelimit"
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/auth"
+	"mimoza-relay/internal/ratelimit"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 // fakeStore is a canned Store — the real dynamodb adapter's

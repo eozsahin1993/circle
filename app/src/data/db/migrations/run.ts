@@ -18,12 +18,12 @@ import migrationsData from '@/data/db/migrations/migrations';
  */
 declare global {
   // eslint-disable-next-line no-var
-  var __hearthMigrations: Promise<void> | undefined;
+  var __mimozaMigrations: Promise<void> | undefined;
 }
 
 export function runMigrations(): Promise<void> {
-  globalThis.__hearthMigrations ??= runMigrationsOnce();
-  return globalThis.__hearthMigrations;
+  globalThis.__mimozaMigrations ??= runMigrationsOnce();
+  return globalThis.__mimozaMigrations;
 }
 
 // Not `__drizzle_migrations` — its schema and lookup logic are entirely

@@ -1,4 +1,4 @@
-# Circle
+# Mimoza
 
 A private, end-to-end encrypted photo and album sharing app for small
 groups ("circles") — an Expo/React Native client and a blind Go relay

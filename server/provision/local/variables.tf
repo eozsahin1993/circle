@@ -5,5 +5,5 @@ variable "env" {
 }
 
 locals {
-  name_prefix = "circle-${var.env}"
+  name_prefix = "mimoza-${var.env}"
 }

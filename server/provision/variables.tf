@@ -5,13 +5,13 @@ variable "aws_region" {
 }
 
 variable "env" {
-  description = "Environment name, folded into every resource's name (e.g. circle-prod-sync-log) so multiple environments can coexist in one account without colliding."
+  description = "Environment name, folded into every resource's name (e.g. mimoza-prod-sync-log) so multiple environments can coexist in one account without colliding."
   type        = string
   default     = "prod"
 }
 
 locals {
-  name_prefix = "circle-${var.env}"
+  name_prefix = "mimoza-${var.env}"
 }
 
 variable "blob_glacier_transition_days" {
@@ -80,5 +80,5 @@ variable "rate_limit_window_minutes" {
 variable "fcm_credential_parameter" {
   description = "SSM SecureString parameter holding the FCM service-account JSON"
   type        = string
-  default     = "/circle/fcm-service-account"
+  default     = "/mimoza/fcm-service-account"
 }

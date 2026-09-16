@@ -3,7 +3,7 @@ package dynamodb
 import (
 	"context"
 
-	"circle-relay/internal/synclog"
+	"mimoza-relay/internal/synclog"
 )
 
 // VerifyWriteToken is a plain, non-consistent read-and-compare — no CAS

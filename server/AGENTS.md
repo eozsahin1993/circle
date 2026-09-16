@@ -1,4 +1,4 @@
-# circle-relay
+# mimoza-relay
 
 Go relay server. Architecture and protocol design live in `docs/` at the
 repo root — read `docs/SYNC_DESIGN.md` before touching anything under
@@ -46,7 +46,7 @@ column by accident.
 Two legs, split by whether a package lives under `integration/`:
 
 ```bash
-go test -race $(go list ./... | grep -Ev '^circle-relay/integration(/|$)')  # unit
+go test -race $(go list ./... | grep -Ev '^mimoza-relay/integration(/|$)')  # unit
 go test -race ./integration/...                                            # integration, black-box HTTP
 ```
 

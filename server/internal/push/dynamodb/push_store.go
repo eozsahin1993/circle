@@ -16,8 +16,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"circle-relay/internal/push"
-	"circle-relay/internal/util/dynamoutil"
+	"mimoza-relay/internal/push"
+	"mimoza-relay/internal/util/dynamoutil"
 )
 
 const (

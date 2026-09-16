@@ -6,8 +6,8 @@ package google
 import (
 	"context"
 
-	"circle-relay/internal/auth"
-	"circle-relay/internal/auth/oidcverify"
+	"mimoza-relay/internal/auth"
+	"mimoza-relay/internal/auth/oidcverify"
 )
 
 type Service struct {

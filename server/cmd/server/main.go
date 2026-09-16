@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"time"
 
-	"circle-relay/internal/app"
-	"circle-relay/internal/config"
+	"mimoza-relay/internal/app"
+	"mimoza-relay/internal/config"
 )
 
 func main() {

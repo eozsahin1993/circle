@@ -19,9 +19,9 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
-	authdynamodb "circle-relay/internal/auth/dynamodb"
-	"circle-relay/internal/config"
-	logdynamodb "circle-relay/internal/synclog/dynamodb"
+	authdynamodb "mimoza-relay/internal/auth/dynamodb"
+	"mimoza-relay/internal/config"
+	logdynamodb "mimoza-relay/internal/synclog/dynamodb"
 )
 
 // DefaultEndpoint is where LocalStack listens locally and in CI.
@@ -47,7 +47,7 @@ func Endpoint() string {
 // The shared resources — see Shared.
 const (
 	LogTable       = "test-sync-log"
-	BlobBucket     = "test-circle-blobs"
+	BlobBucket     = "test-blobs"
 	SessionsTable  = "test-sessions"
 	AccountsTable  = "test-accounts"
 	InviteTable    = "test-invites"

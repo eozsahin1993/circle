@@ -2,12 +2,12 @@
 # in here. Stays
 # private regardless: access is entirely gated by short-lived presigned
 # URLs, never by bucket policy or public access.
-resource "aws_s3_bucket" "circle_blobs" {
-  bucket = "${var.name_prefix}-circle-blobs"
+resource "aws_s3_bucket" "blobs" {
+  bucket = "${var.name_prefix}-blobs"
 }
 
-resource "aws_s3_bucket_public_access_block" "circle_blobs" {
-  bucket = aws_s3_bucket.circle_blobs.id
+resource "aws_s3_bucket_public_access_block" "blobs" {
+  bucket = aws_s3_bucket.blobs.id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -20,8 +20,8 @@ resource "aws_s3_bucket_public_access_block" "circle_blobs" {
 # both without needing to know which client is uploading. The bucket only
 # ever holds ciphertext, so a permissive origin list doesn't expose
 # anything a same-origin policy would have protected.
-resource "aws_s3_bucket_cors_configuration" "circle_blobs" {
-  bucket = aws_s3_bucket.circle_blobs.id
+resource "aws_s3_bucket_cors_configuration" "blobs" {
+  bucket = aws_s3_bucket.blobs.id
 
   cors_rule {
     allowed_methods = ["GET", "PUT"]
@@ -47,8 +47,8 @@ resource "aws_s3_bucket_cors_configuration" "circle_blobs" {
 # Versioning is deliberately off. With it on, those deletes would lay down
 # delete markers over recoverable versions and quietly stop destroying
 # anything.
-resource "aws_s3_bucket_lifecycle_configuration" "circle_blobs" {
-  bucket = aws_s3_bucket.circle_blobs.id
+resource "aws_s3_bucket_lifecycle_configuration" "blobs" {
+  bucket = aws_s3_bucket.blobs.id
 
   rule {
     id     = "archive-blobs"

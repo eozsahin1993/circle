@@ -3,7 +3,7 @@ package logout
 import (
 	"net/http"
 
-	"circle-relay/internal/util/httputil"
+	"mimoza-relay/internal/util/httputil"
 )
 
 type response struct {

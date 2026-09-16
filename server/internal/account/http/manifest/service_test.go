@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"circle-relay/internal/account"
-	"circle-relay/internal/account/http/manifest"
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/account"
+	"mimoza-relay/internal/account/http/manifest"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 func TestService_PutThenGet_RoundTrips(t *testing.T) {

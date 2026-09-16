@@ -5,7 +5,7 @@ import (
 	"crypto/hmac"
 	"errors"
 
-	"circle-relay/internal/ratelimit"
+	"mimoza-relay/internal/ratelimit"
 )
 
 // MaxFanoutTargets caps one send. A circle's membership is bounded, so a

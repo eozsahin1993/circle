@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"circle-relay/integration/harness"
+	"mimoza-relay/integration/harness"
 )
 
 // deleteauthorcontent, end to end: the relay strips every content entry

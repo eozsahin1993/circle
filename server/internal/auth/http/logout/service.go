@@ -6,7 +6,7 @@ package logout
 import (
 	"context"
 
-	"circle-relay/internal/auth"
+	"mimoza-relay/internal/auth"
 )
 
 type Service struct {

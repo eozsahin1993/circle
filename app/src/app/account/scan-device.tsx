@@ -92,8 +92,8 @@ export default function ScanDeviceScreen() {
               <View style={styles.permissionPrompt}>
                 <ThemedText type="meta" themeColor="faint" style={styles.placeholder}>
                   {permission?.canAskAgain === false
-                    ? 'Camera access is off for Circle. Turn it on in Settings to scan.'
-                    : 'Circle needs your camera to scan the code.'}
+                    ? 'Camera access is off for Mimoza. Turn it on in Settings to scan.'
+                    : 'Mimoza needs your camera to scan the code.'}
                 </ThemedText>
                 <SecondaryButton
                   label={permission?.canAskAgain === false ? 'Open Settings' : 'Allow camera'}

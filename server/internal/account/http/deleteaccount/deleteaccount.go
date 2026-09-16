@@ -9,9 +9,9 @@ import (
 	"context"
 	"net/http"
 
-	"circle-relay/internal/account"
-	"circle-relay/internal/auth"
-	"circle-relay/internal/util/httputil"
+	"mimoza-relay/internal/account"
+	"mimoza-relay/internal/auth"
+	"mimoza-relay/internal/util/httputil"
 )
 
 type Service struct {

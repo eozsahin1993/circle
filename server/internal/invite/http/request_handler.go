@@ -6,8 +6,8 @@ import (
 	"errors"
 	"net/http"
 
-	"circle-relay/internal/invite"
-	"circle-relay/internal/util/httputil"
+	"mimoza-relay/internal/invite"
+	"mimoza-relay/internal/util/httputil"
 )
 
 // requestResponse is the wire shape for one join-request row —

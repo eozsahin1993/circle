@@ -39,7 +39,7 @@ export default function ReturningAccountScreen() {
 
         <View style={styles.content}>
           <ThemedText type="screenTitle">
-            {certain ? "You've used Circle before" : 'Used Circle before?'}
+            {certain ? "You've used Mimoza before" : 'Used Mimoza before?'}
           </ThemedText>
           <ThemedText type="captionFeed" themeColor="secondary">
             {certain

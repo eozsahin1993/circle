@@ -10,7 +10,7 @@ package invite
 import (
 	"context"
 
-	"circle-relay/internal/invite"
+	"mimoza-relay/internal/invite"
 )
 
 type Service struct {

@@ -17,11 +17,11 @@ type Database = ExpoSQLiteDatabase<typeof schema>;
  */
 declare global {
   // eslint-disable-next-line no-var
-  var __hearthDb: Database | undefined;
+  var __mimozaDb: Database | undefined;
 }
 
 function open(): Database {
-  return drizzle(openDatabaseSync('hearth.db'), { schema });
+  return drizzle(openDatabaseSync('mimoza.db'), { schema });
 }
 
 /**
@@ -34,7 +34,7 @@ function open(): Database {
  * practice — a production build is never reloaded out from under itself.
  */
 export function reopenDatabase(): void {
-  globalThis.__hearthDb = open();
+  globalThis.__mimozaDb = open();
 }
 
 /**
@@ -45,7 +45,7 @@ export function reopenDatabase(): void {
  */
 export const db: Database = new Proxy({} as Database, {
   get(_target, property) {
-    const current = (globalThis.__hearthDb ??= open());
+    const current = (globalThis.__mimozaDb ??= open());
     const value = Reflect.get(current, property, current);
     // Bound, or drizzle's methods lose the receiver their private fields
     // live on and fail on first use.

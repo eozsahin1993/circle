@@ -10,8 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"circle-relay/internal/synclog"
-	"circle-relay/internal/util/dynamoutil"
+	"mimoza-relay/internal/synclog"
+	"mimoza-relay/internal/util/dynamoutil"
 )
 
 // commit runs the shared transaction: the conditional #control update,

@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"circle-relay/internal/synclog"
-	"circle-relay/internal/synclog/http/circleerrors"
-	"circle-relay/internal/util/httputil"
+	"mimoza-relay/internal/synclog"
+	"mimoza-relay/internal/synclog/http/circleerrors"
+	"mimoza-relay/internal/util/httputil"
 )
 
 // AuthorSignature and AuthorityPublicKey/AuthoritySignature are both

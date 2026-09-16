@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "1069983434017",
-    "project_id": "circle-3ee1d",
-    "storage_bucket": "circle-3ee1d.firebasestorage.app"
+    "project_number": "126380695721",
+    "project_id": "mimozaapp-1587f",
+    "storage_bucket": "mimozaapp-1587f.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1069983434017:android:2d6012847233b6d05eea60",
+        "mobilesdk_app_id": "1:126380695721:android:7b0a9ad8e9aa270b97c9b8",
         "android_client_info": {
-          "package_name": "com.eozsahin.circle"
+          "package_name": "com.eozsahin.mimoza"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAXEY3SXCsIHsxrrzAy7DR2-2iaFBBpYS8"
+          "current_key": "AIzaSyAHHjplivjGrX5SJ62yjqtEihdaDsguXko"
         }
       ],
       "services": {

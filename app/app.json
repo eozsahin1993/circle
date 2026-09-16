@@ -63,7 +63,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Circle uses your camera to scan a device transfer code.",
+          "cameraPermission": "Mimoza uses your camera to scan a device transfer code.",
           "recordAudioAndroid": false
         }
       ]

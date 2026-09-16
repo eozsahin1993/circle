@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"circle-relay/internal/util/httputil"
+	"mimoza-relay/internal/util/httputil"
 )
 
 type putInviteRequest struct {

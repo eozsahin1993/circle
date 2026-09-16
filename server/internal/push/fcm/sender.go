@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"circle-relay/internal/push"
+	"mimoza-relay/internal/push"
 )
 
 // Sender posts to FCM's HTTP v1 API.

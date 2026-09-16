@@ -13,7 +13,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 func validClaims(t *testing.T, email, audience string) jwt.MapClaims {

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"circle-relay/integration/harness"
+	"mimoza-relay/integration/harness"
 )
 
 // The invite mailbox, end to end. Every test here is a sequence, because

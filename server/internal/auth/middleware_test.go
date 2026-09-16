@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"circle-relay/internal/auth"
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/auth"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 func newTestRequest(token string) *http.Request {

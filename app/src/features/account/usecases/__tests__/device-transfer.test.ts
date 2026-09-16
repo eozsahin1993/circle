@@ -145,7 +145,7 @@ describe('the scanned code', () => {
     ['a bad transfer code', JSON.stringify({ transferCode: '!!', ephemeralPublicKey: 'a'.repeat(64) })],
     ['a public key that is not 32 bytes', JSON.stringify({ transferCode: 'ABCD-EFGH-JKLM', ephemeralPublicKey: 'ff' })],
   ])('is rejected: %s', async (_label, raw) => {
-    await expect(inspectDeviceTransfer(raw)).rejects.toThrow("doesn't look like a Circle transfer code");
+    await expect(inspectDeviceTransfer(raw)).rejects.toThrow("doesn't look like a Mimoza transfer code");
   });
 
   test('is rejected once its mailbox row is gone', async () => {

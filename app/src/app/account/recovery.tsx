@@ -53,7 +53,7 @@ export default function RecoveryPhraseScreen() {
   async function handleSendToSelf() {
     if (!words) return;
     await Share.share({
-      message: `Circle recovery phrase\n\n${words.join(' ')}\n\nThese 12 words restore your circles on a new phone. Anyone who has them can too.`,
+      message: `Mimoza recovery phrase\n\n${words.join(' ')}\n\nThese 12 words restore your circles on a new phone. Anyone who has them can too.`,
     });
   }
 

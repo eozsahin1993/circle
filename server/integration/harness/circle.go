@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"circle-relay/internal/synclog"
+	"mimoza-relay/internal/synclog"
 )
 
 // A circle and the endpoints that act on one. There is a method per

@@ -8,7 +8,7 @@ import (
 	"log"
 	"net/http"
 
-	"circle-relay/internal/synclog"
+	"mimoza-relay/internal/synclog"
 )
 
 // Status returns the HTTP status and a client-safe message for err. Falls

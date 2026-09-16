@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"testing"
 
-	"circle-relay/integration/harness"
-	"circle-relay/internal/synclog"
+	"mimoza-relay/integration/harness"
+	"mimoza-relay/internal/synclog"
 )
 
 // getuploadtarget, getblob, deleteblob and getcoverphotouploadtarget, end

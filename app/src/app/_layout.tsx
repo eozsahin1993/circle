@@ -40,7 +40,7 @@ export const unstable_settings = {
   initialRouteName: 'index',
 };
 
-const HearthDarkTheme = {
+const MimozaDarkTheme = {
   ...DarkTheme,
   colors: {
     ...DarkTheme.colors,
@@ -52,7 +52,7 @@ const HearthDarkTheme = {
   },
 };
 
-const HearthLightTheme = {
+const MimozaLightTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
@@ -70,7 +70,7 @@ function AppShell() {
   const { message, visible, dismiss, settle } = useMessages();
 
   return (
-    <ThemeProvider value={scheme === 'dark' ? HearthDarkTheme : HearthLightTheme}>
+    <ThemeProvider value={scheme === 'dark' ? MimozaDarkTheme : MimozaLightTheme}>
       <Stack
         screenOptions={{
           headerShown: false,

@@ -6,8 +6,8 @@ import (
 	"errors"
 	"net/http"
 
-	"circle-relay/internal/push"
-	"circle-relay/internal/util/httputil"
+	"mimoza-relay/internal/push"
+	"mimoza-relay/internal/util/httputil"
 )
 
 type fanoutRequest struct {

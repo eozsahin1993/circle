@@ -13,7 +13,7 @@ import (
 	"context"
 	"log"
 
-	"circle-relay/internal/synclog"
+	"mimoza-relay/internal/synclog"
 )
 
 type Service struct {

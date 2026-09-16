@@ -3,7 +3,7 @@ package push
 import (
 	"testing"
 
-	"circle-relay/internal/push"
+	"mimoza-relay/internal/push"
 )
 
 func TestPackCategories(t *testing.T) {

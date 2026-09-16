@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	"circle-relay/integration/harness"
-	"circle-relay/internal/synclog"
+	"mimoza-relay/integration/harness"
+	"mimoza-relay/internal/synclog"
 )
 
 // rotatelog, changeauthority and deletecircle, end to end — the three

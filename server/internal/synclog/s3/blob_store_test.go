@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"testing"
 
-	"circle-relay/internal/synclog"
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/synclog"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 // GetUploadTarget refuses a second target once a blob has actually landed

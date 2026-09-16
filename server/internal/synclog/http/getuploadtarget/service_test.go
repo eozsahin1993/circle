@@ -7,9 +7,9 @@ import (
 	"errors"
 	"testing"
 
-	"circle-relay/internal/synclog"
-	"circle-relay/internal/synclog/http/getuploadtarget"
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/synclog"
+	"mimoza-relay/internal/synclog/http/getuploadtarget"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 func newToken(t *testing.T) string {

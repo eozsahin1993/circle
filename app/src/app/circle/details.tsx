@@ -213,7 +213,7 @@ export default function CircleDetailsScreen() {
     try {
       const invite = await getOrCreateInvite(circleId);
       await Share.share({
-        message: `Join ${circle?.name ?? 'my circle'} on Circle: ${inviteLink(invite.code)}`,
+        message: `Join ${circle?.name ?? 'my circle'} on Mimoza: ${inviteLink(invite.code)}`,
       });
     } catch (err) {
       console.error('Failed to share invite', err);

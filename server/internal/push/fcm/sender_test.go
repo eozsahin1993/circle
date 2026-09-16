@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"circle-relay/internal/push"
+	"mimoza-relay/internal/push"
 )
 
 // A real key, generated per run — the assertion is genuinely signed, so
@@ -28,7 +28,7 @@ func testAccount(t *testing.T, tokenURI string) *ServiceAccount {
 	encoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
 	return &ServiceAccount{
 		ProjectID:   "circle-test",
-		ClientEmail: "sender@circle-test.iam.gserviceaccount.com",
+		ClientEmail: "sender@mimoza-test.iam.gserviceaccount.com",
 		PrivateKey:  string(encoded),
 		TokenURI:    tokenURI,
 	}
@@ -182,7 +182,7 @@ func TestSendReportsAFailedStatus(t *testing.T) {
 func TestAMalformedKeyDoesNotLeakItself(t *testing.T) {
 	account := &ServiceAccount{
 		ProjectID:   "circle-test",
-		ClientEmail: "sender@circle-test.iam.gserviceaccount.com",
+		ClientEmail: "sender@mimoza-test.iam.gserviceaccount.com",
 		PrivateKey:  "-----BEGIN PRIVATE KEY-----\nnot-a-key\n-----END PRIVATE KEY-----\n",
 	}
 

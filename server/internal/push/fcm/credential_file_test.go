@@ -20,7 +20,7 @@ func TestLoadsFromAFileWhenGiven(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if account.ProjectID != "circle-3ee1d" {
+	if account.ProjectID != "mimoza-test" {
 		t.Fatalf("key did not load: %+v", account)
 	}
 }
@@ -39,8 +39,8 @@ func TestAMalformedFileNamesTheFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := (&Loader{FilePath: path, ParameterName: "/circle/fcm-service-account"}).Load(context.Background())
-	if err == nil || strings.Contains(err.Error(), "/circle/fcm-service-account") {
+	_, err := (&Loader{FilePath: path, ParameterName: "/mimoza/fcm-service-account"}).Load(context.Background())
+	if err == nil || strings.Contains(err.Error(), "/mimoza/fcm-service-account") {
 		t.Fatalf("expected the file named, got %v", err)
 	}
 }

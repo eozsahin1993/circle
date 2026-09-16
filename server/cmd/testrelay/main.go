@@ -15,10 +15,10 @@ import (
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"circle-relay/internal/api"
-	"circle-relay/internal/app"
-	"circle-relay/internal/auth"
-	"circle-relay/internal/util/localstack"
+	"mimoza-relay/internal/api"
+	"mimoza-relay/internal/app"
+	"mimoza-relay/internal/auth"
+	"mimoza-relay/internal/util/localstack"
 )
 
 // sessionTTL only has to outlast a test run.

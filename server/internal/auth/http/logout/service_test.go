@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"circle-relay/internal/auth"
-	"circle-relay/internal/auth/http/logout"
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/auth"
+	"mimoza-relay/internal/auth/http/logout"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 func TestService_Logout_RevokesTheSession(t *testing.T) {

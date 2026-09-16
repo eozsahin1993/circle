@@ -8,9 +8,9 @@ import (
 	"errors"
 	"testing"
 
-	"circle-relay/internal/synclog"
-	"circle-relay/internal/synclog/http/deleteblob"
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/synclog"
+	"mimoza-relay/internal/synclog/http/deleteblob"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 const entryID = "entry-1"

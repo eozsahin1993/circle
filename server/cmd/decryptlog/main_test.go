@@ -11,9 +11,9 @@ import (
 
 	"golang.org/x/crypto/chacha20poly1305"
 
-	"circle-relay/internal/synclog"
-	"circle-relay/internal/util/dynamoutil"
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/synclog"
+	"mimoza-relay/internal/util/dynamoutil"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 // Exercises the tool against a real (LocalStack) table, through the same

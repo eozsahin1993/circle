@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"circle-relay/integration/harness"
+	"mimoza-relay/integration/harness"
 )
 
 // createlog, appendlog and getlog, end to end. Each test is a sequence,

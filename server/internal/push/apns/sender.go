@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"circle-relay/internal/push"
+	"mimoza-relay/internal/push"
 )
 
 const (

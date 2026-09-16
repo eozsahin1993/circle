@@ -14,8 +14,8 @@ import (
 
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
-	"circle-relay/internal/synclog"
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/synclog"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 func hashToken(t *testing.T, tokenHex string) string {

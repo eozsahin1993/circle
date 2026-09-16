@@ -86,7 +86,7 @@ jobs:
       matrix:
         include:
           - name: Unit Tests
-            test: go test -race $(go list ./... | grep -Ev '^circle-relay/integration(/|$)')
+            test: go test -race $(go list ./... | grep -Ev '^mimoza-relay/integration(/|$)')
           - name: Integration Tests
             test: go test -race ./integration/...
 

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"circle-relay/internal/synclog/http/getblob"
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/synclog/http/getblob"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 func TestService_DownloadURL_DerivedFromSyncIDAndEntryID(t *testing.T) {

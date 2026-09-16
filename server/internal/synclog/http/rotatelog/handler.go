@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"circle-relay/internal/synclog/http/circleerrors"
-	"circle-relay/internal/util/httputil"
+	"mimoza-relay/internal/synclog/http/circleerrors"
+	"mimoza-relay/internal/util/httputil"
 )
 
 type request struct {

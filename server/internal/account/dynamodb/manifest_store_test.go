@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"circle-relay/internal/account"
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/account"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 func TestManifestStore_PutManifestThenGetManifest_RoundTrips(t *testing.T) {

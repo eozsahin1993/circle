@@ -3,7 +3,7 @@ package push
 import (
 	"net/http"
 
-	"circle-relay/internal/push"
+	"mimoza-relay/internal/push"
 )
 
 // Register mounts the registration routes. The fanout route is

@@ -7,9 +7,9 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"circle-relay/internal/auth/http/google"
-	"circle-relay/internal/auth/oidcverify"
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/auth/http/google"
+	"mimoza-relay/internal/auth/oidcverify"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 func TestService_SignIn_ValidTokenIssuesASession(t *testing.T) {

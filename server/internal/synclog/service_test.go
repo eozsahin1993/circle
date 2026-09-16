@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"circle-relay/internal/synclog"
+	"mimoza-relay/internal/synclog"
 )
 
 // fakeLogStore drives Service's own decisions without LocalStack — each

@@ -12,7 +12,7 @@ package manifest
 import (
 	"context"
 
-	"circle-relay/internal/account"
+	"mimoza-relay/internal/account"
 )
 
 type Service struct {

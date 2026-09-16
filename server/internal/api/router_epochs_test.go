@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 func TestEndToEnd_Epochs_ReportsCurrentEpochsAndOmitsAnUnknownCircle(t *testing.T) {

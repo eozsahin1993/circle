@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"circle-relay/integration/harness"
+	"mimoza-relay/integration/harness"
 )
 
 // deleteentry, end to end: the relay strips an entry's ciphertext and

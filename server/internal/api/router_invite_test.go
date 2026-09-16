@@ -10,7 +10,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 func TestEndToEnd_Invite_RequiresAuth(t *testing.T) {

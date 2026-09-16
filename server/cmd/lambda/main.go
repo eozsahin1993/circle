@@ -11,8 +11,8 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 
-	"circle-relay/internal/app"
-	"circle-relay/internal/config"
+	"mimoza-relay/internal/app"
+	"mimoza-relay/internal/config"
 )
 
 func main() {

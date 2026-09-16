@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"circle-relay/internal/push"
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/push"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 func newStore(t *testing.T) push.Store {

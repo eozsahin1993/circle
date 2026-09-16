@@ -21,7 +21,7 @@ import (
 	"encoding/hex"
 	"errors"
 
-	"circle-relay/internal/synclog"
+	"mimoza-relay/internal/synclog"
 )
 
 type Service struct {

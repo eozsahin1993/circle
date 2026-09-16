@@ -157,15 +157,15 @@ function parseQr(raw: string): DeviceTransferQrPayload {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error("That doesn't look like a Circle transfer code.");
+    throw new Error("That doesn't look like a Mimoza transfer code.");
   }
 
   const { transferCode, ephemeralPublicKey } = (parsed ?? {}) as Partial<DeviceTransferQrPayload>;
   if (typeof transferCode !== 'string' || !/^[0-9A-Z-]{10,32}$/.test(transferCode)) {
-    throw new Error("That doesn't look like a Circle transfer code.");
+    throw new Error("That doesn't look like a Mimoza transfer code.");
   }
   if (typeof ephemeralPublicKey !== 'string' || !/^[0-9a-f]{64}$/.test(ephemeralPublicKey)) {
-    throw new Error("That doesn't look like a Circle transfer code.");
+    throw new Error("That doesn't look like a Mimoza transfer code.");
   }
   return { transferCode, ephemeralPublicKey };
 }

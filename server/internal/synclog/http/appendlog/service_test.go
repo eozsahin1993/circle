@@ -6,9 +6,9 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"circle-relay/internal/synclog"
-	"circle-relay/internal/synclog/http/appendlog"
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/synclog"
+	"mimoza-relay/internal/synclog/http/appendlog"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 // newToken returns a fresh, random hex-encoded string standing in for a

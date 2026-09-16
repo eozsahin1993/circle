@@ -13,20 +13,20 @@ import (
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"circle-relay/internal/api"
-	"circle-relay/internal/auth/oidcverify"
-	"circle-relay/internal/config"
-	"circle-relay/internal/push"
-	"circle-relay/internal/push/apns"
-	"circle-relay/internal/push/fcm"
+	"mimoza-relay/internal/api"
+	"mimoza-relay/internal/auth/oidcverify"
+	"mimoza-relay/internal/config"
+	"mimoza-relay/internal/push"
+	"mimoza-relay/internal/push/apns"
+	"mimoza-relay/internal/push/fcm"
 
-	manifestdynamodb "circle-relay/internal/account/dynamodb"
-	authdynamodb "circle-relay/internal/auth/dynamodb"
-	invitedynamodb "circle-relay/internal/invite/dynamodb"
-	pushdynamodb "circle-relay/internal/push/dynamodb"
-	ratelimitdynamodb "circle-relay/internal/ratelimit/dynamodb"
-	logdynamodb "circle-relay/internal/synclog/dynamodb"
-	blobs3 "circle-relay/internal/synclog/s3"
+	manifestdynamodb "mimoza-relay/internal/account/dynamodb"
+	authdynamodb "mimoza-relay/internal/auth/dynamodb"
+	invitedynamodb "mimoza-relay/internal/invite/dynamodb"
+	pushdynamodb "mimoza-relay/internal/push/dynamodb"
+	ratelimitdynamodb "mimoza-relay/internal/ratelimit/dynamodb"
+	logdynamodb "mimoza-relay/internal/synclog/dynamodb"
+	blobs3 "mimoza-relay/internal/synclog/s3"
 )
 
 const (

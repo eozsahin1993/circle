@@ -8,7 +8,7 @@ import (
 )
 
 const validKey = `{
-  "project_id": "circle-3ee1d",
+  "project_id": "mimoza-test",
   "client_email": "sender@circle.iam.gserviceaccount.com",
   "private_key": "-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----\n",
   "token_uri": "https://oauth2.googleapis.com/token"
@@ -19,14 +19,14 @@ func TestParsesAServiceAccountKey(t *testing.T) {
 	if err := json.Unmarshal([]byte(validKey), &account); err != nil {
 		t.Fatal(err)
 	}
-	if account.ProjectID != "circle-3ee1d" || account.ClientEmail == "" || account.PrivateKey == "" {
+	if account.ProjectID != "mimoza-test" || account.ClientEmail == "" || account.PrivateKey == "" {
 		t.Fatalf("key did not parse: %+v", account)
 	}
 }
 
 // A parse failure must never quote the input, which is a private key.
 func TestParseFailureDoesNotLeakTheKey(t *testing.T) {
-	loader := &Loader{ParameterName: "/circle/fcm-service-account"}
+	loader := &Loader{ParameterName: "/mimoza/fcm-service-account"}
 	loader.once.Do(func() {
 		var account ServiceAccount
 		if err := json.Unmarshal([]byte("not json at all"), &account); err != nil {

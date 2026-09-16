@@ -7,11 +7,11 @@ output "table_arn" {
 }
 
 output "bucket_name" {
-  value = aws_s3_bucket.circle_blobs.id
+  value = aws_s3_bucket.blobs.id
 }
 
 output "bucket_arn" {
-  value = aws_s3_bucket.circle_blobs.arn
+  value = aws_s3_bucket.blobs.arn
 }
 
 output "invite_table_name" {

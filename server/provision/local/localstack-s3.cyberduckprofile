@@ -25,7 +25,7 @@
         <key>Default Port</key>
         <string>4566</string>
         <key>Default Path</key>
-        <string>/circle-local-circle-blobs</string>
+        <string>/mimoza-local-blobs</string>
         <key>Hostname Configurable</key>
         <true/>
         <key>Port Configurable</key>

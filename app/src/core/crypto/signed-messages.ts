@@ -3,7 +3,7 @@
  * call — must match the relay's own `synclog.RotateMessage` byte-for-byte.
  */
 export function deriveRotateMessage(syncId: string, entryId: string, newWriteTokenHash: string): Uint8Array {
-  return new TextEncoder().encode(`circle-relay/rotate/v1\x00${syncId}\x00${entryId}\x00${newWriteTokenHash}`);
+  return new TextEncoder().encode(`mimoza-relay/rotate/v1\x00${syncId}\x00${entryId}\x00${newWriteTokenHash}`);
 }
 
 /** The two directions an authority key can move across the relay's set. */
@@ -24,7 +24,7 @@ export function deriveAuthorityChangeMessage(
   entryId: string,
   targetAuthorityPublicKey: string
 ): Uint8Array {
-  return new TextEncoder().encode(`circle-relay/authority-change/v1\x00${action}\x00${syncId}\x00${entryId}\x00${targetAuthorityPublicKey}`);
+  return new TextEncoder().encode(`mimoza-relay/authority-change/v1\x00${action}\x00${syncId}\x00${entryId}\x00${targetAuthorityPublicKey}`);
 }
 
 /**
@@ -39,7 +39,7 @@ export function deriveAuthorityChangeMessage(
  * unlike the three messages above.
  */
 export function deriveAuthorityKeyProofMessage(identityPublicKey: string): Uint8Array {
-  return new TextEncoder().encode(`circle-relay/authority-key-proof/v1\x00${identityPublicKey}`);
+  return new TextEncoder().encode(`mimoza-relay/authority-key-proof/v1\x00${identityPublicKey}`);
 }
 
 /**
@@ -48,7 +48,7 @@ export function deriveAuthorityKeyProofMessage(identityPublicKey: string): Uint8
  * `synclog.CoverPhotoUploadMessage` byte-for-byte.
  */
 export function deriveCoverPhotoUploadMessage(syncId: string): Uint8Array {
-  return new TextEncoder().encode(`circle-relay/cover-photo-upload/v1\x00${syncId}`);
+  return new TextEncoder().encode(`mimoza-relay/cover-photo-upload/v1\x00${syncId}`);
 }
 
 /**
@@ -58,7 +58,7 @@ export function deriveCoverPhotoUploadMessage(syncId: string): Uint8Array {
  * signature authorizes destroying one photo.
  */
 export function deriveDeleteBlobMessage(syncId: string, entryId: string): Uint8Array {
-  return new TextEncoder().encode(`circle-relay/delete-blob/v1\x00${syncId}\x00${entryId}`);
+  return new TextEncoder().encode(`mimoza-relay/delete-blob/v1\x00${syncId}\x00${entryId}`);
 }
 
 /**
@@ -68,7 +68,7 @@ export function deriveDeleteBlobMessage(syncId: string, entryId: string): Uint8A
  * one circle rather than authorizing a deletion the caller can replay.
  */
 export function deriveDeleteCircleMessage(syncId: string, entryId: string): Uint8Array {
-  return new TextEncoder().encode(`circle-relay/delete-circle/v1\x00${syncId}\x00${entryId}`);
+  return new TextEncoder().encode(`mimoza-relay/delete-circle/v1\x00${syncId}\x00${entryId}`);
 }
 
 /**
@@ -78,7 +78,7 @@ export function deriveDeleteCircleMessage(syncId: string, entryId: string): Uint
  * can't be replayed against a different tombstone attempt later.
  */
 export function deriveDeleteEntryMessage(syncId: string, entryId: string, tombstoneEntryId: string): Uint8Array {
-  return new TextEncoder().encode(`circle-relay/delete-entry/v1\x00${syncId}\x00${entryId}\x00${tombstoneEntryId}`);
+  return new TextEncoder().encode(`mimoza-relay/delete-entry/v1\x00${syncId}\x00${entryId}\x00${tombstoneEntryId}`);
 }
 
 /**
@@ -94,6 +94,6 @@ export function deriveDeleteAuthorContentMessage(
   tombstoneEntryId: string
 ): Uint8Array {
   return new TextEncoder().encode(
-    `circle-relay/delete-author-content/v1\x00${syncId}\x00${authorIdentityPublicKey}\x00${tombstoneEntryId}`
+    `mimoza-relay/delete-author-content/v1\x00${syncId}\x00${authorIdentityPublicKey}\x00${tombstoneEntryId}`
   );
 }

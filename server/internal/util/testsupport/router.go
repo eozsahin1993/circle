@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"circle-relay/internal/api"
-	"circle-relay/internal/auth/oidcverify"
+	"mimoza-relay/internal/api"
+	"mimoza-relay/internal/auth/oidcverify"
 )
 
 // testRateLimitMaxRequests is deliberately huge — end-to-end router tests

@@ -16,8 +16,8 @@ import (
 	"strings"
 	"testing"
 
-	"circle-relay/internal/synclog"
-	"circle-relay/internal/util/testsupport"
+	"mimoza-relay/internal/synclog"
+	"mimoza-relay/internal/util/testsupport"
 )
 
 // authedRequest sets the bearer token circle content routes require —

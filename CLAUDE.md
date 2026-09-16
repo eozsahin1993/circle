@@ -1,4 +1,4 @@
-# Circle
+# Mimoza
 
 Expo/React Native client in `app/`, Go relay in `server/`. Each has its own
 `AGENTS.md` with rules specific to it — read the one for the directory

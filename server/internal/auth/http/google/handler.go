@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"circle-relay/internal/util/httputil"
+	"mimoza-relay/internal/util/httputil"
 )
 
 type request struct {

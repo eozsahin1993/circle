@@ -25,7 +25,7 @@ export function buildRecoveryCard(words: string[], savedOn = new Date()): string
     'This file restores your account on a new phone.',
     'Anyone who has it is you, so keep it somewhere only you can reach.',
     '',
-    'To use it: open Circle, sign in, and choose "I have a recovery card".',
+    'To use it: open Mimoza, sign in, and choose "I have a recovery card".',
     '',
     words.join(' '),
     '',
@@ -48,7 +48,7 @@ export async function saveRecoveryCard(): Promise<boolean> {
   if (!seed) throw new Error('No master seed on this device.');
 
   const card = buildRecoveryCard(entropyToMnemonic(seed, wordlist).split(' '));
-  const file = new File(Paths.cache, 'circle-recovery-card.txt');
+  const file = new File(Paths.cache, 'mimoza-recovery-card.txt');
   file.create({ overwrite: true });
   file.write(card);
 
