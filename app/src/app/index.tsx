@@ -1,10 +1,11 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { PhotoPlaceholder } from '@/ui/components/photo-placeholder';
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
 import { AppleSignInButton, GoogleSignInButton } from '@/features/account/components/social-sign-in-button';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
@@ -98,7 +99,7 @@ export default function WelcomeScreen() {
       const otherLabel = provider === 'apple' ? 'Google' : appleAvailable ? 'Apple' : null;
       Alert.alert(
         'Sign-in failed',
-        `Couldn't sign in with ${providerLabel} — try again${otherLabel ? `, or try ${otherLabel} instead` : ''}.`,
+        `Couldn't sign in with ${providerLabel}. Try again${otherLabel ? `, or try ${otherLabel} instead` : ''}.`,
       );
     } finally {
       setBusyProvider(null);
@@ -116,20 +117,25 @@ export default function WelcomeScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <PhotoPlaceholder style={styles.photo}>
-        <ThemedText type="eyebrow" style={{ paddingTop: insets.top + 8, paddingLeft: Spacing.screenPadding }}>
-          Photo — Grandmother&apos;s kitchen, 1994
+      <View style={styles.photo}>
+        <Image source={require('@/assets/images/welcome-photo.jpg')} style={StyleSheet.absoluteFill} contentFit="cover" />
+        {/* Caption sits over a real photo now, not the placeholder hatch — a
+            fixed-height scrim keeps it legible regardless of what's behind it. */}
+        <LinearGradient colors={['rgba(0,0,0,0.45)', 'transparent']} style={styles.photoScrim} pointerEvents="none" />
+        <ThemedText
+          type="eyebrow"
+          style={{ paddingTop: insets.top + 8, paddingLeft: Spacing.screenPadding, color: '#fff' }}>
+          Photo: the whole circle, Sunday afternoon
         </ThemedText>
-      </PhotoPlaceholder>
+      </View>
 
       <ThemedSafeAreaView edges={['bottom']} style={styles.content}>
         <ThemedText type="eyebrow" themeColor="accentBright">
           Hearth
         </ThemedText>
-        <ThemedText type="onboardingHeadline">Keep the pictures where the people are.</ThemedText>
+        <ThemedText type="onboardingHeadline">Private circles for your photos.</ThemedText>
         <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
-          Small circles. One shared feed. Photos live on the phones of the people in the circle —
-          not on a company&apos;s servers.
+          Small circles, one shared feed. End-to-end encrypted, so only your circle can ever see it.
         </ThemedText>
 
         <View style={styles.actions}>
@@ -157,6 +163,14 @@ const styles = StyleSheet.create({
   },
   photo: {
     flex: 1.1,
+    overflow: 'hidden',
+  },
+  photoScrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 140,
   },
   content: {
     flex: 1,
