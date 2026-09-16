@@ -164,13 +164,58 @@ handshake beyond sharing a tag.
 
 ## Running locally
 
+The relay runs against LocalStack (DynamoDB, S3, KMS) instead of real AWS.
+All commands are from `server/`.
+
+**1. Start LocalStack** (once per machine boot; `docker start localstack`
+after the first time):
+
 ```
 docker run -d --name localstack -p 4566:4566 -e SERVICES=dynamodb,s3,kms localstack/localstack:4.4.0
-cd provision/local && terraform init && terraform apply   # provisions LocalStack tables/bucket/KMS key
-cd ../..
-cp .env.example .env   # fill in values from `terraform output` above
-export $(cat .env | xargs) && go run ./cmd/server   # see .env.example — Go doesn't load .env itself
 ```
+
+**2. Provision the tables and bucket** (again whenever `provision/local`
+changes, or after LocalStack's container is recreated):
+
+```
+(cd provision/local && terraform init && terraform apply)
+(cd provision/local && terraform output)   # the names step 3 needs
+```
+
+**3. Create `.env`** from the example and point it at LocalStack:
+
+```
+cp .env.example .env
+```
+
+Then in `.env`: set each `*_TABLE_NAME` and `BUCKET_NAME` to the matching
+`terraform output` value (`mimoza-local-*`), set `S3_FORCE_PATH_STYLE=true`,
+and uncomment the LocalStack block (`AWS_ENDPOINT_URL=http://localhost:4566`
+and the `test`/`test` keys). For push, point `FCM_CREDENTIAL_FILE` and
+`APNS_AUTH_KEY_FILE` at the key files in this directory. `.gitignore` keeps
+`.env` and both keys out of the repo.
+
+**4. Run it with `.env` loaded.** Go doesn't read `.env` itself, so export
+it into the shell first:
+
+```
+set -a; source .env; set +a
+go run ./cmd/server          # logs "listening on :<PORT>"
+```
+
+Or in one line, without leaking the vars into your shell:
+
+```
+(set -a; source .env; set +a; go run ./cmd/server)
+```
+
+Don't use `export $(cat .env | xargs)`: bash chokes on the comment lines
+(`export: '#': not a valid identifier`), and any value with a space splits.
+
+Set `PORT=8090`: a dev build of the app talks to the relay on the same
+host as the Metro packager, at `EXPO_PUBLIC_RELAY_PORT` (default 8090). It
+only uses `EXPO_PUBLIC_RELAY_URL` when no packager is serving (see
+`app/src/core/services/relay.ts`).
 
 ### Rebuild on change, or you will chase phantom bugs
 
@@ -185,7 +230,7 @@ Run it under a watcher instead:
 
 ```
 go install github.com/bokwoon95/wgo@latest      # once
-export $(cat .env | xargs) && wgo run ./cmd/server
+(set -a; source .env; set +a; wgo run ./cmd/server)
 ```
 
 `wgo` needs no config file. `air` works too if you already have it.
