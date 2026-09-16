@@ -77,12 +77,21 @@ func authorityChange(signer authorityKey, syncID, entryID string, action synclog
 	return change
 }
 
+// changeAuthority calls the narrowed LogStore.ChangeAuthority with a
+// fully-built AuthorityChange, hashing its WriteToken the way
+// Service.ChangeAuthority does — so tests keep building requests the same
+// way while the store itself never sees a raw token or a signature.
+func changeAuthority(t *testing.T, store synclog.LogStore, ctx context.Context, change synclog.AuthorityChange) (synclog.CommitResult, error) {
+	t.Helper()
+	return store.ChangeAuthority(ctx, change.SyncID, change.EntryID, change.EncryptedPayload, change.KeyVersion, hashToken(t, change.WriteToken), change.Action, change.TargetAuthorityPublicKey, change.SignerAuthorityPublicKey)
+}
+
 // grant promotes target by adding its key to syncID's authority set,
 // signed by signer — the setup step for every test that needs a second
 // admin, which nothing but ChangeAuthority can produce.
 func grant(t *testing.T, store synclog.LogStore, syncID, entryID string, signer, target authorityKey, token string) {
 	t.Helper()
-	if _, err := store.ChangeAuthority(context.Background(), authorityChange(signer, syncID, entryID, synclog.AuthorityAdd, target.publicKeyHex, token)); err != nil {
+	if _, err := changeAuthority(t, store, context.Background(), authorityChange(signer, syncID, entryID, synclog.AuthorityAdd, target.publicKeyHex, token)); err != nil {
 		t.Fatalf("granting authority failed: %v", err)
 	}
 }
@@ -594,7 +603,7 @@ func TestLogStore_ChangeAuthority_AppendsItsEntryInTheSameTransaction(t *testing
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	commit, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-1", synclog.AuthorityAdd, promoted.publicKeyHex, token))
+	commit, err := changeAuthority(t, store, ctx, authorityChange(founder, syncID, "promote-1", synclog.AuthorityAdd, promoted.publicKeyHex, token))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -621,7 +630,7 @@ func TestLogStore_ChangeAuthority_RemovedKeyCanNoLongerRotate(t *testing.T) {
 	bootstrap(t, store, syncID, founder, token)
 	grant(t, store, syncID, "promote-1", founder, promoted, token)
 
-	if _, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "demote-1", synclog.AuthorityRemove, promoted.publicKeyHex, token)); err != nil {
+	if _, err := changeAuthority(t, store, ctx, authorityChange(founder, syncID, "demote-1", synclog.AuthorityRemove, promoted.publicKeyHex, token)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -647,7 +656,7 @@ func TestLogStore_ChangeAuthority_RejectsASignerOutsideTheSet(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	_, err := store.ChangeAuthority(ctx, authorityChange(impostor, syncID, "promote-1", synclog.AuthorityAdd, accomplice.publicKeyHex, token))
+	_, err := changeAuthority(t, store, ctx, authorityChange(impostor, syncID, "promote-1", synclog.AuthorityAdd, accomplice.publicKeyHex, token))
 	if !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
 		t.Fatalf("expected ErrAuthorityNotRecognized for a non-authority signer, got %v", err)
 	}
@@ -655,48 +664,6 @@ func TestLogStore_ChangeAuthority_RejectsASignerOutsideTheSet(t *testing.T) {
 	newHash := hashToken(t, newToken(t))
 	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, hashToken(t, token), newHash, accomplice.publicKeyHex); !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
 		t.Fatalf("a rejected promotion must not have added the key anyway, got %v", err)
-	}
-}
-
-// The signature covers the action, so authorizing a promotion can't be
-// turned into the demotion of the same person by editing one field.
-func TestLogStore_ChangeAuthority_SignatureDoesNotCarryAcrossActions(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	syncID := testsupport.UniqueSyncID(t)
-	founder := newAuthorityKey(t)
-	promoted := newAuthorityKey(t)
-	token := newToken(t)
-	bootstrap(t, store, syncID, founder, token)
-	grant(t, store, syncID, "promote-1", founder, promoted, token)
-
-	change := authorityChange(founder, syncID, "demote-1", synclog.AuthorityAdd, promoted.publicKeyHex, token)
-	change.Action = synclog.AuthorityRemove
-	_, err := store.ChangeAuthority(ctx, change)
-	if !errors.Is(err, synclog.ErrInvalidSignature) {
-		t.Fatalf("expected an add signature to be useless for a remove, got %v", err)
-	}
-}
-
-// ...nor across circles, which is what binding the message to syncID buys.
-func TestLogStore_ChangeAuthority_SignatureDoesNotCarryAcrossCircles(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	founder := newAuthorityKey(t)
-	promoted := newAuthorityKey(t)
-
-	tokenA := newToken(t)
-	syncA := testsupport.UniqueSyncID(t) + "-a"
-	bootstrap(t, store, syncA, founder, tokenA)
-	tokenB := newToken(t)
-	syncB := testsupport.UniqueSyncID(t) + "-b"
-	bootstrap(t, store, syncB, founder, tokenB)
-
-	change := authorityChange(founder, syncA, "promote-1", synclog.AuthorityAdd, promoted.publicKeyHex, tokenB)
-	change.SyncID = syncB
-	_, err := store.ChangeAuthority(ctx, change)
-	if !errors.Is(err, synclog.ErrInvalidSignature) {
-		t.Fatalf("expected a signature bound to another circle to be rejected, got %v", err)
 	}
 }
 
@@ -711,14 +678,14 @@ func TestLogStore_ChangeAuthority_SignerMayRemoveTheirOwnKeyButNotTheLast(t *tes
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	_, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "resign-early", synclog.AuthorityRemove, founder.publicKeyHex, token))
+	_, err := changeAuthority(t, store, ctx, authorityChange(founder, syncID, "resign-early", synclog.AuthorityRemove, founder.publicKeyHex, token))
 	if !errors.Is(err, synclog.ErrWouldEmptyAuthoritySet) {
 		t.Fatalf("expected the sole authority's resignation to be refused, got %v", err)
 	}
 
 	// With a successor in place it goes through — this is the handover.
 	grant(t, store, syncID, "promote-1", founder, promoted, token)
-	if _, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "resign-1", synclog.AuthorityRemove, founder.publicKeyHex, token)); err != nil {
+	if _, err := changeAuthority(t, store, ctx, authorityChange(founder, syncID, "resign-1", synclog.AuthorityRemove, founder.publicKeyHex, token)); err != nil {
 		t.Fatalf("a departing authority must be able to remove their own key: %v", err)
 	}
 
@@ -744,11 +711,11 @@ func TestLogStore_ChangeAuthority_RefusesToDemoteDownToAnEmptySet(t *testing.T) 
 	grant(t, store, syncID, "promote-1", founder, promoted, token)
 
 	// Two in the set, so demoting the founder is fine.
-	if _, err := store.ChangeAuthority(ctx, authorityChange(promoted, syncID, "demote-1", synclog.AuthorityRemove, founder.publicKeyHex, token)); err != nil {
+	if _, err := changeAuthority(t, store, ctx, authorityChange(promoted, syncID, "demote-1", synclog.AuthorityRemove, founder.publicKeyHex, token)); err != nil {
 		t.Fatal(err)
 	}
 	// One left, so there is nowhere further down to go.
-	_, err := store.ChangeAuthority(ctx, authorityChange(promoted, syncID, "demote-2", synclog.AuthorityRemove, promoted.publicKeyHex, token))
+	_, err := changeAuthority(t, store, ctx, authorityChange(promoted, syncID, "demote-2", synclog.AuthorityRemove, promoted.publicKeyHex, token))
 	if !errors.Is(err, synclog.ErrWouldEmptyAuthoritySet) {
 		t.Fatalf("expected ErrWouldEmptyAuthoritySet, got %v", err)
 	}
@@ -756,40 +723,6 @@ func TestLogStore_ChangeAuthority_RefusesToDemoteDownToAnEmptySet(t *testing.T) 
 	newHash := hashToken(t, newToken(t))
 	if _, err := store.Rotate(ctx, syncID, "rotate-1", []byte("payload"), 1, hashToken(t, token), newHash, promoted.publicKeyHex); err != nil {
 		t.Fatalf("the circle must still be governable: %v", err)
-	}
-}
-
-func TestLogStore_ChangeAuthority_RejectsAMalformedTargetKey(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	syncID := testsupport.UniqueSyncID(t)
-	founder := newAuthorityKey(t)
-	token := newToken(t)
-	bootstrap(t, store, syncID, founder, token)
-
-	for name, target := range map[string]string{
-		"not hex":    "zzzz",
-		"wrong size": "aabbcc",
-	} {
-		_, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-"+name, synclog.AuthorityAdd, target, token))
-		if !errors.Is(err, synclog.ErrInvalidAuthorityKey) {
-			t.Fatalf("%s: expected ErrInvalidAuthorityKey, got %v", name, err)
-		}
-	}
-}
-
-func TestLogStore_ChangeAuthority_RejectsAnUnknownAction(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	syncID := testsupport.UniqueSyncID(t)
-	founder := newAuthorityKey(t)
-	promoted := newAuthorityKey(t)
-	token := newToken(t)
-	bootstrap(t, store, syncID, founder, token)
-
-	_, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-1", "replace", promoted.publicKeyHex, token))
-	if !errors.Is(err, synclog.ErrInvalidAuthorityAction) {
-		t.Fatalf("expected ErrInvalidAuthorityAction, got %v", err)
 	}
 }
 
@@ -804,7 +737,7 @@ func TestLogStore_ChangeAuthority_RejectsAStaleWriteToken(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	_, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-1", synclog.AuthorityAdd, promoted.publicKeyHex, newToken(t)))
+	_, err := changeAuthority(t, store, ctx, authorityChange(founder, syncID, "promote-1", synclog.AuthorityAdd, promoted.publicKeyHex, newToken(t)))
 	if !errors.Is(err, synclog.ErrWriteTokenMismatch) {
 		t.Fatalf("expected ErrWriteTokenMismatch, got %v", err)
 	}
@@ -820,11 +753,11 @@ func TestLogStore_ChangeAuthority_RetryWithTheSameEntryIDIsIdempotent(t *testing
 	bootstrap(t, store, syncID, founder, token)
 
 	change := authorityChange(founder, syncID, "promote-1", synclog.AuthorityAdd, promoted.publicKeyHex, token)
-	first, err := store.ChangeAuthority(ctx, change)
+	first, err := changeAuthority(t, store, ctx, change)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := store.ChangeAuthority(ctx, change)
+	second, err := changeAuthority(t, store, ctx, change)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -927,7 +860,7 @@ func TestLogStore_DeleteCircle_RefusesEveryLaterWrite(t *testing.T) {
 	if _, err := store.Rotate(ctx, syncID, "rotate-after", []byte("k"), 1, hashToken(t, token), newHash, founder.publicKeyHex); !errors.Is(err, synclog.ErrCircleDeleted) {
 		t.Fatalf("expected a rotation to be refused, got %v", err)
 	}
-	if _, err := store.ChangeAuthority(ctx, authorityChange(founder, syncID, "promote-after", synclog.AuthorityAdd, promoted.publicKeyHex, token)); !errors.Is(err, synclog.ErrCircleDeleted) {
+	if _, err := changeAuthority(t, store, ctx, authorityChange(founder, syncID, "promote-after", synclog.AuthorityAdd, promoted.publicKeyHex, token)); !errors.Is(err, synclog.ErrCircleDeleted) {
 		t.Fatalf("expected an authority change to be refused, got %v", err)
 	}
 	if _, err := store.DeleteCircle(ctx, circleDeletion(founder, syncID, "tombstone-2", token)); !errors.Is(err, synclog.ErrCircleDeleted) {

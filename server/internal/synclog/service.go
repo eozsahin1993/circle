@@ -23,3 +23,23 @@ func (s *Service) Rotate(ctx context.Context, syncID, entryID string, encryptedP
 	}
 	return s.Log.Rotate(ctx, syncID, entryID, encryptedPayload, currentKeyVersion, currentWriteTokenHash, newWriteTokenHash, authorityPublicKey)
 }
+
+// ChangeAuthority validates the action and target key shape, verifies the
+// signer's signature over change.Message(), then hashes change.WriteToken
+// and calls LogStore.ChangeAuthority.
+func (s *Service) ChangeAuthority(ctx context.Context, change AuthorityChange) (CommitResult, error) {
+	if !change.Action.Valid() {
+		return CommitResult{}, ErrInvalidAuthorityAction
+	}
+	if !ValidPublicKey(change.TargetAuthorityPublicKey) {
+		return CommitResult{}, ErrInvalidAuthorityKey
+	}
+	if err := VerifySignature(change.SignerAuthorityPublicKey, change.Message(), change.Signature); err != nil {
+		return CommitResult{}, err
+	}
+	writeTokenHash, err := WriteTokenHash(change.WriteToken)
+	if err != nil {
+		return CommitResult{}, ErrWriteTokenMismatch
+	}
+	return s.Log.ChangeAuthority(ctx, change.SyncID, change.EntryID, change.EncryptedPayload, change.KeyVersion, writeTokenHash, change.Action, change.TargetAuthorityPublicKey, change.SignerAuthorityPublicKey)
+}

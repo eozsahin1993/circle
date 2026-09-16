@@ -14,9 +14,9 @@ import (
 )
 
 type Service struct {
-	LogStore synclog.LogStore
+	Log *synclog.Service
 }
 
 func (s *Service) ChangeAuthority(ctx context.Context, change synclog.AuthorityChange) (synclog.CommitResult, error) {
-	return s.LogStore.ChangeAuthority(ctx, change)
+	return s.Log.ChangeAuthority(ctx, change)
 }

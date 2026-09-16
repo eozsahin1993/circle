@@ -17,6 +17,10 @@ type fakeLogStore struct {
 	rotateCalls []rotateCall
 	rotateOut   synclog.CommitResult
 	rotateErr   error
+
+	changeAuthorityCalls []changeAuthorityCall
+	changeAuthorityOut   synclog.CommitResult
+	changeAuthorityErr   error
 }
 
 type rotateCall struct {
@@ -31,14 +35,25 @@ func (f *fakeLogStore) Rotate(ctx context.Context, syncID, entryID string, encry
 	return f.rotateOut, f.rotateErr
 }
 
+type changeAuthorityCall struct {
+	syncID, entryID                                    string
+	encryptedPayload                                   []byte
+	keyVersion                                         int64
+	writeTokenHash                                     string
+	action                                             synclog.AuthorityAction
+	targetAuthorityPublicKey, signerAuthorityPublicKey string
+}
+
+func (f *fakeLogStore) ChangeAuthority(ctx context.Context, syncID, entryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash string, action synclog.AuthorityAction, targetAuthorityPublicKey, signerAuthorityPublicKey string) (synclog.CommitResult, error) {
+	f.changeAuthorityCalls = append(f.changeAuthorityCalls, changeAuthorityCall{syncID, entryID, encryptedPayload, keyVersion, writeTokenHash, action, targetAuthorityPublicKey, signerAuthorityPublicKey})
+	return f.changeAuthorityOut, f.changeAuthorityErr
+}
+
 func (f *fakeLogStore) Bootstrap(ctx context.Context, syncID, founderAuthorityPublicKey, initialWriteTokenHash string) error {
 	panic("fakeLogStore: Bootstrap not implemented")
 }
 func (f *fakeLogStore) Append(ctx context.Context, syncID string, ns synclog.Namespace, entryID string, encryptedPayload []byte, keyVersion int64, writeToken, authorIdentityPublicKey string) (synclog.CommitResult, error) {
 	panic("fakeLogStore: Append not implemented")
-}
-func (f *fakeLogStore) ChangeAuthority(ctx context.Context, change synclog.AuthorityChange) (synclog.CommitResult, error) {
-	panic("fakeLogStore: ChangeAuthority not implemented")
 }
 func (f *fakeLogStore) DeleteCircle(ctx context.Context, deletion synclog.CircleDeletion) (synclog.CommitResult, error) {
 	panic("fakeLogStore: DeleteCircle not implemented")
@@ -134,5 +149,115 @@ func TestService_Rotate_HashesTheCurrentTokenBeforeCallingLogStore(t *testing.T)
 	}
 	if got := log.rotateCalls[0].authorityPublicKey; got != pubKey {
 		t.Fatalf("expected authorityPublicKey passed through, got %q", got)
+	}
+}
+
+// newTestAuthorityChange builds a fully, correctly signed AuthorityChange
+// — tests that want a wrong one edit a field after the fact.
+func newTestAuthorityChange(signerPub string, signerPriv ed25519.PrivateKey, syncID, entryID string, action synclog.AuthorityAction, target, token string) synclog.AuthorityChange {
+	change := synclog.AuthorityChange{
+		SyncID:                   syncID,
+		EntryID:                  entryID,
+		EncryptedPayload:         []byte("role_change payload"),
+		KeyVersion:               1,
+		WriteToken:               token,
+		Action:                   action,
+		TargetAuthorityPublicKey: target,
+		SignerAuthorityPublicKey: signerPub,
+	}
+	change.Signature = ed25519.Sign(signerPriv, change.Message())
+	return change
+}
+
+func TestService_ChangeAuthority_RejectsAnUnknownAction(t *testing.T) {
+	pubKey, priv := newTestAuthorityKey(t)
+	change := newTestAuthorityChange(pubKey, priv, "sync-1", "promote-1", synclog.AuthorityAdd, pubKey, "deadbeef")
+	change.Action = "replace"
+
+	log := &fakeLogStore{}
+	svc := &synclog.Service{Log: log}
+	_, err := svc.ChangeAuthority(context.Background(), change)
+	if !errors.Is(err, synclog.ErrInvalidAuthorityAction) {
+		t.Fatalf("expected ErrInvalidAuthorityAction, got %v", err)
+	}
+	if len(log.changeAuthorityCalls) != 0 {
+		t.Fatalf("expected LogStore.ChangeAuthority never called, got %d calls", len(log.changeAuthorityCalls))
+	}
+}
+
+func TestService_ChangeAuthority_RejectsAMalformedTargetKey(t *testing.T) {
+	pubKey, priv := newTestAuthorityKey(t)
+	for name, target := range map[string]string{"not hex": "zzzz", "wrong size": "aabbcc"} {
+		change := newTestAuthorityChange(pubKey, priv, "sync-1", "promote-1", synclog.AuthorityAdd, target, "deadbeef")
+
+		log := &fakeLogStore{}
+		svc := &synclog.Service{Log: log}
+		_, err := svc.ChangeAuthority(context.Background(), change)
+		if !errors.Is(err, synclog.ErrInvalidAuthorityKey) {
+			t.Fatalf("%s: expected ErrInvalidAuthorityKey, got %v", name, err)
+		}
+	}
+}
+
+// The signature covers the action, so authorizing a promotion can't be
+// turned into the demotion of the same person by editing one field.
+func TestService_ChangeAuthority_SignatureDoesNotCarryAcrossActions(t *testing.T) {
+	pubKey, priv := newTestAuthorityKey(t)
+	targetKey, _ := newTestAuthorityKey(t)
+	change := newTestAuthorityChange(pubKey, priv, "sync-1", "demote-1", synclog.AuthorityAdd, targetKey, "deadbeef")
+	change.Action = synclog.AuthorityRemove
+
+	log := &fakeLogStore{}
+	svc := &synclog.Service{Log: log}
+	_, err := svc.ChangeAuthority(context.Background(), change)
+	if !errors.Is(err, synclog.ErrInvalidSignature) {
+		t.Fatalf("expected an add signature to be useless for a remove, got %v", err)
+	}
+	if len(log.changeAuthorityCalls) != 0 {
+		t.Fatalf("expected LogStore.ChangeAuthority never called, got %d calls", len(log.changeAuthorityCalls))
+	}
+}
+
+// ...nor across circles, which is what binding the message to syncID buys.
+func TestService_ChangeAuthority_SignatureDoesNotCarryAcrossCircles(t *testing.T) {
+	pubKey, priv := newTestAuthorityKey(t)
+	targetKey, _ := newTestAuthorityKey(t)
+	change := newTestAuthorityChange(pubKey, priv, "sync-a", "promote-1", synclog.AuthorityAdd, targetKey, "deadbeef")
+	change.SyncID = "sync-b"
+
+	log := &fakeLogStore{}
+	svc := &synclog.Service{Log: log}
+	_, err := svc.ChangeAuthority(context.Background(), change)
+	if !errors.Is(err, synclog.ErrInvalidSignature) {
+		t.Fatalf("expected a signature bound to another circle to be rejected, got %v", err)
+	}
+	if len(log.changeAuthorityCalls) != 0 {
+		t.Fatalf("expected LogStore.ChangeAuthority never called, got %d calls", len(log.changeAuthorityCalls))
+	}
+}
+
+func TestService_ChangeAuthority_HashesTheWriteTokenBeforeCallingLogStore(t *testing.T) {
+	pubKey, priv := newTestAuthorityKey(t)
+	targetKey, _ := newTestAuthorityKey(t)
+	change := newTestAuthorityChange(pubKey, priv, "sync-1", "promote-1", synclog.AuthorityAdd, targetKey, "deadbeef")
+
+	log := &fakeLogStore{changeAuthorityOut: synclog.CommitResult{Epoch: 2, ReceivedAt: 200}}
+	svc := &synclog.Service{Log: log}
+	result, err := svc.ChangeAuthority(context.Background(), change)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != log.changeAuthorityOut {
+		t.Fatalf("expected the LogStore's result passed through unchanged, got %+v", result)
+	}
+	if len(log.changeAuthorityCalls) != 1 {
+		t.Fatalf("expected exactly one LogStore.ChangeAuthority call, got %d", len(log.changeAuthorityCalls))
+	}
+	wantHash, err := synclog.WriteTokenHash("deadbeef")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := log.changeAuthorityCalls[0].writeTokenHash; got != wantHash {
+		t.Fatalf("expected the raw token hashed before reaching LogStore, got %q want %q", got, wantHash)
 	}
 }

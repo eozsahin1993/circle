@@ -104,30 +104,19 @@ func (s *Store) Rotate(ctx context.Context, syncID, entryID string, encryptedPay
 }
 
 // ChangeAuthority runs the same verify-then-CAS shape as Rotate, over
-// authoritySet rather than writeTokenHash.
-func (s *Store) ChangeAuthority(ctx context.Context, change synclog.AuthorityChange) (synclog.CommitResult, error) {
-	if !change.Action.Valid() {
-		return synclog.CommitResult{}, synclog.ErrInvalidAuthorityAction
-	}
-	if !synclog.ValidPublicKey(change.TargetAuthorityPublicKey) {
-		return synclog.CommitResult{}, synclog.ErrInvalidAuthorityKey
-	}
-	if err := synclog.VerifySignature(change.SignerAuthorityPublicKey, change.Message(), change.Signature); err != nil {
-		return synclog.CommitResult{}, err
-	}
-
-	if existing, err := s.lookupIdempotencyMarker(ctx, change.SyncID, synclog.NamespaceMeta, change.EntryID); err != nil {
+// authoritySet rather than writeTokenHash. See LogStore.ChangeAuthority
+// for why validation and signature verification aren't done here.
+func (s *Store) ChangeAuthority(ctx context.Context, syncID, entryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash string, action synclog.AuthorityAction, targetAuthorityPublicKey, signerAuthorityPublicKey string) (synclog.CommitResult, error) {
+	if existing, err := s.lookupIdempotencyMarker(ctx, syncID, synclog.NamespaceMeta, entryID); err != nil {
 		return synclog.CommitResult{}, err
 	} else if existing != nil {
 		return *existing, nil
 	}
 
-	expectedHash, hashErr := synclog.WriteTokenHash(change.WriteToken)
-
 	setClause := "SET metaCounter = :next "
 	condition := "writeTokenHash = :hash AND metaCounter = :current AND contains(authoritySet, :signer) AND attribute_not_exists(deletedAt)"
 	values := map[string]types.AttributeValue{}
-	if change.Action == synclog.AuthorityAdd {
+	if action == synclog.AuthorityAdd {
 		setClause += "ADD authoritySet :target"
 	} else {
 		setClause += "DELETE authoritySet :target"
@@ -139,29 +128,29 @@ func (s *Store) ChangeAuthority(ctx context.Context, change synclog.AuthorityCha
 		values[":one"] = &types.AttributeValueMemberN{Value: "1"}
 	}
 
-	result, err := s.casCommit(ctx, change.SyncID, synclog.NamespaceMeta, change.EntryID, entryFields{
-		EncryptedPayload: change.EncryptedPayload,
-		KeyVersion:       change.KeyVersion,
+	result, err := s.casCommit(ctx, syncID, synclog.NamespaceMeta, entryID, entryFields{
+		EncryptedPayload: encryptedPayload,
+		KeyVersion:       keyVersion,
 	}, func(control *controlState, epoch, receivedAt int64) (casPlan, error) {
-		if hashErr != nil || control.writeTokenHash != expectedHash {
+		if control.writeTokenHash != writeTokenHash {
 			return casPlan{}, synclog.ErrWriteTokenMismatch
 		}
 		if control.deleted {
 			return casPlan{}, synclog.ErrCircleDeleted
 		}
-		if !control.authoritySet[change.SignerAuthorityPublicKey] {
+		if !control.authoritySet[signerAuthorityPublicKey] {
 			return casPlan{}, synclog.ErrAuthorityNotRecognized
 		}
-		if change.Action == synclog.AuthorityRemove && len(control.authoritySet) <= 1 {
+		if action == synclog.AuthorityRemove && len(control.authoritySet) <= 1 {
 			return casPlan{}, synclog.ErrWouldEmptyAuthoritySet
 		}
 
 		return casPlan{Control: types.Update{
 			TableName:                 aws.String(s.tableName),
-			Key:                       controlKey(change.SyncID),
+			Key:                       controlKey(syncID),
 			UpdateExpression:          aws.String(setClause),
 			ConditionExpression:       aws.String(condition),
-			ExpressionAttributeValues: withCASValues(values, expectedHash, epoch-1, epoch, change),
+			ExpressionAttributeValues: withCASValues(values, writeTokenHash, epoch-1, epoch, signerAuthorityPublicKey, targetAuthorityPublicKey),
 		}}, nil
 	})
 	return result, err
@@ -169,13 +158,13 @@ func (s *Store) ChangeAuthority(ctx context.Context, change synclog.AuthorityCha
 
 // withCASValues fills in the placeholders every ChangeAuthority attempt
 // shares, alongside whichever the action added.
-func withCASValues(values map[string]types.AttributeValue, expectedHash string, current, nextEpoch int64, change synclog.AuthorityChange) map[string]types.AttributeValue {
+func withCASValues(values map[string]types.AttributeValue, writeTokenHash string, current, nextEpoch int64, signerAuthorityPublicKey, targetAuthorityPublicKey string) map[string]types.AttributeValue {
 	merged := map[string]types.AttributeValue{
-		":hash":    &types.AttributeValueMemberS{Value: expectedHash},
+		":hash":    &types.AttributeValueMemberS{Value: writeTokenHash},
 		":current": &types.AttributeValueMemberN{Value: strconv.FormatInt(current, 10)},
 		":next":    &types.AttributeValueMemberN{Value: strconv.FormatInt(nextEpoch, 10)},
-		":signer":  &types.AttributeValueMemberS{Value: change.SignerAuthorityPublicKey},
-		":target":  &types.AttributeValueMemberSS{Value: []string{change.TargetAuthorityPublicKey}},
+		":signer":  &types.AttributeValueMemberS{Value: signerAuthorityPublicKey},
+		":target":  &types.AttributeValueMemberSS{Value: []string{targetAuthorityPublicKey}},
 	}
 	for key, value := range values {
 		merged[key] = value

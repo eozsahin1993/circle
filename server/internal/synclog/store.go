@@ -295,23 +295,21 @@ type LogStore interface {
 
 	// ChangeAuthority is the capability-gated write path for a promotion or
 	// demotion — always a meta-namespace entry. Atomically: verifies
-	// WriteToken, verifies SignerAuthorityPublicKey is in the authority
-	// set, appends the entry, and adds or removes
-	// TargetAuthorityPublicKey — all or none. Both halves commit together
-	// because the circle keeps two records of who governs it, the set and
-	// the log, and nothing repairs a disagreement between them from the
-	// log alone.
+	// writeTokenHash, verifies signerAuthorityPublicKey is in the
+	// authority set, appends the entry, and adds or removes
+	// targetAuthorityPublicKey — all or none, since the circle keeps two
+	// records of who governs it (the set and the log) and nothing repairs
+	// a disagreement between them from the log alone.
 	//
-	// Signature must verify against SignerAuthorityPublicKey for the
-	// change's Message() — checked before any storage call, so a forged
-	// signature never touches control state. Authority only ever comes
-	// from authority: nothing seeds the set but a key already in it.
+	// Validation (action, target key shape) and signature verification
+	// happen in Service.ChangeAuthority, not here — see Rotate's doc
+	// comment for why.
 	//
 	// A signer may remove their own key — that's how leaving hands back
 	// authority — but never the last one (ErrWouldEmptyAuthoritySet):
 	// DynamoDB drops a string set attribute once its last element goes,
 	// leaving nothing to add a key back to.
-	ChangeAuthority(ctx context.Context, change AuthorityChange) (CommitResult, error)
+	ChangeAuthority(ctx context.Context, syncID, entryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash string, action AuthorityAction, targetAuthorityPublicKey, signerAuthorityPublicKey string) (CommitResult, error)
 
 	// DeleteCircle ends a circle: appends the tombstone and stamps
 	// deletedAt on control state in one transaction, then deletes every
