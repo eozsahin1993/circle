@@ -28,7 +28,10 @@ export default function StartFreshScreen() {
     setBusy(true);
     try {
       await abandonPriorAccount();
-      router.replace({ pathname: '/profile-setup', params: { suggestedName: '', suggestedPictureUrl: '' } });
+      router.replace({
+        pathname: '/profile-setup',
+        params: { suggestedName: '', suggestedPictureUrl: '', onboarding: '1' },
+      });
     } catch (err) {
       console.error('Failed to start a fresh account', err);
       showError('Could not start fresh. Try again.');

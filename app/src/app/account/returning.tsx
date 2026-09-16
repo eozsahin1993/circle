@@ -33,7 +33,9 @@ export default function ReturningAccountScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="Welcome back" />
+        {/* No back: only reachable right after sign-in, and behind it is
+            the sign-in screen the user just left. */}
+        <ScreenHeader title="Welcome back" hideBack />
 
         <View style={styles.content}>
           <ThemedText type="screenTitle">

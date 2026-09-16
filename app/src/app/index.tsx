@@ -88,7 +88,11 @@ export default function WelcomeScreen() {
       // having seen them first.
       router.push({
         pathname: '/profile-setup',
-        params: { suggestedName: result.suggestedName ?? '', suggestedPictureUrl: result.suggestedPictureUrl ?? '' },
+        params: {
+          suggestedName: result.suggestedName ?? '',
+          suggestedPictureUrl: result.suggestedPictureUrl ?? '',
+          onboarding: '1',
+        },
       });
     } catch (err) {
       console.error(`${provider} sign-in failed`, err);

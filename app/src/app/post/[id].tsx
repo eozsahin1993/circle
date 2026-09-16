@@ -203,7 +203,8 @@ export default function PostDetailsScreen() {
       <ThemedSafeAreaView style={styles.safeArea}>
         <View style={styles.headerInset}>
           <ScreenHeader
-            title={circleName}
+            title="Post"
+            subtitle={circleName}
             actions={
               // Both are about the post as a whole, so they sit in the
               // header rather than among the chips, which are each about

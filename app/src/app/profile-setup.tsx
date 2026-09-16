@@ -26,10 +26,14 @@ export default function ProfileSetupScreen() {
   // user starts typing/picking, and the effect further down only applies
   // suggestedPictureUrl once (empty deps), never overwriting a later
   // manual picture change.
-  const { suggestedName, suggestedPictureUrl } = useLocalSearchParams<{
+  const { suggestedName, suggestedPictureUrl, onboarding } = useLocalSearchParams<{
     suggestedName?: string;
     suggestedPictureUrl?: string;
+    onboarding?: string;
   }>();
+  // Route params only carry strings; '1' or absent, same as `certain`
+  // and `justJoined` elsewhere.
+  const isOnboarding = !!onboarding;
   const [name, setName] = useState(suggestedName ?? '');
   const [picture, setPicture] = useState<CompressedImage | null>(null);
   const [saving, setSaving] = useState(false);
@@ -90,7 +94,10 @@ export default function ProfileSetupScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="Your profile" />
+        {/* Mid-onboarding, back would land on the sign-in screen (or a
+            stale Welcome back after Start fresh) with a live session —
+            editing from /account keeps it. */}
+        <ScreenHeader title="Your profile" hideBack={isOnboarding} />
 
         <KeyboardAvoider style={styles.form}>
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
@@ -135,16 +142,20 @@ export default function ProfileSetupScreen() {
             style={styles.continueButton}
           />
 
-          {/* Only reachable once signed in — the transfer handshake goes
-              through the relay's mailbox, which needs a session. */}
-          <Pressable
-            style={styles.alreadyHaveAccount}
-            disabled={saving}
-            onPress={() => router.push('/account/transfer')}>
-            <ThemedText type="buttonLabel" themeColor="accentBright">
-              I already have an account
-            </ThemedText>
-          </Pressable>
+          {/* Onboarding only: someone editing their profile from /account
+              already has this account. The transfer handshake goes through
+              the relay's mailbox, which needs a session — fine here, since
+              this screen is only reachable once signed in. */}
+          {isOnboarding ? (
+            <Pressable
+              style={styles.alreadyHaveAccount}
+              disabled={saving}
+              onPress={() => router.push('/account/transfer')}>
+              <ThemedText type="buttonLabel" themeColor="accentBright">
+                I already have an account
+              </ThemedText>
+            </Pressable>
+          ) : null}
         </KeyboardAvoider>
       </ThemedSafeAreaView>
     </ThemedView>
