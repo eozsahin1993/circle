@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Mimoza adaptive icon background">
+  <defs>
+    <radialGradient id="bg" cx="42%" cy="36%" r="78%">
+      <stop stop-color="#4C5F52"/>
+      <stop offset="1" stop-color="#101713"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+</svg>
