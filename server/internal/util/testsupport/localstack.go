@@ -1,9 +1,7 @@
 // Package testsupport wires the real adapters (not fakes) to a LocalStack
 // instance at localhost:4566, so tests exercise actual DynamoDB and S3 wire
 // behavior. Those two services are all LocalStack needs to run (see the
-// workflow's SERVICES list): KMS appears in the Terraform as the tables'
-// encryption-at-rest key, but no Go code here holds a KMS client, and the
-// tables these helpers create programmatically have no SSE to configure.
+// workflow's SERVICES list).
 //
 // Not a _test.go file — a regular package imported by other packages'
 // tests, per Go convention for shared test helpers. Google/Apple
@@ -212,7 +210,7 @@ func NewBlobStore(t testing.TB) synclog.BlobStore {
 // creating the sessions table once per test binary run — same
 // sync.Once-guarded create-if-not-exists pattern as NewLogStore, against a
 // genuinely separate table from everything else (see
-// server/provision/sessions_table.tf).
+// server/provision/modules/storage/sessions_table.tf).
 func NewAuthStore(t testing.TB) auth.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
@@ -235,7 +233,7 @@ func NewAuthStore(t testing.TB) auth.Store {
 // NewManifestStore returns a real dynamodb-backed account.Store
 // against LocalStack, creating the accounts table once per test binary
 // run — a genuinely separate table from sessions (see
-// server/provision/accounts_table.tf).
+// server/provision/modules/storage/accounts_table.tf).
 func NewManifestStore(t testing.TB) account.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
@@ -297,7 +295,7 @@ func RawInviteDynamoDBClient(t testing.TB) (*awsdynamodb.Client, string) {
 
 // NewPushStore returns a real dynamodb-backed push.Store against
 // LocalStack, creating the push table once per test binary run (see
-// server/provision/push_table.tf).
+// server/provision/modules/storage/push_table.tf).
 func NewPushStore(t testing.TB) push.Store {
 	t.Helper()
 	client := awsdynamodb.NewFromConfig(loadConfig(t), func(o *awsdynamodb.Options) {
@@ -316,7 +314,7 @@ func NewPushStore(t testing.TB) push.Store {
 
 // NewRateLimitStore returns a real dynamodb-backed ratelimit.Store
 // against LocalStack, creating the rate-limit table once per test binary
-// run (see server/provision/rate_limit_table.tf). Unlike the other New*
+// run (see server/provision/modules/storage/rate_limit_table.tf). Unlike the other New*
 // helpers, callers pick their own keyPrefix/maxRequests/window per test —
 // a Store instance is scoped to one particular budget.
 func NewRateLimitStore(t testing.TB, keyPrefix string, maxRequests int, window time.Duration) ratelimit.Store {

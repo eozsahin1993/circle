@@ -1,7 +1,7 @@
 // Package dynamodb implements auth.Store against its own "sessions"
 // table — one item per bearer token, no sort key needed since a session
 // is looked up by token for every path except account deletion (see
-// server/provision/sessions_table.tf, and its accountId-index GSI).
+// server/provision/modules/storage/sessions_table.tf, and its accountId-index GSI).
 // Deliberately a different table from the account document
 // (account): token-lookup and account-lookup are different access
 // patterns, and sessions are ephemeral (TTL'd) where the account document
@@ -85,7 +85,7 @@ func (s *Store) DeleteSession(ctx context.Context, token string) error {
 }
 
 // AccountIDIndexName is the GSI DeleteAllSessions queries to find every
-// session for an account — see provision/sessions_table.tf. Exported so
+// session for an account — see provision/modules/storage/sessions_table.tf. Exported so
 // internal/util/localstack can create it under the same name in tests.
 const AccountIDIndexName = "accountId-index"
 

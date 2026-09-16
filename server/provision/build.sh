@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compiles the Lambda's Go binary for provision/lambda.tf to zip up. Run
+# Compiles the Lambda's Go binary for modules/lambda/lambda.tf to zip up. Run
 # this (from anywhere) whenever server/cmd/lambda or anything it depends
 # on changes, before `terraform plan`/`terraform apply` — Terraform reads
 # the already-built binary, it doesn't invoke `go build` itself.

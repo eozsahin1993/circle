@@ -1,4 +1,5 @@
-# Secrets
+# Per-environment settings and secrets: local.env, staging.env, prod.env.
+*.env
 .env
 
 # Compiled binary from `go build ./cmd/server` — regenerate with `go run`/`go build`.
@@ -7,10 +8,9 @@
 # Compiled Lambda artifact — regenerate with provision/build.sh
 provision/build/
 
-# Terraform local state and provider cache — no remote backend configured
-# yet (see versions.tf), so these stay machine-local. Matches both
-# provision/ and provision/local/ (each is its own root config with its
-# own state). The .lock.hcl files are NOT ignored — those are meant to be
+# Terraform local state and provider cache. staging/prod keep state in S3
+# (see provision/envs/*/versions.tf); local and bootstrap keep it on this
+# machine. The .lock.hcl files are NOT ignored — those are meant to be
 # committed.
 provision/**/.terraform/
 provision/**/*.tfstate

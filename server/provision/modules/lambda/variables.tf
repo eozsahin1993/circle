@@ -1,0 +1,27 @@
+variable "name_prefix" {
+  description = "Prefix applied to every named resource (mimoza-<env>), and handed to the relay as RESOURCE_PREFIX."
+  type        = string
+}
+
+variable "aws_region" {
+  description = "Region the relay runs in — used to scope the SSM parameter ARNs in its IAM policy."
+  type        = string
+}
+
+variable "binary_path" {
+  description = "The linux/arm64 bootstrap binary build.sh produces."
+  type        = string
+}
+
+variable "storage" {
+  description = "The storage module's outputs — ARNs for the relay's IAM policy. Names aren't passed: the relay derives them from RESOURCE_PREFIX."
+  type = object({
+    table_arn            = string
+    bucket_arn           = string
+    invite_table_arn     = string
+    sessions_table_arn   = string
+    accounts_table_arn   = string
+    rate_limit_table_arn = string
+    push_table_arn       = string
+  })
+}

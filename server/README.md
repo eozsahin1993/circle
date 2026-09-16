@@ -21,7 +21,10 @@ internal/
   crypto/    server-side key derivation (HKDF from the KMS root secret)
   config/    reads every env var once, in one place
   testsupport/ real adapters against LocalStack, shared by every package's tests
-provision/   Terraform — prod in this directory, a LocalStack mirror under local/
+provision/
+  modules/   storage (tables, bucket) and lambda (function, IAM, URL), shared by every env
+  envs/      one thin root per environment: local (LocalStack), staging, prod
+  bootstrap/ the S3 bucket staging/prod state lives in — applied once per account
 ```
 
 Both `cmd/` entry points call the same `api.NewRouter(...)` — nothing
@@ -171,45 +174,45 @@ All commands are from `server/`.
 after the first time):
 
 ```
-docker run -d --name localstack -p 4566:4566 -e SERVICES=dynamodb,s3,kms localstack/localstack:4.4.0
+docker run -d --name localstack -p 4566:4566 -e SERVICES=dynamodb,s3 localstack/localstack:4.4.0
 ```
 
-**2. Provision the tables and bucket** (again whenever `provision/local`
+**2. Provision the tables and bucket** (again whenever `provision/modules`
 changes, or after LocalStack's container is recreated):
 
 ```
-(cd provision/local && terraform init && terraform apply)
-(cd provision/local && terraform output)   # the names step 3 needs
+(cd provision/envs/local && terraform init && terraform apply)
 ```
 
-**3. Create `.env`** from the example and point it at LocalStack:
+**3. Create `local.env`** from the example and point it at LocalStack:
 
 ```
-cp .env.example .env
+cp .env.example local.env
 ```
 
-Then in `.env`: set each `*_TABLE_NAME` and `BUCKET_NAME` to the matching
-`terraform output` value (`mimoza-local-*`), set `S3_FORCE_PATH_STYLE=true`,
+Then in `local.env`: set `RESOURCE_PREFIX=mimoza-local` (the relay derives every
+table and bucket name from it, the same way Terraform names them), set
+`S3_FORCE_PATH_STYLE=true`,
 and uncomment the LocalStack block (`AWS_ENDPOINT_URL=http://localhost:4566`
 and the `test`/`test` keys). For push, point `FCM_CREDENTIAL_FILE` and
 `APNS_AUTH_KEY_FILE` at the key files in this directory. `.gitignore` keeps
-`.env` and both keys out of the repo.
+every `*.env` and both keys out of the repo.
 
-**4. Run it with `.env` loaded.** Go doesn't read `.env` itself, so export
+**4. Run it with `local.env` loaded.** Go doesn't read env files itself, so export
 it into the shell first:
 
 ```
-set -a; source .env; set +a
+set -a; source local.env; set +a
 go run ./cmd/server          # logs "listening on :<PORT>"
 ```
 
 Or in one line, without leaking the vars into your shell:
 
 ```
-(set -a; source .env; set +a; go run ./cmd/server)
+(set -a; source local.env; set +a; go run ./cmd/server)
 ```
 
-Don't use `export $(cat .env | xargs)`: bash chokes on the comment lines
+Don't use `export $(cat local.env | xargs)`: bash chokes on the comment lines
 (`export: '#': not a valid identifier`), and any value with a space splits.
 
 Set `PORT=8090`: a dev build of the app talks to the relay on the same
@@ -230,7 +233,7 @@ Run it under a watcher instead:
 
 ```
 go install github.com/bokwoon95/wgo@latest      # once
-(set -a; source .env; set +a; wgo run ./cmd/server)
+(set -a; source local.env; set +a; wgo run ./cmd/server)
 ```
 
 `wgo` needs no config file. `air` works too if you already have it.
@@ -257,3 +260,35 @@ fixed in `4.4.0`.
 creates tables lazily on first use, shared across test packages — see its
 own doc comment for why IDs in tests are always freshly generated, never
 hardcoded).
+
+## Deploying (staging, prod)
+
+Every env is the same two modules; `provision/envs/<env>/main.tf` holds only
+its prefix, region and deletion protection. All names come from the prefix
+`mimoza-<env>` — Terraform creates resources under it, and the Lambda gets it
+as `RESOURCE_PREFIX` and derives the rest.
+
+Once per AWS account, create the bucket Terraform state lives in:
+
+```
+(cd provision/bootstrap && terraform init && terraform apply)
+```
+
+Each env's settings live in `server/<env>.env` (copy `.env.example`; gitignored
+like `local.env`) with `RESOURCE_PREFIX=mimoza-<env>`, the sign-in client IDs,
+APNs IDs, and `FCM_CREDENTIAL_FILE`/`APNS_AUTH_KEY_FILE` pointing at the key
+files. Upload it to SSM — settings under `/mimoza-<env>/config/`, the two
+keys as SecureStrings — whenever it changes:
+
+```
+provision/push-config.sh staging
+```
+
+Terraform reads those settings at apply time, so nothing env-specific is
+committed. Then, whenever the Go code or the Terraform changes:
+
+```
+provision/build.sh
+(cd provision/envs/staging && terraform init && terraform apply)
+(cd provision/envs/staging && terraform output api_endpoint)   # the app build's EXPO_PUBLIC_RELAY_URL
+```

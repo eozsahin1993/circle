@@ -1,7 +1,7 @@
 // Command testrelay serves the real relay (internal/app's wiring, not a
 // copy) against LocalStack, for tests that drive it over HTTP — the
 // integration suite, and later the app's headless UI-test peer. Never
-// deployed: provision/lambda.tf builds cmd/lambda, not this.
+// deployed: provision/modules/lambda/lambda.tf deploys cmd/lambda, not this.
 package main
 
 import (

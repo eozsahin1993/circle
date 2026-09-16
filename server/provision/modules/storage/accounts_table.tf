@@ -6,7 +6,7 @@
 # (different access pattern, no TTL here — kept until the account itself
 # is deleted) and from the sync-log table (not circle-scoped data).
 resource "aws_dynamodb_table" "accounts" {
-  name         = "${local.name_prefix}-accounts"
+  name         = "${var.name_prefix}-accounts"
   billing_mode = "PAY_PER_REQUEST"
 
   hash_key = "pk"
@@ -16,14 +16,5 @@ resource "aws_dynamodb_table" "accounts" {
     type = "S"
   }
 
-  server_side_encryption {
-    enabled     = true
-    kms_key_arn = aws_kms_key.master.arn
-  }
-
-  # Deletable for now, pre-production — set prevent_destroy = true once
-  # this table holds real user data.
-  lifecycle {
-    prevent_destroy = false
-  }
+  deletion_protection_enabled = var.deletion_protection
 }

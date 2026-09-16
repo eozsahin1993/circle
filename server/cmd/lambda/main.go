@@ -23,7 +23,7 @@ func main() {
 		log.Fatalf("failed to build the relay: %v", err)
 	}
 
-	// NewV2, not New: provision/lambda_url.tf fronts this with a Lambda
+	// NewV2, not New: provision/modules/lambda/lambda_url.tf fronts this with a Lambda
 	// Function URL, which uses the same v2.0 Lambda payload format as an
 	// API Gateway HTTP API.
 	adapter := httpadapter.NewV2(handler)

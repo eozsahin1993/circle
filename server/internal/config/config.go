@@ -12,17 +12,22 @@ import (
 	"time"
 )
 
+// Every table, the blob bucket and both push-credential parameters are
+// named from one RESOURCE_PREFIX (mimoza-<env>), under the same
+// "<prefix>-<suffix>" convention server/provision/modules/storage and
+// modules/lambda create them with. A rename on either side has to happen
+// on both — nothing checks the two against each other.
 type Config struct {
 	TableName  string
 	BucketName string
 	// SessionsTableName is the standalone bearer-token session table — see
-	// server/provision/sessions_table.tf. Not circle-scoped, so it's a
+	// server/provision/modules/storage/sessions_table.tf. Not circle-scoped, so it's a
 	// separate table from TableName; also separate from AccountsTableName
 	// (token-lookup vs account-lookup are different access patterns).
 	SessionsTableName string
 	// AccountsTableName is the standalone one-document-per-account table
 	// (today: the encrypted recovery manifest) — see
-	// server/provision/accounts_table.tf.
+	// server/provision/modules/storage/accounts_table.tf.
 	AccountsTableName string
 	// InviteTableName is the standalone invite/join-request table: pk =
 	// hash(invite code), with one row for the invite itself and one row
@@ -30,7 +35,7 @@ type Config struct {
 	// server/provision/modules/storage/dynamodb.tf's invites resource.
 	InviteTableName string
 	// RateLimitTableName is the standalone per-account request-budget
-	// table — see server/provision/rate_limit_table.tf. Shared by the write
+	// table — see server/provision/modules/storage/rate_limit_table.tf. Shared by the write
 	// and read budgets below; ratelimitdynamodb.New's keyPrefix keeps their
 	// rows from colliding.
 	RateLimitTableName string
@@ -88,12 +93,12 @@ type Config struct {
 	// as a second named field if a web/Android Apple flow is ever added.
 	AppleClientIDIOS string
 	// MaxBlobSize is passed straight to s3.NewBlobStore, overriding its
-	// DefaultMaxBlobSize — see provision/variables.tf's
-	// max_blob_size_bytes. 0 means "use the adapter's own default".
+	// DefaultMaxBlobSize — see .env.example's MAX_BLOB_SIZE_BYTES. 0 means
+	// "use the adapter's own default".
 	MaxBlobSize int64
 	// InviteRetentionDays is passed straight to invitedynamodb.New — see
-	// provision/variables.tf's invite_retention_days. 0 means "use the
-	// adapter's own default".
+	// .env.example's INVITE_RETENTION_DAYS. 0 means "use the adapter's own
+	// default".
 	// Eviction itself is DynamoDB's native TTL
 	// (see provision/modules/storage/dynamodb.tf), not this process — this
 	// only controls what expiresAt gets written as.
@@ -112,17 +117,18 @@ type Config struct {
 // cmd/ entries are meant to crash immediately on misconfiguration, not
 // limp along with a zero value.
 func Load() Config {
+	prefix := mustEnv("RESOURCE_PREFIX")
 	return Config{
-		TableName:                 mustEnv("TABLE_NAME"),
-		BucketName:                mustEnv("BUCKET_NAME"),
-		SessionsTableName:         mustEnv("SESSIONS_TABLE_NAME"),
-		AccountsTableName:         mustEnv("ACCOUNTS_TABLE_NAME"),
-		InviteTableName:           mustEnv("INVITE_TABLE_NAME"),
-		RateLimitTableName:        mustEnv("RATE_LIMIT_TABLE_NAME"),
-		PushTableName:             mustEnv("PUSH_TABLE_NAME"),
-		FCMCredentialParameter:    strEnv("FCM_CREDENTIAL_PARAMETER", "/mimoza/fcm-service-account"),
+		TableName:                 prefix + "-sync-log",
+		BucketName:                prefix + "-blobs",
+		SessionsTableName:         prefix + "-sessions",
+		AccountsTableName:         prefix + "-accounts",
+		InviteTableName:           prefix + "-invites",
+		RateLimitTableName:        prefix + "-rate-limit",
+		PushTableName:             prefix + "-push",
+		FCMCredentialParameter:    "/" + prefix + "/fcm-service-account",
 		FCMCredentialFile:         os.Getenv("FCM_CREDENTIAL_FILE"),
-		APNSAuthKeyParameter:      strEnv("APNS_AUTH_KEY_PARAMETER", "/mimoza/apns-auth-key"),
+		APNSAuthKeyParameter:      "/" + prefix + "/apns-auth-key",
 		APNSAuthKeyFile:           os.Getenv("APNS_AUTH_KEY_FILE"),
 		APNSKeyID:                 envOr("APNS_KEY_ID", ""),
 		APNSTeamID:                envOr("APNS_TEAM_ID", ""),
@@ -158,13 +164,6 @@ func mustEnv(name string) string {
 }
 
 func envOr(name, fallback string) string {
-	if value := os.Getenv(name); value != "" {
-		return value
-	}
-	return fallback
-}
-
-func strEnv(name, fallback string) string {
 	if value := os.Getenv(name); value != "" {
 		return value
 	}

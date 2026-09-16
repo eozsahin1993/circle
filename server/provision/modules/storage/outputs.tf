@@ -21,3 +21,35 @@ output "invite_table_name" {
 output "invite_table_arn" {
   value = aws_dynamodb_table.invites.arn
 }
+
+output "sessions_table_name" {
+  value = aws_dynamodb_table.sessions.name
+}
+
+output "sessions_table_arn" {
+  value = aws_dynamodb_table.sessions.arn
+}
+
+output "accounts_table_name" {
+  value = aws_dynamodb_table.accounts.name
+}
+
+output "accounts_table_arn" {
+  value = aws_dynamodb_table.accounts.arn
+}
+
+output "rate_limit_table_name" {
+  value = aws_dynamodb_table.rate_limit.name
+}
+
+output "rate_limit_table_arn" {
+  value = aws_dynamodb_table.rate_limit.arn
+}
+
+output "push_table_name" {
+  value = aws_dynamodb_table.push.name
+}
+
+output "push_table_arn" {
+  value = aws_dynamodb_table.push.arn
+}

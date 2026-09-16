@@ -1,6 +1,6 @@
 // Package dynamodb implements ratelimit.Store against a single
 // "rate_limit" table shared by every configured Store instance (see
-// server/provision/rate_limit_table.tf) — one item per (keyPrefix, key)
+// server/provision/modules/storage/rate_limit_table.tf) — one item per (keyPrefix, key)
 // pair, distinguished by prefixing the partition key rather than by a
 // sort key, since nothing here is ever queried by range.
 package dynamodb

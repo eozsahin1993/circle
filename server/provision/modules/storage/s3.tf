@@ -3,7 +3,8 @@
 # private regardless: access is entirely gated by short-lived presigned
 # URLs, never by bucket policy or public access.
 resource "aws_s3_bucket" "blobs" {
-  bucket = "${var.name_prefix}-blobs"
+  bucket        = "${var.name_prefix}-blobs"
+  force_destroy = !var.deletion_protection
 }
 
 resource "aws_s3_bucket_public_access_block" "blobs" {
@@ -40,9 +41,9 @@ resource "aws_s3_bucket_cors_configuration" "blobs" {
 #
 # They are deletable on request, which is a different thing from expiry:
 # deleting a photo removes its object then and there (see
-# internal/api/deleteblob), so nothing outlives the post it belonged to,
+# internal/synclog/http/deleteblob), so nothing outlives the post it belonged to,
 # and deleting a circle takes everything under its prefix (see
-# internal/api/deletecircle).
+# internal/synclog/http/deletecircle).
 #
 # Versioning is deliberately off. With it on, those deletes would lay down
 # delete markers over recoverable versions and quietly stop destroying
