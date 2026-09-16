@@ -28,6 +28,8 @@ export type CircleFeedController = {
   rows: FeedRow[];
   circleName: string;
   memberCount: number;
+  /** Whether the first read has resolved — an empty `rows` before this is "still loading", not "no posts". */
+  loaded: boolean;
   refreshing: boolean;
   /** Whether an older page exists to fetch — see `loadMore`. */
   hasMore: boolean;
@@ -194,6 +196,7 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     rows,
     circleName: feed?.meta.circleName ?? '',
     memberCount: feed?.meta.memberCount ?? 0,
+    loaded: feed !== null,
     refreshing,
     hasMore: feed !== null && feed.cursor !== null,
     loadingMore,

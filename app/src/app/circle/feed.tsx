@@ -4,10 +4,13 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View, type Vie
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FabButton } from '@/ui/components/buttons/fab-button';
+import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
+import { EmptyFeedIcon } from '@/features/feed/components/empty-feed-icon';
 import { gapBetween, stickyIndices, type FeedRow } from '@/features/feed/components/rows';
 import { HeaderIconButton } from '@/ui/components/navbar/header-icon-button';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
+import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Icons, Spacing } from '@/ui/theme/tokens';
 import { markCircleViewed } from '@/data/db';
@@ -31,9 +34,10 @@ export default function FeedScreen() {
     [circleId],
   );
   const theme = useTheme();
-  const { rows, circleName, memberCount, refreshing, hasMore, loadingMore, loadMore, reload, refresh } = useCircleFeed(circleId, {
-    justJoined: justJoined === '1',
-  });
+  const { rows, circleName, memberCount, loaded, refreshing, hasMore, loadingMore, loadMore, reload, refresh } = useCircleFeed(
+    circleId,
+    { justJoined: justJoined === '1' },
+  );
   useFocusEffect(
     useCallback(() => {
       reload().catch((err) => console.error('Failed to load the feed', err));
@@ -109,6 +113,22 @@ export default function FeedScreen() {
           }}
           onEndReached={hasMore ? loadMore : undefined}
           onEndReachedThreshold={2}
+          // Only once the first read has resolved — otherwise this flashes
+          // before the feed arrives, same as the circle list's empty state.
+          ListEmptyComponent={
+            loaded ? (
+              <View style={styles.empty}>
+                <EmptyFeedIcon />
+                <ThemedText type="screenTitle" style={styles.emptyTitle}>
+                  Nothing here yet
+                </ThemedText>
+                <ThemedText type="captionFeed" themeColor="muted" style={styles.emptyBody}>
+                  Add the first photo, or invite the people you want in this circle.
+                </ThemedText>
+                <SecondaryButton label="Invite people" onPress={openDetails} style={styles.emptyButton} />
+              </View>
+            ) : null
+          }
           // Native padding, not `useSafeAreaInsets` — see the FAB's comment below.
           ListFooterComponent={
             <>
@@ -150,9 +170,28 @@ const styles = StyleSheet.create({
     // content arriving under fixed chrome, not the next line of it.
     paddingTop: Spacing.cardListGap,
     paddingBottom: LIST_BOTTOM_PADDING,
+    // Grows to fill the screen so the empty state's `flex: 1` has height
+    // to centre itself in — see circle/index.tsx's empty state.
+    flexGrow: 1,
   },
   loadingMore: {
     paddingVertical: Spacing.cardListGap,
+  },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.screenPadding,
+    gap: Spacing.cardListGap,
+  },
+  emptyTitle: {
+    textAlign: 'center',
+  },
+  emptyBody: {
+    textAlign: 'center',
+  },
+  emptyButton: {
+    marginTop: 4,
   },
   // Full width so the FAB still anchors bottom-right, without intercepting
   // touches over the rest of that width (see `pointerEvents` on the JSX).
