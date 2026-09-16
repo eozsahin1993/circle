@@ -10,6 +10,7 @@ import { JoinSheet } from '@/features/invite/components/join-sheet';
 import { PendingCircleCard } from '@/features/invite/components/pending-circle-card';
 import { EmptyCirclesIcon } from '@/features/circle/components/empty-circles-icon';
 import { FabButton } from '@/ui/components/buttons/fab-button';
+import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
 import { PrivacyNotice } from '@/features/account/components/privacy-notice';
 import { ThemedText } from '@/ui/theme/themed-text';
@@ -261,9 +262,10 @@ export default function CircleListScreen() {
                   No circles yet
                 </ThemedText>
                 <ThemedText type="captionFeed" themeColor="muted" style={styles.emptyBody}>
-                  Create one to share memories with the people in it, or join with a key someone
-                  sent you.
+                  Create one to share memories with the people in it. Circles are invite-only, so
+                  open a link someone sent you to join one.
                 </ThemedText>
+                <SecondaryButton label="Create a circle" onPress={() => router.push('/circle/new')} style={styles.emptyButton} />
               </View>
             ) : null
           }
@@ -336,6 +338,9 @@ const styles = StyleSheet.create({
   },
   emptyBody: {
     textAlign: 'center',
+  },
+  emptyButton: {
+    marginTop: 4,
   },
   fab: {
     position: 'absolute',
