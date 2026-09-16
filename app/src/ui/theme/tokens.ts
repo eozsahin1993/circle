@@ -29,6 +29,7 @@ import ShieldOff from 'lucide-react-native/icons/shield-off';
 import SquarePen from 'lucide-react-native/icons/square-pen';
 import Trash from 'lucide-react-native/icons/trash';
 import TriangleAlert from 'lucide-react-native/icons/triangle-alert';
+import Users from 'lucide-react-native/icons/users';
 import UserX from 'lucide-react-native/icons/user-x';
 import X from 'lucide-react-native/icons/x';
 
@@ -248,6 +249,8 @@ export const Icons = {
   replaceKey: RefreshCw,
   /** Centered over an empty photo/cover picker — a plain `add` reads as "add a row," not "add a photo." */
   addPhoto: ImagePlus,
+  /** How many people are in a circle — next to the count on its card row. */
+  members: Users,
 } as const satisfies Record<string, IconGlyph>;
 
 export const Radius = {

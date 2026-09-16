@@ -1,98 +1,111 @@
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { Icon } from '@/ui/components/icon';
 import { PhotoPlaceholder } from '@/ui/components/photo-placeholder';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Radius } from '@/ui/theme/tokens';
-import { useTints } from '@/ui/theme/hooks/use-theme';
+import { Icons, Radius } from '@/ui/theme/tokens';
+import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
 export type CircleCardProps = {
   name: string;
   memberCount: number;
   /** Data URI of the actual cover photo, when it's known — otherwise the hatch placeholder shows. */
   photoUri?: string;
-  /** Small eyebrow caption overlaid on the thumbnail, e.g. "Photo — Lake at dusk" — see PostCard's own photoLabel. */
-  photoLabel?: string;
-  /** Unread count shown as a pill on the right — omitted entirely once there's nothing new. */
+  /** Unread count shown as a "3 new" pill next to the name — omitted entirely once there's nothing new. */
   newCount?: number;
-  /** Most recent activity line, e.g. "Last added 6 days ago" — falls back to the member count. */
+  /** Most recent activity line, e.g. "Last added 6 days ago" — its own row under the member count. */
   latestActivity?: string;
   onPress?: () => void;
 };
 
-const THUMB_SIZE = 84;
+const CARD_HEIGHT = 92;
 
-export function CircleCard({ name, memberCount, photoUri, photoLabel, newCount, latestActivity, onPress }: CircleCardProps) {
+/**
+ * A real card, not a photo with text laid over it — the cover gets a
+ * full-height square (bigger than the old 84px thumbnail) on its own,
+ * and the name, member count and activity sit on the card's own surface
+ * beside it, so the photo can be emphasized without having to also stay
+ * legible as a backdrop for white text.
+ */
+export function CircleCard({ name, memberCount, photoUri, newCount, latestActivity, onPress }: CircleCardProps) {
+  const theme = useTheme();
   const tints = useTints();
   return (
-    <Pressable style={styles.row} onPress={onPress}>
-      <View style={styles.thumbWrap}>
-        {photoUri ? (
-          <Image source={{ uri: photoUri }} style={styles.thumb} contentFit="cover" />
-        ) : (
-          <PhotoPlaceholder style={styles.thumb} />
-        )}
-        {photoLabel ? (
-          <ThemedText type="eyebrow" style={styles.photoLabel} numberOfLines={3}>
-            {photoLabel}
+    <Pressable
+      style={[styles.card, { backgroundColor: theme.surface, borderColor: tints.raisedBorder }]}
+      onPress={onPress}>
+      {photoUri ? (
+        <Image source={{ uri: photoUri }} style={styles.cover} contentFit="cover" />
+      ) : (
+        <PhotoPlaceholder style={styles.cover} />
+      )}
+
+      <View style={styles.content}>
+        <View style={styles.titleRow}>
+          <ThemedText type="cardTitle" numberOfLines={1} style={styles.title}>
+            {name}
+          </ThemedText>
+          {newCount ? (
+            <View style={[styles.badge, { backgroundColor: tints.chipReactedBg }]}>
+              <ThemedText type="meta" themeColor="accentBright">
+                {newCount} new
+              </ThemedText>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.metaRow}>
+          <Icon icon={Icons.members} size={14} color={theme.muted} />
+          <ThemedText type="meta" themeColor="muted" numberOfLines={1}>
+            {memberCount} {memberCount === 1 ? 'person' : 'people'}
+          </ThemedText>
+        </View>
+
+        {latestActivity ? (
+          <ThemedText type="meta" themeColor="faint" numberOfLines={1}>
+            {latestActivity}
           </ThemedText>
         ) : null}
       </View>
-
-      <View style={styles.body}>
-        <ThemedText type="cardTitle" numberOfLines={1}>
-          {name}
-        </ThemedText>
-        <ThemedText type="meta" themeColor="muted" numberOfLines={1}>
-          {latestActivity ?? `${memberCount} ${memberCount === 1 ? 'person' : 'people'}`}
-        </ThemedText>
-      </View>
-
-      {newCount ? (
-        <View style={[styles.badge, { backgroundColor: tints.chipReactedBg }]}>
-          <ThemedText type="meta" themeColor="accentBright">
-            {newCount}
-          </ThemedText>
-        </View>
-      ) : null}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
+  card: {
+    height: CARD_HEIGHT,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    paddingVertical: 16,
-  },
-  thumbWrap: {
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-    borderRadius: Radius.panel,
+    borderRadius: Radius.circleCard,
+    borderWidth: 1,
     overflow: 'hidden',
-    justifyContent: 'flex-end',
   },
-  thumb: {
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-    borderRadius: Radius.panel,
+  cover: {
+    width: CARD_HEIGHT,
+    height: CARD_HEIGHT,
   },
-  photoLabel: {
-    position: 'absolute',
-    left: 6,
-    bottom: 6,
-    right: 6,
-  },
-  body: {
+  content: {
     flex: 1,
+    padding: 12,
+    justifyContent: 'center',
     gap: 4,
   },
-  badge: {
-    minWidth: 34,
+  titleRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 5,
+    gap: 8,
+  },
+  title: {
+    flex: 1,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: Radius.pill,
   },
 });
