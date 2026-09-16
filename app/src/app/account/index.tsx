@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -26,6 +27,9 @@ import type { ThemePreference } from '@/core/services/settings';
 
 /** How often to check whether the background erasure has finished while this screen waits on it. */
 const DELETION_POLL_MS = 2_000;
+
+/** From app.json's "version" — Constants.expoConfig is only ever missing in a context this screen doesn't run in. */
+const appVersion = Constants.expoConfig?.version ?? 'Unknown';
 
 function pushLevelLabel(level: PushLevelId): string {
   return PushLevels.find((candidate) => candidate.id === level)?.label ?? '';
@@ -149,24 +153,9 @@ export default function AccountScreen() {
           control: { kind: 'navigate' },
           onPress: () => router.push('/account/credits'),
         },
-      ],
-    },
-    {
-      title: 'Developer',
-      rows: [
-        __DEV__ && {
-          label: resettingDevData ? 'Resetting…' : 'Reset all local data',
-          description:
-            '__DEV__ only. Wipes circles, keys, the master seed, and the database schema, so a changed migration actually re-runs.',
-          destructive: true,
-          disabled: resettingDevData,
-          onPress: handleDevReset,
-        },
-        __DEV__ && {
-          label: 'Log a test push payload',
-          description: '__DEV__ only. Logs a simctl push payload this device can decrypt, for testing the iOS notification extension.',
-          control: { kind: 'navigate' as const },
-          onPress: () => void logTestPushPayload(),
+        {
+          label: 'Version',
+          control: { kind: 'value', text: appVersion },
         },
       ],
     },
@@ -183,6 +172,26 @@ export default function AccountScreen() {
           description: "Erases everything you've posted, everywhere, then deletes your account",
           destructive: true,
           onPress: handleDeleteAccount,
+        },
+      ],
+    },
+    // Always last — developer tools shouldn't sit above real settings.
+    {
+      title: 'Developer',
+      rows: [
+        __DEV__ && {
+          label: resettingDevData ? 'Resetting…' : 'Reset all local data',
+          description:
+            '__DEV__ only. Wipes circles, keys, the master seed, and the database schema, so a changed migration actually re-runs.',
+          destructive: true,
+          disabled: resettingDevData,
+          onPress: handleDevReset,
+        },
+        __DEV__ && {
+          label: 'Log a test push payload',
+          description: '__DEV__ only. Logs a simctl push payload this device can decrypt, for testing the iOS notification extension.',
+          control: { kind: 'navigate' as const },
+          onPress: () => void logTestPushPayload(),
         },
       ],
     },
