@@ -25,6 +25,13 @@ type fakeLogStore struct {
 	deleteCircleCalls []deleteCircleCall
 	deleteCircleOut   synclog.CommitResult
 	deleteCircleErr   error
+
+	findEntryOut synclog.LogEntry
+	findEntryErr error
+
+	deleteEntryCalls []deleteEntryCall
+	deleteEntryOut   synclog.CommitResult
+	deleteEntryErr   error
 }
 
 type rotateCall struct {
@@ -72,8 +79,22 @@ func (f *fakeLogStore) DeleteCircle(ctx context.Context, syncID, entryID string,
 	f.deleteCircleCalls = append(f.deleteCircleCalls, deleteCircleCall{syncID, entryID, encryptedPayload, keyVersion, writeTokenHash, signerAuthorityPublicKey})
 	return f.deleteCircleOut, f.deleteCircleErr
 }
-func (f *fakeLogStore) DeleteEntry(ctx context.Context, deletion synclog.EntryDeletion) (synclog.CommitResult, error) {
-	panic("fakeLogStore: DeleteEntry not implemented")
+func (f *fakeLogStore) FindEntry(ctx context.Context, syncID, entryID string) (synclog.LogEntry, error) {
+	return f.findEntryOut, f.findEntryErr
+}
+
+type deleteEntryCall struct {
+	syncID, tombstoneEntryID     string
+	targetEpoch                  int64
+	encryptedPayload             []byte
+	keyVersion                   int64
+	writeTokenHash, authorizedBy string
+	requiredAuthorityPublicKey   string
+}
+
+func (f *fakeLogStore) DeleteEntry(ctx context.Context, syncID, tombstoneEntryID string, targetEpoch int64, encryptedPayload []byte, keyVersion int64, writeTokenHash, authorizedBy, requiredAuthorityPublicKey string) (synclog.CommitResult, error) {
+	f.deleteEntryCalls = append(f.deleteEntryCalls, deleteEntryCall{syncID, tombstoneEntryID, targetEpoch, encryptedPayload, keyVersion, writeTokenHash, authorizedBy, requiredAuthorityPublicKey})
+	return f.deleteEntryOut, f.deleteEntryErr
 }
 func (f *fakeLogStore) DeleteAuthorContent(ctx context.Context, deletion synclog.AuthorContentDeletion) (synclog.AuthorContentResult, error) {
 	panic("fakeLogStore: DeleteAuthorContent not implemented")
@@ -345,5 +366,168 @@ func TestService_DeleteCircle_HashesTheWriteTokenBeforeCallingLogStore(t *testin
 	}
 	if got := log.deleteCircleCalls[0].writeTokenHash; got != wantHash {
 		t.Fatalf("expected the raw token hashed before reaching LogStore, got %q want %q", got, wantHash)
+	}
+}
+
+// newTestEntryDeletion builds an EntryDeletion signed by authorPriv over
+// the deletion — tests that want a wrong signature, or the admin path
+// instead, replace AuthorSignature after the fact.
+func newTestEntryDeletion(syncID, targetEntryID, tombstoneEntryID string, authorPriv ed25519.PrivateKey, token string) synclog.EntryDeletion {
+	deletion := synclog.EntryDeletion{
+		SyncID:           syncID,
+		TargetEntryID:    targetEntryID,
+		TombstoneEntryID: tombstoneEntryID,
+		EncryptedPayload: []byte("post_delete payload"),
+		KeyVersion:       1,
+		WriteToken:       token,
+	}
+	deletion.AuthorSignature = ed25519.Sign(authorPriv, deletion.Message())
+	return deletion
+}
+
+func TestService_DeleteEntry_SucceedsViaAuthorSignature(t *testing.T) {
+	authorPub, authorPriv := newTestAuthorityKey(t)
+	deletion := newTestEntryDeletion("sync-1", "post-1", "tombstone-1", authorPriv, "deadbeef")
+
+	log := &fakeLogStore{
+		findEntryOut:   synclog.LogEntry{Epoch: 3, AuthorIdentityPublicKey: authorPub},
+		deleteEntryOut: synclog.CommitResult{Epoch: 4, ReceivedAt: 500},
+	}
+	svc := &synclog.Service{Log: log}
+	result, err := svc.DeleteEntry(context.Background(), deletion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != log.deleteEntryOut {
+		t.Fatalf("expected the LogStore's result passed through unchanged, got %+v", result)
+	}
+	if len(log.deleteEntryCalls) != 1 {
+		t.Fatalf("expected exactly one LogStore.DeleteEntry call, got %d", len(log.deleteEntryCalls))
+	}
+	call := log.deleteEntryCalls[0]
+	if call.targetEpoch != 3 {
+		t.Fatalf("expected the post's epoch passed through, got %d", call.targetEpoch)
+	}
+	if call.authorizedBy != authorPub {
+		t.Fatalf("expected authorizedBy to be the author's key, got %q", call.authorizedBy)
+	}
+	if call.requiredAuthorityPublicKey != "" {
+		t.Fatalf("expected no authoritySet check on the author path, got %q", call.requiredAuthorityPublicKey)
+	}
+	wantHash, err := synclog.WriteTokenHash("deadbeef")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if call.writeTokenHash != wantHash {
+		t.Fatalf("expected the raw token hashed before reaching LogStore, got %q want %q", call.writeTokenHash, wantHash)
+	}
+}
+
+// The impostor's signature doesn't match the post's real author, and no
+// authority pair is offered — the same request an outsider forging a
+// delete would send.
+func TestService_DeleteEntry_RejectsWrongSignature(t *testing.T) {
+	authorPub, _ := newTestAuthorityKey(t)
+	_, impostorPriv := newTestAuthorityKey(t)
+	deletion := newTestEntryDeletion("sync-1", "post-1", "tombstone-1", impostorPriv, "deadbeef")
+
+	log := &fakeLogStore{findEntryOut: synclog.LogEntry{Epoch: 3, AuthorIdentityPublicKey: authorPub}}
+	svc := &synclog.Service{Log: log}
+	_, err := svc.DeleteEntry(context.Background(), deletion)
+	if !errors.Is(err, synclog.ErrEntryNotAuthorized) {
+		t.Fatalf("expected ErrEntryNotAuthorized, got %v", err)
+	}
+	if len(log.deleteEntryCalls) != 0 {
+		t.Fatalf("expected LogStore.DeleteEntry never called, got %d calls", len(log.deleteEntryCalls))
+	}
+}
+
+// A circle admin deleting someone else's post: no AuthorSignature, an
+// AuthorityPublicKey/AuthoritySignature pair instead. requiredAuthorityPublicKey
+// carries the admin's key through to LogStore rather than being checked
+// here — authoritySet membership has to be re-verified atomically inside
+// the same commit that lands the tombstone, not against a moment-earlier
+// read (the TOCTOU DeleteEntry's admin path used to have).
+func TestService_DeleteEntry_FallsBackToAuthoritySignatureAndDefersMembership(t *testing.T) {
+	authorPub, _ := newTestAuthorityKey(t)
+	adminPub, adminPriv := newTestAuthorityKey(t)
+	deletion := synclog.EntryDeletion{
+		SyncID:             "sync-1",
+		TargetEntryID:      "post-1",
+		TombstoneEntryID:   "tombstone-1",
+		EncryptedPayload:   []byte("post_delete payload"),
+		KeyVersion:         1,
+		WriteToken:         "deadbeef",
+		AuthorityPublicKey: adminPub,
+	}
+	deletion.AuthoritySignature = ed25519.Sign(adminPriv, deletion.Message())
+
+	log := &fakeLogStore{findEntryOut: synclog.LogEntry{Epoch: 3, AuthorIdentityPublicKey: authorPub}}
+	svc := &synclog.Service{Log: log}
+	if _, err := svc.DeleteEntry(context.Background(), deletion); err != nil {
+		t.Fatal(err)
+	}
+	if len(log.deleteEntryCalls) != 1 {
+		t.Fatalf("expected exactly one LogStore.DeleteEntry call, got %d", len(log.deleteEntryCalls))
+	}
+	call := log.deleteEntryCalls[0]
+	if call.authorizedBy != adminPub {
+		t.Fatalf("expected authorizedBy to be the admin's key, got %q", call.authorizedBy)
+	}
+	if call.requiredAuthorityPublicKey != adminPub {
+		t.Fatalf("expected requiredAuthorityPublicKey passed through for LogStore to re-check atomically, got %q", call.requiredAuthorityPublicKey)
+	}
+}
+
+func TestService_DeleteEntry_RejectsAnInvalidAuthoritySignature(t *testing.T) {
+	authorPub, _ := newTestAuthorityKey(t)
+	adminPub, _ := newTestAuthorityKey(t)
+	_, impostorPriv := newTestAuthorityKey(t)
+	deletion := synclog.EntryDeletion{
+		SyncID:             "sync-1",
+		TargetEntryID:      "post-1",
+		TombstoneEntryID:   "tombstone-1",
+		EncryptedPayload:   []byte("post_delete payload"),
+		KeyVersion:         1,
+		WriteToken:         "deadbeef",
+		AuthorityPublicKey: adminPub,
+	}
+	deletion.AuthoritySignature = ed25519.Sign(impostorPriv, deletion.Message())
+
+	log := &fakeLogStore{findEntryOut: synclog.LogEntry{Epoch: 3, AuthorIdentityPublicKey: authorPub}}
+	svc := &synclog.Service{Log: log}
+	_, err := svc.DeleteEntry(context.Background(), deletion)
+	if !errors.Is(err, synclog.ErrInvalidSignature) {
+		t.Fatalf("expected ErrInvalidSignature, got %v", err)
+	}
+	if len(log.deleteEntryCalls) != 0 {
+		t.Fatalf("expected LogStore.DeleteEntry never called, got %d calls", len(log.deleteEntryCalls))
+	}
+}
+
+func TestService_DeleteEntry_RejectsAMalformedWriteToken(t *testing.T) {
+	authorPub, authorPriv := newTestAuthorityKey(t)
+	deletion := newTestEntryDeletion("sync-1", "post-1", "tombstone-1", authorPriv, "not-hex")
+
+	log := &fakeLogStore{findEntryOut: synclog.LogEntry{Epoch: 3, AuthorIdentityPublicKey: authorPub}}
+	svc := &synclog.Service{Log: log}
+	_, err := svc.DeleteEntry(context.Background(), deletion)
+	if !errors.Is(err, synclog.ErrWriteTokenMismatch) {
+		t.Fatalf("expected ErrWriteTokenMismatch for a malformed token, got %v", err)
+	}
+	if len(log.deleteEntryCalls) != 0 {
+		t.Fatalf("expected LogStore.DeleteEntry never called, got %d calls", len(log.deleteEntryCalls))
+	}
+}
+
+func TestService_DeleteEntry_PropagatesFindEntryError(t *testing.T) {
+	log := &fakeLogStore{findEntryErr: synclog.ErrEntryNotFound}
+	svc := &synclog.Service{Log: log}
+	_, err := svc.DeleteEntry(context.Background(), synclog.EntryDeletion{SyncID: "sync-1", TargetEntryID: "no-such-post", TombstoneEntryID: "tombstone-1"})
+	if !errors.Is(err, synclog.ErrEntryNotFound) {
+		t.Fatalf("expected ErrEntryNotFound, got %v", err)
+	}
+	if len(log.deleteEntryCalls) != 0 {
+		t.Fatalf("expected LogStore.DeleteEntry never called, got %d calls", len(log.deleteEntryCalls))
 	}
 }

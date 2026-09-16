@@ -1091,6 +1091,34 @@ func deleteEntry(author authorityKey, syncID, entryID, tombstoneEntryID, token s
 	return deletion
 }
 
+// callDeleteEntry calls the narrowed LogStore.DeleteEntry, replicating
+// Service.DeleteEntry's find-then-authorize steps: try the author
+// signature first, falling back to the authority signature, exactly as
+// the domain layer does — so tests keep building an EntryDeletion the
+// same way while the store itself never sees a raw token or a signature.
+func callDeleteEntry(t *testing.T, store synclog.LogStore, ctx context.Context, deletion synclog.EntryDeletion) (synclog.CommitResult, error) {
+	t.Helper()
+	post, err := store.FindEntry(ctx, deletion.SyncID, deletion.TargetEntryID)
+	if err != nil {
+		return synclog.CommitResult{}, err
+	}
+
+	authorizedBy := post.AuthorIdentityPublicKey
+	var requiredAuthorityPublicKey string
+	if synclog.VerifySignature(post.AuthorIdentityPublicKey, deletion.Message(), deletion.AuthorSignature) != nil {
+		if deletion.AuthorityPublicKey == "" || len(deletion.AuthoritySignature) == 0 {
+			return synclog.CommitResult{}, synclog.ErrEntryNotAuthorized
+		}
+		if err := synclog.VerifySignature(deletion.AuthorityPublicKey, deletion.Message(), deletion.AuthoritySignature); err != nil {
+			return synclog.CommitResult{}, err
+		}
+		authorizedBy = deletion.AuthorityPublicKey
+		requiredAuthorityPublicKey = deletion.AuthorityPublicKey
+	}
+
+	return store.DeleteEntry(ctx, deletion.SyncID, deletion.TombstoneEntryID, post.Epoch, deletion.EncryptedPayload, deletion.KeyVersion, hashToken(t, deletion.WriteToken), authorizedBy, requiredAuthorityPublicKey)
+}
+
 func TestLogStore_DeleteEntry_SucceedsViaAuthorSignature(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
@@ -1107,7 +1135,7 @@ func TestLogStore_DeleteEntry_SucceedsViaAuthorSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	commit, err := store.DeleteEntry(ctx, deleteEntry(author, syncID, postID, "tombstone-1", token))
+	commit, err := callDeleteEntry(t, store, ctx, deleteEntry(author, syncID, postID, "tombstone-1", token))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1164,32 +1192,12 @@ func TestLogStore_DeleteEntry_SucceedsViaAuthoritySignature(t *testing.T) {
 	}
 	deletion.AuthoritySignature = ed25519.Sign(founder.private, deletion.Message())
 
-	if _, err := store.DeleteEntry(ctx, deletion); err != nil {
+	if _, err := callDeleteEntry(t, store, ctx, deletion); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestLogStore_DeleteEntry_RejectsWrongSignature(t *testing.T) {
-	ctx := context.Background()
-	store := testsupport.NewLogStore(t)
-	syncID := testsupport.UniqueSyncID(t)
-	founder := newAuthorityKey(t)
-	author := newAuthorityKey(t)
-	impostor := newAuthorityKey(t)
-	token := newToken(t)
-	bootstrap(t, store, syncID, founder, token)
-
-	postID := syncID + "-post-1"
-	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, postID, []byte("caption"), 1, token, author.publicKeyHex); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := store.DeleteEntry(ctx, deleteEntry(impostor, syncID, postID, "tombstone-1", token)); !errors.Is(err, synclog.ErrEntryNotAuthorized) {
-		t.Fatalf("expected ErrEntryNotAuthorized, got %v", err)
-	}
-}
-
-func TestLogStore_DeleteEntry_RejectsUnknownTargetEntryID(t *testing.T) {
+func TestLogStore_FindEntry_RejectsAnUnknownEntryID(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
 	syncID := testsupport.UniqueSyncID(t)
@@ -1197,12 +1205,12 @@ func TestLogStore_DeleteEntry_RejectsUnknownTargetEntryID(t *testing.T) {
 	token := newToken(t)
 	bootstrap(t, store, syncID, founder, token)
 
-	if _, err := store.DeleteEntry(ctx, deleteEntry(founder, syncID, "no-such-post", "tombstone-1", token)); !errors.Is(err, synclog.ErrEntryNotFound) {
+	if _, err := store.FindEntry(ctx, syncID, "no-such-post"); !errors.Is(err, synclog.ErrEntryNotFound) {
 		t.Fatalf("expected ErrEntryNotFound, got %v", err)
 	}
 }
 
-func TestLogStore_DeleteEntry_RejectsAMetaNamespaceTargetEntryID(t *testing.T) {
+func TestLogStore_FindEntry_RejectsAMetaNamespaceEntryID(t *testing.T) {
 	ctx := context.Background()
 	store := testsupport.NewLogStore(t)
 	syncID := testsupport.UniqueSyncID(t)
@@ -1211,15 +1219,14 @@ func TestLogStore_DeleteEntry_RejectsAMetaNamespaceTargetEntryID(t *testing.T) {
 	bootstrap(t, store, syncID, founder, token)
 
 	// The entryId-index GSI spans both namespaces, so a meta entry's id is
-	// findable the same way a content entry's is. DeleteEntry must still
-	// refuse it rather than strip whatever content row happens to sit at
-	// that resolved epoch.
+	// findable the same way a content entry's is. FindEntry must still
+	// refuse it — only content entries are deletable this way.
 	metaEntryID := syncID + "-meta-entry"
 	if _, err := store.Append(ctx, syncID, synclog.NamespaceMeta, metaEntryID, []byte("meta"), 1, token, founder.publicKeyHex); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := store.DeleteEntry(ctx, deleteEntry(founder, syncID, metaEntryID, "tombstone-1", token)); !errors.Is(err, synclog.ErrEntryNotFound) {
+	if _, err := store.FindEntry(ctx, syncID, metaEntryID); !errors.Is(err, synclog.ErrEntryNotFound) {
 		t.Fatalf("expected ErrEntryNotFound for a meta-namespace target, got %v", err)
 	}
 }
@@ -1238,16 +1245,55 @@ func TestLogStore_DeleteEntry_RetryWithTheSameTombstoneEntryIDIsIdempotent(t *te
 		t.Fatal(err)
 	}
 
-	first, err := store.DeleteEntry(ctx, deleteEntry(author, syncID, postID, "tombstone-1", token))
+	first, err := callDeleteEntry(t, store, ctx, deleteEntry(author, syncID, postID, "tombstone-1", token))
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := store.DeleteEntry(ctx, deleteEntry(author, syncID, postID, "tombstone-1", token))
+	second, err := callDeleteEntry(t, store, ctx, deleteEntry(author, syncID, postID, "tombstone-1", token))
 	if err != nil {
 		t.Fatalf("a retry must converge rather than fail: %v", err)
 	}
 	if first != second {
 		t.Fatalf("expected the retry to return the original commit, got %+v then %+v", first, second)
+	}
+}
+
+func TestLogStore_DeleteEntry_RejectsADemotedAdmin(t *testing.T) {
+	ctx := context.Background()
+	store := testsupport.NewLogStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+	founder := newAuthorityKey(t)
+	promoted := newAuthorityKey(t)
+	author := newAuthorityKey(t)
+	token := newToken(t)
+	bootstrap(t, store, syncID, founder, token)
+	grant(t, store, syncID, "promote-1", founder, promoted, token)
+
+	postID := syncID + "-post-1"
+	if _, err := store.Append(ctx, syncID, synclog.NamespaceContent, postID, []byte("caption"), 1, token, author.publicKeyHex); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := changeAuthority(t, store, ctx, authorityChange(founder, syncID, "demote-1", synclog.AuthorityRemove, promoted.publicKeyHex, token)); err != nil {
+		t.Fatal(err)
+	}
+
+	// promoted's signature is still cryptographically valid, but the key
+	// is no longer an authority — the CAS condition re-checking
+	// authoritySet at commit time is what catches this, not a check made
+	// once before the commit and trusted afterward.
+	deletion := synclog.EntryDeletion{
+		SyncID:             syncID,
+		TargetEntryID:      postID,
+		TombstoneEntryID:   "tombstone-1",
+		EncryptedPayload:   []byte("post_delete payload"),
+		KeyVersion:         1,
+		WriteToken:         token,
+		AuthorityPublicKey: promoted.publicKeyHex,
+	}
+	deletion.AuthoritySignature = ed25519.Sign(promoted.private, deletion.Message())
+
+	if _, err := callDeleteEntry(t, store, ctx, deletion); !errors.Is(err, synclog.ErrAuthorityNotRecognized) {
+		t.Fatalf("expected a demoted admin's delete to be rejected, got %v", err)
 	}
 }
 

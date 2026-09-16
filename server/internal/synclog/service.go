@@ -56,3 +56,36 @@ func (s *Service) DeleteCircle(ctx context.Context, deletion CircleDeletion) (Co
 	}
 	return s.Log.DeleteCircle(ctx, deletion.SyncID, deletion.EntryID, deletion.EncryptedPayload, deletion.KeyVersion, writeTokenHash, deletion.SignerAuthorityPublicKey)
 }
+
+// DeleteEntry finds the target post, then verifies whichever capability
+// authorizes deleting it: the post's own author first, falling back to a
+// circle admin. The admin path passes its own key through to LogStore as
+// requiredAuthorityPublicKey rather than verifying membership here —
+// unlike a plain read, this authorizes a write, so membership has to be
+// re-checked atomically alongside the commit that lands the tombstone,
+// not against state read moments earlier.
+func (s *Service) DeleteEntry(ctx context.Context, deletion EntryDeletion) (CommitResult, error) {
+	post, err := s.Log.FindEntry(ctx, deletion.SyncID, deletion.TargetEntryID)
+	if err != nil {
+		return CommitResult{}, err
+	}
+
+	authorizedBy := post.AuthorIdentityPublicKey
+	var requiredAuthorityPublicKey string
+	if VerifySignature(post.AuthorIdentityPublicKey, deletion.Message(), deletion.AuthorSignature) != nil {
+		if deletion.AuthorityPublicKey == "" || len(deletion.AuthoritySignature) == 0 {
+			return CommitResult{}, ErrEntryNotAuthorized
+		}
+		if err := VerifySignature(deletion.AuthorityPublicKey, deletion.Message(), deletion.AuthoritySignature); err != nil {
+			return CommitResult{}, err
+		}
+		authorizedBy = deletion.AuthorityPublicKey
+		requiredAuthorityPublicKey = deletion.AuthorityPublicKey
+	}
+
+	writeTokenHash, err := WriteTokenHash(deletion.WriteToken)
+	if err != nil {
+		return CommitResult{}, ErrWriteTokenMismatch
+	}
+	return s.Log.DeleteEntry(ctx, deletion.SyncID, deletion.TombstoneEntryID, post.Epoch, deletion.EncryptedPayload, deletion.KeyVersion, writeTokenHash, authorizedBy, requiredAuthorityPublicKey)
+}

@@ -330,15 +330,28 @@ type LogStore interface {
 	// see Rotate's doc comment for why.
 	DeleteCircle(ctx context.Context, syncID, entryID string, encryptedPayload []byte, keyVersion int64, writeTokenHash string, signerAuthorityPublicKey string) (CommitResult, error)
 
-	// DeleteEntry strips a post's EncryptedMeta, stamps deletedAt/deletedBy,
-	// and appends the tombstone entry — the row itself survives, since
-	// comments/reactions reference it by id. Finds the post via a GSI on
-	// entryId, not anything the caller supplies. AuthorSignature is
-	// checked against the found row's own AuthorIdentityPublicKey first,
-	// falling back to AuthorityPublicKey/AuthoritySignature — same
-	// author-or-admin shape as deleteblob, relay-enforced here instead of
-	// left to every client's own predicate.
-	DeleteEntry(ctx context.Context, deletion EntryDeletion) (CommitResult, error)
+	// FindEntry resolves a content-namespace entry by id via a GSI on
+	// entryId, not anything else the caller supplies — ErrEntryNotFound if
+	// absent, in a different circle, or in the meta namespace instead.
+	// Service.DeleteEntry calls this first to learn the post's epoch and
+	// AuthorIdentityPublicKey before deciding whether the delete is
+	// authorized.
+	FindEntry(ctx context.Context, syncID, entryID string) (LogEntry, error)
+
+	// DeleteEntry strips targetEpoch's EncryptedMeta, stamps
+	// deletedAt/deletedBy with authorizedBy, and appends the tombstone
+	// entry at tombstoneEntryID — the row itself survives, since
+	// comments/reactions reference it by id.
+	//
+	// requiredAuthorityPublicKey is empty when authorizedBy is the post's
+	// own author (no live-state check needed beyond writeTokenHash), or
+	// set to the admin's key when Service.DeleteEntry authorized the
+	// delete via an authority signature instead — in that case,
+	// authoritySet membership is re-checked atomically inside this same
+	// commit, not against state read before it, since (unlike
+	// VerifyAuthoritySignature) this authorizes a write rather than a
+	// plain read.
+	DeleteEntry(ctx context.Context, syncID, tombstoneEntryID string, targetEpoch int64, encryptedPayload []byte, keyVersion int64, writeTokenHash, authorizedBy, requiredAuthorityPublicKey string) (CommitResult, error)
 
 	// DeleteAuthorContent strips every content entry authored by
 	// AuthorIdentityPublicKey — the same per-row mutation as DeleteEntry,
