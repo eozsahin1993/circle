@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
@@ -13,15 +13,19 @@ import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Icons, Radius, Spacing } from '@/ui/theme/tokens';
 import { getProfile, listCircles, type Profile } from '@/data/db';
+import { deleteAccount, finishAccountDeletionIfPending, isAccountDeletionPending } from '@/features/account/usecases/delete-account';
 import { resetEverythingForTesting } from '@/features/dev/dev-reset';
 import { logTestPushPayload } from '@/features/dev/dev-test-push';
 import { signOut } from '@/features/account/usecases/sign-in';
 import { PushLevels, type PushLevelId } from '@/features/push-notifications/usecases/push-preferences';
 import { useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
-import { useTints } from '@/ui/theme/hooks/use-theme';
+import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { bytesToDataUri } from '@/core/photo/image';
 import type { ThemePreference } from '@/core/services/settings';
+
+/** How often to check whether the background erasure has finished while this screen waits on it. */
+const DELETION_POLL_MS = 2_000;
 
 function pushLevelLabel(level: PushLevelId): string {
   return PushLevels.find((candidate) => candidate.id === level)?.label ?? '';
@@ -35,6 +39,7 @@ const APPEARANCE_OPTIONS: { value: ThemePreference; label: string }[] = [
 
 export default function AccountScreen() {
   const { settings, updateSettings } = useAppSettings();
+  const theme = useTheme();
   const tints = useTints();
   const ownColorSeed = useOwnColorSeed();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -45,6 +50,36 @@ export default function AccountScreen() {
   // Gates the "bring over" direction: adopting another account's seed
   // would strand any circle this device already joined under its own.
   const [hasCircles, setHasCircles] = useState(true);
+  // Set once account deletion is confirmed. From here the screen only
+  // ever shows the "deleting" state — there's nothing left to cancel.
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const deletionPollInFlight = useRef(false);
+
+  // Polls rather than waiting on the 30s scheduler: deletion still
+  // finishes via finishAccountDeletionIfPending either way (it dedupes
+  // against this call), but a user staring at a spinner shouldn't wait
+  // half a minute for the first check.
+  useEffect(() => {
+    if (!deletingAccount) return;
+
+    const timer = setInterval(async () => {
+      if (deletionPollInFlight.current) return;
+      deletionPollInFlight.current = true;
+      try {
+        await finishAccountDeletionIfPending();
+        if (!(await isAccountDeletionPending())) {
+          clearInterval(timer);
+          router.replace('/');
+        }
+      } catch (err) {
+        console.error('Failed to check on account deletion', err);
+      } finally {
+        deletionPollInFlight.current = false;
+      }
+    }, DELETION_POLL_MS);
+
+    return () => clearInterval(timer);
+  }, [deletingAccount]);
 
   useFocusEffect(
     useCallback(() => {
@@ -135,6 +170,22 @@ export default function AccountScreen() {
         },
       ],
     },
+    {
+      title: 'Account',
+      rows: [
+        {
+          label: signingOut ? 'Signing out…' : 'Sign out',
+          disabled: signingOut,
+          onPress: handleSignOut,
+        },
+        {
+          label: 'Delete account',
+          description: "Erases everything you've posted, everywhere, then deletes your account",
+          destructive: true,
+          onPress: handleDeleteAccount,
+        },
+      ],
+    },
   ];
 
   function handleDevReset() {
@@ -175,6 +226,46 @@ export default function AccountScreen() {
           },
         },
       ],
+    );
+  }
+
+  function handleDeleteAccount() {
+    Alert.alert(
+      'Delete your account?',
+      "This erases everything you've posted in every circle you're in, then permanently deletes your account. This can't be undone.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            // No way back from here, so the screen commits to the
+            // deleting state before deleteAccount even starts — nothing
+            // below it is a decision the user still gets to make.
+            setDeletingAccount(true);
+            try {
+              await deleteAccount();
+            } catch (err) {
+              console.error('Failed to start account deletion', err);
+              setDeletingAccount(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  if (deletingAccount) {
+    return (
+      <ThemedView style={[styles.screen, styles.deletingScreen]}>
+        <ActivityIndicator size="large" color={theme.accent} />
+        <ThemedText type="screenTitle" style={styles.deletingTitle}>
+          Deleting your account…
+        </ThemedText>
+        <ThemedText type="captionFeed" themeColor="secondary" style={styles.deletingBody}>
+          This can take a moment. Don&apos;t close the app.
+        </ThemedText>
+      </ThemedView>
     );
   }
 
@@ -226,13 +317,6 @@ export default function AccountScreen() {
           </View>
 
           <SettingsGroups groups={settingsGroups} />
-
-          <Pressable style={styles.signOutRow} onPress={handleSignOut} disabled={signingOut}>
-            <ThemedText type="postAuthor" themeColor="accent">
-              {signingOut ? 'Signing out…' : 'Sign out'}
-            </ThemedText>
-          </Pressable>
-
         </ScrollView>
       </ThemedSafeAreaView>
 
@@ -294,8 +378,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  signOutRow: {
+  deletingScreen: {
     alignItems: 'center',
-    paddingVertical: 14,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.screenPadding,
+    gap: 10,
+  },
+  deletingTitle: {
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  deletingBody: {
+    textAlign: 'center',
   },
 });

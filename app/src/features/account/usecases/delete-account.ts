@@ -21,7 +21,7 @@ import { leaveCircleForAccountDeletion } from '@/features/circle/usecases/leave-
  */
 const DELETING_KEY = 'account.deletionPending';
 
-async function isAccountDeletionPending(): Promise<boolean> {
+export async function isAccountDeletionPending(): Promise<boolean> {
   return (await AsyncStorage.getItem(DELETING_KEY)) === '1';
 }
 
