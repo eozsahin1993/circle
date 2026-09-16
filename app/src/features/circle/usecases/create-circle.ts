@@ -2,7 +2,7 @@ import { Buffer } from 'buffer';
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { generateUUID, sealToPublicKey } from '@/core/crypto/primitives';
+import { generateUUID, hashBytes, sealToPublicKey } from '@/core/crypto/primitives';
 import { buildAuthorityKeyClaim, deriveAuthorityKeypair, deriveCircleIdentity, derivePushRoutingId, deriveCircleSealingKeypair } from '@/core/crypto/identity';
 import { deriveWriteToken, generateContentKey, hashWriteToken } from '@/features/circle/crypto';
 import { getProfile, insertCircle, MemberRoles, recordMemberAddedLocally } from '@/data/db';
@@ -98,12 +98,17 @@ export async function createCircle(input: CreateCircleInput): Promise<{ id: stri
  * picture arrives as one boxed JS number per byte. The cache is still
  * disposable — resolveCoverUri re-reads if the OS clears it.
  */
-  if (input.picture) writeCoverFile(circleId, input.picture);
+  let pictureHash: string | null = null;
+  if (input.picture) {
+    pictureHash = hashBytes(input.picture);
+    writeCoverFile(circleId, input.picture, pictureHash);
+  }
 
   await insertCircle({
     id: circleId,
     name: input.name,
     picture: input.picture ?? null,
+    pictureHash,
     syncId,
     pushCategoryMask,
     createdAt: now,

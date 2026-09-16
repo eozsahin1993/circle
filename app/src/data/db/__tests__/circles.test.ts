@@ -47,6 +47,7 @@ function makeCircle(overrides: Partial<{ id: string; name: string; createdAt: nu
     id: generateUUID(),
     name: 'Nana’s House',
     picture: null,
+    pictureHash: null,
     syncId: generateUUID(),
     createdAt: Date.now(),
     pushCategoryMask: 3,

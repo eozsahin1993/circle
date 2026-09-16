@@ -63,8 +63,8 @@ async function fetchOne(attachment: FetchableAttachment): Promise<void> {
       // list and header read; nothing there consults attachments. Not a
       // post, so nothing to patch — the circle list re-reads on its own
       // focus, same as before this event existed.
-      await updateCirclePicture(circleId, bytes);
-      writeCoverFile(circleId, bytes);
+      await updateCirclePicture(circleId, bytes, hash);
+      writeCoverFile(circleId, bytes, hash);
     } else {
       // Whatever screen is showing this post's placeholder patches just
       // this row rather than reloading — a backlog of many photos landing

@@ -11,6 +11,7 @@ import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-seed';
 import { getCircle, initDatabase } from '@/data/db';
 import { createCircle } from '@/features/circle/usecases/create-circle';
+import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
 import { setCoverPhoto } from '@/features/circle/usecases/set-cover-photo';
 import { appendEntry } from '@/core/services/log-relay';
 import { getCoverPhotoUploadTarget, uploadBlob } from '@/core/services/blob-relay';
@@ -107,4 +108,25 @@ test('setCoverPhoto updates the local circle row so this device sees its own wri
 
 test('setCoverPhoto throws without a local circle for this id', async () => {
   await expect(setCoverPhoto('unknown-circle-id', new Uint8Array([1]))).rejects.toThrow();
+});
+
+/**
+ * Regression test: the cover cache used to key its cached file on
+ * circleId alone, a path that never changes across covers — so
+ * resolveCircleCoverUri kept handing back the *first* cover's cached
+ * path forever, and `expo-image` never had a reason to reload it either.
+ * The fix versions the cached path by the cover's own hash.
+ */
+test('resolveCircleCoverUri returns a different uri after the cover changes', async () => {
+  const circleId = await makeCircle();
+
+  await setCoverPhoto(circleId, new Uint8Array([1, 2, 3]));
+  const first = await resolveCircleCoverUri(circleId);
+
+  await setCoverPhoto(circleId, new Uint8Array([4, 5, 6]));
+  const second = await resolveCircleCoverUri(circleId);
+
+  expect(first).toBeDefined();
+  expect(second).toBeDefined();
+  expect(second).not.toBe(first);
 });

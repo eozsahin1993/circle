@@ -1,0 +1,1 @@
+ALTER TABLE `circles` ADD `picture_hash` text;

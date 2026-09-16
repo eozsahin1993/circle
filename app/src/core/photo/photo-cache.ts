@@ -61,20 +61,46 @@ export function deleteCirclePhotoFiles(circleId: string): void {
 }
 
 /**
- * A circle's cover, which is cached exactly like a post photo — it sits at
- * the fixed `COVER_ENTRY_ID` the relay reserves for it, so it can't
- * collide with a post. These two wrappers exist so that key stays the
- * cache's business: every caller that has cover bytes (creating a circle,
- * joining one, an admin replacing it) just hands them over, and the circle
- * list asks for a path without knowing how covers are named.
+ * A circle's cover lives at the fixed `COVER_ENTRY_ID`, unlike a post
+ * photo — replacing one overwrites the same slot rather than adding a
+ * new one. The filename is suffixed with the content's own hash (unlike
+ * `photoFile`, whose entryId is already unique per post) specifically so
+ * a changed cover gets a genuinely different path: reusing the same path
+ * for new bytes is invisible to both this cache's own "does it exist"
+ * check and `expo-image`'s native cache, which both key on the path
+ * string, not on what's actually in the file.
  */
-export function writeCoverFile(circleId: string, bytes: Uint8Array): string {
-  return writePhotoFile(circleId, COVER_ENTRY_ID, bytes);
+function coverFile(circleId: string, hash: string): File {
+  const directory = new Directory(Paths.cache, PHOTO_DIRECTORY);
+  return new File(directory, `${circleId}-${COVER_ENTRY_ID}-${hash}.jpg`);
 }
 
-/** The cover's cached path, or null if it hasn't been written yet. */
-export function cachedCoverUri(circleId: string): string | null {
-  return ensurePhotoUri(circleId, COVER_ENTRY_ID, () => null);
+/**
+ * Writes a circle's cover under a hash-versioned path and drops whatever
+ * was cached under a different hash — otherwise every cover change this
+ * device ever makes or downloads leaves its predecessor behind forever.
+ */
+export function writeCoverFile(circleId: string, bytes: Uint8Array, hash: string): string {
+  const directory = new Directory(Paths.cache, PHOTO_DIRECTORY);
+  directory.create({ intermediates: true, idempotent: true });
+
+  const prefix = `${circleId}-${COVER_ENTRY_ID}-`;
+  for (const entry of directory.list()) {
+    if (entry instanceof File && entry.name.startsWith(prefix) && entry.name !== `${prefix}${hash}.jpg`) {
+      entry.delete();
+    }
+  }
+
+  const file = coverFile(circleId, hash);
+  file.create({ overwrite: true });
+  file.write(bytes);
+  return file.uri;
+}
+
+/** The cover's cached path for this exact hash, or null if it isn't cached under it yet. */
+export function cachedCoverUri(circleId: string, hash: string): string | null {
+  const file = coverFile(circleId, hash);
+  return file.exists ? file.uri : null;
 }
 
 /**

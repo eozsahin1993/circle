@@ -2,7 +2,7 @@ import { Buffer } from 'buffer';
 
 import { bytesToHex, hexToBytes } from '@noble/curves/utils.js';
 
-import { decrypt, encryptJSON, generateEphemeralKeypair, generateUUID, openSealedBox, verify } from '@/core/crypto/primitives';
+import { decrypt, encryptJSON, generateEphemeralKeypair, generateUUID, hashBytes, openSealedBox, verify } from '@/core/crypto/primitives';
 import { buildAuthorityKeyClaim, deriveAuthorityKeypair, deriveCircleIdentity, derivePushRoutingId, deriveCircleSealingKeypair } from '@/core/crypto/identity';
 import { deriveInvitePreviewKey, deriveInviteTag, deriveJoinRequestKey } from '@/features/invite/crypto';
 import {
@@ -187,11 +187,13 @@ async function completeJoin(pending: PendingJoinRequest, keyMap: Record<number, 
   await saveCircleIdentity(circleId, { ...identity, memberId });
 
   const picture = await fetchCoverPhoto(syncId, currentKey);
-  if (picture) writeCoverFile(circleId, picture);
+  const pictureHash = picture ? hashBytes(picture) : null;
+  if (picture && pictureHash) writeCoverFile(circleId, picture, pictureHash);
   await insertCircle({
     id: circleId,
     name: circleName,
     picture,
+    pictureHash,
     syncId,
     pushCategoryMask,
     createdAt: now,

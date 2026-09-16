@@ -7,6 +7,13 @@ export const circles = sqliteTable('circles', {
   /** Cover photo picked on creation, if any — separate from any post's photo. */
   picture: blob('picture').$type<Uint8Array>(),
   /**
+   * `hashBytes(picture)` at the moment it was last written. The cover's
+   * cached file path is versioned by it (see photo-cache.ts's coverFile),
+   * so a changed cover gets a new path without re-reading the blob. Null
+   * for covers stored before this column; circle-cover.ts backfills them.
+   */
+  pictureHash: text('picture_hash'),
+  /**
    * The relay-facing address for this circle's log — random, independent
    * of key material so rotation never repoints it. Stored, never derived.
    */

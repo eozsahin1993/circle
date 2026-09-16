@@ -41,9 +41,10 @@ export async function setCoverPhoto(circleId: string, photo: Uint8Array): Promis
   const target = await getCoverPhotoUploadTarget(circle.syncId, writeToken, authorityKeypair.publicKey, signature);
   await uploadBlob(target, encrypt(photo, current.key));
 
-  const entry = buildAndEncryptLogEntry(EntryTypes.COVER_PHOTO_SET, { photoHash: hashBytes(photo), keyVersion: current.version }, identity, current.key);
+  const photoHash = hashBytes(photo);
+  const entry = buildAndEncryptLogEntry(EntryTypes.COVER_PHOTO_SET, { photoHash, keyVersion: current.version }, identity, current.key);
   await appendEntry(circle.syncId, 'meta', generateUUID(), entry, current.version, writeToken, identity.publicKey);
 
-  await updateCirclePicture(circleId, photo);
-  writeCoverFile(circleId, photo);
+  await updateCirclePicture(circleId, photo, photoHash);
+  writeCoverFile(circleId, photo, photoHash);
 }

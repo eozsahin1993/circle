@@ -108,6 +108,17 @@ export async function getCircleCoverBytes(id: string): Promise<Uint8Array | null
   return rows[0] ? normalizeBlob(rows[0].picture) : null;
 }
 
+/**
+ * Just the cover's hash — cheap enough to check on every focus, unlike
+ * the blob itself. See circle-cover.ts's resolveCircleCoverUri, which
+ * uses this to tell "still the same cover" from "just changed" without
+ * paying for the bytes.
+ */
+export async function getCircleCoverHash(id: string): Promise<string | null> {
+  const rows = await db.select({ pictureHash: circles.pictureHash }).from(circles).where(eq(circles.id, id));
+  return rows[0]?.pictureHash ?? null;
+}
+
 /** Circles this device is still an active member of — excludes ones it's left. */
 export async function getAllCircles(): Promise<Circle[]> {
   const rows = await db.select().from(circles).where(isNull(circles.leftAt)).orderBy(asc(circles.createdAt));
@@ -193,8 +204,8 @@ export async function updateCircleName(id: string, name: string): Promise<void> 
   await db.update(circles).set({ name }).where(eq(circles.id, id));
 }
 
-export async function updateCirclePicture(id: string, picture: Uint8Array | null): Promise<void> {
-  await db.update(circles).set({ picture }).where(eq(circles.id, id));
+export async function updateCirclePicture(id: string, picture: Uint8Array | null, hash: string | null): Promise<void> {
+  await db.update(circles).set({ picture, pictureHash: hash }).where(eq(circles.id, id));
 }
 
 /**
