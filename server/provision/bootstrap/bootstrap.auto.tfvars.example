@@ -1,0 +1,7 @@
+# Copy to bootstrap.auto.tfvars (gitignored) per account, before running
+# anything in envs/. This creates the state bucket that env's backend
+# expects, so the name must match its versions.tf exactly.
+
+aws_profile    = "mimoza-staging-admin"
+aws_account_id = ""
+bucket_name    = "mimoza-terraform-state-staging"

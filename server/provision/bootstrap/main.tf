@@ -19,7 +19,21 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1"
+  region              = "us-east-1"
+  profile             = var.aws_profile != "" ? var.aws_profile : null
+  allowed_account_ids = var.aws_account_id != "" ? [var.aws_account_id] : null
+}
+
+variable "aws_profile" {
+  description = "Local AWS profile to apply with. Empty uses the ambient credentials."
+  type        = string
+  default     = ""
+}
+
+variable "aws_account_id" {
+  description = "The account this bucket belongs in. Set it and Terraform refuses to apply anywhere else — this runs before any env, against whatever profile is ambient, so the guard matters most here."
+  type        = string
+  default     = ""
 }
 
 variable "bucket_name" {
