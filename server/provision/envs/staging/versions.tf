@@ -12,11 +12,11 @@ terraform {
     }
   }
 
-  # One state file per env in the bucket ../../bootstrap creates. Backend
-  # blocks can't read variables, so the bucket name is repeated literally
-  # in every env's versions.tf.
+  # State lives in this env's own account, so the bucket name carries the
+  # env — bucket names are globally unique. ../../bootstrap creates it.
+  # Backend blocks can't read variables, hence the literal.
   backend "s3" {
-    bucket       = "mimoza-terraform-state"
+    bucket       = "mimoza-terraform-state-staging"
     key          = "staging/terraform.tfstate"
     region       = "us-east-1"
     encrypt      = true
