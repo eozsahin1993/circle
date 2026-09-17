@@ -110,6 +110,10 @@ type Config struct {
 	// subdomains (bucket.host) the way real S3 does. Real AWS always uses
 	// the default (false) — never set this in a deployed environment.
 	S3ForcePathStyle bool
+	// AWSEndpointURL is the SDK's own AWS_ENDPOINT_URL — the SDK reads it
+	// directly; this copy is only for cmd/server to tell it's pointed at a
+	// LocalStack on loopback (see its presignForRequestHost). Empty in AWS.
+	AWSEndpointURL string
 }
 
 // Load reads every setting from the environment, once, at startup. Fails
@@ -146,6 +150,7 @@ func Load() Config {
 		InviteRetentionDays:       intEnv("INVITE_RETENTION_DAYS", 0),
 		Port:                      envOr("PORT", "8080"),
 		S3ForcePathStyle:          envOr("S3_FORCE_PATH_STYLE", "false") == "true",
+		AWSEndpointURL:            os.Getenv("AWS_ENDPOINT_URL"),
 	}
 }
 

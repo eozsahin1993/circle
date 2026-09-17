@@ -104,7 +104,7 @@ func (s *Store) presignUpload(ctx context.Context, key, uploaderPublicKey string
 		conditions = append(conditions, map[string]any{uploaderField: uploaderPublicKey})
 	}
 
-	req, err := s.presignClient.PresignPostObject(ctx, &s3.PutObjectInput{
+	req, err := s.presigner(ctx).PresignPostObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucketName),
 		Key:    aws.String(key),
 	}, func(o *s3.PresignPostOptions) {
@@ -213,7 +213,7 @@ func (s *Store) DeleteCircle(ctx context.Context, syncID string) error {
 }
 
 func (s *Store) GetDownloadURL(ctx context.Context, syncID, entryID string) (string, error) {
-	req, err := s.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+	req, err := s.presigner(ctx).PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucketName),
 		Key:    aws.String(blobKey(syncID, entryID)),
 	}, s3.WithPresignExpires(downloadURLTTL))

@@ -5,10 +5,14 @@ import (
 	"errors"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"mimoza-relay/internal/synclog"
+	blobs3 "mimoza-relay/internal/synclog/s3"
+	"mimoza-relay/internal/util/localstack"
 	"mimoza-relay/internal/util/testsupport"
 )
 
@@ -74,6 +78,81 @@ func TestGetUploadTarget_RejectsOversizedBlob(t *testing.T) {
 	if status >= 200 && status < 300 {
 		t.Fatalf("expected the oversized upload to be rejected by S3's content-length-range condition, but it succeeded: %s", body)
 	}
+}
+
+// A URL presigned for another address of the same LocalStack is signed
+// for that host, so both the upload and the host-covering GET signature
+// still work through it — what cmd/server relies on to hand devices a
+// reachable address. Without the override, URLs keep the client's own
+// endpoint: the path cmd/lambda always takes.
+func TestPresignEndpoint_SignsForTheGivenHost(t *testing.T) {
+	store := testsupport.NewBlobStore(t)
+	syncID := testsupport.UniqueSyncID(t)
+
+	endpoint, err := url.Parse(localstack.Endpoint())
+	if err != nil {
+		t.Fatalf("parse LocalStack endpoint: %v", err)
+	}
+	otherHost := "127.0.0.1"
+	if endpoint.Hostname() == otherHost {
+		otherHost = "localhost"
+	}
+
+	plain, err := store.GetDownloadURL(t.Context(), syncID, "entry-1")
+	if err != nil {
+		t.Fatalf("GetDownloadURL: %v", err)
+	}
+	if got := mustHost(t, plain); got != endpoint.Host {
+		t.Fatalf("without an override the URL should keep the client's endpoint %s, got %s", endpoint.Host, got)
+	}
+
+	other := *endpoint
+	other.Host = net.JoinHostPort(otherHost, endpoint.Port())
+	ctx := blobs3.WithPresignEndpoint(t.Context(), other.String())
+
+	target, err := store.GetUploadTarget(ctx, syncID, "entry-1", "circle-scoped-public-key-uploader")
+	if err != nil {
+		t.Fatalf("GetUploadTarget: %v", err)
+	}
+	if got := mustHost(t, target.URL); got != other.Host {
+		t.Fatalf("upload URL host = %s, want %s", got, other.Host)
+	}
+	if status, body := postUpload(t, target, []byte("hello world")); status < 200 || status >= 300 {
+		t.Fatalf("upload through %s failed: %d %s", other.Host, status, body)
+	}
+
+	download, err := store.GetDownloadURL(ctx, syncID, "entry-1")
+	if err != nil {
+		t.Fatalf("GetDownloadURL: %v", err)
+	}
+	if got := mustHost(t, download); got != other.Host {
+		t.Fatalf("download URL host = %s, want %s", got, other.Host)
+	}
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, download, nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET download: %v", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read download: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK || string(body) != "hello world" {
+		t.Fatalf("download through %s = %d %q, want 200 \"hello world\"", other.Host, resp.StatusCode, body)
+	}
+}
+
+func mustHost(t *testing.T, raw string) string {
+	t.Helper()
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		t.Fatalf("parse %q: %v", raw, err)
+	}
+	return parsed.Host
 }
 
 // postUpload sends payload to a presigned POST target — fields must come

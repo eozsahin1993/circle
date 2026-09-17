@@ -220,6 +220,12 @@ host as the Metro packager, at `EXPO_PUBLIC_RELAY_PORT` (default 8090). It
 only uses `EXPO_PUBLIC_RELAY_URL` when no packager is serving (see
 `app/src/core/services/relay.ts`).
 
+Photo uploads and downloads go straight to LocalStack through presigned
+URLs, not through the relay. Keep `AWS_ENDPOINT_URL=http://localhost:4566`:
+when it's loopback, cmd/server signs each URL for the host the device used to
+reach the relay (a LAN IP, or `10.0.2.2` from the Android emulator), so they
+work from a phone, emulator or simulator alike.
+
 ### Rebuild on change, or you will chase phantom bugs
 
 `go run` builds once and keeps serving that binary, so a route edited
