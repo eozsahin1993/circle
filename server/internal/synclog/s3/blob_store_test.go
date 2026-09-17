@@ -128,12 +128,19 @@ func TestPresignEndpoint_SignsForTheGivenHost(t *testing.T) {
 	if got := mustHost(t, download); got != other.Host {
 		t.Fatalf("download URL host = %s, want %s", got, other.Host)
 	}
-	resp, err := http.Get(download)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, download, nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("GET download: %v", err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read download: %v", err)
+	}
 	if resp.StatusCode != http.StatusOK || string(body) != "hello world" {
 		t.Fatalf("download through %s = %d %q, want 200 \"hello world\"", other.Host, resp.StatusCode, body)
 	}

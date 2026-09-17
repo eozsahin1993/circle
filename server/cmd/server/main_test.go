@@ -22,6 +22,8 @@ func TestPresignForRequestHost(t *testing.T) {
 	}{
 		{"phone on the LAN", "http://localhost:4566", "192.168.1.23:8090", "192.168.1.23:4566"},
 		{"android emulator", "http://127.0.0.1:4566", "10.0.2.2:8090", "10.0.2.2:4566"},
+		{"IPv6 host with port", "http://localhost:4566", "[fd00::1]:8090", "[fd00::1]:4566"},
+		{"IPv6 host without port", "http://localhost:4566", "[fd00::1]", "[fd00::1]:4566"},
 		{"no endpoint, as in AWS", "", "192.168.1.23:8090", localStackHost},
 		{"non-loopback endpoint", "http://192.168.1.50:4566", "10.0.2.2:8090", localStackHost},
 	}

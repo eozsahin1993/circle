@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"mimoza-relay/internal/app"
@@ -46,7 +47,9 @@ func presignForRequestHost(endpoint string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host, _, err := net.SplitHostPort(r.Host)
 		if err != nil {
-			host = r.Host
+			// No port: an IPv6 literal keeps its brackets, which JoinHostPort
+			// would add a second time.
+			host = strings.TrimSuffix(strings.TrimPrefix(r.Host, "["), "]")
 		}
 		public := *s3URL
 		public.Host = host
