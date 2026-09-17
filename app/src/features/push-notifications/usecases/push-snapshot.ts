@@ -2,9 +2,13 @@ import { File, Paths } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { getAllCircles, getCircleMembers } from '@/data/db';
+import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { APP_GROUP } from '@/features/push-notifications/app-group';
 
 export const PUSH_SNAPSHOT_FILE = 'push-snapshot.json';
+
+/** Bumped by every clear, so a refresh that was already reading can tell it lost the race. */
+let generation = 0;
 
 /**
  * Mirrors the circle and member names the iOS notification extension
@@ -14,8 +18,11 @@ export const PUSH_SNAPSHOT_FILE = 'push-snapshot.json';
  */
 export async function refreshPushSnapshot(): Promise<void> {
   if (Platform.OS !== 'ios') return;
+  const startedAt = generation;
 
   try {
+    if (!(await getAuthToken())) return;
+
     const container = Paths.appleSharedContainers?.[APP_GROUP];
     if (!container) return;
 
@@ -29,15 +36,25 @@ export async function refreshPushSnapshot(): Promise<void> {
       });
     }
 
+    // Synchronous from this check to the write, so no clear can land between them.
+    if (generation !== startedAt) return;
     new File(container, PUSH_SNAPSHOT_FILE).write(JSON.stringify({ circles }));
   } catch (err) {
     console.error('Failed to write the push snapshot', err);
   }
 }
 
-/** Removes the snapshot, leaving the extension nothing to name a circle with. Never throws. */
+/**
+ * Removes the snapshot, for signing out. Without it the extension can only
+ * show the placeholder, which matters when the relay couldn't be reached to
+ * unregister and pushes still arrive. Never throws.
+ *
+ * Call after the session token is deleted. A refresh starting later then
+ * finds no token, and one already running sees the bumped generation.
+ */
 export async function clearPushSnapshot(): Promise<void> {
   if (Platform.OS !== 'ios') return;
+  generation += 1;
 
   try {
     const container = Paths.appleSharedContainers?.[APP_GROUP];
