@@ -53,6 +53,11 @@ we control before any build ships to a real user.
 Sync payloads still gain from the nearby TLS handshake and the AWS
 backbone on the long leg.
 
+Built as `modules/cdn`, wired into both envs but inert until `api_domain`
+is set — with it empty, `api_endpoint` stays the raw function URL.
+Certificate validation is manual: the first apply blocks on the record,
+which the `cdn` output prints for adding at Cloudflare.
+
 ---
 
 ## Blob delivery

@@ -27,3 +27,10 @@ terraform {
 provider "aws" {
   region = local.aws_region
 }
+
+# CloudFront certificates must live in us-east-1 regardless of where the
+# relay runs — modules/cdn takes this alias for that one resource.
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}

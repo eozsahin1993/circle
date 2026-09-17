@@ -19,3 +19,17 @@ module "lambda" {
   binary_path = "${path.root}/../../build/bootstrap"
   storage     = module.storage
 }
+
+module "cdn" {
+  count  = var.api_domain == "" ? 0 : 1
+  source = "../../modules/cdn"
+
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
+
+  name_prefix = local.name_prefix
+  domain_name = var.api_domain
+  origin_url  = module.lambda.api_endpoint
+}
