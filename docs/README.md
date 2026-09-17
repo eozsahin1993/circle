@@ -12,6 +12,8 @@ to double as both a map of the code and a design history.
   end.
 - [PUSH_DESIGN.md](PUSH_DESIGN.md) — mobile push notifications: routing,
   fanout, on-device composition.
+- [INFRASTRUCTURE.md](INFRASTRUCTURE.md) — accounts, environments, the
+  CloudFront front door, blob delivery, deploys, cost.
 
 Each doc's own status line says what's actually built versus still
 design-only — check that before trusting a claim about current behavior;
