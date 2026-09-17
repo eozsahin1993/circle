@@ -205,6 +205,12 @@ resource "aws_lambda_function" "relay" {
   timeout     = 10
   memory_size = 256
 
+  # AWS has no spending cap, and every table is PAY_PER_REQUEST — so this
+  # is the only thing bounding how fast a runaway client or an abusive
+  # caller can spend. Set well above real traffic: crossing it throttles
+  # requests (503) rather than queueing them.
+  reserved_concurrent_executions = var.reserved_concurrency
+
   environment {
     variables = merge(local.config, { RESOURCE_PREFIX = var.name_prefix })
   }

@@ -15,3 +15,15 @@ variable "blob_signing_public_key" {
   type        = string
   default     = ""
 }
+
+variable "billing_alert_email" {
+  description = "Where the billing alarm mails. Empty leaves the account with no alarm — AWS has no spending cap, so set it."
+  type        = string
+  default     = ""
+}
+
+variable "billing_threshold_usd" {
+  description = "Estimated monthly charges that trigger the alarm."
+  type        = number
+  default     = 10
+}

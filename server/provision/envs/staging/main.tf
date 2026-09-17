@@ -38,3 +38,16 @@ module "cdn" {
   blob_bucket_arn                  = module.storage.bucket_arn
   blob_bucket_regional_domain_name = module.storage.bucket_regional_domain_name
 }
+
+module "billing_alarm" {
+  count  = var.billing_alert_email == "" ? 0 : 1
+  source = "../../modules/billing-alarm"
+
+  providers = {
+    aws.us_east_1 = aws.us_east_1
+  }
+
+  name_prefix   = local.name_prefix
+  alert_email   = var.billing_alert_email
+  threshold_usd = var.billing_threshold_usd
+}

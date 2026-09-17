@@ -8,6 +8,12 @@ variable "aws_region" {
   type        = string
 }
 
+variable "reserved_concurrency" {
+  description = "Ceiling on concurrent relay executions — a cost bound, not a capacity plan. -1 removes the ceiling."
+  type        = number
+  default     = 50
+}
+
 variable "binary_path" {
   description = "The linux/arm64 bootstrap binary build.sh produces."
   type        = string
