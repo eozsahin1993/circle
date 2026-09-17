@@ -25,12 +25,16 @@ terraform {
 }
 
 provider "aws" {
-  region = local.aws_region
+  region              = local.aws_region
+  profile             = var.aws_profile != "" ? var.aws_profile : null
+  allowed_account_ids = var.aws_account_id != "" ? [var.aws_account_id] : null
 }
 
 # CloudFront certificates must live in us-east-1 regardless of where the
 # relay runs — modules/cdn takes this alias for that one resource.
 provider "aws" {
-  alias  = "us_east_1"
-  region = "us-east-1"
+  alias               = "us_east_1"
+  region              = "us-east-1"
+  profile             = var.aws_profile != "" ? var.aws_profile : null
+  allowed_account_ids = var.aws_account_id != "" ? [var.aws_account_id] : null
 }

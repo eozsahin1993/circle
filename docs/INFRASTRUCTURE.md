@@ -30,8 +30,15 @@ in state as plaintext).
 
 Shared across accounts: APNs `.p8` key, Google/Apple sign-in client IDs.
 
-Providers set `profile` and `allowed_account_ids`, so applying with the
-wrong credentials fails instead of building in the wrong place.
+Providers take `aws_profile` and `aws_account_id`, so applying with the
+wrong credentials fails instead of building in the wrong place. Neither is
+committed — locally they come from the environment, in CI from a GitHub
+Environment variable beside the role ARN:
+
+```bash
+export AWS_PROFILE=mimoza-staging
+export TF_VAR_aws_account_id=<account>
+```
 
 ---
 

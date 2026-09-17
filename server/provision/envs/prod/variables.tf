@@ -1,3 +1,15 @@
+variable "aws_profile" {
+  description = "Local AWS profile to apply with. Empty uses the ambient credentials — which is what CI does, assuming its role via OIDC."
+  type        = string
+  default     = ""
+}
+
+variable "aws_account_id" {
+  description = "The account this env belongs to. Set it and Terraform refuses to apply anywhere else. Kept out of git: a gitignored *.auto.tfvars locally, a GitHub Environment variable in CI."
+  type        = string
+  default     = ""
+}
+
 variable "api_domain" {
   description = "Hostname app builds point at (api.mimoza.app). Empty leaves the raw function URL in place — set it before shipping a build to anyone, since the URL is compiled in."
   type        = string
