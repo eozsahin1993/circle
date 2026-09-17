@@ -16,7 +16,7 @@ terraform {
   # env — bucket names are globally unique. ../../bootstrap creates it.
   # Backend blocks can't read variables, hence the literal.
   backend "s3" {
-    bucket       = "mimoza-terraform-state-staging"
+    bucket       = "mimoza-terraform-staging"
     key          = "staging/terraform.tfstate"
     region       = "us-east-1"
     encrypt      = true

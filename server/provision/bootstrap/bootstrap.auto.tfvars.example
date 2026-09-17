@@ -4,4 +4,4 @@
 
 aws_profile    = "mimoza-staging-admin"
 aws_account_id = ""
-bucket_name    = "mimoza-terraform-state-staging"
+bucket_name    = "mimoza-terraform-staging"
