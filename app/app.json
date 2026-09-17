@@ -54,12 +54,7 @@
       "expo-secure-store",
       "expo-sqlite",
       "expo-apple-authentication",
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          "iosUrlScheme": "com.googleusercontent.apps.REPLACE-WITH-IOS-CLIENT-ID-FOR-com.eozsahin.mimoza"
-        }
-      ],
+      "@react-native-google-signin/google-signin",
       "expo-sharing",
       [
         "expo-camera",
