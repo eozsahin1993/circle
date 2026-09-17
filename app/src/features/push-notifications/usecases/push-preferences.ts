@@ -23,17 +23,9 @@ import { silenceCircle, syncCirclePushPrefs } from '@/features/push-notification
  * combination arriving from another device survives being read back.
  */
 export const PushLevels = [
-  { id: 'posts', label: 'New photos only', categories: [PushCategories.newPost] },
-  {
-    id: 'comments',
-    label: 'Photos and comments',
-    categories: [PushCategories.newPost, PushCategories.comment],
-  },
-  {
-    id: 'reactions',
-    label: 'Photos, comments and reactions',
-    categories: [PushCategories.newPost, PushCategories.comment, PushCategories.reaction],
-  },
+  { id: 'posts', categories: [PushCategories.newPost] },
+  { id: 'comments', categories: [PushCategories.newPost, PushCategories.comment] },
+  { id: 'reactions', categories: [PushCategories.newPost, PushCategories.comment, PushCategories.reaction] },
 ] as const;
 
 /**

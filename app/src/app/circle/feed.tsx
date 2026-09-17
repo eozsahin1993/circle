@@ -1,5 +1,6 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View, type ViewToken } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -28,6 +29,7 @@ const LIST_BOTTOM_PADDING = 100;
  * are, and gains no branch when a new one is added.
  */
 export default function FeedScreen() {
+  const { t } = useTranslation();
   const { circleId, justJoined } = useLocalSearchParams<{ circleId: string; justJoined?: string }>();
   const openDetails = useCallback(
     () => router.push({ pathname: '/circle/details', params: { circleId } }),
@@ -81,16 +83,16 @@ export default function FeedScreen() {
         <View style={styles.headerInset}>
           <ScreenHeader
             title={circleName}
-            subtitle={`${memberCount} people. Tap for details`}
+            subtitle={t('circle.feed.subtitle', { count: memberCount })}
             onPressTitle={openDetails}
             actions={
               <>
                 <HeaderIconButton
                   icon={Icons.album}
-                  accessibilityLabel="Album"
+                  accessibilityLabel={t('circle.feed.album')}
                   onPress={() => router.push({ pathname: '/circle/album', params: { circleId } })}
                 />
-                <HeaderIconButton icon={Icons.more} accessibilityLabel="Circle details" onPress={openDetails} />
+                <HeaderIconButton icon={Icons.more} accessibilityLabel={t('circle.feed.details')} onPress={openDetails} />
               </>
             }
           />
@@ -120,12 +122,12 @@ export default function FeedScreen() {
               <View style={styles.empty}>
                 <EmptyFeedIcon />
                 <ThemedText type="screenTitle" style={styles.emptyTitle}>
-                  Nothing here yet
+                  {t('circle.feed.emptyTitle')}
                 </ThemedText>
                 <ThemedText type="captionFeed" themeColor="muted" style={styles.emptyBody}>
-                  Add the first photo, or invite the people you want in this circle.
+                  {t('circle.feed.emptyBody')}
                 </ThemedText>
-                <SecondaryButton label="Invite people" onPress={openDetails} style={styles.emptyButton} />
+                <SecondaryButton label={t('circle.feed.invitePeople')} onPress={openDetails} style={styles.emptyButton} />
               </View>
             ) : null
           }

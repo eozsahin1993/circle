@@ -4,9 +4,25 @@ import UserNotifications
 
 let appGroup = "group.com.eozsahin.mimoza"
 
-/// Hardcoded, never read from the payload: a push that can't be decrypted
-/// must not choose its own lock-screen text.
-let placeholder = "New activity"
+/// The extension's copy, from Localizable.xcstrings — keys and wording
+/// mirror push.ts in the app, and push-copy-parity.test.ts holds them
+/// together. Nothing here is ever read from the payload: a push that can't
+/// be decrypted must not choose its own lock-screen text.
+private struct Strings {
+  let bundle: Bundle
+
+  /// The language picked in the app, or nil to follow the device — which
+  /// is what the main bundle already does.
+  init(language: String?) {
+    bundle = language
+      .flatMap { Bundle.main.path(forResource: $0, ofType: "lproj") }
+      .flatMap(Bundle.init(path:)) ?? .main
+  }
+
+  func callAsFunction(_ key: String, _ arguments: CVarArg...) -> String {
+    String(format: bundle.localizedString(forKey: key, value: nil, table: nil), arguments: arguments)
+  }
+}
 
 class NotificationService: UNNotificationServiceExtension {
   private var contentHandler: ((UNNotificationContent) -> Void)?
@@ -23,9 +39,11 @@ class NotificationService: UNNotificationServiceExtension {
       return
     }
 
+    let snapshot = readSnapshot()
+    let strings = Strings(language: snapshot?.language)
     content.title = ""
-    content.body = placeholder
-    if let composed = compose(userInfo: request.content.userInfo) {
+    content.body = strings("push.placeholder")
+    if let snapshot, let composed = compose(userInfo: request.content.userInfo, snapshot: snapshot, strings: strings) {
       content.title = composed.title
       content.body = composed.body
       content.threadIdentifier = composed.circleId
@@ -49,12 +67,12 @@ class NotificationService: UNNotificationServiceExtension {
 
   /// The native mirror of handle-push.ts's decrypt half. Nil for every
   /// failure — the placeholder stands.
-  private func decrypt(userInfo: [AnyHashable: Any]) -> DecryptedPush? {
+  private func decrypt(userInfo: [AnyHashable: Any], circles: [SnapshotCircle]) -> DecryptedPush? {
     guard let routingId = userInfo["pushRoutingId"] as? String,
           let payloadB64 = userInfo["payload"] as? String,
           let box = Data(base64Encoded: payloadB64),
           let keyVersion = keyVersion(from: userInfo["keyVersion"]),
-          let (circle, key) = contentKey(routingId: routingId, keyVersion: keyVersion),
+          let (circle, key) = contentKey(routingId: routingId, keyVersion: keyVersion, circles: circles),
           let plaintext = CircleCrypto.open(box, key: key),
           let envelope = CircleCrypto.verifyEnvelope(plaintext),
           let type = envelope["type"] as? String,
@@ -71,36 +89,38 @@ class NotificationService: UNNotificationServiceExtension {
   /// describeEntry in handle-push.ts. Nil for types that shouldn't raise
   /// a card — but iOS can't suppress a delivered alert, so the
   /// placeholder is the quietest outcome available.
-  private func compose(userInfo: [AnyHashable: Any]) -> (title: String, body: String, circleId: String)? {
-    guard let push = decrypt(userInfo: userInfo) else { return nil }
+  private func compose(
+    userInfo: [AnyHashable: Any],
+    snapshot: Snapshot,
+    strings: Strings
+  ) -> (title: String, body: String, circleId: String)? {
+    guard let push = decrypt(userInfo: userInfo, circles: snapshot.circles) else { return nil }
 
     let body: String
     switch push.type {
     case "member_added":
       // The author is the approving admin; the joiner's name is in the payload.
-      let joined = push.payload?["name"] as? String
-      body = "\((joined?.isEmpty == false ? joined : nil) ?? "Someone") joined"
+      let joined = (push.payload?["name"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+      body = strings("push.joined", joined ?? strings("push.someone"))
     case "post", "comment", "reaction":
       let member = push.circle.members.first { $0.identityPublicKey == push.authorPubkey }
-      let name = (member?.name.isEmpty == false ? member?.name : nil) ?? "Someone"
-      // Mirrors describeEntry in handle-push.ts — the copy must match
-      // whichever platform composes it.
+      let name = (member?.name).flatMap { $0.isEmpty ? nil : $0 } ?? strings("push.someone")
       switch push.type {
-      case "post": body = "\(name) added a photo"
+      case "post": body = strings("push.post", name)
       case "comment":
-        let text = (push.payload?["body"] as? String).flatMap { $0.isEmpty ? nil : ": “\($0)”" } ?? ""
+        let text = (push.payload?["body"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let key: String
         if let postAuthor = push.payload?["postAuthorPubkey"] as? String {
-          body = postAuthor == ownIdentityPubkey(circleId: push.circle.id)
-            ? "\(name) commented on your photo\(text)"
-            : "\(name) also commented\(text)"
+          key = postAuthor == ownIdentityPubkey(circleId: push.circle.id) ? "push.commentOnYours" : "push.alsoCommented"
         } else {
-          body = "\(name) commented\(text)"
+          key = "push.comment"
         }
+        body = text.map { strings(key + "WithText", name, $0) } ?? strings(key, name)
       default:
         if let emoji = push.payload?["emoji"] as? String, !emoji.isEmpty {
-          body = "\(name) reacted \(emoji) to your photo"
+          body = strings("push.reactionWithEmoji", name, emoji)
         } else {
-          body = "\(name) reacted to your photo"
+          body = strings("push.reaction", name)
         }
       }
     default:
@@ -114,10 +134,9 @@ class NotificationService: UNNotificationServiceExtension {
   /// routing id names (recomputed per circle, same as circleForRoutingId
   /// in handle-push.ts — there is no stored map, by design), and that
   /// circle's content key at the entry's version.
-  private func contentKey(routingId: String, keyVersion: Int) -> (circle: SnapshotCircle, key: Data)? {
+  private func contentKey(routingId: String, keyVersion: Int, circles: [SnapshotCircle]) -> (circle: SnapshotCircle, key: Data)? {
     guard let seedHex = readKeychain(account: "master_seed"),
           let seed = Data(hexString: seedHex),
-          let circles = readSnapshot(),
           let circle = circles.first(where: {
             CircleCrypto.pushRoutingId(masterSeed: seed, circleId: $0.id) == routingId
           }),
@@ -165,7 +184,11 @@ class NotificationService: UNNotificationServiceExtension {
     return nil
   }
 
-  private struct Snapshot: Decodable { let circles: [SnapshotCircle] }
+  private struct Snapshot: Decodable {
+    let circles: [SnapshotCircle]
+    /// Absent when the app follows the device's language.
+    let language: String?
+  }
   private struct SnapshotCircle: Decodable {
     let id: String
     let name: String
@@ -176,12 +199,12 @@ class NotificationService: UNNotificationServiceExtension {
     let name: String
   }
 
-  /// The circle/member names mirror written by push-snapshot.ts.
-  private func readSnapshot() -> [SnapshotCircle]? {
+  /// The circle/member names and language mirror written by push-snapshot.ts.
+  private func readSnapshot() -> Snapshot? {
     guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup),
           let data = try? Data(contentsOf: container.appendingPathComponent("push-snapshot.json")),
           let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data)
     else { return nil }
-    return snapshot.circles
+    return snapshot
   }
 }

@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
@@ -22,6 +23,7 @@ import { showError } from '@/core/services/messages';
  * skipping a step.
  */
 export default function StartFreshScreen() {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
 
   async function handleStartFresh() {
@@ -34,7 +36,7 @@ export default function StartFreshScreen() {
       });
     } catch (err) {
       console.error('Failed to start a fresh account', err);
-      showError('Could not start fresh. Try again.');
+      showError(t('account.startFresh.failed'));
       setBusy(false);
     }
   }
@@ -42,28 +44,25 @@ export default function StartFreshScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="Start fresh" />
+        <ScreenHeader title={t('account.startFresh.header')} />
 
         <View style={styles.content}>
-          <ThemedText type="screenTitle">Leave the old account behind?</ThemedText>
+          <ThemedText type="screenTitle">{t('account.startFresh.title')}</ThemedText>
           <ThemedText type="captionFeed" themeColor="secondary">
-            You&apos;ll get a new identity on this phone. The circles you were in carry on without
-            you, and the people in them keep everything you posted.
+            {t('account.startFresh.body')}
           </ThemedText>
           <ThemedText type="captionFeed" themeColor="secondary">
-            This also clears the record of which circles those were. A recovery phrase found later
-            still proves who you are, but it won&apos;t find them for you. The people already in a
-            circle can always invite you back into it.
+            {t('account.startFresh.recordNote')}
           </ThemedText>
         </View>
 
         <View style={styles.actions}>
           <PrimaryButton
-            label={busy ? 'Starting…' : 'Start fresh'}
+            label={busy ? t('account.startFresh.starting') : t('account.startFresh.confirm')}
             disabled={busy}
             onPress={handleStartFresh}
           />
-          <PrimaryButton label="Go back" disabled={busy} onPress={() => router.back()} />
+          <PrimaryButton label={t('account.startFresh.goBack')} disabled={busy} onPress={() => router.back()} />
         </View>
       </ThemedSafeAreaView>
     </ThemedView>

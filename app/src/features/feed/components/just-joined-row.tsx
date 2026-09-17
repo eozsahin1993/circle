@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet } from 'react-native';
 
 import type { FeedRow, FeedRows } from '@/features/feed/components/rows';
@@ -30,15 +31,21 @@ export function justJoinedRow(): FeedRow {
   return {
     key: 'just-joined',
     spacing: Spacing.gapBetweenPosts,
-    render: () => (
-      <ThemedView style={styles.banner} type="surface">
-        <ThemedText type="cardTitle">You&apos;re in!</ThemedText>
-        <ThemedText type="meta" themeColor="muted">
-          Content will sync soon.
-        </ThemedText>
-      </ThemedView>
-    ),
+    render: () => <JustJoinedBanner />,
   };
+}
+
+function JustJoinedBanner() {
+  const { t } = useTranslation();
+
+  return (
+    <ThemedView style={styles.banner} type="surface">
+      <ThemedText type="cardTitle">{t('feed.justJoinedTitle')}</ThemedText>
+      <ThemedText type="meta" themeColor="muted">
+        {t('feed.justJoinedBody')}
+      </ThemedText>
+    </ThemedView>
+  );
 }
 
 const styles = StyleSheet.create({

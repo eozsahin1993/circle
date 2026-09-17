@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
@@ -10,8 +11,8 @@ import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Fonts, Radius, Spacing } from '@/ui/theme/tokens';
-import { pickRecoveryCard } from '@/features/account/usecases/recovery-card';
-import { restoreFromPhrase } from '@/features/account/usecases/restore-from-phrase';
+import { NoRecoveryPhraseError, pickRecoveryCard } from '@/features/account/usecases/recovery-card';
+import { PhoneInCircleError, restoreFromPhrase } from '@/features/account/usecases/restore-from-phrase';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
 import { showDone } from '@/core/services/messages';
 
@@ -24,6 +25,7 @@ const WORD_COUNT = 12;
  * without adding a check.
  */
 export default function RestoreScreen() {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [phrase, setPhrase] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -39,18 +41,14 @@ export default function RestoreScreen() {
       const { circleCount } = await restoreFromPhrase(phrase);
       showDone(
         circleCount === null
-          ? 'Recovered your account'
-          : circleCount === 1
-            ? 'Recovered your account and 1 circle'
-            : `Recovered your account and ${circleCount} circles`,
+          ? t('account.restore.restored')
+          : t('account.restore.restoredWithCircles', { count: circleCount }),
       );
       router.replace('/circle');
     } catch (err) {
       console.error('Failed to restore from a recovery phrase', err);
       setError(
-        err instanceof Error && err.message.includes('already in a circle')
-          ? err.message
-          : "Those words aren't a valid recovery phrase. Check for a typo.",
+        err instanceof PhoneInCircleError ? t('account.restore.alreadyInCircle') : t('account.restore.invalidPhrase'),
       );
     } finally {
       setBusy(false);
@@ -70,7 +68,9 @@ export default function RestoreScreen() {
       if (picked) setPhrase(picked);
     } catch (err) {
       console.error('Failed to read a recovery card', err);
-      setError(err instanceof Error ? err.message : "Couldn't read that file.");
+      setError(
+        err instanceof NoRecoveryPhraseError ? t('account.restore.noPhraseInFile') : t('account.restore.unreadableFile'),
+      );
     } finally {
       setPicking(false);
     }
@@ -79,19 +79,18 @@ export default function RestoreScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="Recovery phrase" />
+        <ScreenHeader title={t('account.restore.title')} />
 
         <KeyboardAvoider style={styles.body}>
           <ThemedText type="captionFeed" themeColor="secondary">
-            Pick the recovery card you saved, or type the {WORD_COUNT} words from your old phone, in
-            order, separated by spaces.
+            {t('account.restore.intro', { total: WORD_COUNT })}
           </ThemedText>
 
           {/* First, because it is the path that can't be got wrong. The
               field below stays for a card that was printed, read aloud, or
               never saved at all. */}
           <SecondaryButton
-            label={picking ? 'Reading…' : 'Choose recovery card'}
+            label={picking ? t('account.restore.reading') : t('account.restore.chooseCard')}
             disabled={picking || busy}
             onPress={handlePickCard}
           />
@@ -113,7 +112,7 @@ export default function RestoreScreen() {
           />
 
           <ThemedText type="meta" themeColor={words === WORD_COUNT ? 'accentBright' : 'muted'}>
-            {words} of {WORD_COUNT} words
+            {t('account.restore.wordCount', { typed: words, total: WORD_COUNT })}
           </ThemedText>
 
           {error ? (
@@ -128,12 +127,11 @@ export default function RestoreScreen() {
               proves who you are, it does not re-open the circles. Only a
               member can do that, by letting you back in. */}
           <ThemedText type="meta" themeColor="faint">
-            This gets your identity back, so when someone lets you into a circle again you return as
-            yourself, with your old posts still yours. You will still need a new invite for each one.
+            {t('account.restore.identityNote')}
           </ThemedText>
 
           <PrimaryButton
-            label="Restore"
+            label={t('account.restore.restore')}
             disabled={busy || words !== WORD_COUNT}
             onPress={handleRestore}
           />

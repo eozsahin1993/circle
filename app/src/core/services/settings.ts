@@ -1,11 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { isLanguageCode, type LanguagePreference } from '@/core/i18n/languages';
+
 export type ThemePreference = 'system' | 'light' | 'dark';
 
 export type AppSettings = {
   themePreference: ThemePreference;
   /** Which level a newly created or joined circle starts at — see push-preferences.ts. */
   defaultPushLevel: string;
+  language: LanguagePreference;
 };
 
 const STORAGE_KEY = 'app_settings';
@@ -17,6 +20,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   // now scopes a reaction push to the post's own author, and only on their
   // first reaction to it, so that volume concern is gone.
   defaultPushLevel: 'reactions',
+  language: 'system',
 };
 
 /**
@@ -28,7 +32,10 @@ const DEFAULT_SETTINGS: AppSettings = {
 export async function getAppSettings(): Promise<AppSettings> {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
   if (!raw) return DEFAULT_SETTINGS;
-  return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<AppSettings>) };
+  const settings = { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<AppSettings>) };
+  // A language dropped in a later release falls back to the device's.
+  if (settings.language !== 'system' && !isLanguageCode(settings.language)) settings.language = 'system';
+  return settings;
 }
 
 export async function updateAppSettings(patch: Partial<AppSettings>): Promise<void> {

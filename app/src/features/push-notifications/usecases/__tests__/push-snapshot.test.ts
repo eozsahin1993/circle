@@ -19,6 +19,7 @@ import { Platform } from 'react-native';
 
 import { getAllCircles, getCircleMembers } from '@/data/db';
 import { deleteAuthToken, saveAuthToken } from '@/core/services/keystore/auth-token';
+import { updateAppSettings } from '@/core/services/settings';
 import { clearPushSnapshot, refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
 
 const SNAPSHOT = '/group/push-snapshot.json';
@@ -38,6 +39,22 @@ test('writes the snapshot while signed in', async () => {
   await refreshPushSnapshot();
 
   expect(JSON.parse(mockFiles.get(SNAPSHOT)!).circles[0].name).toBe('Family Circle');
+});
+
+test('carries a language picked in the app', async () => {
+  await updateAppSettings({ language: 'tr' });
+
+  await refreshPushSnapshot();
+
+  expect(JSON.parse(mockFiles.get(SNAPSHOT)!).language).toBe('tr');
+});
+
+test('leaves the language out when following the device, so the extension resolves it', async () => {
+  await updateAppSettings({ language: 'system' });
+
+  await refreshPushSnapshot();
+
+  expect(JSON.parse(mockFiles.get(SNAPSHOT)!)).not.toHaveProperty('language');
 });
 
 test('writes nothing without a session', async () => {

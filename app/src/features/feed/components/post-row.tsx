@@ -15,6 +15,8 @@ import { getReactionsForPost, toggleReaction } from '@/features/post/usecases/re
 import { setAlbumVisibility } from '@/features/post/usecases/set-album-visibility';
 import { bytesToDataUri } from '@/core/photo/image';
 import { formatRelative, formatTimestamp } from '@/core/utils/time';
+import { i18n } from '@/core/i18n/i18n';
+import type { LanguageCode } from '@/core/i18n/languages';
 
 /**
  * What this kind can't work out for itself. The feed lives in whoever
@@ -31,6 +33,7 @@ export type PostRowsInput = {
   /** Who the reader is, and whether they may re-file any photo — see set-album-visibility.ts. */
   ownPublicKey: string | null;
   ownIsAdmin: boolean;
+  language: LanguageCode;
 };
 
 /** Only callbacks. Anything derivable from `feed` is derived below rather than passed in. */
@@ -57,6 +60,7 @@ export function usePostRows({
   profile,
   ownPublicKey,
   ownIsAdmin,
+  language,
 }: PostRowsInput): FeedRows {
   const actions = useMemo<PostRowActions>(
     () => ({
@@ -83,7 +87,7 @@ export function usePostRows({
         } catch (err) {
           console.error('Failed to change album visibility', err);
           patchPost(id, { post: view.post });
-          showError(next ? 'Could not add it to the album' : 'Could not remove it from the album');
+          showError(next ? i18n.t('post.addToAlbumFailed') : i18n.t('post.removeFromAlbumFailed'));
         }
       },
       onOpenPost: (postId) => router.push({ pathname: '/post/[id]', params: { id: postId, circleId } }),
@@ -104,15 +108,21 @@ export function usePostRows({
   return useMemo(
     () => ({
       rows: posts.map((view) =>
-        postRow(view, profile, actions, ownIsAdmin || view.post.authorPublicKey === ownPublicKey),
+        postRow(view, profile, actions, ownIsAdmin || view.post.authorPublicKey === ownPublicKey, language),
       ),
     }),
-    [posts, profile, actions, ownPublicKey, ownIsAdmin],
+    [posts, profile, actions, ownPublicKey, ownIsAdmin, language],
   );
 }
 
-function postRow(view: FeedPostView, profile: Profile | null, actions: PostRowActions, canEditAlbum: boolean): FeedRow {
-  const post = toPostCard(view, profile);
+function postRow(
+  view: FeedPostView,
+  profile: Profile | null,
+  actions: PostRowActions,
+  canEditAlbum: boolean,
+  language: LanguageCode,
+): FeedRow {
+  const post = toPostCard(view, profile, language);
 
   return {
     key: post.id,
@@ -161,21 +171,21 @@ function pictureUri(picture: Uint8Array | null | undefined): string | undefined 
  * strings. Falls back to this device's own profile for a post whose author
  * has no roster row yet.
  */
-function toPostCard(view: FeedPostView, profile: Profile | null): Post {
+function toPostCard(view: FeedPostView, profile: Profile | null, language: LanguageCode): Post {
   const { post } = view;
   const picture = post.authorPicture ?? profile?.picture;
 
   return {
     id: post.id,
-    authorName: post.authorName || profile?.name || 'Unknown member',
+    authorName: post.authorName || profile?.name || i18n.getFixedT(language)('post.unknownMember'),
     authorPhotoUri: pictureUri(picture),
-    timestamp: formatTimestamp(post.createdAt),
+    timestamp: formatTimestamp(post.createdAt, language),
     photoUri: view.photoUri,
     missingPhoto: view.photoUri ? undefined : missingPhotoFor(post.photoStatus),
     caption: post.caption,
     reactions: view.reactions,
     authorPublicKey: post.authorPublicKey,
-    latestComment: view.comments.latest ? toCommentItem(view.comments.latest, profile?.name) : undefined,
+    latestComment: view.comments.latest ? toCommentItem(view.comments.latest, language, profile?.name) : undefined,
     commentCount: view.comments.total,
     hasUnseenComments: view.hasUnseenComments,
     inAlbum: post.inAlbum,
@@ -188,13 +198,13 @@ function toPostCard(view: FeedPostView, profile: Profile | null): Post {
  * device's own profile for a comment written before its author's roster
  * row arrived — which is the local author's own comments, pre-sync.
  */
-function toCommentItem(comment: CommentWithAuthor, ownName?: string): CommentItem {
+function toCommentItem(comment: CommentWithAuthor, language: LanguageCode, ownName?: string): CommentItem {
   return {
     id: comment.id,
-    authorName: comment.authorName || ownName || 'Unknown member',
+    authorName: comment.authorName || ownName || i18n.getFixedT(language)('post.unknownMember'),
     authorPhotoUri: pictureUri(comment.authorPicture),
     authorPublicKey: comment.authorPublicKey,
     body: comment.body,
-    timestamp: formatRelative(comment.createdAt),
+    timestamp: formatRelative(comment.createdAt, language),
   };
 }

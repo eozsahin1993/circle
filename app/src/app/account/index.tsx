@@ -1,6 +1,8 @@
 import Constants from 'expo-constants';
+import { useLocales } from 'expo-localization';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
@@ -21,6 +23,8 @@ import { resetEverythingForTesting } from '@/features/dev/dev-reset';
 import { logTestPushPayload } from '@/features/dev/dev-test-push';
 import { signOut } from '@/features/account/usecases/sign-in';
 import { PushLevels, type PushLevelId } from '@/features/push-notifications/usecases/push-preferences';
+import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
+import { Languages, resolveLanguage, type LanguagePreference } from '@/core/i18n/languages';
 import { useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
 import { useTints } from '@/ui/theme/hooks/use-theme';
@@ -33,18 +37,10 @@ const DELETION_POLL_MS = 2_000;
 /** From app.json's "version" — Constants.expoConfig is only ever missing in a context this screen doesn't run in. */
 const appVersion = Constants.expoConfig?.version ?? 'Unknown';
 
-function pushLevelLabel(level: PushLevelId): string {
-  return PushLevels.find((candidate) => candidate.id === level)?.label ?? '';
-}
-
-const APPEARANCE_OPTIONS: { value: ThemePreference; label: string }[] = [
-  { value: 'system', label: 'System' },
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-];
-
 export default function AccountScreen() {
+  const { t } = useTranslation();
   const { settings, updateSettings } = useAppSettings();
+  const deviceLanguage = resolveLanguage('system', useLocales());
   const tints = useTints();
   const ownColorSeed = useOwnColorSeed();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -52,6 +48,7 @@ export default function AccountScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const [resettingDevData, setResettingDevData] = useState(false);
   const [levelPicker, setLevelPicker] = useState(false);
+  const [languagePicker, setLanguagePicker] = useState(false);
   // Gates the "bring over" direction: adopting another account's seed
   // would strand any circle this device already joined under its own.
   const [hasCircles, setHasCircles] = useState(true);
@@ -93,80 +90,115 @@ export default function AccountScreen() {
     }, []),
   );
 
+  const appearanceOptions: { value: ThemePreference; label: string }[] = [
+    { value: 'system', label: t('settings.appearanceSystem') },
+    { value: 'light', label: t('settings.appearanceLight') },
+    { value: 'dark', label: t('settings.appearanceDark') },
+  ];
+
+  // Each language by its own name, with what it's called in the current one
+  // underneath — the name is what someone stuck in the wrong language can read.
+  const languageOptions = [
+    {
+      id: 'system' as LanguagePreference,
+      label: t('settings.languageSystem'),
+      description: Languages.find((language) => language.code === deviceLanguage)?.name,
+    },
+    ...Languages.map((language) => ({
+      id: language.code as LanguagePreference,
+      label: language.name,
+      description: t(`settings.languageNames.${language.code}`),
+    })),
+  ];
+
+  const pushLevelOptions = PushLevels.map((level) => ({ id: level.id, label: t(`settings.pushLevels.${level.id}`) }));
+
   /** Same shape the circle screen uses — one list, one row component, one set of spacings. */
   const settingsGroups: SettingsGroup[] = [
     {
-      title: 'New circles start with',
-      footnote:
-        'Each circle keeps its own setting once you are in it. Change those in the circle itself. Notifications are generated on your phone; no push server is told what happened.',
+      title: t('settings.language'),
       rows: [
         {
-          label: 'Notify me about',
-          control: { kind: 'value', text: pushLevelLabel(settings.defaultPushLevel as PushLevelId) },
+          label: t('settings.languageRow'),
+          control: {
+            kind: 'value',
+            text: languageOptions.find((option) => option.id === settings.language)?.label ?? '',
+          },
+          onPress: () => setLanguagePicker(true),
+        },
+      ],
+    },
+    {
+      title: t('settings.newCircles'),
+      footnote: t('settings.newCirclesFootnote'),
+      rows: [
+        {
+          label: t('settings.notifyMeAbout'),
+          control: { kind: 'value', text: t(`settings.pushLevels.${settings.defaultPushLevel as PushLevelId}`) },
           onPress: () => setLevelPicker(true),
         },
       ],
     },
     {
-      title: 'Devices',
+      title: t('settings.devices'),
       // No list and no count: nothing tracks which devices hold your keys,
       // and nothing could revoke one if it did — every device with the
       // seed derives the same identity, so the log can't tell them apart.
       // A list you can't act on reads as control you don't have.
-      footnote: 'A device you add holds the same keys as this one. There is no way to take them back.',
+      footnote: t('settings.devicesFootnote'),
       rows: [
         {
-          label: 'Add another device',
-          description: 'Scan the code on your other phone',
+          label: t('settings.addDevice'),
+          description: t('settings.addDeviceDescription'),
           control: { kind: 'navigate' },
           onPress: () => router.push('/account/scan-device'),
         },
         !hasCircles && {
-          label: 'Bring over an existing account',
-          description: 'Show a code for your old phone to scan',
+          label: t('settings.bringOver'),
+          description: t('settings.bringOverDescription'),
           control: { kind: 'navigate' },
           onPress: () => router.push('/account/transfer'),
         },
       ],
     },
     {
-      title: 'Account recovery',
+      title: t('settings.recovery'),
       rows: [
         {
-          label: 'Recovery phrase',
-          description: '12 words that restore your circles on a new phone',
+          label: t('settings.recoveryPhrase'),
+          description: t('settings.recoveryPhraseDescription'),
           control: { kind: 'navigate' },
           onPress: () => router.push('/account/recovery'),
         },
         {
-          label: 'How the privacy works',
-          description: 'What end-to-end encrypted means here',
+          label: t('settings.privacy'),
+          description: t('settings.privacyDescription'),
           control: { kind: 'navigate' },
           onPress: () => setPrivacyVisible(true),
         },
       ],
     },
     {
-      title: 'About',
+      title: t('settings.about'),
       rows: [
         {
-          label: 'Credits & attribution',
+          label: t('settings.credits'),
           control: { kind: 'navigate' },
           onPress: () => router.push('/account/credits'),
         },
       ],
     },
     {
-      title: 'Account',
+      title: t('settings.account'),
       rows: [
         {
-          label: signingOut ? 'Signing out…' : 'Sign out',
+          label: signingOut ? t('settings.signingOut') : t('settings.signOut'),
           disabled: signingOut,
           onPress: handleSignOut,
         },
         {
-          label: 'Delete account',
-          description: "Erases everything you've posted, everywhere, then deletes your account",
+          label: t('settings.deleteAccount'),
+          description: t('settings.deleteAccountDescription'),
           destructive: true,
           onPress: handleDeleteAccount,
         },
@@ -219,12 +251,12 @@ export default function AccountScreen() {
 
   function handleSignOut() {
     Alert.alert(
-      'Sign out?',
-      'Your circles and photos stay on this device. Signing back in picks up right where you left off.',
+      t('settings.signOutTitle'),
+      t('settings.signOutMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Sign Out',
+          text: t('settings.signOutConfirm'),
           onPress: async () => {
             setSigningOut(true);
             try {
@@ -241,12 +273,12 @@ export default function AccountScreen() {
 
   function handleDeleteAccount() {
     Alert.alert(
-      'Delete your account?',
-      "This erases everything you've posted in every circle you're in, then permanently deletes your account. This can't be undone.",
+      t('settings.deleteTitle'),
+      t('settings.deleteMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('settings.deleteConfirm'),
           style: 'destructive',
           onPress: async () => {
             // No way back from here, so the screen commits to the
@@ -268,7 +300,7 @@ export default function AccountScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="Your account" />
+        <ScreenHeader title={t('settings.title')} />
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.profileRow}>
@@ -280,27 +312,27 @@ export default function AccountScreen() {
             />
             <View style={styles.profileText}>
               <ThemedText type="cardTitle" numberOfLines={1}>
-                {profile?.name || 'Add your name'}
+                {profile?.name || t('settings.addName')}
               </ThemedText>
               <ThemedText type="meta" themeColor="muted">
-                Visible only inside your circles
+                {t('settings.nameVisibility')}
               </ThemedText>
             </View>
             <Pressable
               style={[styles.editButton, { borderColor: tints.secondaryButtonBorder }]}
               onPress={() => router.push('/profile-setup')}>
-              <ThemedText type="buttonLabel">Edit</ThemedText>
+              <ThemedText type="buttonLabel">{t('settings.edit')}</ThemedText>
             </Pressable>
           </View>
 
 
           <View style={styles.section}>
             <ThemedText type="sectionTitle" style={styles.sectionLabel}>
-              Appearance
+              {t('settings.appearance')}
             </ThemedText>
 
             <View style={styles.appearanceRow}>
-              {APPEARANCE_OPTIONS.map((option) => (
+              {appearanceOptions.map((option) => (
                 <ReactionChip
                   key={option.value}
                   label={option.label}
@@ -328,8 +360,8 @@ export default function AccountScreen() {
       <OptionSheet
         visible={levelPicker}
         onClose={() => setLevelPicker(false)}
-        title="Notify me about"
-        options={PushLevels}
+        title={t('settings.notifyMeAbout')}
+        options={pushLevelOptions}
         selected={settings.defaultPushLevel as PushLevelId}
         onSelect={(level) => {
           setLevelPicker(false);
@@ -337,12 +369,25 @@ export default function AccountScreen() {
         }}
       />
 
+      <OptionSheet
+        visible={languagePicker}
+        onClose={() => setLanguagePicker(false)}
+        title={t('settings.language')}
+        options={languageOptions}
+        selected={settings.language}
+        onSelect={(language) => {
+          setLanguagePicker(false);
+          // After the write, since the snapshot reads the stored setting.
+          void updateSettings({ language }).then(refreshPushSnapshot);
+        }}
+      />
+
       <PrivacyInfoModal visible={privacyVisible} onClose={() => setPrivacyVisible(false)} />
 
       <LoadingModal
         visible={deletingAccount}
-        label="Deleting your account…"
-        sublabel="This can take a moment. Don't close the app."
+        label={t('settings.deleting')}
+        sublabel={t('settings.deletingDetail')}
       />
     </ThemedView>
   );

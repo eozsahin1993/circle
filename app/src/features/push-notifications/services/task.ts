@@ -10,6 +10,7 @@ import { Platform } from 'react-native';
 import { handlePush } from '@/features/push-notifications/usecases/handle-push';
 import { initDatabase } from '@/data/db';
 import { getAuthToken } from '@/core/services/keystore/auth-token';
+import { loadLanguage } from '@/core/i18n/i18n';
 
 /**
  * The background handler that turns a delivered push into a notification.
@@ -36,6 +37,7 @@ defineTask<NotificationTaskPayload>(PUSH_TASK, async ({ data, error }) => {
     // The bundle may have been started by this task alone, so nothing has
     // opened the database yet. Idempotent, and memoized (see run.ts).
     await initDatabase();
+    await loadLanguage();
 
     const pushData = pushDataFrom(data);
     const notification = await handlePush(pushData);

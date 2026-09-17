@@ -6,6 +6,8 @@ import {
 } from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { i18n } from '@/core/i18n/i18n';
+
 /**
  * Android notification channels, one per circle.
  *
@@ -39,7 +41,7 @@ export function circleNotificationChannelId(circleId: string): string {
 export async function ensureCircleNotificationChannel(circleId: string, circleName: string): Promise<void> {
   if (Platform.OS !== 'android') return;
 
-  await setNotificationChannelGroupAsync(PUSH_CHANNEL_GROUP_ID, { name: 'Circles' });
+  await setNotificationChannelGroupAsync(PUSH_CHANNEL_GROUP_ID, { name: i18n.t('push.channelGroup') });
   await setNotificationChannelAsync(circleNotificationChannelId(circleId), {
     name: circleName,
     groupId: PUSH_CHANNEL_GROUP_ID,

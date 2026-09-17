@@ -1,0 +1,6 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Mimoza nutzt deine Kamera, um einen Geräteübertragungscode zu scannen.",
+    "NSPhotoLibraryUsageDescription": "Mimoza greift auf deine Fotos zu, damit du auswählen kannst, was du in deinen Kreisen teilst."
+  }
+}

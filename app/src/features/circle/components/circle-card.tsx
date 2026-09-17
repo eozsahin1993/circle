@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/ui/components/icon';
@@ -29,6 +30,7 @@ const CARD_HEIGHT = 92;
  * legible as a backdrop for white text.
  */
 export function CircleCard({ name, memberCount, photoUri, newCount, latestActivity, onPress }: CircleCardProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const tints = useTints();
   return (
@@ -49,7 +51,7 @@ export function CircleCard({ name, memberCount, photoUri, newCount, latestActivi
           {newCount ? (
             <View style={[styles.badge, { backgroundColor: tints.chipReactedBg }]}>
               <ThemedText type="meta" themeColor="accentBright">
-                {newCount} new
+                {t('circle.newCount', { count: newCount })}
               </ThemedText>
             </View>
           ) : null}
@@ -58,7 +60,7 @@ export function CircleCard({ name, memberCount, photoUri, newCount, latestActivi
         <View style={styles.metaRow}>
           <Icon icon={Icons.members} size={14} color={theme.muted} />
           <ThemedText type="meta" themeColor="muted" numberOfLines={1}>
-            {memberCount} {memberCount === 1 ? 'person' : 'people'}
+            {t('circle.peopleCount', { count: memberCount })}
           </ThemedText>
         </View>
 

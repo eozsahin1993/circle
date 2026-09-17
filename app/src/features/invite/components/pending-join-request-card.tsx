@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
@@ -8,16 +9,8 @@ import { ThemedView } from '@/ui/theme/themed-view';
 import { Radius } from '@/ui/theme/tokens';
 import { useTints } from '@/ui/theme/hooks/use-theme';
 import type { PendingRequest } from '@/features/invite/usecases/invite-to-circle';
-
-function formatAgo(ms: number): string {
-  const minutes = Math.max(0, Math.round((Date.now() - ms) / (60 * 1000)));
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  const days = Math.round(hours / 24);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
-}
+import { formatAgo } from '@/core/utils/time';
+import { useLanguage } from '@/core/i18n/use-language';
 
 export type PendingJoinRequestCardProps = {
   request: PendingRequest;
@@ -38,21 +31,23 @@ export type PendingJoinRequestCardProps = {
  * than the creator already has.
  */
 export function PendingJoinRequestCard({ request, busy, onApprove, onDeny }: PendingJoinRequestCardProps) {
+  const { t } = useTranslation();
   const tints = useTints();
+  const language = useLanguage();
   return (
     <ThemedView type="surface" style={[styles.card, { borderColor: tints.chipReactedBorder }]}>
       <View style={styles.header}>
         <Avatar size={44} uri={request.pictureUri} name={request.selfReportedName} />
         <View style={styles.text}>
-          <ThemedText type="cardTitle">{request.selfReportedName || 'Someone'}</ThemedText>
+          <ThemedText type="cardTitle">{request.selfReportedName || t('invite.request.someone')}</ThemedText>
           <ThemedText type="meta" themeColor="muted">
-            Tapped your link · {formatAgo(request.createdAt)}
+            {t('invite.request.tappedLink', { ago: formatAgo(request.createdAt, language) })}
           </ThemedText>
         </View>
       </View>
       <View style={styles.actions}>
-        <PrimaryButton label="Let in" disabled={busy} onPress={onApprove} style={styles.actionButton} />
-        <SecondaryButton label="Not now" disabled={busy} onPress={onDeny} style={styles.actionButton} />
+        <PrimaryButton label={t('invite.request.letIn')} disabled={busy} onPress={onApprove} style={styles.actionButton} />
+        <SecondaryButton label={t('invite.request.notNow')} disabled={busy} onPress={onDeny} style={styles.actionButton} />
       </View>
     </ThemedView>
   );

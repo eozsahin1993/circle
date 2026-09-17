@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
@@ -82,6 +83,7 @@ export function PostCard({
   selfName,
   onToggleAlbum,
 }: PostCardProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [showPicker, setShowPicker] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -132,7 +134,7 @@ export function PostCard({
                 </ThemedText>
                 <Icon icon={Icons.inAlbum} size={12} color={theme.accent} filled />
                 <ThemedText type="meta" themeColor="accent">
-                  Album
+                  {t('post.album')}
                 </ThemedText>
               </>
             ) : null}
@@ -174,15 +176,15 @@ export function PostCard({
             emoji={topEmoji}
             label={String(totalReactions)}
             reacted={reactedByMe}
-            accessibilityLabel={`${totalReactions} reaction${totalReactions === 1 ? '' : 's'}`}
+            accessibilityLabel={t('post.reactionCount', { count: totalReactions })}
             onPress={() => setShowPicker((v) => !v)}
           />
         ) : (
-          <ReactionChip icon={Icons.react} label="React" onPress={() => setShowPicker((v) => !v)} />
+          <ReactionChip icon={Icons.react} label={t('post.react')} onPress={() => setShowPicker((v) => !v)} />
         )}
 
         <View style={styles.commentsChipWrap}>
-          <ReactionChip icon={Icons.comment} label="Comment" reacted={composerOpen} onPress={handleToggleComposer} />
+          <ReactionChip icon={Icons.comment} label={t('post.comment')} reacted={composerOpen} onPress={handleToggleComposer} />
           {post.hasUnseenComments ? (
             <View style={[styles.unseenDot, { backgroundColor: theme.accentBright }]} />
           ) : null}
@@ -191,9 +193,9 @@ export function PostCard({
         {onToggleAlbum ? (
           <ReactionChip
             icon={Icons.inAlbum}
-            label="Album"
+            label={t('post.album')}
             reacted={post.inAlbum}
-            accessibilityLabel={post.inAlbum ? 'Remove from album' : 'Add to album'}
+            accessibilityLabel={post.inAlbum ? t('post.removeFromAlbum') : t('post.addToAlbum')}
             onPress={onToggleAlbum}
           />
         ) : null}

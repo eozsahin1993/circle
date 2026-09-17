@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/ui/components/icon';
@@ -39,6 +40,7 @@ const QUICK_REACTIONS = ['❤️', '🥂', '😂', '😭', '👏', '🙏', '✨'
  * caption above it, and a choice this small shouldn't need two lines.
  */
 export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const tints = useTints();
 
@@ -51,7 +53,7 @@ export function EmojiPicker({ onSelect, onClose }: EmojiPickerProps) {
       ))}
 
       {onClose ? (
-        <Pressable style={styles.slot} onPress={onClose} accessibilityLabel="Close">
+        <Pressable style={styles.slot} onPress={onClose} accessibilityLabel={t('ui.close')}>
           <Icon icon={Icons.close} size={17} color={theme.faint} />
         </Pressable>
       ) : null}

@@ -4,6 +4,8 @@ import { useJustJoinedRows } from '@/features/feed/components/just-joined-row';
 import { usePendingRequestRows } from '@/features/feed/components/pending-request-row';
 import { usePostRows } from '@/features/feed/components/post-row';
 import { useRosterChangeRows } from '@/features/feed/components/roster-change-row';
+import { i18n } from '@/core/i18n/i18n';
+import { useLanguage } from '@/core/i18n/use-language';
 import { buildFeedRows, type FeedRow, type FeedRows } from '@/features/feed/components/rows';
 import {
   loadCircleFeedMeta,
@@ -138,6 +140,7 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
 
   const requests = usePendingRequestRows({ circleId, onRosterChanged: reload });
   const justJoined = useJustJoinedRows({ justJoined: options.justJoined ?? false, postCount: feed?.posts.length ?? 0 });
+  const language = useLanguage();
   const posts = usePostRows({
     circleId,
     patchPost,
@@ -145,6 +148,7 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     profile: feed?.meta.profile ?? null,
     ownPublicKey: feed?.meta.ownPublicKey ?? null,
     ownIsAdmin: feed?.meta.ownIsAdmin ?? false,
+    language,
   });
   // The only other thing roster changes share a timeline with — see
   // roster-change-row.tsx for why a post's own timestamp is all it needs.
@@ -153,6 +157,7 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     events: feed?.events ?? [],
     postTimestamps,
     ownPublicKey: feed?.meta.ownPublicKey ?? null,
+    language,
   });
 
   /**
@@ -185,7 +190,7 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
       // the relay still shows whatever landed last, rather than replacing
       // stale-but-valid content with a failure.
       console.error('Failed to sync on pull-to-refresh', err);
-      showError('Could not refresh the feed');
+      showError(i18n.t('feed.refreshFailed'));
     } finally {
       await reload().catch((err) => console.error('Failed to reload the feed', err));
       setRefreshing(false);

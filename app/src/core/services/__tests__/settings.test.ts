@@ -15,3 +15,9 @@ test('a stored preference overrides the default', async () => {
 
   expect((await getAppSettings()).defaultPushLevel).toBe('posts');
 });
+
+test('follows the device when a stored language is no longer offered', async () => {
+  await updateAppSettings({ language: 'pt' as never });
+
+  expect((await getAppSettings()).language).toBe('system');
+});

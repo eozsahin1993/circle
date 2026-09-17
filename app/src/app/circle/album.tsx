@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
@@ -11,6 +12,8 @@ import { ThemedView } from '@/ui/theme/themed-view';
 import { Spacing } from '@/ui/theme/tokens';
 import { getAlbumPhotos, getAttachment, getCircleSummary, type AlbumPhoto } from '@/data/db';
 import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
+import { formatMonth } from '@/core/utils/time';
+import { useLanguage } from '@/core/i18n/use-language';
 
 /** Photos per row. Four fits a month on a screen without shrinking faces past recognising. */
 const COLUMNS = 4;
@@ -25,7 +28,17 @@ type AlbumItem = AlbumPhoto & { uri: string | null };
  * discriminated-union shape the feed's own rows use.
  */
 type AlbumRow =
-  | { kind: 'month'; key: string; label: string }
+  | {
+      kind: 'month';
+      key: string;
+      /**
+       * Headed "September 2027". The year is always spelled out, even for the
+       * current one — an album is read years later, where a bare month is
+       * ambiguous, and a label that grows a year only once January passes
+       * would reorder the headers under the reader mid-scroll.
+       */
+      start: number;
+    }
   | { kind: 'photos'; key: string; photos: AlbumItem[] };
 
 /** Midnight on the 1st of this timestamp's month — the grouping key. */
@@ -34,16 +47,6 @@ function monthStart(ms: number): Date {
   date.setHours(0, 0, 0, 0);
   date.setDate(1);
   return date;
-}
-
-/**
- * "September 2027". The year is always spelled out, even for the current
- * one — an album is read years later, where a bare month is ambiguous, and
- * a label that grows a year only once January passes would reorder the
- * headers under the reader mid-scroll.
- */
-function monthLabel(start: Date): string {
-  return start.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 }
 
 /** Groups newest-first photos into month sections, each chunked into rows. */
@@ -55,7 +58,7 @@ function buildRows(photos: AlbumItem[]): AlbumRow[] {
     const start = monthStart(photo.createdAt);
     if (start.getTime() !== openMonth) {
       openMonth = start.getTime();
-      rows.push({ kind: 'month', key: `month-${openMonth}`, label: monthLabel(start) });
+      rows.push({ kind: 'month', key: `month-${openMonth}`, start: openMonth });
     }
 
     const last = rows[rows.length - 1];
@@ -101,6 +104,8 @@ export default function AlbumScreen() {
   const [rows, setRows] = useState<AlbumRow[]>([]);
   // Avoids flashing the empty state before the first read resolves.
   const [loaded, setLoaded] = useState(false);
+  const { t } = useTranslation();
+  const language = useLanguage();
 
   const load = useCallback(async () => {
     if (!circleId) return;
@@ -123,7 +128,7 @@ export default function AlbumScreen() {
         {/* The header keeps the screen's usual inset; the grid below runs
             edge to edge, so nothing competes with the photos. */}
         <View style={styles.headerInset}>
-          <ScreenHeader title="Album" subtitle={circleName} />
+          <ScreenHeader title={t('circle.album.title')} subtitle={circleName} />
         </View>
 
         <FlatList
@@ -133,7 +138,7 @@ export default function AlbumScreen() {
           renderItem={({ item }) =>
             item.kind === 'month' ? (
               <ThemedText type="sectionTitle" style={styles.monthLabel}>
-                {item.label}
+                {formatMonth(item.start, language)}
               </ThemedText>
             ) : (
               <View style={styles.photoRow}>
@@ -162,10 +167,10 @@ export default function AlbumScreen() {
             loaded ? (
               <View style={styles.empty}>
                 <ThemedText type="screenTitle" style={styles.emptyText}>
-                  Nothing in the album yet
+                  {t('circle.album.emptyTitle')}
                 </ThemedText>
                 <ThemedText type="captionFeed" themeColor="muted" style={styles.emptyText}>
-                  Photos you add to the album while posting collect here, so they outlast the feed.
+                  {t('circle.album.emptyBody')}
                 </ThemedText>
               </View>
             ) : null

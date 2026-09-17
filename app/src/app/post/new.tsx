@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScrollView, Switch, TextInput, View, StyleSheet } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
@@ -16,6 +17,7 @@ import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { pickAndCompressImage, type CompressedImage } from '@/core/photo/image';
 
 export default function NewPostScreen() {
+  const { t } = useTranslation();
   const theme = useTheme();
   const tints = useTints();
   const { circleId } = useLocalSearchParams<{ circleId: string }>();
@@ -49,7 +51,7 @@ export default function NewPostScreen() {
       router.back();
     } catch (err) {
       console.error('Failed to create post', err);
-      setError("Couldn't post. Try again.");
+      setError(t('post.create.failed'));
       setPosting(false);
     }
   }
@@ -59,13 +61,13 @@ export default function NewPostScreen() {
       <ThemedSafeAreaView style={styles.safeArea}>
         <ScreenHeader variant="close" />
 
-        <ThemedText type="screenTitle">Create a post</ThemedText>
+        <ThemedText type="screenTitle">{t('post.create.title')}</ThemedText>
 
         <View style={styles.postingToRow}>
           <ThemedText type="postAuthor">{circleName}</ThemedText>
           <ThemedText type="meta" themeColor="muted">
             {' '}
-            · {memberCount} people can see it, nobody else
+            · {t('post.create.audience', { count: memberCount })}
           </ThemedText>
         </View>
 
@@ -74,14 +76,14 @@ export default function NewPostScreen() {
             <PhotoPicker
               uri={picture?.uri}
               aspectRatio={PhotoAspect.post}
-              label="Tap to pick from your library"
+              label={t('post.create.pickPhoto')}
               onPress={handlePickPhoto}
             />
 
             <TextInput
               value={caption}
               onChangeText={setCaption}
-              placeholder="Say something about this one…"
+              placeholder={t('post.create.captionPlaceholder')}
               placeholderTextColor={theme.faint}
               multiline
               style={[styles.captionInput, { color: theme.text }]}
@@ -89,9 +91,9 @@ export default function NewPostScreen() {
 
             <View style={[styles.albumRow, { backgroundColor: tints.chipIdleBg, borderColor: tints.chipIdleBorder }]}>
               <View style={styles.albumText}>
-                <ThemedText type="postAuthor">Add to the album</ThemedText>
+                <ThemedText type="postAuthor">{t('post.create.addToAlbum')}</ThemedText>
                 <ThemedText type="meta" themeColor="muted">
-                  Kept with the circle&rsquo;s photos · you or an admin can change this later
+                  {t('post.create.albumHint')}
                 </ThemedText>
               </View>
               <Switch
@@ -110,7 +112,7 @@ export default function NewPostScreen() {
           ) : null}
 
           <PrimaryButton
-            label={`Post to ${circleName}`}
+            label={t('post.create.postTo', { circle: circleName })}
             disabled={!picture || posting}
             onPress={handlePost}
             style={styles.postButton}

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/ui/components/icon';
@@ -5,6 +6,7 @@ import { ThemedText } from '@/ui/theme/themed-text';
 import { Icons, Radius } from '@/ui/theme/tokens';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { formatAgo } from '@/core/utils/time';
+import { useLanguage } from '@/core/i18n/use-language';
 
 export type PendingCircleCardProps = {
   circleName: string;
@@ -26,8 +28,10 @@ export type PendingCircleCardProps = {
  * burying it behind a tap would make waiting feel like the only option.
  */
 export function PendingCircleCard({ circleName, createdByName, submittedAt, onPress, onCancel }: PendingCircleCardProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const tints = useTints();
+  const language = useLanguage();
 
   return (
     <Pressable
@@ -40,15 +44,16 @@ export function PendingCircleCard({ circleName, createdByName, submittedAt, onPr
           {circleName}
         </ThemedText>
         <ThemedText type="meta" themeColor="muted">
-          {createdByName ? `Waiting on ${createdByName} to approve you` : 'Waiting on whoever sent the key'} · asked{' '}
-          {formatAgo(submittedAt)}
+          {createdByName
+            ? t('invite.card.waitingOn', { name: createdByName, ago: formatAgo(submittedAt, language) })
+            : t('invite.card.waitingOnUnknown', { ago: formatAgo(submittedAt, language) })}
         </ThemedText>
       </View>
 
       {onCancel ? (
         <Pressable onPress={onCancel} hitSlop={12}>
           <ThemedText type="captionFeed" themeColor="secondary">
-            Cancel
+            {t('common.cancel')}
           </ThemedText>
         </Pressable>
       ) : null}

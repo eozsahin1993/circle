@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Icon } from '@/ui/components/icon';
@@ -18,6 +19,7 @@ export type PrivacyNoticeProps = {
 
 /** Quiet, easy-to-ignore reminder that scrolls with its list, wherever that list is. */
 export function PrivacyNotice({ onPress, style }: PrivacyNoticeProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   return (
@@ -26,10 +28,10 @@ export function PrivacyNotice({ onPress, style }: PrivacyNoticeProps) {
       <Icon icon={Icons.locked} size={12} color={theme.accentBright} />
       <ThemedText type="meta" style={styles.text}>
         <ThemedText type="meta" themeColor="muted">
-          End-to-end encrypted.{' '}
+          {t('account.privacyNotice.encrypted')}{' '}
         </ThemedText>
         <ThemedText type="meta" themeColor="accentBright">
-          Tap for privacy details
+          {t('account.privacyNotice.details')}
         </ThemedText>
       </ThemedText>
     </Pressable>

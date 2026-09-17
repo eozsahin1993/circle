@@ -23,11 +23,11 @@ function event(overrides: Partial<MemberEvent> = {}): MemberEvent {
 
 describe('groupMemberEvents', () => {
   test('an empty list makes no blocks', () => {
-    expect(groupMemberEvents([], [])).toEqual([]);
+    expect(groupMemberEvents([], [], 'en')).toEqual([]);
   });
 
   test('one event is one block with one group of one subject', () => {
-    const blocks = groupMemberEvents([event()], []);
+    const blocks = groupMemberEvents([event()], [], 'en');
 
     expect(blocks).toHaveLength(1);
     expect(blocks[0].groups).toHaveLength(1);
@@ -41,7 +41,7 @@ describe('groupMemberEvents', () => {
       event({ id: '3', subjectPublicKey: 'c', subjectName: 'C', occurredAt: NOON - 2000 }),
     ];
 
-    const blocks = groupMemberEvents(events, []);
+    const blocks = groupMemberEvents(events, [], 'en');
 
     expect(blocks).toHaveLength(1);
     expect(blocks[0].groups).toHaveLength(1);
@@ -56,7 +56,7 @@ describe('groupMemberEvents', () => {
       event({ id: '3', kind: 'removed', selfInflicted: true, actorPublicKey: 'c', subjectPublicKey: 'c', occurredAt: NOON - 2000 }),
     ];
 
-    const blocks = groupMemberEvents(events, []);
+    const blocks = groupMemberEvents(events, [], 'en');
 
     expect(blocks).toHaveLength(1);
     expect(blocks[0].groups).toHaveLength(3);
@@ -68,7 +68,7 @@ describe('groupMemberEvents', () => {
       event({ id: '2', kind: 'role_changed', role: 'member', actorPublicKey: 'nadia', subjectPublicKey: 'b', occurredAt: NOON - 1000 }),
     ];
 
-    const blocks = groupMemberEvents(events, []);
+    const blocks = groupMemberEvents(events, [], 'en');
 
     expect(blocks[0].groups).toHaveLength(2);
   });
@@ -80,7 +80,7 @@ describe('groupMemberEvents', () => {
       event({ id: '2', kind: 'removed', selfInflicted: true, actorPublicKey: 'b', subjectPublicKey: 'b', subjectName: 'B', occurredAt: NOON - 1000 }),
     ];
 
-    const blocks = groupMemberEvents(events, []);
+    const blocks = groupMemberEvents(events, [], 'en');
 
     expect(blocks[0].groups).toHaveLength(1);
     expect(blocks[0].groups[0].subjects.map((s) => s.subjectName)).toEqual(['B', 'A']);
@@ -94,7 +94,7 @@ describe('groupMemberEvents', () => {
       event({ id: '2', kind: 'removed', selfInflicted: true, actorPublicKey: 'nadia', subjectPublicKey: 'nadia', occurredAt: NOON - 1000 }),
     ];
 
-    const blocks = groupMemberEvents(events, []);
+    const blocks = groupMemberEvents(events, [], 'en');
 
     expect(blocks[0].groups).toHaveLength(2);
   });
@@ -102,7 +102,7 @@ describe('groupMemberEvents', () => {
   test('a different calendar day starts a new block', () => {
     const events = [event({ occurredAt: NOON }), event({ id: '2', occurredAt: NOON - DAY })];
 
-    const blocks = groupMemberEvents(events, []);
+    const blocks = groupMemberEvents(events, [], 'en');
 
     expect(blocks).toHaveLength(2);
     expect(blocks[0].day).not.toBe(blocks[1].day);
@@ -112,7 +112,7 @@ describe('groupMemberEvents', () => {
     const events = [event({ id: '1', occurredAt: NOON }), event({ id: '2', occurredAt: NOON - 2000 })];
     const postTimestamps = [NOON - 1000];
 
-    const blocks = groupMemberEvents(events, postTimestamps);
+    const blocks = groupMemberEvents(events, postTimestamps, 'en');
 
     expect(blocks).toHaveLength(2);
     // Both blocks are still the same calendar day — the split is real, not a day boundary in disguise.
@@ -123,7 +123,7 @@ describe('groupMemberEvents', () => {
     const events = [event({ id: '1', occurredAt: NOON }), event({ id: '2', occurredAt: NOON - 2000 })];
     const postTimestamps = [NOON + 5000, NOON - 5000];
 
-    const blocks = groupMemberEvents(events, postTimestamps);
+    const blocks = groupMemberEvents(events, postTimestamps, 'en');
 
     expect(blocks).toHaveLength(1);
   });
@@ -131,13 +131,13 @@ describe('groupMemberEvents', () => {
   test("a block's day and occurredAt come from its newest event", () => {
     const events = [event({ id: '1', occurredAt: NOON }), event({ id: '2', occurredAt: NOON - 1000 })];
 
-    const blocks = groupMemberEvents(events, []);
+    const blocks = groupMemberEvents(events, [], 'en');
 
     expect(blocks[0].occurredAt).toBe(NOON);
   });
 
   test('a group carries the kind, role, actor and self-inflicted flag it was keyed on', () => {
-    const blocks = groupMemberEvents([event({ kind: 'role_changed', role: 'admin', actorName: 'Nadia', actorPublicKey: 'nadia' })], []);
+    const blocks = groupMemberEvents([event({ kind: 'role_changed', role: 'admin', actorName: 'Nadia', actorPublicKey: 'nadia' })], [], 'en');
 
     expect(blocks[0].groups[0]).toMatchObject({
       kind: 'role_changed',

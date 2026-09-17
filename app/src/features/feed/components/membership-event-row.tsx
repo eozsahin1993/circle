@@ -1,9 +1,13 @@
+import type { TFunction } from 'i18next';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/ui/theme/themed-text';
 import { Spacing } from '@/ui/theme/tokens';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
+import { upperCase } from '@/core/i18n/text';
+import { useLanguage } from '@/core/i18n/use-language';
 
 export type MembershipEventItem = {
   id: string;
@@ -29,6 +33,36 @@ export type MembershipEventItem = {
  */
 type Segment = { text: string; name?: true; interactive?: true };
 
+type Slot = 'subject' | 'actor' | 'list' | 'first' | 'second';
+
+/**
+ * Handed to `t` in place of the real values, so each sentence is
+ * translated whole and cut back into segments afterwards. Names never go
+ * through `t` themselves, so nothing in one can be mistaken for a slot or
+ * a tag.
+ */
+const slots: Record<Slot, string> = {
+  subject: '\u0001subject\u0001',
+  actor: '\u0001actor\u0001',
+  list: '\u0001list\u0001',
+  first: '\u0001first\u0001',
+  second: '\u0001second\u0001',
+};
+
+/** Slots become their parts; `<name>` marks a fixed word — "you" — that reads as a name. */
+function toSegments(sentence: string, parts: Partial<Record<Slot, Segment[]>>): Segment[] {
+  const out: Segment[] = [];
+  let last = 0;
+  for (const match of sentence.matchAll(/\u0001(\w+)\u0001|<name>(.*?)<\/name>/g)) {
+    if (match.index > last) out.push({ text: sentence.slice(last, match.index) });
+    if (match[1] !== undefined) out.push(...(parts[match[1] as Slot] ?? []));
+    else out.push({ text: match[2], name: true });
+    last = match.index + match[0].length;
+  }
+  if (last < sentence.length) out.push({ text: sentence.slice(last) });
+  return out;
+}
+
 /**
  * Turns one roster change into the words for it.
  *
@@ -45,51 +79,50 @@ type Segment = { text: string; name?: true; interactive?: true };
  * that guess is wrong for every family that puts it last. Long names wrap
  * instead; see `numberOfLines` below.
  */
-export function describeMembershipEvent(event: MembershipEventItem): Segment[] {
-  const you = (capitalized: boolean): Segment => ({ text: capitalized ? 'You' : 'you', name: true });
-  const named = (name: string): Segment => ({ text: name, name: true });
-
-  // Whoever leads the line is capitalized; a name in object position is not.
-  const subject = event.subjectIsYou ? you(true) : named(event.subjectName);
-  const subjectObject = event.subjectIsYou ? you(false) : named(event.subjectName);
-  const actor: Segment | null = event.actorName === null ? null : named(event.actorName);
+export function describeMembershipEvent(event: MembershipEventItem, t: TFunction): Segment[] {
+  const subject: Segment[] = [{ text: event.subjectName, name: true }];
+  const actor: Segment[] | null = event.actorName === null ? null : [{ text: event.actorName, name: true }];
   const attributed = actor !== null && !event.selfInflicted;
+  const you = event.subjectIsYou;
+  const say = (sentence: string) => toSegments(sentence, { subject, actor: actor ?? [] });
 
   // `created` is decided at apply time, not inferred here — see
   // recordMemberAdded.
-  if (event.kind === 'created') return [subject, { text: ' created this circle' }];
+  if (event.kind === 'created') return say(you ? t('feed.membership.youCreated') : t('feed.membership.created', slots));
 
   if (event.kind === 'added') {
-    if (!attributed) return [subject, { text: ' joined' }];
-    if (event.actorIsYou) return [you(true), { text: ' added ' }, subjectObject];
-    if (event.subjectIsYou) return [actor, { text: ' added ' }, you(false)];
-    return [subject, { text: ' was added by ' }, actor];
+    if (!attributed) return say(you ? t('feed.membership.youJoined') : t('feed.membership.joined', slots));
+    if (event.actorIsYou) return say(t('feed.membership.youAdded', slots));
+    if (you) return say(t('feed.membership.addedYou', slots));
+    return say(t('feed.membership.addedBy', slots));
   }
 
   // Always self-inflicted (nobody deletes an account but its own), and
   // its own kind rather than `removed` plus a flag — a different reason
   // for leaving, not a special case of "left".
-  if (event.kind === 'account_deleted') return [subject, { text: event.subjectIsYou ? ' deleted your account' : ' deleted their account' }];
+  if (event.kind === 'account_deleted') {
+    return say(you ? t('feed.membership.youDeletedAccount') : t('feed.membership.deletedAccount', slots));
+  }
 
   if (event.kind === 'removed') {
-    if (event.selfInflicted) return [subject, { text: ' left' }];
-    if (!attributed) return [subject, { text: event.subjectIsYou ? ' are no longer in this circle' : ' is no longer in this circle' }];
-    if (event.actorIsYou) return [you(true), { text: ' removed ' }, subjectObject];
-    if (event.subjectIsYou) return [actor, { text: ' removed ' }, you(false)];
-    return [subject, { text: ' was removed by ' }, actor];
+    if (event.selfInflicted) return say(you ? t('feed.membership.youLeft') : t('feed.membership.left', slots));
+    if (!attributed) return say(you ? t('feed.membership.youNotInCircle') : t('feed.membership.notInCircle', slots));
+    if (event.actorIsYou) return say(t('feed.membership.youRemoved', slots));
+    if (you) return say(t('feed.membership.removedYou', slots));
+    return say(t('feed.membership.removedBy', slots));
   }
 
   const becameAdmin = event.role === 'admin';
-  const verb = becameAdmin ? ' made ' : ' removed ';
-  const suffix = becameAdmin ? ' an admin' : ' as an admin';
 
   if (!attributed) {
-    if (becameAdmin) return [subject, { text: event.subjectIsYou ? ' are now an admin' : ' is now an admin' }];
-    return [subject, { text: event.subjectIsYou ? ' are no longer an admin' : ' is no longer an admin' }];
+    if (becameAdmin) return say(you ? t('feed.membership.youNowAdmin') : t('feed.membership.nowAdmin', slots));
+    return say(you ? t('feed.membership.youNoLongerAdmin') : t('feed.membership.noLongerAdmin', slots));
   }
-  if (event.actorIsYou) return [you(true), { text: verb }, subjectObject, { text: suffix }];
-  if (event.subjectIsYou) return [actor, { text: verb }, you(false), { text: suffix }];
-  return [actor, { text: verb }, subject, { text: suffix }];
+  if (event.actorIsYou) {
+    return say(becameAdmin ? t('feed.membership.youMadeAdmin', slots) : t('feed.membership.youRemovedAdmin', slots));
+  }
+  if (you) return say(becameAdmin ? t('feed.membership.madeYouAdmin', slots) : t('feed.membership.removedYouAdmin', slots));
+  return say(becameAdmin ? t('feed.membership.madeAdmin', slots) : t('feed.membership.removedAdmin', slots));
 }
 
 /** One subject inside a group — enough to name them, nothing else. */
@@ -116,22 +149,10 @@ export type MembershipEventGroupItem = {
 export const GROUP_PREVIEW_COUNT = 2;
 
 /** "A" | "A and B" | "A, B and C" — the last item never gets a leading comma, only "and". */
-function andJoin(items: Segment[]): Segment[] {
+function andJoin(items: Segment[], t: TFunction): Segment[] {
   if (items.length <= 1) return items;
-  const out: Segment[] = [];
-  items.slice(0, -1).forEach((item, index) => {
-    out.push(item);
-    out.push({ text: index === items.length - 2 ? ' and ' : ', ' });
-  });
-  out.push(items[items.length - 1]);
-  return out;
-}
-
-/** "you" only capitalizes when it's the very first word — never mid-sentence, even inside a list. */
-function capitalizeLeadingYou(segments: Segment[]): Segment[] {
-  const [first, ...rest] = segments;
-  if (!first || first.text !== 'you') return segments;
-  return [{ ...first, text: 'You' }, ...rest];
+  const head = items.slice(0, -1).flatMap((item, index) => (index === 0 ? [item] : [{ text: t('feed.membership.listSeparator') }, item]));
+  return toSegments(t('feed.membership.listPair', slots), { first: head, second: [items[items.length - 1]] });
 }
 
 /**
@@ -143,50 +164,54 @@ function capitalizeLeadingYou(segments: Segment[]): Segment[] {
  * into "and N others" — that fold is part of the sentence's own grammar;
  * "Show less" isn't, and gets appended after the sentence by the caller.
  */
-export function describeMembershipEventGroup(group: MembershipEventGroupItem, expanded: boolean): Segment[] {
-  const named = (name: string): Segment => ({ text: name, name: true });
-  const subjectItem = (s: GroupedSubject): Segment => (s.subjectIsYou ? { text: 'you', name: true } : named(s.subjectName));
+export function describeMembershipEventGroup(group: MembershipEventGroupItem, expanded: boolean, t: TFunction): Segment[] {
+  const you: Segment = { text: t('feed.membership.you'), name: true };
+  const subjectItem = (s: GroupedSubject): Segment => (s.subjectIsYou ? you : { text: s.subjectName, name: true });
 
   const visible = expanded ? group.subjects : group.subjects.slice(0, GROUP_PREVIEW_COUNT);
   const hiddenCount = group.subjects.length - visible.length;
-  const others: Segment[] = hiddenCount > 0 ? [{ text: `${hiddenCount} other${hiddenCount === 1 ? '' : 's'}`, interactive: true }] : [];
-  const subjectList = andJoin([...visible.map(subjectItem), ...others]);
+  const others: Segment[] = hiddenCount > 0 ? [{ text: t('feed.membership.others', { count: hiddenCount }), interactive: true }] : [];
+  const list = andJoin([...visible.map(subjectItem), ...others], t);
 
-  const actor: Segment | null = group.actorName === null ? null : named(group.actorName);
-  const attributed = actor !== null && !group.selfInflicted;
+  const actor: Segment[] = group.actorName === null ? [] : [{ text: group.actorName, name: true }];
+  const attributed = group.actorName !== null && !group.selfInflicted;
+
+  // "you" only capitalizes when it's the very first word — never mid-sentence, even inside a list.
+  const say = (sentence: string) => {
+    const segments = toSegments(sentence, { list, actor });
+    return segments[0] === you ? [{ ...you, text: t('feed.membership.youLeading') }, ...segments.slice(1)] : segments;
+  };
 
   if (group.kind === 'added') {
-    if (!attributed) return [...capitalizeLeadingYou(subjectList), { text: ' joined' }];
-    if (group.actorIsYou) return [{ text: 'You', name: true }, { text: ' added ' }, ...subjectList];
-    return [actor as Segment, { text: ' added ' }, ...subjectList];
+    if (!attributed) return say(t('feed.membership.group.joined', slots));
+    if (group.actorIsYou) return say(t('feed.membership.group.youAdded', slots));
+    return say(t('feed.membership.group.added', slots));
   }
 
   // Its own kind, not `removed` plus a flag — see group-member-events.ts's
   // groupKey, which is what keeps a group's subjects from ever mixing
   // "left" with "deleted their account".
-  if (group.kind === 'account_deleted') {
-    return [...capitalizeLeadingYou(subjectList), { text: group.subjects.length > 1 ? ' deleted their accounts' : ' deleted their account' }];
-  }
+  if (group.kind === 'account_deleted') return say(t('feed.membership.group.deletedAccounts', slots));
 
   if (group.kind === 'removed') {
     // Self-inflicted here always means "left" — see group-member-events.ts's groupKey.
-    if (group.selfInflicted) return [...capitalizeLeadingYou(subjectList), { text: ' left' }];
-    if (!attributed) return [...capitalizeLeadingYou(subjectList), { text: ' are no longer in this circle' }];
-    if (group.actorIsYou) return [{ text: 'You', name: true }, { text: ' removed ' }, ...subjectList];
-    return [actor as Segment, { text: ' removed ' }, ...subjectList];
+    if (group.selfInflicted) return say(t('feed.membership.group.left', slots));
+    if (!attributed) return say(t('feed.membership.group.notInCircle', slots));
+    if (group.actorIsYou) return say(t('feed.membership.group.youRemoved', slots));
+    return say(t('feed.membership.group.removed', slots));
   }
 
   // Only `role_changed` reaches here — `created` is excluded by the
   // one-founder-ever invariant on `MembershipEventGroupItem.kind`.
   const becameAdmin = group.role === 'admin';
-  const verb = becameAdmin ? ' made ' : ' removed ';
-  const suffix = becameAdmin ? ' admins' : ' as admins';
 
   if (!attributed) {
-    return [...capitalizeLeadingYou(subjectList), { text: becameAdmin ? ' are now admins' : ' are no longer admins' }];
+    return say(becameAdmin ? t('feed.membership.group.nowAdmins', slots) : t('feed.membership.group.noLongerAdmins', slots));
   }
-  if (group.actorIsYou) return [{ text: 'You', name: true }, { text: verb }, ...subjectList, { text: suffix }];
-  return [actor as Segment, { text: verb }, ...subjectList, { text: suffix }];
+  if (group.actorIsYou) {
+    return say(becameAdmin ? t('feed.membership.group.youMadeAdmins', slots) : t('feed.membership.group.youRemovedAdmins', slots));
+  }
+  return say(becameAdmin ? t('feed.membership.group.madeAdmins', slots) : t('feed.membership.group.removedAdmins', slots));
 }
 
 /**
@@ -197,21 +222,25 @@ export function describeMembershipEventGroup(group: MembershipEventGroupItem, ex
  * affordance, so grouping is invisible until there's more than one to fold.
  */
 export function MembershipEventGroupRow({ group }: { group: MembershipEventGroupItem }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   const solo = group.subjects.length === 1;
   const segments = solo
-    ? describeMembershipEvent({
-        id: '',
-        kind: group.kind,
-        subjectName: group.subjects[0].subjectName,
-        actorName: group.actorName,
-        selfInflicted: group.selfInflicted,
-        subjectIsYou: group.subjects[0].subjectIsYou,
-        actorIsYou: group.actorIsYou,
-        role: group.role,
-      })
-    : describeMembershipEventGroup(group, expanded);
+    ? describeMembershipEvent(
+        {
+          id: '',
+          kind: group.kind,
+          subjectName: group.subjects[0].subjectName,
+          actorName: group.actorName,
+          selfInflicted: group.selfInflicted,
+          subjectIsYou: group.subjects[0].subjectIsYou,
+          actorIsYou: group.actorIsYou,
+          role: group.role,
+        },
+        t,
+      )
+    : describeMembershipEventGroup(group, expanded, t);
   // Only a truncatable group ever gets a "Show less" — expanding a group
   // that was never folded in the first place has nothing to collapse back to.
   const collapsible = !solo && group.subjects.length > GROUP_PREVIEW_COUNT;
@@ -237,7 +266,7 @@ export function MembershipEventGroupRow({ group }: { group: MembershipEventGroup
         )}
         {collapsible && expanded && (
           <ThemedText type="meta" themeColor="accent" onPress={() => setExpanded((current) => !current)}>
-            {' Show less'}
+            {` ${t('feed.membership.showLess')}`}
           </ThemedText>
         )}
       </ThemedText>
@@ -254,6 +283,7 @@ export function MembershipEventGroupRow({ group }: { group: MembershipEventGroup
  * than being repeated once per line the way it used to be.
  */
 export function DayDivider({ day }: { day: string }) {
+  const language = useLanguage();
   const theme = useTheme();
   const rule = { backgroundColor: theme.faintest };
 
@@ -261,7 +291,7 @@ export function DayDivider({ day }: { day: string }) {
     <View style={styles.row}>
       <View style={[styles.rule, rule]} />
       <ThemedText type="meta" themeColor="faintest" style={styles.dayText}>
-        {day.toUpperCase()}
+        {upperCase(day, language)}
       </ThemedText>
       <View style={[styles.rule, rule]} />
     </View>

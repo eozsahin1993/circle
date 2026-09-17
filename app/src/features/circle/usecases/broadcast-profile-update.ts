@@ -8,6 +8,7 @@ import { buildAndEncryptLogEntry, EntryTypes } from '@/core/sync/log-entry';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { compressToThumbnail } from '@/core/photo/image';
 import { showError } from '@/core/services/messages';
+import { i18n } from '@/core/i18n/i18n';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 
 /**
@@ -86,8 +87,8 @@ export async function broadcastProfileUpdate(name: string, picture: Uint8Array |
   if (missed.length > 0) {
     showError(
       missed.length === 1
-        ? `Could not update your profile in ${missed[0]}`
-        : 'Could not update your profile everywhere',
+        ? i18n.t('circle.profileUpdateFailedIn', { name: missed[0] })
+        : i18n.t('circle.profileUpdateFailed'),
     );
   }
 }

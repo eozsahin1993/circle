@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
@@ -15,6 +16,7 @@ import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { pickAndCompressImage, type CompressedImage } from '@/core/photo/image';
 
 export default function NewCircleScreen() {
+  const { t } = useTranslation();
   const theme = useTheme();
   const tints = useTints();
   const [name, setName] = useState('');
@@ -35,7 +37,7 @@ export default function NewCircleScreen() {
       router.replace({ pathname: '/circle/feed', params: { circleId: circle.id } });
     } catch (err) {
       console.error('Failed to create circle', err);
-      setError("Couldn't create the circle. Try again.");
+      setError(t('circle.create.failed'));
       setCreating(false);
     }
   }
@@ -46,16 +48,16 @@ export default function NewCircleScreen() {
         <ScreenHeader variant="close" />
 
         <KeyboardAvoider style={styles.form}>
-          <ThemedText type="screenTitle">Create circle</ThemedText>
+          <ThemedText type="screenTitle">{t('circle.create.title')}</ThemedText>
 
           <View>
             <ThemedText type="sectionTitle" style={styles.fieldLabel}>
-              Name
+              {t('circle.create.name')}
             </ThemedText>
             <TextInput
               value={name}
               onChangeText={setName}
-              placeholder="e.g. Sunday Dinners"
+              placeholder={t('circle.create.namePlaceholder')}
               placeholderTextColor={theme.faint}
               style={[styles.input, { color: theme.text, borderColor: tints.secondaryButtonBorder }]}
             />
@@ -63,12 +65,12 @@ export default function NewCircleScreen() {
 
           <View>
             <ThemedText type="sectionTitle" style={styles.fieldLabel}>
-              Cover
+              {t('circle.create.cover')}
             </ThemedText>
             <PhotoPicker
               uri={cover?.uri}
               aspectRatio={PhotoAspect.cover}
-              label="Tap to choose a photo"
+              label={t('circle.create.pickCover')}
               onPress={handlePickCover}
             />
           </View>
@@ -79,11 +81,10 @@ export default function NewCircleScreen() {
             </ThemedText>
           ) : null}
 
-          <PrimaryButton label="Create circle" disabled={!name.trim() || creating} onPress={handleCreate} />
+          <PrimaryButton label={t('circle.create.submit')} disabled={!name.trim() || creating} onPress={handleCreate} />
 
           <ThemedText type="meta" themeColor="faint" style={styles.footnote}>
-            Only the people you invite can see this circle, and everyone sees the same feed in
-            the same order.
+            {t('circle.create.footnote')}
           </ThemedText>
         </KeyboardAvoider>
       </ThemedSafeAreaView>

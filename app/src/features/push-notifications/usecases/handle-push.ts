@@ -7,6 +7,7 @@ import { derivePushRoutingId } from '@/core/crypto/identity';
 import { getCircleIdentity, getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { getMasterSeed } from '@/core/services/keystore/master-seed';
 import { circleNotificationChannelId } from '@/features/push-notifications/services/channels';
+import { i18n } from '@/core/i18n/i18n';
 
 /**
  * Turning a delivered push into the words on the lock screen.
@@ -14,9 +15,6 @@ import { circleNotificationChannelId } from '@/features/push-notifications/servi
  * The relay forwards the entry's own ciphertext and cannot read it, so the
  * text is composed here, on the device, from keys the relay never has.
  */
-
-/** The fixed string shown when nothing here could produce better. Names nothing. */
-export const PUSH_PLACEHOLDER = 'New activity';
 
 export type PushNotification = { circleId: string; channelId: string; title: string; body: string };
 
@@ -76,7 +74,11 @@ export async function decryptPushEntry(circleId: string, data: PushData): Promis
   return verifyLogEntry(new Uint8Array(Buffer.from(data.payload, 'base64')), key);
 }
 
-/** Null for an entry type that shouldn't interrupt anyone. */
+/**
+ * Null for an entry type that shouldn't interrupt anyone. Each variant is a
+ * whole sentence rather than pieces joined here, since word order differs
+ * by language — and each has a twin in the iOS extension's string catalog.
+ */
 async function describeEntry(circleId: string, envelope: LogEntryEnvelope): Promise<string | null> {
   // `member_added` is signed by the admin who approved it, not by the
   // person joining, so the author is the wrong name here. It carries the
@@ -84,29 +86,34 @@ async function describeEntry(circleId: string, envelope: LogEntryEnvelope): Prom
   // arrives before the sync that would put them on the roster.
   if (envelope.type === EntryTypes.MEMBER_ADDED) {
     const joined = (envelope.payload as { name?: unknown })?.name;
-    return `${typeof joined === 'string' && joined ? joined : 'Someone'} joined`;
+    return i18n.t('push.joined', { name: typeof joined === 'string' && joined ? joined : i18n.t('push.someone') });
   }
 
   const name = await authorName(circleId, envelope.authorPubkey);
   switch (envelope.type) {
     case EntryTypes.POST:
-      return `${name} added a photo`;
+      return i18n.t('push.post', { name });
     case EntryTypes.COMMENT: {
       const record = envelope.payload as { body?: unknown; postAuthorPubkey?: unknown } | undefined;
-      const text = typeof record?.body === 'string' && record.body ? `: “${record.body}”` : '';
+      const text = typeof record?.body === 'string' && record.body ? record.body : null;
       const postAuthor = record?.postAuthorPubkey;
-      if (typeof postAuthor !== 'string') return `${name} commented${text}`;
+      if (typeof postAuthor !== 'string') {
+        return text ? i18n.t('push.commentWithText', { name, text }) : i18n.t('push.comment', { name });
+      }
 
       const own = (await getCircleIdentity(circleId))?.publicKey;
-      return own && bytesToHex(own) === postAuthor
-        ? `${name} commented on your photo${text}`
-        : `${name} also commented${text}`;
+      if (own && bytesToHex(own) === postAuthor) {
+        return text ? i18n.t('push.commentOnYoursWithText', { name, text }) : i18n.t('push.commentOnYours', { name });
+      }
+      return text ? i18n.t('push.alsoCommentedWithText', { name, text }) : i18n.t('push.alsoCommented', { name });
     }
     case EntryTypes.REACTION: {
       // Every reaction push is already scoped to the post's own author (see
       // notify-circle.ts), so "your photo" is always literally true here.
       const emoji = (envelope.payload as { emoji?: unknown })?.emoji;
-      return typeof emoji === 'string' && emoji ? `${name} reacted ${emoji} to your photo` : `${name} reacted to your photo`;
+      return typeof emoji === 'string' && emoji
+        ? i18n.t('push.reactionWithEmoji', { name, emoji })
+        : i18n.t('push.reaction', { name });
     }
     default:
       return null;
@@ -117,5 +124,5 @@ async function authorName(circleId: string, authorPubkey: string): Promise<strin
   const member = (await getCircleMembers(circleId)).find(
     (candidate) => candidate.identityPublicKey === authorPubkey,
   );
-  return member?.name || 'Someone';
+  return member?.name || i18n.t('push.someone');
 }

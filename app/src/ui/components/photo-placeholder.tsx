@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
 import { StyleSheet, View, type ViewProps } from 'react-native';
 
@@ -21,10 +22,10 @@ export function missingPhotoFor(status: string | null | undefined): MissingPhoto
   return status === 'failed' ? 'unavailable' : 'arriving';
 }
 
-const NOTES: Record<MissingPhoto, { icon: IconGlyph; label: string }> = {
-  arriving: { icon: Icons.photoArriving, label: 'Photo on its way' },
-  unavailable: { icon: Icons.photoUnavailable, label: 'Photo unavailable' },
-};
+const NOTES = {
+  arriving: { icon: Icons.photoArriving, label: 'ui.photoArriving' },
+  unavailable: { icon: Icons.photoUnavailable, label: 'ui.photoUnavailable' },
+} as const satisfies Record<MissingPhoto, { icon: IconGlyph; label: string }>;
 
 export type PhotoPlaceholderProps = ViewProps & {
   /** Names the gap instead of leaving the hatch to be read as either loading or broken. */
@@ -38,6 +39,7 @@ export type PhotoPlaceholderProps = ViewProps & {
  * in the app is a placeholder until media upload/decrypt lands.
  */
 export function PhotoPlaceholder({ style, children, missing, compact, ...rest }: PhotoPlaceholderProps) {
+  const { t } = useTranslation();
   const { scheme } = useAppSettings();
   const theme = useTheme();
   const tints = useTints();
@@ -77,7 +79,7 @@ export function PhotoPlaceholder({ style, children, missing, compact, ...rest }:
           <Icon icon={NOTES[missing].icon} size={compact ? 15 : 18} color={theme.muted} />
           {compact ? null : (
             <ThemedText type="meta" themeColor="muted">
-              {NOTES[missing].label}
+              {t(NOTES[missing].label)}
             </ThemedText>
           )}
         </View>

@@ -1,3 +1,4 @@
+import { i18n } from '@/core/i18n/i18n';
 import {
   describeMembershipEvent,
   describeMembershipEventGroup,
@@ -5,6 +6,8 @@ import {
   type MembershipEventGroupItem,
   type MembershipEventItem,
 } from '@/features/feed/components/membership-event-row';
+
+const t = i18n.getFixedT('en');
 
 function event(overrides: Partial<MembershipEventItem> = {}): MembershipEventItem {
   return {
@@ -22,7 +25,7 @@ function event(overrides: Partial<MembershipEventItem> = {}): MembershipEventIte
 
 /** The rendered sentence, with the name/plain distinction flattened away. */
 const words = (item: MembershipEventItem) =>
-  describeMembershipEvent(item)
+  describeMembershipEvent(item, t)
     .map((segment) => segment.text)
     .join('');
 
@@ -71,7 +74,7 @@ describe('describeMembershipEvent', () => {
   });
 
   test('emphasises the names and nothing else', () => {
-    const segments = describeMembershipEvent(event({ kind: 'role_changed', role: 'admin' }));
+    const segments = describeMembershipEvent(event({ kind: 'role_changed', role: 'admin' }), t);
 
     expect(segments.filter((segment) => segment.name).map((segment) => segment.text)).toEqual(['Nadia', 'Marcus']);
   });
@@ -120,7 +123,7 @@ function group(overrides: Partial<MembershipEventGroupItem> = {}): MembershipEve
 
 /** The rendered sentence, with the name/plain/interactive distinction flattened away. */
 const groupWords = (item: MembershipEventGroupItem, expanded = false) =>
-  describeMembershipEventGroup(item, expanded)
+  describeMembershipEventGroup(item, expanded, t)
     .map((segment) => segment.text)
     .join('');
 
@@ -138,7 +141,7 @@ describe('describeMembershipEventGroup', () => {
   });
 
   test('the fold is marked interactive; nothing else is', () => {
-    const segments = describeMembershipEventGroup(group(), false);
+    const segments = describeMembershipEventGroup(group(), false, t);
 
     expect(segments.filter((s) => s.interactive).map((s) => s.text)).toEqual(['5 others']);
   });

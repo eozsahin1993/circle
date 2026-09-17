@@ -1,6 +1,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
@@ -37,26 +38,15 @@ import {
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { showDone, showError } from '@/core/services/messages';
 import { bytesToDataUri, pickAndCompressImage } from '@/core/photo/image';
+import { formatMonth } from '@/core/utils/time';
+import { useLanguage } from '@/core/i18n/use-language';
 
 function inviteLink(code: string): string {
   return `mimoza://join/${code}`;
 }
 
-function formatJoined(joinedAt: number): string {
-  return new Date(joinedAt).toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-  });
-}
-
-function pushLevelLabel(level: PushLevelId): string {
-  return PushLevels.find((candidate) => candidate.id === level)?.label ?? '';
-}
-
-function formatExpiry(expiresAt: number): string {
-  const days = Math.ceil((expiresAt - Date.now()) / (24 * 60 * 60 * 1000));
-  if (days <= 0) return 'expired';
-  return days === 1 ? 'expires in 1 day' : `expires in ${days} days`;
+function daysUntil(expiresAt: number): number {
+  return Math.ceil((expiresAt - Date.now()) / (24 * 60 * 60 * 1000));
 }
 
 /** Stable identity, so `avatarUris`' memo doesn't bust on every render. */
@@ -65,6 +55,8 @@ const NO_MEMBERS: Member[] = [];
 const NO_PUSH_PREFERENCES: CirclePushPreferences = { silenced: false, level: 'comments', categories: [] };
 
 export default function CircleDetailsScreen() {
+  const { t } = useTranslation();
+  const language = useLanguage();
   const theme = useTheme();
   const tints = useTints();
   const { circleId } = useLocalSearchParams<{ circleId: string }>();
@@ -114,6 +106,16 @@ export default function CircleDetailsScreen() {
     [members],
   );
 
+  function formatExpiry(expiresAt: number): string {
+    const days = daysUntil(expiresAt);
+    return days <= 0 ? t('circle.details.expired') : t('circle.details.expiresIn', { count: days });
+  }
+
+  function expiryFootnote(expiresAt: number): string {
+    const days = daysUntil(expiresAt);
+    return days <= 0 ? t('circle.details.keyExpired') : t('circle.details.keyExpiresIn', { count: days });
+  }
+
   useFocusEffect(
     useCallback(() => {
       reload().catch((err) => console.error('Failed to load circle details', err));
@@ -123,12 +125,12 @@ export default function CircleDetailsScreen() {
   function handleRemoveMember(member: Member) {
     if (!circleId) return;
     Alert.alert(
-      `Remove ${member.name || 'this member'}?`,
-      "They'll disappear from the roster and lose the ability to decrypt anything new, once this and everyone else's devices sync. They keep what they already downloaded.",
+      member.name ? t('circle.details.removeTitle', { name: member.name }) : t('circle.details.removeTitleUnnamed'),
+      t('circle.details.removeMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('circle.details.remove'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -136,7 +138,7 @@ export default function CircleDetailsScreen() {
               await reload();
             } catch (err) {
               console.error('Failed to remove member', err);
-              showError('Could not remove that member');
+              showError(t('circle.details.removeFailed'));
             }
           },
         },
@@ -152,10 +154,10 @@ export default function CircleDetailsScreen() {
       // Nothing on the roster moves until the relay accepts the change
       // and the entry syncs back, so say so rather than leave the tap
       // looking like it did nothing.
-      showDone(role === MemberRoles.admin ? 'They become an admin once this syncs' : 'They stop being an admin once this syncs');
+      showDone(role === MemberRoles.admin ? t('circle.details.becomesAdmin') : t('circle.details.stopsBeingAdmin'));
     } catch (err) {
       console.error('Failed to change member role', err);
-      showError('Could not change their role');
+      showError(t('circle.details.roleChangeFailed'));
     }
   }
 
@@ -163,17 +165,17 @@ export default function CircleDetailsScreen() {
     ? [
         memberMenu.role === MemberRoles.admin
           ? {
-              label: 'Remove as admin',
+              label: t('circle.details.removeAdmin'),
               icon: Icons.demote,
               onPress: () => handleSetRole(memberMenu, MemberRoles.member),
             }
           : {
-              label: 'Make admin',
+              label: t('circle.details.makeAdmin'),
               icon: Icons.promote,
               onPress: () => handleSetRole(memberMenu, MemberRoles.admin),
             },
         {
-          label: 'Remove from circle',
+          label: t('circle.details.removeFromCircle'),
           icon: Icons.removeMember,
           destructive: true,
           onPress: () => handleRemoveMember(memberMenu),
@@ -190,7 +192,7 @@ export default function CircleDetailsScreen() {
       await setCircleSilenced(circleId, silenced);
     } catch (err) {
       console.error('Failed to change notification settings', err);
-      showError("Couldn't reach the relay, but this phone remembers");
+      showError(t('circle.details.relayUnreachable'));
     }
     await reload();
   }
@@ -202,7 +204,7 @@ export default function CircleDetailsScreen() {
       await setCircleLevel(circleId, level);
     } catch (err) {
       console.error('Failed to change notification settings', err);
-      showError("Couldn't reach the relay, but this phone remembers");
+      showError(t('circle.details.relayUnreachable'));
     }
     await reload();
   }
@@ -213,11 +215,13 @@ export default function CircleDetailsScreen() {
     try {
       const invite = await getOrCreateInvite(circleId);
       await Share.share({
-        message: `Join ${circle?.name ?? 'my circle'} on Mimoza: ${inviteLink(invite.code)}`,
+        message: circle
+          ? t('circle.details.shareMessage', { name: circle.name, link: inviteLink(invite.code) })
+          : t('circle.details.shareMessageUnnamed', { link: inviteLink(invite.code) }),
       });
     } catch (err) {
       console.error('Failed to share invite', err);
-      showError('Could not create an invite');
+      showError(t('circle.details.inviteFailed'));
     } finally {
       setSharing(false);
     }
@@ -232,7 +236,7 @@ export default function CircleDetailsScreen() {
       setInviteSheet(true);
     } catch (err) {
       console.error('Failed to create an invite', err);
-      showError('Could not create an invite');
+      showError(t('circle.details.inviteFailed'));
     }
   }
 
@@ -240,12 +244,12 @@ export default function CircleDetailsScreen() {
   function handleReplaceKey() {
     if (!circleId) return;
     Alert.alert(
-      'Replace the key?',
-      'The old link and code stop working, so anyone still holding one can no longer ask to join. Everyone already in the circle stays in.',
+      t('circle.details.replaceKeyTitle'),
+      t('circle.details.replaceKeyMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Replace',
+          text: t('circle.details.replace'),
           style: 'destructive',
           onPress: async () => {
             setSharing(true);
@@ -254,7 +258,7 @@ export default function CircleDetailsScreen() {
               await reload();
             } catch (err) {
               console.error('Failed to replace the invite key', err);
-              showError('Could not replace the key');
+              showError(t('circle.details.replaceKeyFailed'));
             } finally {
               setSharing(false);
             }
@@ -270,17 +274,28 @@ export default function CircleDetailsScreen() {
     // hands the circle to someone, and this is where that can be
     // cancelled and overridden with "Make admin" on someone else.
     const successor = await departingSuccessor(circleId).catch(() => null);
+    const name = circle?.name;
     Alert.alert(
-      lastMember ? `Delete ${circle?.name ?? 'this circle'}?` : `Leave ${circle?.name ?? 'this circle'}?`,
       lastMember
-        ? `You are the only one left. This deletes ${circle?.name ?? 'this circle'} and every photo in it for good, and there is nobody who could invite you back.`
+        ? name
+          ? t('circle.details.deleteTitle', { name })
+          : t('circle.details.deleteTitleUnnamed')
+        : name
+          ? t('circle.details.leaveTitle', { name })
+          : t('circle.details.leaveTitleUnnamed'),
+      lastMember
+        ? name
+          ? t('circle.details.deleteMessage', { name })
+          : t('circle.details.deleteMessageUnnamed')
         : successor
-          ? `The circle disappears from this phone, and ${successor.name || 'the longest-standing member'} becomes admin.`
-          : 'The circle disappears from this phone, and you will need a new key to come back.',
+          ? successor.name
+            ? t('circle.details.leaveMessageSuccessor', { name: successor.name })
+            : t('circle.details.leaveMessageSuccessorUnnamed')
+          : t('circle.details.leaveMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: lastMember ? 'Delete' : 'Leave',
+          text: lastMember ? t('circle.details.delete') : t('circle.details.leave'),
           style: 'destructive',
           onPress: async () => {
             // All local: the entry announcing the departure is queued, not
@@ -289,7 +304,7 @@ export default function CircleDetailsScreen() {
               await leaveCircle(circleId);
             } catch (err) {
               console.error('Failed to leave circle', err);
-              showError(lastMember ? 'Could not delete the circle' : 'Could not leave the circle');
+              showError(lastMember ? t('circle.details.deleteFailed') : t('circle.details.leaveFailed'));
               return;
             }
             router.dismissTo('/circle');
@@ -308,7 +323,7 @@ export default function CircleDetailsScreen() {
       await reload();
     } catch (err) {
       console.error('Failed to set the cover photo', err);
-      showError('Could not set the cover photo');
+      showError(t('circle.details.coverFailed'));
     }
   }
 
@@ -320,7 +335,7 @@ export default function CircleDetailsScreen() {
       await reload();
     } catch (err) {
       console.error('Failed to rename the circle', err);
-      showError('Could not rename the circle');
+      showError(t('circle.details.renameFailed'));
       setRenaming(false);
     }
   }
@@ -345,11 +360,11 @@ export default function CircleDetailsScreen() {
    * someone.
    */
   const inviteGroup: SettingsGroup = {
-    title: 'Invite members',
+    title: t('circle.details.inviteMembers'),
     rows: [
       {
-        label: 'Share invite link',
-        description: 'Sends the key however you like',
+        label: t('circle.details.shareLink'),
+        description: t('circle.details.shareLinkDescription'),
         icon: Icons.inviteLink,
         // No chevron: this hands off to the OS share sheet rather than
         // opening a view of ours to come back from.
@@ -357,16 +372,16 @@ export default function CircleDetailsScreen() {
         onPress: handleShareLink,
       },
       {
-        label: 'Show a QR code',
-        description: 'For someone standing next to you',
+        label: t('circle.details.showCode'),
+        description: t('circle.details.showCodeDescription'),
         icon: Icons.inviteCode,
         control: { kind: 'navigate' },
         disabled: sharing,
         onPress: handleShowCode,
       },
       {
-        label: 'Replace the key',
-        description: 'The old link and code stop working',
+        label: t('circle.details.replaceKey'),
+        description: t('circle.details.replaceKeyDescription'),
         icon: Icons.replaceKey,
         // The code sits on the row that retires it, so what "the old code"
         // means is the thing you're looking at.
@@ -375,9 +390,9 @@ export default function CircleDetailsScreen() {
         onPress: handleReplaceKey,
       },
     ],
-    footnote: `The key only lets someone ask. You approve each person yourself before they see anything.${
-      invite ? ` This one ${formatExpiry(invite.expiresAt)}.` : ''
-    }`,
+    footnote: invite
+      ? `${t('circle.details.inviteFootnote')} ${expiryFootnote(invite.expiresAt)}`
+      : t('circle.details.inviteFootnote'),
   };
 
   /**
@@ -387,30 +402,30 @@ export default function CircleDetailsScreen() {
    */
   const settingsGroups: SettingsGroup[] = [
     {
-      title: 'Notifications',
+      title: t('circle.details.notifications'),
       footnote: push.silenced
-        ? 'Silenced, so nothing from here reaches you until you switch it back on.'
-        : 'Only this circle. Your other circles keep their own setting.',
+        ? t('circle.details.notificationsSilencedFootnote')
+        : t('circle.details.notificationsFootnote'),
       rows: [
         {
-          label: 'Silence this circle',
-          description: 'Nothing from here reaches your phone',
+          label: t('circle.details.silence'),
+          description: t('circle.details.silenceDescription'),
           control: { kind: 'switch', value: push.silenced, onValueChange: handleSilenceChange },
         },
         {
-          label: 'Notify me about',
-          control: { kind: 'value', text: pushLevelLabel(push.level) },
+          label: t('settings.notifyMeAbout'),
+          control: { kind: 'value', text: t(`settings.pushLevels.${push.level}`) },
           disabled: push.silenced,
           onPress: () => setLevelPicker(true),
         },
       ],
     },
     {
-      title: 'This circle',
+      title: t('circle.details.thisCircle'),
       rows: [
         admin && {
-          label: 'Cover photo',
-          description: 'What everyone sees on the circles list',
+          label: t('circle.details.coverPhoto'),
+          description: t('circle.details.coverPhotoDescription'),
           // Resolved the same way the list resolves it, newest-post
           // fallback included, so the row can't show a circle a different
           // face from the one you just tapped.
@@ -418,32 +433,32 @@ export default function CircleDetailsScreen() {
           onPress: handleSetCoverPhoto,
         },
         admin && {
-          label: 'Rename this circle',
-          description: 'Everyone sees the new name once their phone syncs',
+          label: t('circle.details.rename'),
+          description: t('circle.details.renameDescription'),
           control: { kind: 'navigate' },
           onPress: () => setRenaming(true),
         },
       ],
     },
     {
-      title: 'Careful',
+      title: t('circle.details.careful'),
       destructive: true,
       rows: [
         lastMember
           ? {
               // What actually happens: a sole member's departure runs
               // `deleteCircleForEveryone`, not a plain leave.
-              label: `Delete ${circle?.name ?? 'this circle'}`,
-              description: 'You are the only one here. The circle and every photo in it are removed for good.',
+              label: circle ? t('circle.details.deleteRow', { name: circle.name }) : t('circle.details.deleteRowUnnamed'),
+              description: t('circle.details.deleteRowDescription'),
               destructive: true,
               onPress: handleLeave,
             }
           : {
-              label: `Leave ${circle?.name ?? 'this circle'}`,
+              label: circle ? t('circle.details.leaveRow', { name: circle.name }) : t('circle.details.leaveRowUnnamed'),
               // Not "you keep the photos": `markCircleLeft` is a soft delete and
               // the bytes do survive, but every list filters left circles out,
               // so there is no screen that can still show them.
-              description: 'The circle disappears from this phone. You will need a new key to come back.',
+              description: t('circle.details.leaveRowDescription'),
               destructive: true,
               onPress: handleLeave,
             },
@@ -456,10 +471,10 @@ export default function CircleDetailsScreen() {
       <>
         <View style={styles.sectionHeader}>
           <ThemedText type="sectionTitle">
-            Members
+            {t('circle.details.members')}
           </ThemedText>
           <ThemedText type="meta" themeColor="muted">
-            {members.length} in the circle
+            {t('circle.details.inTheCircle', { count: members.length })}
           </ThemedText>
         </View>
 
@@ -467,8 +482,7 @@ export default function CircleDetailsScreen() {
 
         {soleAdmin && members.length > 1 ? (
           <ThemedText type="meta" themeColor="faint" style={styles.adminNotice}>
-            You are the only admin. If you lose this phone, nobody can be added or removed again. Tap
-            someone above to make them an admin too.
+            {t('circle.details.soleAdminNotice')}
           </ThemedText>
         ) : null}
       </>
@@ -488,17 +502,17 @@ export default function CircleDetailsScreen() {
 
         <View style={styles.memberInfo}>
           <View style={styles.memberNameRow}>
-            <ThemedText type="postAuthor">{member.name || 'Unnamed member'}</ThemedText>
+            <ThemedText type="postAuthor">{member.name || t('circle.details.unnamedMember')}</ThemedText>
             {member.role === MemberRoles.admin ? (
               <View style={[styles.adminBadge, { backgroundColor: theme.accent }]}>
                 <ThemedText type="meta" themeColor="accentLabel" style={styles.adminBadgeText}>
-                  Admin
+                  {t('circle.details.admin')}
                 </ThemedText>
               </View>
             ) : null}
           </View>
           <ThemedText type="meta" themeColor="muted">
-            Joined {formatJoined(member.joinedAt)}
+            {t('circle.details.joined', { month: formatMonth(member.joinedAt, language) })}
           </ThemedText>
         </View>
 
@@ -514,12 +528,12 @@ export default function CircleDetailsScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="Circle details" />
+        <ScreenHeader title={t('circle.details.title')} />
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
           <ThemedText type="screenTitle">{circle?.name ?? ''}</ThemedText>
           <ThemedText type="meta" themeColor="muted" style={styles.memberCount}>
-            {members.length} {members.length === 1 ? 'person' : 'people'}
+            {t('circle.peopleCount', { count: members.length })}
           </ThemedText>
 
           {admin ? <SettingsGroups groups={[inviteGroup]} /> : null}
@@ -541,11 +555,11 @@ export default function CircleDetailsScreen() {
 
       <PromptSheet
         visible={renaming}
-        title="Rename this circle"
-        description="Everyone sees the new name once their phone syncs."
+        title={t('circle.details.rename')}
+        description={t('circle.details.renamePromptDescription')}
         initialValue={circle?.name ?? ''}
-        placeholder="Circle name"
-        confirmLabel="Rename"
+        placeholder={t('circle.details.namePlaceholder')}
+        confirmLabel={t('circle.details.renameConfirm')}
         onCancel={() => setRenaming(false)}
         onConfirm={handleRename}
       />
@@ -561,8 +575,8 @@ export default function CircleDetailsScreen() {
       <OptionSheet
         visible={levelPicker}
         onClose={() => setLevelPicker(false)}
-        title="Notify me about"
-        options={PushLevels}
+        title={t('settings.notifyMeAbout')}
+        options={PushLevels.map((level) => ({ id: level.id, label: t(`settings.pushLevels.${level.id}`) }))}
         selected={push.level}
         onSelect={handleLevelChange}
       />
@@ -570,7 +584,7 @@ export default function CircleDetailsScreen() {
       <ActionSheet
         visible={memberMenu !== null}
         onClose={() => setMemberMenu(null)}
-        title={memberMenu?.name || 'This member'}
+        title={memberMenu?.name || t('circle.details.thisMember')}
         avatarUri={memberMenu ? avatarUris.get(memberMenu.identityPublicKey) : undefined}
         avatarName={memberMenu?.name}
         avatarColorSeed={memberMenu?.identityPublicKey}

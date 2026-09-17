@@ -1,7 +1,9 @@
+import type { TFunction } from 'i18next';
 import { bytesToHex } from '@noble/curves/utils.js';
 import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
@@ -42,19 +44,24 @@ import { getCircleIdentity } from '@/core/services/keystore/circle-keys';
 import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
 import { onPhotoFetched } from '@/core/photo/photo-events';
 import { formatDay, formatRelative, formatTimestamp } from '@/core/utils/time';
+import { useLanguage } from '@/core/i18n/use-language';
 
 /** Names shown before the rest become "& N others" — enough to recognise who, not a roster dump. */
 const PREVIEW_NAMES = 3;
 
-/** "Aunt Ro, Dad, Emre & 5 others" — or every name, once expanded. */
-function listReactors(names: string[], expanded: boolean): string {
+/** "Aunt Ro, Dad, Emre & 5 others reacted." — or every name, once expanded. */
+function describeReactors(names: string[], expanded: boolean, t: TFunction): string {
   const shown = expanded ? names : names.slice(0, PREVIEW_NAMES);
   const hidden = names.length - shown.length;
 
-  return hidden > 0 ? `${shown.join(', ')} & ${hidden} other${hidden === 1 ? '' : 's'}` : shown.join(', ');
+  return hidden > 0
+    ? t('post.details.reactedWithOthers', { names: shown.join(', '), count: hidden })
+    : t('post.details.reacted', { names: shown.join(', '), count: shown.length });
 }
 
 export default function PostDetailsScreen() {
+  const { t } = useTranslation();
+  const language = useLanguage();
   const theme = useTheme();
   const { id: postId, circleId } = useLocalSearchParams<{ id: string; circleId: string }>();
 
@@ -157,7 +164,7 @@ export default function PostDetailsScreen() {
       setPost({ ...post, inAlbum: post.inAlbum });
       // The revert is otherwise indistinguishable from the tap not
       // registering, or from the app undoing it on a whim.
-      showError(next ? 'Could not add it to the album' : 'Could not remove it from the album');
+      showError(next ? t('post.addToAlbumFailed') : t('post.removeFromAlbumFailed'));
     }
   }
 
@@ -169,9 +176,9 @@ export default function PostDetailsScreen() {
   function handleDelete() {
     if (!circleId || !postId) return;
 
-    Alert.alert('Delete this photo?', 'It will disappear for everyone in the circle. This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: runDelete },
+    Alert.alert(t('post.details.deleteConfirmTitle'), t('post.details.deleteConfirmMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('post.details.delete'), style: 'destructive', onPress: runDelete },
     ]);
   }
 
@@ -182,11 +189,11 @@ export default function PostDetailsScreen() {
     deletePost(circleId, postId)
       .then(() => {
         router.back();
-        showMessage('Photo deleted', { icon: Icons.deletePost });
+        showMessage(t('post.details.deleted'), { icon: Icons.deletePost });
       })
       .catch((err) => {
         console.error('Failed to delete the post', err);
-        showError('Could not delete the photo', { action: { label: 'Retry', onPress: runDelete } });
+        showError(t('post.details.deleteFailed'), { action: { label: t('post.details.retry'), onPress: runDelete } });
       });
   }
 
@@ -203,7 +210,7 @@ export default function PostDetailsScreen() {
       <ThemedSafeAreaView style={styles.safeArea}>
         <View style={styles.headerInset}>
           <ScreenHeader
-            title="Post"
+            title={t('post.details.title')}
             subtitle={circleName}
             actions={
               // Both are about the post as a whole, so they sit in the
@@ -215,12 +222,12 @@ export default function PostDetailsScreen() {
                   <HeaderIconButton
                     icon={Icons.inAlbum}
                     active={post.inAlbum}
-                    accessibilityLabel={post.inAlbum ? 'Remove from album' : 'Add to album'}
+                    accessibilityLabel={post.inAlbum ? t('post.removeFromAlbum') : t('post.addToAlbum')}
                     onPress={handleToggleAlbum}
                   />
                   <HeaderIconButton
                     icon={Icons.more}
-                    accessibilityLabel="More"
+                    accessibilityLabel={t('post.details.more')}
                     onPress={() => setShowActions(true)}
                   />
                 </>
@@ -250,7 +257,7 @@ export default function PostDetailsScreen() {
                     gets the bookmark in the header that changes it. */}
                 <View style={[styles.byline, post.caption ? null : styles.bylineAlone]}>
                   <ThemedText type="meta" themeColor="muted">
-                    {post.authorName || profileName || 'Unknown member'} · {formatTimestamp(post.createdAt)}
+                    {post.authorName || profileName || t('post.unknownMember')} · {formatTimestamp(post.createdAt, language)}
                   </ThemedText>
                   {post.inAlbum ? (
                     <>
@@ -259,7 +266,7 @@ export default function PostDetailsScreen() {
                       </ThemedText>
                       <Icon icon={Icons.inAlbum} size={12} color={theme.accent} filled />
                       <ThemedText type="meta" themeColor="accent">
-                        Album
+                        {t('post.album')}
                       </ThemedText>
                     </>
                   ) : null}
@@ -281,9 +288,9 @@ export default function PostDetailsScreen() {
                 />
               ))}
               {reactions.length > 0 ? (
-                <ReactionChip label="+" accessibilityLabel="Add a reaction" onPress={() => setShowPicker((v) => !v)} />
+                <ReactionChip label="+" accessibilityLabel={t('post.addReaction')} onPress={() => setShowPicker((v) => !v)} />
               ) : (
-                <ReactionChip icon={Icons.react} label="React" onPress={() => setShowPicker((v) => !v)} />
+                <ReactionChip icon={Icons.react} label={t('post.react')} onPress={() => setShowPicker((v) => !v)} />
               )}
             </View>
 
@@ -297,14 +304,14 @@ export default function PostDetailsScreen() {
                 above already carry which emoji and how many. */}
             {reactors.length > 0 ? (
               <ThemedText type="comment" themeColor="secondary" style={styles.reactors}>
-                {`${listReactors(reactors, showAllReactors)} reacted.`}
+                {describeReactors(reactors, showAllReactors, t)}
                 {reactors.length > PREVIEW_NAMES ? (
                   <>
                     {' '}
                     {/* Nested so it flows with the names instead of being
                         pinned somewhere a long list can't wrap to. */}
                     <ThemedText type="comment" themeColor="accentBright" onPress={() => setShowAllReactors((v) => !v)}>
-                      {showAllReactors ? 'See less' : 'See all'}
+                      {showAllReactors ? t('post.details.seeLess') : t('post.details.seeAll')}
                     </ThemedText>
                   </>
                 ) : null}
@@ -324,9 +331,9 @@ export default function PostDetailsScreen() {
                   />
                   <View style={styles.commentBody}>
                     <View style={styles.commentByline}>
-                      <ThemedText type="postAuthor">{comment.authorName || profileName || 'Unknown member'}</ThemedText>
+                      <ThemedText type="postAuthor">{comment.authorName || profileName || t('post.unknownMember')}</ThemedText>
                       <ThemedText type="meta" themeColor="faint">
-                        {formatRelative(comment.createdAt)}
+                        {formatRelative(comment.createdAt, language)}
                       </ThemedText>
                     </View>
                     <ThemedText type="comment" themeColor="secondary">
@@ -343,7 +350,7 @@ export default function PostDetailsScreen() {
               value={commentText}
               onChangeText={setCommentText}
               onSubmitEditing={handleSubmitComment}
-              placeholder="Say something to the circle"
+              placeholder={t('post.details.commentPlaceholder')}
               placeholderTextColor={theme.faint}
               returnKeyType="send"
               style={[styles.composerInput, { color: theme.text, borderColor: theme.faint }]}
@@ -365,14 +372,14 @@ export default function PostDetailsScreen() {
       <ActionSheet
         visible={showActions}
         onClose={() => setShowActions(false)}
-        title={post?.authorName ? `${post.authorName}’s photo` : 'This photo'}
-        subtitle={post ? `${formatDay(post.createdAt)} · ${circleName}` : undefined}
+        title={post?.authorName ? t('post.details.authorsPhoto', { name: post.authorName }) : t('post.details.thisPhoto')}
+        subtitle={post ? `${formatDay(post.createdAt, language)} · ${circleName}` : undefined}
         avatarUri={photoUri}
         avatarRadius={Radius.input}
         options={[
           {
-            label: 'Delete this photo',
-            description: ownPost ? 'It’s yours to take back.' : 'You are an admin of this circle.',
+            label: t('post.details.deleteThisPhoto'),
+            description: ownPost ? t('post.details.deleteBecauseYours') : t('post.details.deleteBecauseAdmin'),
             icon: Icons.deletePost,
             destructive: true,
             onPress: handleDelete,

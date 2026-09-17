@@ -1,6 +1,7 @@
 import * as Device from 'expo-device';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
@@ -31,6 +32,7 @@ const QR_SIZE = 220;
  * who photographs it.
  */
 export default function DeviceTransferScreen() {
+  const { t } = useTranslation();
   const tints = useTints();
   const [pending, setPending] = useState<PendingDeviceTransfer | null>(null);
   const [failed, setFailed] = useState(false);
@@ -42,7 +44,7 @@ export default function DeviceTransferScreen() {
   useEffect(() => {
     let cancelled = false;
 
-    startDeviceTransfer(Device.modelName ?? 'A new phone')
+    startDeviceTransfer(Device.modelName ?? t('account.transfer.unnamedDevice'))
       .then((started) => !cancelled && setPending(started))
       .catch((err) => {
         console.error('Failed to start a device transfer', err);
@@ -65,14 +67,12 @@ export default function DeviceTransferScreen() {
         if (!result.transferred) return;
 
         done.current = true;
-        showDone(
-          result.circleCount === 1 ? 'Brought over 1 circle' : `Brought over ${result.circleCount} circles`,
-        );
+        showDone(t('account.transfer.broughtOver', { count: result.circleCount }));
         router.replace('/circle');
       } catch (err) {
         console.error('Failed to complete a device transfer', err);
         done.current = true;
-        showError("That transfer couldn't be completed");
+        showError(t('account.transfer.failed'));
         setFailed(true);
       } finally {
         inFlight.current = false;
@@ -85,11 +85,11 @@ export default function DeviceTransferScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="Bring over an account" />
+        <ScreenHeader title={t('account.transfer.header')} />
 
         <View style={styles.content}>
           <ThemedText type="captionFeed" themeColor="secondary">
-            On your old phone, open Account and tap Add another device, then point it at this code.
+            {t('account.transfer.instructions')}
           </ThemedText>
 
           <View style={[styles.qrFrame, { borderColor: tints.chipIdleBorder }]}>
@@ -114,28 +114,27 @@ export default function DeviceTransferScreen() {
 
           {failed ? (
             <ThemedText type="meta" themeColor="muted" style={styles.status}>
-              Something went wrong. Go back and try again.
+              {t('account.transfer.somethingWrong')}
             </ThemedText>
           ) : (
             <ThemedText type="meta" themeColor="muted" style={styles.status}>
-              Waiting for your other phone…
+              {t('account.transfer.waiting')}
             </ThemedText>
           )}
 
           <View style={styles.spacer} />
 
           <ThemedText type="meta" themeColor="faint">
-            Your old phone asks you to confirm before anything is sent. Nothing on this screen is
-            secret on its own.
+            {t('account.transfer.reassurance')}
           </ThemedText>
 
           <Pressable style={styles.noOtherPhone} onPress={() => router.replace('/account/restore')}>
             <ThemedText type="buttonLabel" themeColor="accentBright">
-              I don&apos;t have my old phone
+              {t('account.transfer.noOldPhone')}
             </ThemedText>
           </Pressable>
 
-          <PrimaryButton label="Cancel" onPress={() => router.back()} />
+          <PrimaryButton label={t('common.cancel')} onPress={() => router.back()} />
         </View>
       </ThemedSafeAreaView>
     </ThemedView>

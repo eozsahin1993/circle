@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Animated, Dimensions, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
@@ -64,6 +65,7 @@ export function ActionSheet({
   avatarRadius,
   options,
 }: ActionSheetProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const tints = useTints();
   // Same not-yet-visible-but-still-mounted trick as PrivacyInfoModal —
@@ -156,7 +158,7 @@ export function ActionSheet({
               ))}
             </ThemedView>
 
-            <SecondaryButton label="Cancel" style={styles.cancelButton} onPress={onClose} />
+            <SecondaryButton label={t('common.cancel')} style={styles.cancelButton} onPress={onClose} />
           </ThemedSafeAreaView>
         </ThemedView>
       </Animated.View>

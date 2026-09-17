@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { BottomSheet } from '@/ui/components/bottom-sheet';
@@ -40,6 +41,7 @@ export function PromptSheet({
   onConfirm,
   busy,
 }: PromptSheetProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [value, setValue] = useState(initialValue);
 
@@ -70,7 +72,7 @@ export function PromptSheet({
         />
 
         <View style={styles.actions}>
-          <SecondaryButton label="Cancel" style={styles.action} onPress={onCancel} />
+          <SecondaryButton label={t('common.cancel')} style={styles.action} onPress={onCancel} />
           <PrimaryButton
             label={confirmLabel}
             style={styles.action}

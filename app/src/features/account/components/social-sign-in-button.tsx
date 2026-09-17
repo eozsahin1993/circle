@@ -2,6 +2,7 @@ import { AntDesign } from '@expo/vector-icons';
 import { Pressable, View, StyleSheet, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ButtonHeight, Radius } from '@/ui/theme/tokens';
@@ -74,6 +75,7 @@ export type AppleSignInButtonProps = Omit<PressableProps, 'style' | 'children'>;
  * either way — light mode needs the inverse pair instead.
  */
 export function AppleSignInButton(props: AppleSignInButtonProps) {
+  const { t } = useTranslation();
   const { scheme } = useAppSettings();
   const fill = scheme === 'dark' ? '#F4EDE2' : '#231A11';
   const content = scheme === 'dark' ? '#000000' : '#F4EDE2';
@@ -81,7 +83,7 @@ export function AppleSignInButton(props: AppleSignInButtonProps) {
   return (
     <SocialButton
       {...props}
-      label="Continue with Apple"
+      label={t('onboarding.continueWithApple')}
       icon={<AntDesign name="apple" size={18} color={content} />}
       contentColor={content}
       fillStyle={{ backgroundColor: fill }}
@@ -97,13 +99,14 @@ export type GoogleSignInButtonProps = Omit<PressableProps, 'style' | 'children'>
  * to sit next to the Apple button without one looking like an afterthought.
  */
 export function GoogleSignInButton(props: GoogleSignInButtonProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const tints = useTints();
 
   return (
     <SocialButton
       {...props}
-      label="Continue with Google"
+      label={t('onboarding.continueWithGoogle')}
       icon={<GoogleLogo />}
       contentColor={theme.text}
       fillStyle={[styles.google, { borderColor: tints.secondaryButtonBorder }]}

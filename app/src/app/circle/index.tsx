@@ -1,6 +1,7 @@
 import { bytesToHex } from '@noble/curves/utils.js';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
@@ -37,12 +38,14 @@ import { formatAgo } from '@/core/utils/time';
 import { nudgePhotoQueue } from '@/core/photo/photo-queue';
 import { showError } from '@/core/services/messages';
 import { syncAllCircles } from '@/core/sync/sync-circles';
+import { useLanguage } from '@/core/i18n/use-language';
 
 type CircleListItem = CircleListRow & {
   memberCount: number;
   photoUri?: string;
   newCount: number;
-  latestActivity?: string;
+  /** When the newest photo was added — null for a circle with none yet. */
+  newestPostAt: number | null;
 };
 
 /**
@@ -57,13 +60,9 @@ async function resolveUnreadCount(circle: CircleListRow): Promise<number> {
   return getUnreadCount(circle.id, bytesToHex(identity.publicKey), circle.createdAt, circle.lastViewedAt);
 }
 
-/** "Last added just now" / "…3 hours ago" / "…6 days ago" — undefined for a circle with no posts yet. */
-async function resolveLatestActivity(circleId: string): Promise<string | undefined> {
-  const newestPostCreatedAt = await getNewestPostCreatedAt(circleId);
-  return newestPostCreatedAt === null ? undefined : `Last added ${formatAgo(newestPostCreatedAt)}`;
-}
-
 export default function CircleListScreen() {
+  const { t } = useTranslation();
+  const language = useLanguage();
   const [avatarUri, setAvatarUri] = useState<string | undefined>();
   // Only for the header avatar's initials — the name isn't shown here.
   const [profileName, setProfileName] = useState<string | undefined>();
@@ -91,13 +90,13 @@ export default function CircleListScreen() {
     const allCircles = await listCircles();
     const withCounts = await Promise.all(
       allCircles.map(async (circle) => {
-        const [memberCount, photoUri, newCount, latestActivity] = await Promise.all([
+        const [memberCount, photoUri, newCount, newestPostAt] = await Promise.all([
           getCircleMemberCount(circle.id),
           resolveCircleCoverUri(circle.id),
           resolveUnreadCount(circle),
-          resolveLatestActivity(circle.id),
+          getNewestPostCreatedAt(circle.id),
         ]);
-        return { ...circle, memberCount, photoUri, newCount, latestActivity };
+        return { ...circle, memberCount, photoUri, newCount, newestPostAt };
       }),
     );
     setCircles(withCounts);
@@ -162,10 +161,10 @@ export default function CircleListScreen() {
   );
 
   const handleCancelPending = useCallback((request: PendingJoinRequest) => {
-    Alert.alert(`Stop waiting to join ${request.circleName}?`, 'You can ask again with a new key.', [
-      { text: 'Keep waiting', style: 'cancel' },
+    Alert.alert(t('circle.list.cancelPendingTitle', { name: request.circleName }), t('circle.list.cancelPendingMessage'), [
+      { text: t('circle.list.keepWaiting'), style: 'cancel' },
       {
-        text: 'Cancel request',
+        text: t('circle.list.cancelRequest'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -177,7 +176,7 @@ export default function CircleListScreen() {
         },
       },
     ]);
-  }, []);
+  }, [t]);
 
   /** Syncs every circle, then re-reads. Photos are left to their own queue. */
   const handleRefresh = useCallback(async () => {
@@ -191,12 +190,12 @@ export default function CircleListScreen() {
 
       const failed = await syncAllCircles();
       nudgePhotoQueue();
-      if (failed > 0) showError('Could not refresh your circles');
+      if (failed > 0) showError(t('circle.list.refreshFailed'));
     } finally {
       await loadFromDatabase().catch((err) => console.error('Failed to reload circles', err));
       setRefreshing(false);
     }
-  }, [loadFromDatabase, completePendingJoins]);
+  }, [loadFromDatabase, completePendingJoins, t]);
 
   return (
     <ThemedView style={styles.screen}>
@@ -219,7 +218,7 @@ export default function CircleListScreen() {
               {pending.length ? (
                 <View style={styles.pending}>
                   <ThemedText type="sectionTitle">
-                    {`Waiting to join · ${pending.length}`}
+                    {t('circle.list.waitingToJoin', { count: pending.length })}
                   </ThemedText>
                   {pending.map((request) => (
                     <PendingCircleCard
@@ -235,7 +234,7 @@ export default function CircleListScreen() {
               ) : null}
               {loaded && circles.length ? (
                 <ThemedText type="sectionTitle" style={styles.sectionTitle}>
-                  Your circles
+                  {t('circle.list.yourCircles')}
                 </ThemedText>
               ) : null}
             </>
@@ -247,7 +246,11 @@ export default function CircleListScreen() {
               memberCount={item.memberCount}
               photoUri={item.photoUri}
               newCount={item.newCount}
-              latestActivity={item.latestActivity}
+              latestActivity={
+                item.newestPostAt === null
+                  ? undefined
+                  : t('circle.lastAdded', { ago: formatAgo(item.newestPostAt, language) })
+              }
               onPress={() => router.push({ pathname: '/circle/feed', params: { circleId: item.id } })}
             />
           )}
@@ -260,13 +263,12 @@ export default function CircleListScreen() {
               <View style={styles.empty}>
                 <EmptyCirclesIcon />
                 <ThemedText type="screenTitle" style={styles.emptyTitle}>
-                  No circles yet
+                  {t('circle.list.emptyTitle')}
                 </ThemedText>
                 <ThemedText type="captionFeed" themeColor="muted" style={styles.emptyBody}>
-                  Create one to share memories with the people in it. Circles are invite-only, so
-                  open a link someone sent you to join one.
+                  {t('circle.list.emptyBody')}
                 </ThemedText>
-                <SecondaryButton label="Create a circle" onPress={() => router.push('/circle/new')} style={styles.emptyButton} />
+                <SecondaryButton label={t('circle.list.createCircle')} onPress={() => router.push('/circle/new')} style={styles.emptyButton} />
               </View>
             ) : null
           }

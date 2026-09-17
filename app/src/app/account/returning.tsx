@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon, type IconGlyph } from '@/ui/components/icon';
@@ -25,6 +26,7 @@ import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
  * and every manifest write fails as a `ForeignManifestError` nobody chose.
  */
 export default function ReturningAccountScreen() {
+  const { t } = useTranslation();
   // Unset when the check couldn't reach the relay. Asking anyway beats
   // minting a seed in silence, but it mustn't claim to know something it
   // doesn't — a first-time user offline would be told they'd been here.
@@ -35,16 +37,14 @@ export default function ReturningAccountScreen() {
       <ThemedSafeAreaView style={styles.safeArea}>
         {/* No back: only reachable right after sign-in, and behind it is
             the sign-in screen the user just left. */}
-        <ScreenHeader title="Welcome back" hideBack />
+        <ScreenHeader title={t('account.returning.header')} hideBack />
 
         <View style={styles.content}>
           <ThemedText type="screenTitle">
-            {certain ? "You've used Mimoza before" : 'Used Mimoza before?'}
+            {certain ? t('account.returning.titleCertain') : t('account.returning.titleUncertain')}
           </ThemedText>
           <ThemedText type="captionFeed" themeColor="secondary">
-            {certain
-              ? "Your circles are still there. This phone just can't read them yet."
-              : "We couldn't reach the server to check. If you've had an account, bring it over now. Once this phone makes its own, the old one is out of reach."}
+            {certain ? t('account.returning.bodyCertain') : t('account.returning.bodyUncertain')}
           </ThemedText>
 
           <View style={styles.options}>
@@ -52,14 +52,14 @@ export default function ReturningAccountScreen() {
                 The phrase restores who you are, not what you can read. */}
             <OptionCard
               icon={Icons.inviteCode}
-              label="Use another device"
-              description="Your old phone scans a code from this one. Restores everything."
+              label={t('account.returning.useDevice')}
+              description={t('account.returning.useDeviceDescription')}
               onPress={() => router.push('/account/transfer')}
             />
             <OptionCard
               icon={Icons.locked}
-              label="Use your recovery phrase"
-              description="Comes back as yourself. Someone in each circle still has to let you in."
+              label={t('account.returning.usePhrase')}
+              description={t('account.returning.usePhraseDescription')}
               onPress={() => router.push('/account/restore')}
             />
           </View>
@@ -67,7 +67,7 @@ export default function ReturningAccountScreen() {
 
         <Pressable style={styles.startFresh} onPress={() => router.push('/account/start-fresh')}>
           <ThemedText type="meta" themeColor="accent" style={styles.startFreshText}>
-            Start fresh instead. Your previous account details will be gone.
+            {t('account.returning.startFresh')}
           </ThemedText>
         </Pressable>
       </ThemedSafeAreaView>

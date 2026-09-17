@@ -26,7 +26,7 @@ function renderedGroup(row: { render: () => React.ReactElement }): MembershipEve
 
 describe('rosterChangeRows', () => {
   test('one event is a day header, its one row, then a spacer closing the block', () => {
-    const rows = rosterChangeRows([event()], [], null);
+    const rows = rosterChangeRows([event()], [], null, 'en');
 
     expect(rows).toHaveLength(3);
     expect(rows[0].at).toBeGreaterThan(rows[1].at!);
@@ -38,7 +38,7 @@ describe('rosterChangeRows', () => {
     const events = [event({ id: '1', occurredAt: NOON }), event({ id: '2', occurredAt: NOON - 2000 })];
     const postTimestamps = [NOON - 1000];
 
-    const rows = rosterChangeRows(events, postTimestamps, null);
+    const rows = rosterChangeRows(events, postTimestamps, null, 'en');
 
     // header, row, spacer, header, row, spacer
     expect(rows).toHaveLength(6);
@@ -52,13 +52,13 @@ describe('rosterChangeRows', () => {
    * would otherwise break, since that row is both first and last.
    */
   test('the spacer sits between the last row and whatever comes next, not between the header and the row', () => {
-    const rows = rosterChangeRows([event()], [], null);
+    const rows = rosterChangeRows([event()], [], null, 'en');
 
     expect(rows[1].spacing).toBeLessThan(rows[2].spacing);
   });
 
   test('resolves ownPublicKey into actorIsYou/subjectIsYou on the built group', () => {
-    const rows = rosterChangeRows([event({ actorPublicKey: 'me', subjectPublicKey: 'marcus' })], [], 'me');
+    const rows = rosterChangeRows([event({ actorPublicKey: 'me', subjectPublicKey: 'marcus' })], [], 'me', 'en');
 
     const group = renderedGroup(rows[1]);
     expect(group.actorIsYou).toBe(true);
@@ -66,14 +66,14 @@ describe('rosterChangeRows', () => {
   });
 
   test('a blank subject name (event landed before the roster write behind it) falls back to "Someone"', () => {
-    const rows = rosterChangeRows([event({ subjectName: '' })], [], null);
+    const rows = rosterChangeRows([event({ subjectName: '' })], [], null, 'en');
 
     expect(renderedGroup(rows[1]).subjects[0].subjectName).toBe('Someone');
   });
 
   test('every row key is unique, even across two same-day blocks', () => {
     const events = [event({ id: '1', occurredAt: NOON }), event({ id: '2', occurredAt: NOON - 2000 })];
-    const rows = rosterChangeRows(events, [NOON - 1000], null);
+    const rows = rosterChangeRows(events, [NOON - 1000], null, 'en');
 
     expect(new Set(rows.map((row) => row.key)).size).toBe(rows.length);
   });

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Animated, Dimensions, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
@@ -24,29 +25,13 @@ export type PrivacyInfoModalProps = {
 // everything one identity posted — the relay can tell two entries in the
 // same circle share an author, though never who that author is or
 // whether they're active in any other circle.
-const SECTIONS = [
-  {
-    label: 'Your content',
-    body: "Everything you add is meant to be encrypted on your device with a key that belongs to the circle, not us. Copies remain on every member's device, and we help you keep an offline backup as well.",
-  },
-  {
-    label: 'Your account',
-    body: "Signing in only confirms you're a real person, to prevent abuse. It's stored separately from your circles and is never linked to what you post or who you're with.",
-  },
-  {
-    label: 'What we can see',
-    body: 'At rest, we can determine that two entries in the same circle share an author, but never who that person is. We see only that a circle exists, how active it is, and that requests occur, never who made them or what they contain.',
-  },
-  {
-    label: 'If someone leaves',
-    body: 'The circle key rotates when someone leaves. They keep what they already downloaded, and receive nothing further.',
-  },
-];
+const SECTIONS = ['content', 'account', 'visibility', 'leaving'] as const;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const SLIDE_DISTANCE = Dimensions.get('window').height;
 
 export function PrivacyInfoModal({ visible, onClose }: PrivacyInfoModalProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   // Modal unmounts the instant `visible` goes false, which would cut off
   // any exit animation — so mounting is tracked separately, and only
@@ -93,23 +78,23 @@ export function PrivacyInfoModal({ visible, onClose }: PrivacyInfoModalProps) {
 
             <ScrollView contentContainerStyle={styles.content}>
               <ThemedText type="screenTitle" style={styles.title}>
-                Where your content lives
+                {t('account.privacy.title')}
               </ThemedText>
 
               {SECTIONS.map((section) => (
-                <View key={section.label} style={styles.section}>
+                <View key={section} style={styles.section}>
                   <ThemedText type="sectionTitle">
-                    {section.label}
+                    {t(`account.privacy.${section}Label`)}
                   </ThemedText>
                   <ThemedText type="captionFeed" themeColor="secondary">
-                    {section.body}
+                    {t(`account.privacy.${section}Body`)}
                   </ThemedText>
                 </View>
               ))}
             </ScrollView>
 
             <View style={styles.footer}>
-              <SecondaryButton label="Close" onPress={onClose} />
+              <SecondaryButton label={t('account.privacy.close')} onPress={onClose} />
             </View>
           </ThemedSafeAreaView>
         </ThemedView>

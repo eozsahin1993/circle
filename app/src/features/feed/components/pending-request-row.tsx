@@ -5,6 +5,7 @@ import type { FeedRow, FeedRows } from '@/features/feed/components/rows';
 import { PendingJoinRequestCard } from '@/features/invite/components/pending-join-request-card';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Spacing } from '@/ui/theme/tokens';
+import { i18n } from '@/core/i18n/i18n';
 import { showError } from '@/core/services/messages';
 import {
   approveJoinRequest,
@@ -90,7 +91,7 @@ export function usePendingRequestRows({ circleId, onRosterChanged }: PendingRequ
           requesterId,
           () => approveJoinRequest(circleId, requesterId),
           'Failed to approve join request',
-          'Could not let them in',
+          i18n.t('feed.approveRequestFailed'),
           true,
         ),
       // Denying changes nothing outside this list.
@@ -99,7 +100,7 @@ export function usePendingRequestRows({ circleId, onRosterChanged }: PendingRequ
           requesterId,
           () => denyJoinRequest(circleId, requesterId),
           'Failed to dismiss join request',
-          'Could not dismiss the request',
+          i18n.t('feed.denyRequestFailed'),
         ),
     }),
     [busyId, answer, circleId],

@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
@@ -18,6 +19,7 @@ import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { goPostAuth } from '@/features/invite/services/pending-invite';
 
 export default function ProfileSetupScreen() {
+  const { t } = useTranslation();
   const theme = useTheme();
   const tints = useTints();
   // Only ever set by index.tsx, right after a first-time sign-in — see
@@ -86,7 +88,7 @@ export default function ProfileSetupScreen() {
       await goPostAuth(router);
     } catch (err) {
       console.error('Failed to save profile', err);
-      setError("Couldn't save your profile. Try again.");
+      setError(t('onboarding.profile.saveFailed'));
       setSaving(false);
     }
   }
@@ -97,33 +99,32 @@ export default function ProfileSetupScreen() {
         {/* Mid-onboarding, back would land on the sign-in screen (or a
             stale Welcome back after Start fresh) with a live session —
             editing from /account keeps it. */}
-        <ScreenHeader title="Your profile" hideBack={isOnboarding} />
+        <ScreenHeader title={t('onboarding.profile.header')} hideBack={isOnboarding} />
 
         <KeyboardAvoider style={styles.form}>
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-            <ThemedText type="screenTitle">Who are you, to the people in your circles?</ThemedText>
+            <ThemedText type="screenTitle">{t('onboarding.profile.title')}</ThemedText>
             <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
-              A picture and a name. That is the whole profile: no username, no bio, no email, no
-              phone number. There is nothing else to collect.
+              {t('onboarding.profile.body')}
             </ThemedText>
 
             <Pressable style={styles.pictureRow} onPress={handleAddPicture}>
               <Avatar size={64} uri={picture?.uri} name={name} colorSeed={colorSeed} />
               <View style={styles.pictureText}>
-                <ThemedText type="cardTitle">Add a picture</ThemedText>
+                <ThemedText type="cardTitle">{t('onboarding.profile.addPicture')}</ThemedText>
                 <ThemedText type="meta" themeColor="muted">
-                  Stays on your device and the devices of people you share circles with.
+                  {t('onboarding.profile.pictureVisibility')}
                 </ThemedText>
               </View>
             </Pressable>
 
             <ThemedText type="sectionTitle" style={styles.nameLabel}>
-              Full name
+              {t('onboarding.profile.nameLabel')}
             </ThemedText>
             <TextInput
               value={name}
               onChangeText={setName}
-              placeholder="e.g. Marcus Adeyemi"
+              placeholder={t('onboarding.profile.namePlaceholder')}
               placeholderTextColor={theme.faint}
               style={[styles.input, { color: theme.text, borderColor: tints.secondaryButtonBorder }]}
             />
@@ -136,7 +137,7 @@ export default function ProfileSetupScreen() {
           ) : null}
 
           <PrimaryButton
-            label={name.trim() ? 'Continue' : 'Add your name to continue'}
+            label={name.trim() ? t('onboarding.profile.continue') : t('onboarding.profile.addNameToContinue')}
             disabled={!name.trim() || saving}
             onPress={handleContinue}
             style={styles.continueButton}
@@ -152,7 +153,7 @@ export default function ProfileSetupScreen() {
               disabled={saving}
               onPress={() => router.push('/account/transfer')}>
               <ThemedText type="buttonLabel" themeColor="accentBright">
-                I already have an account
+                {t('onboarding.profile.alreadyHaveAccount')}
               </ThemedText>
             </Pressable>
           ) : null}

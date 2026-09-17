@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
@@ -23,6 +24,7 @@ import { enablePushEverywhere } from '@/features/push-notifications/usecases/ena
 type Provider = 'apple' | 'google';
 
 export default function WelcomeScreen() {
+  const { t } = useTranslation();
   // null = still checking. Runs once per launch; _layout.tsx already
   // guarantees the database is ready before this screen ever mounts.
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
@@ -105,8 +107,10 @@ export default function WelcomeScreen() {
       // so telling an Android user to "try Apple instead" would be wrong.
       const otherLabel = provider === 'apple' ? 'Google' : appleAvailable ? 'Apple' : null;
       Alert.alert(
-        'Sign-in failed',
-        `Couldn't sign in with ${providerLabel}. Try again${otherLabel ? `, or try ${otherLabel} instead` : ''}.`,
+        t('onboarding.signInFailedTitle'),
+        otherLabel
+          ? t('onboarding.signInFailedTryOther', { provider: providerLabel, other: otherLabel })
+          : t('onboarding.signInFailed', { provider: providerLabel }),
       );
     } finally {
       setBusyProvider(null);
@@ -147,9 +151,9 @@ export default function WelcomeScreen() {
       </View>
 
       <ThemedSafeAreaView edges={['bottom']} style={styles.content}>
-        <ThemedText type="onboardingHeadline">Private circles for your photos.</ThemedText>
+        <ThemedText type="onboardingHeadline">{t('onboarding.headline')}</ThemedText>
         <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
-          Small circles, one shared feed. End-to-end encrypted, so only your circle can ever see it.
+          {t('onboarding.intro')}
         </ThemedText>
 
         <View style={styles.actions}>
@@ -161,7 +165,7 @@ export default function WelcomeScreen() {
 
         <Pressable style={styles.footer} onPress={() => setPrivacyVisible(true)}>
           <ThemedText type="meta" themeColor="muted">
-            How the privacy works
+            {t('onboarding.privacyLink')}
           </ThemedText>
         </Pressable>
       </ThemedSafeAreaView>

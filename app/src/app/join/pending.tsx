@@ -1,5 +1,6 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, AppState, Pressable, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
@@ -17,6 +18,7 @@ import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/in
 const CHECK_INTERVAL_MS = 5_000;
 
 export default function JoinPendingScreen() {
+  const { t } = useTranslation();
   const { requestId } = useLocalSearchParams<{ requestId: string }>();
   const [circleName, setCircleName] = useState('');
   const [inviterName, setInviterName] = useState('');
@@ -84,10 +86,10 @@ export default function JoinPendingScreen() {
 
   function handleCancel() {
     if (!requestId) return;
-    Alert.alert('Withdraw this request?', 'You can ask again with a new key.', [
-      { text: 'Keep waiting', style: 'cancel' },
+    Alert.alert(t('invite.pending.withdrawTitle'), t('invite.pending.withdrawMessage'), [
+      { text: t('invite.pending.keepWaiting'), style: 'cancel' },
       {
-        text: 'Withdraw',
+        text: t('invite.pending.withdrawConfirm'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -104,31 +106,31 @@ export default function JoinPendingScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="Join request" />
+        <ScreenHeader title={t('invite.pending.title')} />
 
         <View style={styles.content}>
           {gone ? (
             <>
-              <ThemedText type="screenTitle">Request no longer available</ThemedText>
+              <ThemedText type="screenTitle">{t('invite.pending.goneTitle')}</ThemedText>
               <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
-                It may have gone through on another device, or whoever shared the key turned it
-                down.
+                {t('invite.pending.goneBody')}
               </ThemedText>
             </>
           ) : (
             <>
               <View>
-                <ThemedText type="sectionTitle">Waiting for approval</ThemedText>
+                <ThemedText type="sectionTitle">{t('invite.pending.waiting')}</ThemedText>
                 <ThemedText type="screenTitle">{circleName}</ThemedText>
               </View>
               <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
-                {inviterName || 'Whoever shared this key'} needs to let you in. This screen moves on
-                by itself once they have.
+                {inviterName
+                  ? t('invite.pending.letYouIn', { name: inviterName })
+                  : t('invite.pending.letYouInUnknown')}
               </ThemedText>
 
               <Pressable onPress={handleCancel} style={styles.cancel}>
                 <ThemedText type="captionFeed" themeColor="danger">
-                  Withdraw request
+                  {t('invite.pending.withdraw')}
                 </ThemedText>
               </Pressable>
             </>

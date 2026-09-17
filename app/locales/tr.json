@@ -1,0 +1,6 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Mimoza, cihaz aktarım kodunu taramak için kameranı kullanır.",
+    "NSPhotoLibraryUsageDescription": "Mimoza, çevrelerinde paylaşacağın fotoğrafları seçebilmen için fotoğraflarına erişir."
+  }
+}

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
@@ -6,26 +7,28 @@ import { SettingsGroups, type SettingsGroup } from '@/ui/components/settings-gro
 import { ThemedView } from '@/ui/theme/themed-view';
 import { Spacing } from '@/ui/theme/tokens';
 
-const CREDITS_GROUPS: SettingsGroup[] = [
-  {
-    title: 'Photos',
-    rows: [
-      {
-        label: 'Welcome photo',
-        description: 'Simi Iluyomade on Unsplash',
-      },
-    ],
-  },
-];
-
 export default function CreditsScreen() {
+  const { t } = useTranslation();
+
+  const creditsGroups: SettingsGroup[] = [
+    {
+      title: t('account.credits.photos'),
+      rows: [
+        {
+          label: t('account.credits.welcomePhoto'),
+          description: t('account.credits.welcomePhotoCredit', { author: 'Simi Iluyomade' }),
+        },
+      ],
+    },
+  ];
+
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="Credits & attribution" />
+        <ScreenHeader title={t('settings.credits')} />
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <SettingsGroups groups={CREDITS_GROUPS} />
+          <SettingsGroups groups={creditsGroups} />
         </ScrollView>
       </ThemedSafeAreaView>
     </ThemedView>

@@ -113,6 +113,14 @@ async function restoreCircle(seed: Uint8Array, circle: RecoverableCircle): Promi
   syncCircle(circle.circleId).catch((err) => console.error('Failed to sync a restored circle', err));
 }
 
+/** Thrown instead of adopting a different seed on a phone that's already in a circle. */
+export class PhoneInCircleError extends Error {
+  constructor() {
+    super('This phone is already in a circle. Restoring would lose it.');
+    this.name = 'PhoneInCircleError';
+  }
+}
+
 /**
  * Refuses only what actually loses data: a *different* seed on a phone whose
  * circles are keyed to the current one. A matching seed passes, which is what
@@ -122,7 +130,7 @@ async function assertSafeToAdopt(seed: Uint8Array): Promise<void> {
   const existing = await getMasterSeed();
   if (!existing || bytesToHex(existing) === bytesToHex(seed)) return;
   if ((await listCircles()).length > 0) {
-    throw new Error('This phone is already in a circle. Restoring would lose it.');
+    throw new PhoneInCircleError();
   }
 }
 

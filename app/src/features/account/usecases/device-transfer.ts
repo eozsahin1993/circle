@@ -128,9 +128,22 @@ function requesterId(transferCode: string): string {
 /** What the established device shows before it agrees to send anything. */
 export type ScannedDeviceTransfer = {
   qr: DeviceTransferQrPayload;
-  deviceName: string;
+  /** Null when the other device sent none, so the prompt can word itself without one. */
+  deviceName: string | null;
   circleCount: number;
 };
+
+/** A scanned code that can't start a transfer. The message is for logs; the screen words it for the person. */
+export class TransferCodeError extends Error {
+  constructor(readonly reason: 'invalid' | 'expired') {
+    super(
+      reason === 'invalid'
+        ? "That doesn't look like a Mimoza transfer code."
+        : 'That code has expired or was already used.',
+    );
+    this.name = 'TransferCodeError';
+  }
+}
 
 /**
  * Established-device side, step one. Sends nothing: sealing a seed waits
@@ -142,13 +155,13 @@ export async function inspectDeviceTransfer(raw: string): Promise<ScannedDeviceT
 
   const id = requesterId(qr.transferCode);
   const row = (await listJoinRequests(tag)).find((request) => request.requesterId === id);
-  if (!row) throw new Error('That code has expired or was already used.');
+  if (!row) throw new TransferCodeError('expired');
 
   const request = JSON.parse(
     new TextDecoder().decode(decrypt(row.encryptedRequest, deriveDeviceTransferRequestKey(qr.transferCode))),
   ) as DeviceTransferRequestPayload;
 
-  return { qr, deviceName: request.deviceName || 'that device', circleCount: (await getAllCircles()).length };
+  return { qr, deviceName: request.deviceName || null, circleCount: (await getAllCircles()).length };
 }
 
 /** A camera hands over any barcode in view, and this ends up in a key and a URL path. */
@@ -157,15 +170,15 @@ function parseQr(raw: string): DeviceTransferQrPayload {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error("That doesn't look like a Mimoza transfer code.");
+    throw new TransferCodeError('invalid');
   }
 
   const { transferCode, ephemeralPublicKey } = (parsed ?? {}) as Partial<DeviceTransferQrPayload>;
   if (typeof transferCode !== 'string' || !/^[0-9A-Z-]{10,32}$/.test(transferCode)) {
-    throw new Error("That doesn't look like a Mimoza transfer code.");
+    throw new TransferCodeError('invalid');
   }
   if (typeof ephemeralPublicKey !== 'string' || !/^[0-9a-f]{64}$/.test(ephemeralPublicKey)) {
-    throw new Error("That doesn't look like a Mimoza transfer code.");
+    throw new TransferCodeError('invalid');
   }
   return { transferCode, ephemeralPublicKey };
 }

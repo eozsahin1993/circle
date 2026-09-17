@@ -1,5 +1,6 @@
 import type { MemberEvent, MemberEventKind, MemberRole } from '@/data/db';
 import { formatDay } from '@/core/utils/time';
+import type { LanguageCode } from '@/core/i18n/languages';
 
 /**
  * One subject swept into a group — just enough to name them, in the order
@@ -50,7 +51,11 @@ export type MembershipEventBlock = {
  * never re-sorts either, so a caller with a different order gets nonsense
  * blocks silently rather than a clear failure.
  */
-export function groupMemberEvents(events: MemberEvent[], postTimestamps: number[]): MembershipEventBlock[] {
+export function groupMemberEvents(
+  events: MemberEvent[],
+  postTimestamps: number[],
+  language: LanguageCode,
+): MembershipEventBlock[] {
   // A single forward pointer into `postTimestamps`, walked alongside
   // `events` — O(events + posts) instead of rescanning every post per event.
   let postIndex = 0;
@@ -59,7 +64,7 @@ export function groupMemberEvents(events: MemberEvent[], postTimestamps: number[
   let current: MemberEvent[] = [];
 
   const flush = () => {
-    if (current.length > 0) blocks.push(buildBlock(current));
+    if (current.length > 0) blocks.push(buildBlock(current, language));
     current = [];
   };
 
@@ -71,7 +76,7 @@ export function groupMemberEvents(events: MemberEvent[], postTimestamps: number[
       // event from here on is older still.
       while (postIndex < postTimestamps.length && postTimestamps[postIndex] >= previous.occurredAt) postIndex++;
       const postBetween = postIndex < postTimestamps.length && postTimestamps[postIndex] > event.occurredAt;
-      if (formatDay(event.occurredAt) !== formatDay(previous.occurredAt) || postBetween) flush();
+      if (formatDay(event.occurredAt, language) !== formatDay(previous.occurredAt, language) || postBetween) flush();
     }
     current.push(event);
   }
@@ -80,7 +85,7 @@ export function groupMemberEvents(events: MemberEvent[], postTimestamps: number[
   return blocks;
 }
 
-function buildBlock(events: MemberEvent[]): MembershipEventBlock {
+function buildBlock(events: MemberEvent[], language: LanguageCode): MembershipEventBlock {
   const groups = new Map<string, MembershipEventGroup>();
   const order: string[] = [];
 
@@ -108,7 +113,7 @@ function buildBlock(events: MemberEvent[]): MembershipEventBlock {
   }
   for (const key of order) groups.get(key)!.subjects.reverse();
 
-  return { day: formatDay(events[0].occurredAt), groups: order.map((key) => groups.get(key)!), occurredAt: events[0].occurredAt };
+  return { day: formatDay(events[0].occurredAt, language), groups: order.map((key) => groups.get(key)!), occurredAt: events[0].occurredAt };
 }
 
 /**

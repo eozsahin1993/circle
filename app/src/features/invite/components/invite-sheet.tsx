@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -30,6 +31,7 @@ const QR_SIZE = 176;
  * than a list of actions, so it doesn't fold into that component.
  */
 export function InviteSheet({ visible, onClose, link, code, expiry }: InviteSheetProps) {
+  const { t } = useTranslation();
   const tints = useTints();
   return (
     <BottomSheet visible={visible} onClose={onClose}>
@@ -38,9 +40,9 @@ export function InviteSheet({ visible, onClose, link, code, expiry }: InviteShee
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        <ThemedText type="screenTitle">Let them scan it</ThemedText>
+        <ThemedText type="screenTitle">{t('invite.sheet.title')}</ThemedText>
         <ThemedText type="captionFeed" themeColor="secondary" style={styles.subtitle}>
-          Best when the person is next to you, so the key never leaves the room.
+          {t('invite.sheet.subtitle')}
         </ThemedText>
 
         {/* Framed like the buttons that open this, but the code
@@ -68,10 +70,10 @@ export function InviteSheet({ visible, onClose, link, code, expiry }: InviteShee
         ) : null}
 
         <ThemedText type="meta" themeColor="faint" style={styles.footnote}>
-          Everyone shares this code until you replace it.
+          {t('invite.sheet.footnote')}
         </ThemedText>
 
-        <PrimaryButton label="Done" onPress={onClose} style={styles.done} />
+        <PrimaryButton label={t('invite.done')} onPress={onClose} style={styles.done} />
       </ScrollView>
     </BottomSheet>
   );

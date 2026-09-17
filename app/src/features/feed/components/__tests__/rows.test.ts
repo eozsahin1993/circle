@@ -21,7 +21,7 @@ function event(id: string, occurredAt: number): MemberEvent {
 
 /** One event's group row — everything `rosterChangeRows` builds for it besides the day header above it. */
 function eventRow(occurredAt: number): FeedRow {
-  return rosterChangeRows([event('e', occurredAt)], [], null)[1];
+  return rosterChangeRows([event('e', occurredAt)], [], null, 'en')[1];
 }
 
 const noRequestActions = { busy: false, onApprove: () => {}, onDeny: () => {} };
@@ -31,7 +31,7 @@ function build(events: MemberEvent[] = [], justJoined = false): FeedRow[] {
   return buildFeedRows([
     pendingRequestRow({ requesterId: 'a', selfReportedName: 'Marcus', createdAt: 1 }, noRequestActions),
     ...(justJoined ? [justJoinedRow()] : []),
-    ...rosterChangeRows(events, [], null),
+    ...rosterChangeRows(events, [], null, 'en'),
   ]);
 }
 
@@ -65,7 +65,7 @@ describe('buildFeedRows', () => {
 
   /** Ordering only — it renders exactly the rows it is handed. */
   test('renders exactly the rows it is given', () => {
-    expect(buildFeedRows(rosterChangeRows([event('e1', 1_000)], [], null)).map((row) => row.key)).toEqual([
+    expect(buildFeedRows(rosterChangeRows([event('e1', 1_000)], [], null, 'en')).map((row) => row.key)).toEqual([
       'member-event-day-0-1000',
       'member-event-0-0',
       'member-event-block-end-0',
@@ -87,7 +87,7 @@ describe('each row decides for itself', () => {
   /** Pinned without being sticky — no `at` keeps it above the timeline. */
   test('a join request stays above dated rows', () => {
     const rows = buildFeedRows([
-      ...rosterChangeRows([event('e1', 9_000)], [], null),
+      ...rosterChangeRows([event('e1', 9_000)], [], null, 'en'),
       pendingRequestRow({ requesterId: 'a', selfReportedName: 'M', createdAt: 1 }, noRequestActions),
     ]);
     expect(rows[0].key).toBe('request:a');

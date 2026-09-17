@@ -4,6 +4,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
+import { i18n } from '@/core/i18n/i18n';
 import { seedPhraseToEntropy } from '@/features/account/crypto';
 import { getMasterSeed } from '@/core/services/keystore/master-seed';
 
@@ -20,16 +21,19 @@ const PHRASE_LENGTH = 12;
  */
 export function buildRecoveryCard(words: string[], savedOn = new Date()): string {
   return [
-    'CIRCLE RECOVERY CARD',
+    i18n.t('account.recoveryCard.heading'),
     '',
-    'This file restores your account on a new phone.',
-    'Anyone who has it is you, so keep it somewhere only you can reach.',
+    i18n.t('account.recoveryCard.restoresAccount'),
+    i18n.t('account.recoveryCard.keepSafe'),
     '',
-    'To use it: open Mimoza, sign in, and choose "I have a recovery card".',
+    i18n.t('account.recoveryCard.howToUse', {
+      option: i18n.t('account.returning.usePhrase'),
+      button: i18n.t('account.restore.chooseCard'),
+    }),
     '',
     words.join(' '),
     '',
-    `Saved ${savedOn.toISOString().slice(0, 10)}`,
+    i18n.t('account.recoveryCard.saved', { date: savedOn.toISOString().slice(0, 10) }),
     '',
   ].join('\n');
 }
@@ -98,12 +102,19 @@ function findPhrase(text: string): string | null {
   return null;
 }
 
+export class NoRecoveryPhraseError extends Error {
+  constructor() {
+    super("That file doesn't have a recovery phrase in it.");
+    this.name = 'NoRecoveryPhraseError';
+  }
+}
+
 /** The phrase from a card the person picks, or null if they cancelled. Throws if the file holds no valid one. */
 export async function pickRecoveryCard(): Promise<string | null> {
   const picked = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true });
   if (picked.canceled || !picked.assets?.[0]) return null;
 
   const phrase = extractSeedPhrase(await new File(picked.assets[0].uri).text());
-  if (!phrase) throw new Error("That file doesn't have a recovery phrase in it.");
+  if (!phrase) throw new NoRecoveryPhraseError();
   return phrase;
 }

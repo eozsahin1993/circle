@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 import { getAllCircles, getCircleMembers } from '@/data/db';
 import { getAuthToken } from '@/core/services/keystore/auth-token';
+import { getAppSettings } from '@/core/services/settings';
 import { APP_GROUP } from '@/features/push-notifications/app-group';
 
 export const PUSH_SNAPSHOT_FILE = 'push-snapshot.json';
@@ -15,6 +16,11 @@ let generation = 0;
  * needs into the App Group container — it can't open the app's SQLite.
  * Stale is benign (a card says "Someone"); never throws, since the sync
  * and launch paths calling it must not fail on it.
+ *
+ * Also carries the language picked in the app, which the extension can't
+ * read from AsyncStorage either. Left out when following the device, so
+ * the extension resolves that itself and a change of device language
+ * applies without waiting for the app to rewrite this.
  */
 export async function refreshPushSnapshot(): Promise<void> {
   if (Platform.OS !== 'ios') return;
@@ -26,6 +32,7 @@ export async function refreshPushSnapshot(): Promise<void> {
     const container = Paths.appleSharedContainers?.[APP_GROUP];
     if (!container) return;
 
+    const { language } = await getAppSettings();
     const circles = [];
     for (const circle of await getAllCircles()) {
       const members = await getCircleMembers(circle.id);
@@ -38,7 +45,7 @@ export async function refreshPushSnapshot(): Promise<void> {
 
     // Synchronous from this check to the write, so no clear can land between them.
     if (generation !== startedAt) return;
-    new File(container, PUSH_SNAPSHOT_FILE).write(JSON.stringify({ circles }));
+    new File(container, PUSH_SNAPSHOT_FILE).write(JSON.stringify({ circles, language: language === 'system' ? undefined : language }));
   } catch (err) {
     console.error('Failed to write the push snapshot', err);
   }

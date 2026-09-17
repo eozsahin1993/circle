@@ -2,6 +2,7 @@ import { entropyToMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Share, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
@@ -17,6 +18,7 @@ import { getMasterSeed } from '@/core/services/keystore/master-seed';
 import { showDone, showError } from '@/core/services/messages';
 
 export default function RecoveryPhraseScreen() {
+  const { t } = useTranslation();
   const tints = useTints();
   const [words, setWords] = useState<string[] | null>(null);
   const [saving, setSaving] = useState(false);
@@ -35,11 +37,11 @@ export default function RecoveryPhraseScreen() {
   async function handleSaveCard() {
     setSaving(true);
     try {
-      if (await saveRecoveryCard()) showDone('Save it somewhere that survives this phone');
-      else showError("This device can't share files");
+      if (await saveRecoveryCard()) showDone(t('account.recovery.cardSaved'));
+      else showError(t('account.recovery.cannotShare'));
     } catch (err) {
       console.error('Failed to save the recovery card', err);
-      showError('Could not make your recovery card');
+      showError(t('account.recovery.cardFailed'));
     } finally {
       setSaving(false);
     }
@@ -53,19 +55,18 @@ export default function RecoveryPhraseScreen() {
   async function handleSendToSelf() {
     if (!words) return;
     await Share.share({
-      message: `Mimoza recovery phrase\n\n${words.join(' ')}\n\nThese 12 words restore your circles on a new phone. Anyone who has them can too.`,
+      message: t('account.recovery.shareMessage', { words: words.join(' ') }),
     });
   }
 
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="Recovery phrase" />
+        <ScreenHeader title={t('account.recovery.title')} />
 
         <View style={styles.content}>
           <ThemedText type="captionFeed" themeColor="secondary">
-            These 12 words can rebuild your circle keys on a new phone. Anyone who has them can too,
-            so keep them somewhere only you can get to.
+            {t('account.recovery.intro')}
           </ThemedText>
 
           <ThemedView type="surface" style={[styles.card, { borderColor: tints.chipIdleBorder }]}>
@@ -91,11 +92,11 @@ export default function RecoveryPhraseScreen() {
               retyping anything. Sharing the words as text still has a place
               — a mailbox is searchable years later — but it can only be
               recovered by copy-paste. */}
-          <SecondaryButton label={saving ? 'Preparing…' : 'Save recovery card'} disabled={saving} onPress={handleSaveCard} />
+          <SecondaryButton label={saving ? t('account.recovery.preparing') : t('account.recovery.saveCard')} disabled={saving} onPress={handleSaveCard} />
 
-          <SecondaryButton label="Send the words as text" onPress={handleSendToSelf} />
+          <SecondaryButton label={t('account.recovery.sendAsText')} onPress={handleSendToSelf} />
 
-          <PrimaryButton label="Done" disabled={!words} onPress={() => router.back()} />
+          <PrimaryButton label={t('account.recovery.done')} disabled={!words} onPress={() => router.back()} />
         </View>
       </ThemedSafeAreaView>
     </ThemedView>

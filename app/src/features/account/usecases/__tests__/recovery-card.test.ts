@@ -25,7 +25,7 @@ describe('extractSeedPhrase', () => {
   test('takes the words from their own line, not from wordlist words in the prose', () => {
     const phrase = generateSeedPhrase();
     const decoys = 'able absent absorb abstract absurd abuse access accident account accuse achieve acid';
-    const card = buildRecoveryCard(phrase.split(' ')).replace('CIRCLE RECOVERY CARD', `keep ${decoys} safe`);
+    const card = buildRecoveryCard(phrase.split(' ')).replace('MIMOZA RECOVERY CARD', `keep ${decoys} safe`);
 
     expect(extractSeedPhrase(card)).toBe(phrase);
   });
@@ -66,7 +66,7 @@ describe('buildRecoveryCard', () => {
   test('says what the card is, for whoever opens it years later', () => {
     const card = buildRecoveryCard(generateSeedPhrase().split(' '), new Date('2026-09-14'));
 
-    expect(card).toContain('CIRCLE RECOVERY CARD');
+    expect(card).toContain('MIMOZA RECOVERY CARD');
     expect(card).toContain('Anyone who has it is you');
     expect(card).toContain('2026-09-14');
   });

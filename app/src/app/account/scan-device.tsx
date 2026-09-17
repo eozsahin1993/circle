@@ -1,6 +1,7 @@
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { router } from 'expo-router';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, Linking, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
@@ -13,6 +14,7 @@ import { Radius, Spacing } from '@/ui/theme/tokens';
 import {
   approveDeviceTransfer,
   inspectDeviceTransfer,
+  TransferCodeError,
 } from '@/features/account/usecases/device-transfer';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { showDone, showError } from '@/core/services/messages';
@@ -22,6 +24,7 @@ import { showDone, showError } from '@/core/services/messages';
  * code, confirm, and seal this account to it.
  */
 export default function ScanDeviceScreen() {
+  const { t } = useTranslation();
   const theme = useTheme();
   const tints = useTints();
   const [permission, requestPermission] = useCameraPermissions();
@@ -39,22 +42,22 @@ export default function ScanDeviceScreen() {
     try {
       const scanned = await inspectDeviceTransfer(data);
       Alert.alert(
-        `Add ${scanned.deviceName}?`,
-        `It will hold the same keys as this phone and see all ${
-          scanned.circleCount === 1 ? 'your circle' : `${scanned.circleCount} of your circles`
-        }. You cannot take that back later.`,
+        scanned.deviceName
+          ? t('account.scanDevice.confirmTitle', { name: scanned.deviceName })
+          : t('account.scanDevice.confirmTitleUnnamed'),
+        t('account.scanDevice.confirmMessage', { count: scanned.circleCount }),
         [
-          { text: 'Cancel', style: 'cancel', onPress: () => setBusy(false) },
+          { text: t('common.cancel'), style: 'cancel', onPress: () => setBusy(false) },
           {
-            text: 'Add device',
+            text: t('account.scanDevice.addDevice'),
             onPress: async () => {
               try {
                 await approveDeviceTransfer(scanned.qr);
-                showDone('Sent to your other phone');
+                showDone(t('account.scanDevice.sent'));
                 router.back();
               } catch (err) {
                 console.error('Failed to approve a device transfer', err);
-                showError("That device couldn't be added");
+                showError(t('account.scanDevice.addFailed'));
               } finally {
                 setBusy(false);
               }
@@ -64,7 +67,11 @@ export default function ScanDeviceScreen() {
       );
     } catch (err) {
       console.error('Failed to read a transfer code', err);
-      showError(err instanceof Error ? err.message : "That code couldn't be read");
+      showError(
+        err instanceof TransferCodeError
+          ? t(err.reason === 'invalid' ? 'account.scanDevice.invalidCode' : 'account.scanDevice.expiredCode')
+          : t('account.scanDevice.unreadableCode'),
+      );
       setBusy(false);
     }
   }
@@ -72,12 +79,11 @@ export default function ScanDeviceScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
-        <ScreenHeader title="Add another device" />
+        <ScreenHeader title={t('account.scanDevice.header')} />
 
         <View style={styles.content}>
           <ThemedText type="captionFeed" themeColor="secondary">
-            On your new phone, sign in and choose Bring over an existing account, then point this
-            camera at the code it shows.
+            {t('account.scanDevice.instructions')}
           </ThemedText>
 
           <View style={[styles.viewfinder, { backgroundColor: theme.surface, borderColor: tints.chipIdleBorder }]}>
@@ -92,11 +98,15 @@ export default function ScanDeviceScreen() {
               <View style={styles.permissionPrompt}>
                 <ThemedText type="meta" themeColor="faint" style={styles.placeholder}>
                   {permission?.canAskAgain === false
-                    ? 'Camera access is off for Mimoza. Turn it on in Settings to scan.'
-                    : 'Mimoza needs your camera to scan the code.'}
+                    ? t('account.scanDevice.cameraOff')
+                    : t('account.scanDevice.cameraNeeded')}
                 </ThemedText>
                 <SecondaryButton
-                  label={permission?.canAskAgain === false ? 'Open Settings' : 'Allow camera'}
+                  label={
+                    permission?.canAskAgain === false
+                      ? t('account.scanDevice.openSettings')
+                      : t('account.scanDevice.allowCamera')
+                  }
                   onPress={permission?.canAskAgain === false ? Linking.openSettings : requestPermission}
                 />
               </View>
@@ -106,10 +116,10 @@ export default function ScanDeviceScreen() {
           <View style={styles.spacer} />
 
           <ThemedText type="meta" themeColor="faint">
-            You will be asked to confirm before anything leaves this phone.
+            {t('account.scanDevice.confirmNote')}
           </ThemedText>
 
-          <PrimaryButton label="Back" disabled={busy} onPress={() => router.back()} />
+          <PrimaryButton label={t('account.scanDevice.back')} disabled={busy} onPress={() => router.back()} />
         </View>
       </ThemedSafeAreaView>
     </ThemedView>

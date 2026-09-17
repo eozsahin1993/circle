@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
@@ -31,12 +32,12 @@ export type JoinSheetProps = {
 };
 
 export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
+  const { t } = useTranslation();
   const [phase, setPhase] = useState<Phase>('checking');
   const [circleName, setCircleName] = useState('');
   const [inviterName, setInviterName] = useState('');
   const [inviterPictureUri, setInviterPictureUri] = useState<string | undefined>();
   const [inviterPublicKey, setInviterPublicKey] = useState<string | undefined>();
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!code) return;
@@ -61,7 +62,6 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
       } catch (err) {
         console.error('Failed to load invite preview', err);
         if (stale) return;
-        setError("This invite doesn't work anymore. Ask for a new one.");
         setPhase('error');
       }
     })();
@@ -84,7 +84,7 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
       // The error state takes the button away, which would make a dropped
       // connection look like a dead key.
       setPhase('asking');
-      showError('Could not send your request', { action: { label: 'Retry', onPress: handleRequestToJoin } });
+      showError(t('invite.join.sendFailed'), { action: { label: t('invite.join.retry'), onPress: handleRequestToJoin } });
     }
   }
 
@@ -93,11 +93,11 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
       <View style={styles.content}>
         {phase === 'error' ? (
           <>
-            <ThemedText type="cardTitle">Can&apos;t open this invite</ThemedText>
+            <ThemedText type="cardTitle">{t('invite.join.cantOpen')}</ThemedText>
             <ThemedText type="meta" themeColor="muted">
-              {error}
+              {t('invite.join.expired')}
             </ThemedText>
-            <PrimaryButton label="Close" onPress={onClose} style={styles.button} />
+            <PrimaryButton label={t('invite.join.close')} onPress={onClose} style={styles.button} />
           </>
         ) : (
           <>
@@ -108,7 +108,7 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
               <Avatar size={48} uri={inviterPictureUri} name={inviterName} colorSeed={inviterPublicKey} />
               <View style={styles.headerText}>
                 <ThemedText type="meta" themeColor="muted" numberOfLines={1}>
-                  {inviterName ? `${inviterName} invited you to` : "You've been invited to"}
+                  {inviterName ? t('invite.join.invitedBy', { name: inviterName }) : t('invite.join.invited')}
                 </ThemedText>
                 <ThemedText type="cardTitle" numberOfLines={2}>
                   {circleName}
@@ -118,12 +118,22 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
 
             <ThemedText type="meta" themeColor="muted">
               {phase === 'waiting'
-                ? `You've asked to join. ${inviterName || 'Whoever sent the key'} hasn't answered yet.`
-                : `${inviterName || 'Whoever shared this key'} still has to approve you before you're in.`}
+                ? inviterName
+                  ? t('invite.join.waitingOn', { name: inviterName })
+                  : t('invite.join.waitingOnUnknown')
+                : inviterName
+                  ? t('invite.join.needsApproval', { name: inviterName })
+                  : t('invite.join.needsApprovalUnknown')}
             </ThemedText>
 
             <PrimaryButton
-              label={phase === 'waiting' ? 'Done' : phase === 'submitting' ? 'Sending request…' : 'Request to join'}
+              label={
+                phase === 'waiting'
+                  ? t('invite.done')
+                  : phase === 'submitting'
+                    ? t('invite.join.sending')
+                    : t('invite.join.request')
+              }
               disabled={phase === 'submitting'}
               onPress={phase === 'waiting' ? onClose : handleRequestToJoin}
               style={styles.button}

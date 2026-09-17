@@ -14,7 +14,9 @@
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
-        ]
+        ],
+        "CFBundleAllowMixedLocalizations": true,
+        "NSPhotoLibraryUsageDescription": "Mimoza accesses your photos so you can pick the ones to share in your circles."
       },
       "entitlements": {
         "aps-environment": "development",
@@ -67,6 +69,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "locales": {
+      "tr": "./locales/tr.json",
+      "es": "./locales/es.json",
+      "fr": "./locales/fr.json",
+      "de": "./locales/de.json"
     }
   }
 }

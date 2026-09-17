@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
@@ -65,6 +66,7 @@ export function PostComments({
   selfPhotoUri,
   selfName,
 }: PostCommentsProps) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const tints = useTints();
   const ownColorSeed = useOwnColorSeed();
@@ -102,7 +104,7 @@ export function PostComments({
       {total > 1 ? (
         <Pressable style={styles.showAll} onPress={onPressShowAll} disabled={!onPressShowAll} hitSlop={6}>
           <ThemedText type="comment" themeColor="secondary">
-            Show all {total} comments
+            {t('post.showAllComments', { count: total })}
           </ThemedText>
         </Pressable>
       ) : null}
@@ -118,7 +120,7 @@ export function PostComments({
             value={text}
             onChangeText={setText}
             onSubmitEditing={handleSubmit}
-            placeholder="Add a comment"
+            placeholder={t('post.addComment')}
             placeholderTextColor={theme.muted}
             returnKeyType="send"
             autoFocus
