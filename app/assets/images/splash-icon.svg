@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Mimoza adaptive icon foreground">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Mimoza splash screen bloom">
   <defs>
     <linearGradient id="petal" x1="0" y1="0" x2="1" y2="1">
       <stop stop-color="#FFD95A" stop-opacity=".97"/>
@@ -18,10 +18,7 @@
     </g>
   </defs>
 
-  <!-- 0.66: launchers crop to the middle 72 of 108dp, so this puts the bloom at
-       the same share of the visible shape as on the iOS tile. Filling the
-       safe zone instead makes it look oversized next to other apps. -->
-  <g transform="translate(512 512) scale(0.66)">
+  <g transform="translate(512 512) scale(0.92)">
     <g fill="url(#petal)"><use href="#ring"/></g>
     <circle r="98" fill="url(#center)"/>
   </g>

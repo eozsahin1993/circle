@@ -1,21 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Mimoza app icon">
   <defs>
     <!-- Radial rather than linear: the ground lifts behind the bloom and falls
-         away at the corners, which keeps the tile from reading flat. -->
-    <radialGradient id="bg" cx="42%" cy="36%" r="78%">
-      <stop stop-color="#4C5F52"/>
-      <stop offset="1" stop-color="#101713"/>
+         away at the corners, which keeps the tile from reading flat. The corner
+         stop is the splash backgroundColor in app.json, so launch has no seam. -->
+    <radialGradient id="bg" cx="50%" cy="50%" r="71%">
+      <stop stop-color="#2A231B"/>
+      <stop offset="1" stop-color="#14100C"/>
     </radialGradient>
-    <!-- Petals stay cool. Warming them toward the heart's gold is what collapsed
-         the contrast between the two — the separation here is temperature, not
-         brightness, so the yellow can stay soft. -->
     <linearGradient id="petal" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#FBF8F0" stop-opacity=".95"/>
-      <stop offset="1" stop-color="#B6C2B6" stop-opacity=".58"/>
+      <stop stop-color="#FFD95A" stop-opacity=".97"/>
+      <stop offset="1" stop-color="#E3A722" stop-opacity=".78"/>
     </linearGradient>
+    <!-- Pale, not dark: a dark eye in yellow petals reads as a sunflower, and a
+         heart in the petals' own gold disappears into them at small sizes. -->
     <radialGradient id="center" cx="38%" cy="32%" r="72%">
-      <stop stop-color="#FBDA8E"/>
-      <stop offset="1" stop-color="#CE9433"/>
+      <stop stop-color="#FFF6DC"/>
+      <stop offset="1" stop-color="#F1D892"/>
     </radialGradient>
 
     <!-- Six round petals rather than eight narrow ones: they meet only near the
