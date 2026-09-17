@@ -5,8 +5,7 @@
 # recovers it.
 #
 # The name carries the env because bucket names are globally unique and
-# each env is its own account: two accounts cannot both hold
-# "mimoza-terraform-state".
+# each env is its own account: two accounts cannot both hold one name.
 terraform {
   required_version = ">= 1.10"
 
@@ -37,7 +36,7 @@ variable "aws_account_id" {
 }
 
 variable "bucket_name" {
-  description = "State bucket for this account — mimoza-terraform-state-<env>. Must match the env's backend block, which can't read variables."
+  description = "State bucket for this account — mimoza-terraform-<env>. Must match the env's backend block, which can't read variables."
   type        = string
 }
 
