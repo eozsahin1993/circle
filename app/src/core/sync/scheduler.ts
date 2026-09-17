@@ -1,6 +1,7 @@
 import { AppState, type AppStateStatus } from 'react-native';
 
 import { recordInManifestBestEffort } from '@/features/account/usecases/account-manifest';
+import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { nudgePhotoQueue } from '@/core/photo/photo-queue';
 import { syncStaleCircles } from '@/core/sync/sync-circles';
 
@@ -23,7 +24,7 @@ let inFlight: Promise<void> | null = null;
  */
 export function runSync(): Promise<void> {
   if (!inFlight) {
-    inFlight = syncStaleCircles()
+    inFlight = syncIfSignedIn()
       .catch((err) => console.error('Sync pass failed', err))
       .finally(() => {
         inFlight = null;
@@ -34,6 +35,11 @@ export function runSync(): Promise<void> {
   // Fire-and-forget: photos must never hold up whatever is awaiting the pass.
   pass.then(() => nudgePhotoQueue());
   return pass;
+}
+
+/** Signed out, every relay route would refuse the pass, so there's no pass to run. */
+async function syncIfSignedIn(): Promise<void> {
+  if (await getAuthToken()) await syncStaleCircles();
 }
 
 /**
@@ -48,7 +54,9 @@ export function runSync(): Promise<void> {
  * asking costs a request that almost always finds nothing to do.
  */
 function syncAndRepairManifest(): void {
-  runSync().then(() => recordInManifestBestEffort());
+  runSync().then(async () => {
+    if (await getAuthToken()) await recordInManifestBestEffort();
+  });
 }
 
 /**
@@ -64,9 +72,9 @@ function syncAndRepairManifest(): void {
  * The first two also repair the account manifest; the timer deliberately
  * doesn't — see `syncAndRepairManifest`.
  *
- * Safe to start before sign-in: with no circles `syncAllCircles` is a
- * fast no-op, and without a session each circle's fetch fails and is
- * caught per-circle.
+ * Safe to start before sign-in, and left running across sign-out: every
+ * trigger checks for a session first and does nothing without one, so
+ * signing back in resumes it without a restart.
  */
 export function startSyncScheduler(): () => void {
   syncAndRepairManifest();

@@ -3,6 +3,7 @@ jest.mock('@/features/account/usecases/account-manifest');
 jest.mock('@/core/services/log-relay');
 jest.mock('@/features/push-notifications/services/relay');
 jest.mock('@/core/photo/image');
+jest.mock('@/features/push-notifications/services/tokens');
 
 import { bytesToHex } from '@noble/curves/utils.js';
 
@@ -28,6 +29,9 @@ import { getMasterSeed, saveMasterSeed } from '@/core/services/keystore/master-s
 import { deletePushDevice, deletePushRouting, putPushDevice, putPushPrefs } from '@/features/push-notifications/services/relay';
 import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
+import { deleteAuthToken, saveAuthToken } from '@/core/services/keystore/auth-token';
+import { enablePushEverywhere, unregisterPushEverywhere } from '@/features/push-notifications/usecases/enable-push';
+import { getDevicePushToken } from '@/features/push-notifications/services/tokens';
 
 const registration = {
   pushToken: 'fcm-registration-token',
@@ -142,6 +146,51 @@ test('silencing a circle removes the routing id outright', async () => {
   await silenceCircle(circleId);
 
   expect(deletePushRouting).toHaveBeenCalledWith(derivePushRoutingId((await getMasterSeed())!, circleId));
+});
+
+describe('signing out', () => {
+  beforeEach(() => {
+    (getDevicePushToken as jest.Mock).mockResolvedValue({ pushToken: 'fcm-registration-token', platform: 'android' });
+  });
+
+  afterEach(async () => {
+    await deleteAuthToken();
+  });
+
+  test('removes this device from every circle', async () => {
+    const first = await createCircle({ name: 'Family Circle' });
+    const second = await createCircle({ name: 'Friends' });
+    const seed = (await getMasterSeed())!;
+
+    await unregisterPushEverywhere();
+
+    const routingIds = (deletePushDevice as jest.Mock).mock.calls.map(([routingId]) => routingId);
+    expect(routingIds.sort()).toEqual([derivePushRoutingId(seed, first.id), derivePushRoutingId(seed, second.id)].sort());
+    expect(deletePushRouting).not.toHaveBeenCalled();
+  });
+
+  test('one circle failing does not keep the others registered', async () => {
+    await createCircle({ name: 'Family Circle' });
+    await createCircle({ name: 'Friends' });
+    (deletePushDevice as jest.Mock).mockRejectedValueOnce(new Error('relay down'));
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await unregisterPushEverywhere();
+
+    expect(deletePushDevice).toHaveBeenCalledTimes(2);
+  });
+
+  test('launch registration does nothing without a session', async () => {
+    await createCircle({ name: 'Family Circle' });
+    jest.clearAllMocks();
+
+    await enablePushEverywhere();
+    expect(putPushDevice).not.toHaveBeenCalled();
+
+    await saveAuthToken('session-token');
+    await enablePushEverywhere();
+    expect(putPushDevice).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('the derivations', () => {

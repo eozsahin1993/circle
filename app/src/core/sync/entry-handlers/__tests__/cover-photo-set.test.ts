@@ -19,12 +19,14 @@ import type { LogEntryEnvelope } from '@/core/sync/log-entry';
 import { encrypt, generateIdentity, generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
+import { saveAuthToken } from '@/core/services/keystore/auth-token';
 import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 import { getBlob } from '@/core/services/blob-relay';
 import { coverPhotoSetHandler } from '@/core/sync/entry-handlers/cover-photo-set';
 import { drainPhotoQueue } from '@/core/photo/photo-queue';
 
 beforeAll(async () => {
+  await saveAuthToken('session-token');
   await initDatabase();
   await saveMasterSeed(new Uint8Array(16));
 });

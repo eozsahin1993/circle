@@ -34,3 +34,18 @@ export async function refreshPushSnapshot(): Promise<void> {
     console.error('Failed to write the push snapshot', err);
   }
 }
+
+/** Removes the snapshot, leaving the extension nothing to name a circle with. Never throws. */
+export async function clearPushSnapshot(): Promise<void> {
+  if (Platform.OS !== 'ios') return;
+
+  try {
+    const container = Paths.appleSharedContainers?.[APP_GROUP];
+    if (!container) return;
+
+    const file = new File(container, PUSH_SNAPSHOT_FILE);
+    if (file.exists) file.delete();
+  } catch (err) {
+    console.error('Failed to clear the push snapshot', err);
+  }
+}

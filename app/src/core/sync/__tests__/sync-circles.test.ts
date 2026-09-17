@@ -30,6 +30,7 @@ import { listJoinRequests, putJoinApproval } from '@/core/services/mailbox-relay
 import { putInvitePreview } from '@/features/invite/services/invite-preview-relay';
 import { getCircleIdentity, getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
+import { saveAuthToken } from '@/core/services/keystore/auth-token';
 import {
   appendEntry,
   bootstrapCircle,
@@ -45,6 +46,7 @@ import { drainOutbox } from '@/features/circle/usecases/sync-circle';
 import { syncCircle, syncStaleCircles } from '@/core/sync/sync-circles';
 
 beforeAll(async () => {
+  await saveAuthToken('session-token');
   await initDatabase();
   await saveMasterSeed(new Uint8Array(16));
 });

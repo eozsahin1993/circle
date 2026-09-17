@@ -17,6 +17,7 @@ import { hasUnreadableAccountManifest, recordSignInProviderBestEffort } from '@/
 import { signInWithApple, signInWithGoogle } from '@/features/account/usecases/sign-in';
 import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { goPostAuth } from '@/features/invite/services/pending-invite';
+import { enablePushEverywhere } from '@/features/push-notifications/usecases/enable-push';
 
 type Provider = 'apple' | 'google';
 
@@ -60,6 +61,8 @@ export default function WelcomeScreen() {
       // Best-effort — silently a no-op on a brand-new install's very
       // first sign-in (no master seed yet), picked up on the next one.
       recordSignInProviderBestEffort(provider);
+      // Launch skipped this while signed out, and signing out removed it.
+      enablePushEverywhere().catch((error) => console.error('Failed to register for notifications', error));
 
       // A returning device (local profile already exists — e.g. this was
       // just a re-auth after signing out) has nothing new to fill in.

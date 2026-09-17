@@ -9,6 +9,7 @@ import { Platform } from 'react-native';
 
 import { handlePush } from '@/features/push-notifications/usecases/handle-push';
 import { initDatabase } from '@/data/db';
+import { getAuthToken } from '@/core/services/keystore/auth-token';
 
 /**
  * The background handler that turns a delivered push into a notification.
@@ -28,6 +29,10 @@ defineTask<NotificationTaskPayload>(PUSH_TASK, async ({ data, error }) => {
   }
 
   try {
+    // Signing out unregisters this device, but not if the relay was
+    // unreachable then — pushes can still arrive.
+    if (!(await getAuthToken())) return;
+
     // The bundle may have been started by this task alone, so nothing has
     // opened the database yet. Idempotent, and memoized (see run.ts).
     await initDatabase();

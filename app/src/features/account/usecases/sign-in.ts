@@ -3,6 +3,7 @@ import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from '@
 import { Platform } from 'react-native';
 
 import { deleteAuthToken, getAuthToken, saveAuthToken } from '@/core/services/keystore/auth-token';
+import { unregisterPushEverywhere } from '@/features/push-notifications/usecases/enable-push';
 import {
   logout as relayLogout,
   signInWithApple as relaySignInWithApple,
@@ -146,6 +147,7 @@ export async function signInWithApple(): Promise<SignInResult> {
 export async function signOut(): Promise<void> {
   const token = await getAuthToken();
   if (token) {
+    await unregisterPushEverywhere();
     try {
       await relayLogout(token);
     } catch (err) {

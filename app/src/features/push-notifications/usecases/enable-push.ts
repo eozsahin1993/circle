@@ -1,9 +1,10 @@
 import { getPermissionsAsync } from 'expo-notifications';
 
 import { getAllCircles } from '@/data/db';
+import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { circlePushPreferences } from '@/features/push-notifications/usecases/push-preferences';
-import { registerPushForCircle } from '@/features/push-notifications/usecases/push-registration';
-import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
+import { registerPushForCircle, unregisterDeviceForCircle } from '@/features/push-notifications/usecases/push-registration';
+import { clearPushSnapshot, refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
 import { getDevicePushToken } from '@/features/push-notifications/services/tokens';
 
 /**
@@ -19,6 +20,10 @@ import { getDevicePushToken } from '@/features/push-notifications/services/token
  * ever surface as an error to whoever just opened the app.
  */
 export async function enablePushEverywhere(): Promise<void> {
+  // Registration is session-gated, and a signed-out device shouldn't be
+  // re-arming the iOS extension's snapshot either — see unregisterPushEverywhere.
+  if (!(await getAuthToken())) return;
+
   // Even without permission (or a token), the iOS extension's snapshot
   // should reflect this launch's circles.
   await refreshPushSnapshot();
@@ -36,6 +41,27 @@ export async function enablePushEverywhere(): Promise<void> {
       await registerPushForCircle(circle.id, { ...device, categories });
     } catch (err) {
       console.error(`Failed to enable notifications for circle ${circle.id}`, err);
+    }
+  }
+}
+
+/**
+ * Stops this device receiving notifications for any circle — for signing
+ * out, and must run while the session is still valid, since the relay's
+ * push routes require one. Other devices on the account keep theirs.
+ *
+ * The snapshot is cleared too, for when the relay can't be reached: the
+ * registration then survives, and iOS shows a card for any delivered
+ * push, but without the snapshot the extension can only show the placeholder.
+ */
+export async function unregisterPushEverywhere(): Promise<void> {
+  await clearPushSnapshot();
+
+  for (const circle of await getAllCircles()) {
+    try {
+      await unregisterDeviceForCircle(circle.id);
+    } catch (err) {
+      console.error(`Failed to disable notifications for circle ${circle.id}`, err);
     }
   }
 }
