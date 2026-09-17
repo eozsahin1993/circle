@@ -3,11 +3,12 @@
 # build (app/src/core/services/relay.ts), so an AWS-generated hostname
 # would be permanent — see docs/INFRASTRUCTURE.md.
 #
-# Caching is off. The relay serves per-user encrypted data, and responses
-# depend on the caller's cursor and session. Blobs are the opposite and
-# get their own distribution.
+# Caching is off here. The relay serves per-user encrypted data, and
+# responses depend on the caller's cursor and session. Blobs are the
+# opposite — see blobs.tf.
 
 locals {
+  api_enabled = var.api_domain_name == "" ? 0 : 1
   origin_host = replace(replace(var.origin_url, "https://", ""), "/", "")
   origin_id   = "${var.name_prefix}-relay"
 }
@@ -25,8 +26,9 @@ data "aws_cloudfront_origin_request_policy" "all_viewer_except_host" {
 }
 
 resource "aws_acm_certificate" "relay" {
+  count             = local.api_enabled
   provider          = aws.us_east_1
-  domain_name       = var.domain_name
+  domain_name       = var.api_domain_name
   validation_method = "DNS"
 
   lifecycle {
@@ -34,13 +36,14 @@ resource "aws_acm_certificate" "relay" {
   }
 }
 
-# Blocks until the CNAME below exists at Cloudflare, so the first apply
-# in a new environment stops here: read the domain_validation_records
-# output, add the record, re-run. Nothing else can be created until the
-# certificate is issued, since CloudFront won't attach a pending one.
+# Blocks until the CNAME below exists at Cloudflare, so the first apply in
+# a new environment stops here: read the validation records output, add
+# them, re-run. Nothing else can be created until the certificate is
+# issued, since CloudFront won't attach a pending one.
 resource "aws_acm_certificate_validation" "relay" {
+  count           = local.api_enabled
   provider        = aws.us_east_1
-  certificate_arn = aws_acm_certificate.relay.arn
+  certificate_arn = aws_acm_certificate.relay[0].arn
 
   timeouts {
     create = "30m"
@@ -48,9 +51,10 @@ resource "aws_acm_certificate_validation" "relay" {
 }
 
 resource "aws_cloudfront_distribution" "relay" {
+  count   = local.api_enabled
   enabled = true
   comment = "${var.name_prefix} relay"
-  aliases = [var.domain_name]
+  aliases = [var.api_domain_name]
 
   origin {
     origin_id   = local.origin_id
@@ -76,7 +80,7 @@ resource "aws_cloudfront_distribution" "relay" {
   }
 
   viewer_certificate {
-    acm_certificate_arn      = aws_acm_certificate_validation.relay.certificate_arn
+    acm_certificate_arn      = aws_acm_certificate_validation.relay[0].certificate_arn
     ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021"
   }

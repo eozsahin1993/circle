@@ -20,7 +20,6 @@ module "lambda" {
 }
 
 module "cdn" {
-  count  = var.api_domain == "" ? 0 : 1
   source = "../../modules/cdn"
 
   providers = {
@@ -29,6 +28,13 @@ module "cdn" {
   }
 
   name_prefix = local.name_prefix
-  domain_name = var.api_domain
   origin_url  = module.lambda.api_endpoint
+
+  api_domain_name         = var.api_domain
+  blob_domain_name        = var.blob_domain
+  blob_signing_public_key = var.blob_signing_public_key
+
+  blob_bucket_name                 = module.storage.bucket_name
+  blob_bucket_arn                  = module.storage.bucket_arn
+  blob_bucket_regional_domain_name = module.storage.bucket_regional_domain_name
 }

@@ -70,14 +70,15 @@ reader onward should be served from the edge.
 
 - **S3 reachable only via the distribution** (origin access control), or
   old-style URLs bypass signing and the cache.
-- **Cache key must exclude signing parameters.** All members must hit one
-  cached object. **Open: verify CloudFront excludes its own signed-URL
-  parameters from the cache key.** The saving depends on it.
+- **Signing parameters stay out of the cache key**, so all members share
+  one object: the cache policy sets query strings to `none`, and
+  CloudFront strips `Expires`/`Key-Pair-Id`/`Policy`/`Signature` before
+  the origin sees them.
 - **Post photos are immutable** (`<syncId>/<entryId>`) — long TTL.
 - **Covers overwrite in place** at `<syncId>/cover`
-  (`internal/synclog/s3/blob_store.go`). Put the hash in the path:
-  `cover_photo_set` already carries `photoHash`, so devices know it before
-  fetching. Otherwise a stale cover is served until TTL.
+  (`internal/synclog/s3/blob_store.go`), so that path is **uncached**
+  until the hash moves into it — `cover_photo_set` already carries
+  `photoHash`, so devices know it before fetching.
 - **Invalidate on delete only.** Nothing else ever changes. One path per
   photo; one wildcard (`/<syncId>/*`) per circle for bulk deletion, which
   counts as a single path. First 1,000 paths/month free, account-wide.
@@ -87,6 +88,12 @@ reader onward should be served from the edge.
 Provider portability comes from the domain plus the relay handing out
 URLs at request time; clients never see S3. Signing is CloudFront-specific
 and stays behind the `BlobStore` interface.
+
+The distribution, key group and bucket policy are in `modules/cdn`, inert
+until `blob_domain` is set. **The relay still hands out presigned S3
+URLs** — switching it to CloudFront signing (private key in SSM under
+`/mimoza-<env>/`, key pair id from the `blob_key_pair_id` output) is the
+next step, along with invalidation on delete.
 
 ---
 

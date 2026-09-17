@@ -1,14 +1,21 @@
 output "api_endpoint" {
   description = "Base URL for this env's app builds (EXPO_PUBLIC_RELAY_URL)."
-  value       = one(module.cdn[*].api_endpoint) != null ? one(module.cdn[*].api_endpoint) : module.lambda.api_endpoint
+  value       = coalesce(module.cdn.api_endpoint, module.lambda.api_endpoint)
 }
 
-output "cdn" {
-  description = "The CNAME target and certificate validation records to add at Cloudflare. Null until api_domain is set."
-  value = one(module.cdn[*]) == null ? null : {
-    cname_target       = one(module.cdn[*].distribution_domain_name)
-    validation_records = one(module.cdn[*].domain_validation_records)
-  }
+output "blob_base_url" {
+  description = "Where the relay signs blob download URLs against. Null while reads still use presigned S3 URLs."
+  value       = module.cdn.blob_base_url
+}
+
+output "blob_key_pair_id" {
+  description = "Key-Pair-Id for signed blob URLs — pairs with the private key in SSM."
+  value       = module.cdn.blob_key_pair_id
+}
+
+output "dns_records" {
+  description = "CNAME targets and certificate validation records to add at Cloudflare, grey cloud."
+  value       = module.cdn.dns_records
 }
 
 output "resource_prefix" {

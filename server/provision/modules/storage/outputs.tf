@@ -14,6 +14,10 @@ output "bucket_arn" {
   value = aws_s3_bucket.blobs.arn
 }
 
+output "bucket_regional_domain_name" {
+  value = aws_s3_bucket.blobs.bucket_regional_domain_name
+}
+
 output "invite_table_name" {
   value = aws_dynamodb_table.invites.name
 }

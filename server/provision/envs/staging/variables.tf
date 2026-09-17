@@ -3,3 +3,15 @@ variable "api_domain" {
   type        = string
   default     = ""
 }
+
+variable "blob_domain" {
+  description = "Hostname photo downloads are served from (cdn.mimoza.app). Empty leaves reads on presigned S3 URLs."
+  type        = string
+  default     = ""
+}
+
+variable "blob_signing_public_key" {
+  description = "PEM public key for signing blob download URLs; its private half goes in SSM by hand. Required with blob_domain."
+  type        = string
+  default     = ""
+}
