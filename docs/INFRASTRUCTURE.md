@@ -179,9 +179,11 @@ tier. Storage accumulates; nothing deletes photos unless asked.
 
 **Guardrails, in order:**
 
-1. Billing alarm — free, and the only thing that reports a problem.
+1. Billing alarm — free, and the only thing that reports a problem. Built
+   as `modules/billing-alarm`, off until `billing_alert_email` is set.
 2. Lambda reserved concurrency — free, caps how fast money can leave.
-   Unset today; every table is `PAY_PER_REQUEST`.
+   Defaults to 50; every table is `PAY_PER_REQUEST`, so nothing else
+   bounds spend.
 3. WAF — deferred. ~$6/month per environment, and the account-level rate
    limiter already handles fairness. IP rules are a cost shield, not a
    replacement: shared carrier and household IPs force loose thresholds.
