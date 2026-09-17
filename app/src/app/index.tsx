@@ -4,14 +4,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
 import { AppleSignInButton, GoogleSignInButton } from '@/features/account/components/social-sign-in-button';
+import { Wordmark } from '@/ui/components/wordmark';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Spacing } from '@/ui/theme/tokens';
+import { Colors, Spacing } from '@/ui/theme/tokens';
 import { getProfile } from '@/data/db';
 import { hasUnreadableAccountManifest, recordSignInProviderBestEffort } from '@/features/account/usecases/account-manifest';
 import { signInWithApple, signInWithGoogle } from '@/features/account/usecases/sign-in';
@@ -22,7 +23,6 @@ import { enablePushEverywhere } from '@/features/push-notifications/usecases/ena
 type Provider = 'apple' | 'google';
 
 export default function WelcomeScreen() {
-  const insets = useSafeAreaInsets();
   // null = still checking. Runs once per launch; _layout.tsx already
   // guarantees the database is ready before this screen ever mounts.
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
@@ -126,20 +126,27 @@ export default function WelcomeScreen() {
     <ThemedView style={styles.screen}>
       <View style={styles.photo}>
         <Image source={require('@/assets/images/welcome-photo.jpg')} style={StyleSheet.absoluteFill} contentFit="cover" />
-        {/* Caption sits over a real photo now, not the placeholder hatch — a
-            fixed-height scrim keeps it legible regardless of what's behind it. */}
+        {/* Top scrim keeps the status bar legible over the photo. */}
         <LinearGradient colors={['rgba(0,0,0,0.45)', 'transparent']} style={styles.photoScrim} pointerEvents="none" />
-        <ThemedText
-          type="eyebrow"
-          style={{ paddingTop: insets.top + 8, paddingLeft: Spacing.screenPadding, color: '#fff' }}>
-          Photo: the whole circle, Sunday afternoon
-        </ThemedText>
+        {/* Radial from the bottom-left corner so only the wordmark's corner goes dark — a full-width
+            band would shade the faces too. Fades out before any face in this photo; recheck if it changes. */}
+        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Defs>
+            <RadialGradient id="wordmarkScrim" cx="0" cy="1" fx="0" fy="1" rx="0.95" ry="0.48">
+              <Stop offset="0" stopColor="#000" stopOpacity={0.9} />
+              <Stop offset="0.35" stopColor="#000" stopOpacity={0.75} />
+              <Stop offset="0.7" stopColor="#000" stopOpacity={0.35} />
+              <Stop offset="1" stopColor="#000" stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#wordmarkScrim)" />
+        </Svg>
+        {/* Dark-theme text in both schemes: this sits on the photo, not the page,
+            and the light scheme's brown would disappear into it. */}
+        <Wordmark color={Colors.dark.text} style={styles.wordmark} />
       </View>
 
       <ThemedSafeAreaView edges={['bottom']} style={styles.content}>
-        <ThemedText type="eyebrow" themeColor="accentBright">
-          Mimoza
-        </ThemedText>
         <ThemedText type="onboardingHeadline">Private circles for your photos.</ThemedText>
         <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
           Small circles, one shared feed. End-to-end encrypted, so only your circle can ever see it.
@@ -179,18 +186,23 @@ const styles = StyleSheet.create({
     right: 0,
     height: 140,
   },
+  wordmark: {
+    position: 'absolute',
+    left: Spacing.screenPadding,
+    bottom: 18,
+  },
   content: {
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
-    justifyContent: 'center',
+    paddingTop: 32,
     gap: Spacing.cardListGap,
   },
   body: {
-    marginTop: -4,
+    marginTop: 0,
   },
   actions: {
     gap: 12,
-    marginTop: 8,
+    marginTop: 16,
   },
   footer: {
     alignSelf: 'center',

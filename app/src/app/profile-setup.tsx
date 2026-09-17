@@ -101,7 +101,7 @@ export default function ProfileSetupScreen() {
 
         <KeyboardAvoider style={styles.form}>
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-            <ThemedText type="onboardingHeadline">Who are you, to the people in your circles?</ThemedText>
+            <ThemedText type="screenTitle">Who are you, to the people in your circles?</ThemedText>
             <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
               A picture and a name. That is the whole profile: no username, no bio, no email, no
               phone number. There is nothing else to collect.
@@ -117,7 +117,7 @@ export default function ProfileSetupScreen() {
               </View>
             </Pressable>
 
-            <ThemedText type="eyebrow" style={styles.nameLabel}>
+            <ThemedText type="sectionTitle" style={styles.nameLabel}>
               Full name
             </ThemedText>
             <TextInput
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: Radius.input,
     borderWidth: 1,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.sans,
     fontSize: 18,
   },
   continueButton: {

@@ -5,6 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
+import { Wordmark } from '@/ui/components/wordmark';
 import { LoadingModal } from '@/ui/components/loading-modal';
 import { OptionSheet } from '@/ui/components/option-sheet';
 import { PrivacyInfoModal } from '@/features/account/components/privacy-info-modal';
@@ -13,7 +14,7 @@ import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { SettingsGroups, type SettingsGroup } from '@/ui/components/settings-group';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Icons, Radius, Spacing } from '@/ui/theme/tokens';
+import { Radius, Spacing } from '@/ui/theme/tokens';
 import { getProfile, listCircles, type Profile } from '@/data/db';
 import { deleteAccount, finishAccountDeletionIfPending, isAccountDeletionPending } from '@/features/account/usecases/delete-account';
 import { resetEverythingForTesting } from '@/features/dev/dev-reset';
@@ -294,7 +295,7 @@ export default function AccountScreen() {
 
 
           <View style={styles.section}>
-            <ThemedText type="eyebrow" themeColor="muted" style={styles.sectionLabel}>
+            <ThemedText type="sectionTitle" style={styles.sectionLabel}>
               Appearance
             </ThemedText>
 
@@ -313,9 +314,12 @@ export default function AccountScreen() {
 
           <SettingsGroups groups={settingsGroups} />
 
-          <ThemedText type="meta" themeColor="faint" style={styles.version}>
-            Mimoza v{appVersion}
-          </ThemedText>
+          <View style={styles.version}>
+            <Wordmark size={21} />
+            <ThemedText type="meta" themeColor="faint">
+              v{appVersion}
+            </ThemedText>
+          </View>
 
           <SettingsGroups groups={[developerGroup]} />
         </ScrollView>
@@ -386,6 +390,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   version: {
-    textAlign: 'center',
+    alignItems: 'center',
   },
 });

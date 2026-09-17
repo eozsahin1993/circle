@@ -15,7 +15,7 @@ import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
 import { SettingsGroups, type SettingsGroup } from '@/ui/components/settings-group';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Icons, Radius, Spacing } from '@/ui/theme/tokens';
+import { Fonts, Icons, Radius, Spacing } from '@/ui/theme/tokens';
 import { MemberRoles, type Member, type MemberRole } from '@/data/db';
 import { setMemberRole } from '@/features/circle/usecases/change-member-role';
 import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
@@ -455,7 +455,7 @@ export default function CircleDetailsScreen() {
     return (
       <>
         <View style={styles.sectionHeader}>
-          <ThemedText type="eyebrow" themeColor="muted">
+          <ThemedText type="sectionTitle">
             Members
           </ThemedText>
           <ThemedText type="meta" themeColor="muted">
@@ -530,7 +530,7 @@ export default function CircleDetailsScreen() {
 
           {__DEV__ ? (
             <View style={styles.debugZone}>
-              <ThemedText type="eyebrow" themeColor="muted">
+              <ThemedText type="sectionTitle">
                 Debug
               </ThemedText>
               <SecondaryButton label="Copy keyset for decryptlog" onPress={handleCopyDebugKeyset} />
@@ -629,8 +629,8 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   adminBadgeText: {
+    fontFamily: Fonts.sansSemiBold,
     fontSize: 10.5,
-    fontWeight: '600',
   },
   adminNotice: {
     marginTop: 10,

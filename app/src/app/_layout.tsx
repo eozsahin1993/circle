@@ -1,7 +1,5 @@
 import 'react-native-get-random-values';
 
-import { Figtree_400Regular, Figtree_500Medium, Figtree_600SemiBold } from '@expo-google-fonts/figtree';
-import { Newsreader_300Light, Newsreader_400Regular, Newsreader_500Medium } from '@expo-google-fonts/newsreader';
 import { Buffer } from 'buffer';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { useFonts } from 'expo-font';
@@ -88,12 +86,9 @@ function AppShell() {
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
-    Newsreader_300Light,
-    Newsreader_400Regular,
-    Newsreader_500Medium,
-    Figtree_400Regular,
-    Figtree_500Medium,
-    Figtree_600SemiBold,
+    Outfit_400Regular: require('@/assets/fonts/Outfit_400Regular.ttf'),
+    Outfit_500Medium: require('@/assets/fonts/Outfit_500Medium.ttf'),
+    Outfit_600SemiBold: require('@/assets/fonts/Outfit_600SemiBold.ttf'),
   });
   const [dbReady, setDbReady] = useState(false);
   const [settings, setSettings] = useState<AppSettings | null>(null);

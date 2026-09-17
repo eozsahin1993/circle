@@ -17,7 +17,7 @@ import { EmojiPicker } from '@/ui/components/emoji-picker';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Icons, PhotoAspect, Radius, Spacing } from '@/ui/theme/tokens';
+import { Fonts, Icons, PhotoAspect, Radius, Spacing } from '@/ui/theme/tokens';
 import {
   getAttachment,
   getCircleSummary,
@@ -471,6 +471,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 999,
     borderWidth: 1,
+    fontFamily: Fonts.sans,
     fontSize: 14,
   },
   composerSendDisabled: {

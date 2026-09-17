@@ -98,7 +98,7 @@ export function PrivacyInfoModal({ visible, onClose }: PrivacyInfoModalProps) {
 
               {SECTIONS.map((section) => (
                 <View key={section.label} style={styles.section}>
-                  <ThemedText type="eyebrow" themeColor="accent">
+                  <ThemedText type="sectionTitle">
                     {section.label}
                   </ThemedText>
                   <ThemedText type="captionFeed" themeColor="secondary">

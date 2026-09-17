@@ -117,8 +117,10 @@ export default function JoinPendingScreen() {
             </>
           ) : (
             <>
-              <ThemedText type="screenTitle">Waiting for approval</ThemedText>
-              <ThemedText type="onboardingHeadline">{circleName}</ThemedText>
+              <View>
+                <ThemedText type="sectionTitle">Waiting for approval</ThemedText>
+                <ThemedText type="screenTitle">{circleName}</ThemedText>
+              </View>
               <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
                 {inviterName || 'Whoever shared this key'} needs to let you in. This screen moves on
                 by itself once they have.

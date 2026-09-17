@@ -5,6 +5,7 @@ import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 're
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 
 import { Avatar } from '@/ui/components/avatar/avatar';
+import { Wordmark } from '@/ui/components/wordmark';
 import { CircleCard } from '@/features/circle/components/circle-card';
 import { JoinSheet } from '@/features/invite/components/join-sheet';
 import { PendingCircleCard } from '@/features/invite/components/pending-circle-card';
@@ -201,12 +202,7 @@ export default function CircleListScreen() {
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <View>
-            <ThemedText type="eyebrow" style={styles.eyebrow}>
-              Mimoza
-            </ThemedText>
-            <ThemedText type="circleListHeader">Your Circles</ThemedText>
-          </View>
+          <Wordmark withBloom accessibilityRole="header" accessibilityLabel="mimoza" />
 
           <Pressable onPress={() => router.push('/account')}>
             <Avatar size={44} uri={avatarUri} name={profileName} colorSeed={ownColorSeed} />
@@ -222,7 +218,7 @@ export default function CircleListScreen() {
               <PrivacyNotice onPress={() => setShowPrivacyInfo(true)} style={styles.privacyNotice} />
               {pending.length ? (
                 <View style={styles.pending}>
-                  <ThemedText type="eyebrow" themeColor="faint">
+                  <ThemedText type="sectionTitle">
                     {`Waiting to join · ${pending.length}`}
                   </ThemedText>
                   {pending.map((request) => (
@@ -236,6 +232,11 @@ export default function CircleListScreen() {
                     />
                   ))}
                 </View>
+              ) : null}
+              {loaded && circles.length ? (
+                <ThemedText type="sectionTitle" style={styles.sectionTitle}>
+                  Your circles
+                </ThemedText>
               ) : null}
             </>
           }
@@ -305,11 +306,8 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  eyebrow: {
-    marginBottom: 2,
   },
   list: {
     // Grows to fill the screen so the empty state's `flex: 1` still has
@@ -321,6 +319,10 @@ const styles = StyleSheet.create({
   },
   privacyNotice: {
     paddingHorizontal: 0,
+    paddingBottom: 8,
+  },
+  sectionTitle: {
+    marginTop: 8,
   },
   pending: {
     gap: 12,

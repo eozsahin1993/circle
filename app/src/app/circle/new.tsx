@@ -49,7 +49,7 @@ export default function NewCircleScreen() {
           <ThemedText type="screenTitle">Create circle</ThemedText>
 
           <View>
-            <ThemedText type="eyebrow" style={styles.fieldLabel}>
+            <ThemedText type="sectionTitle" style={styles.fieldLabel}>
               Name
             </ThemedText>
             <TextInput
@@ -62,7 +62,7 @@ export default function NewCircleScreen() {
           </View>
 
           <View>
-            <ThemedText type="eyebrow" style={styles.fieldLabel}>
+            <ThemedText type="sectionTitle" style={styles.fieldLabel}>
               Cover
             </ThemedText>
             <PhotoPicker
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: Radius.input,
     borderWidth: 1,
-    fontFamily: Fonts.serif,
+    fontFamily: Fonts.sans,
     fontSize: 18,
   },
   fieldLabel: {

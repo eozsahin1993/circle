@@ -9,7 +9,7 @@ import { PrimaryButton } from '@/ui/components/buttons/primary-button';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Fonts, PhotoAspect, Radius, Spacing } from '@/ui/theme/tokens';
+import { PhotoAspect, Radius, Spacing, Type } from '@/ui/theme/tokens';
 import { getCircleSummary, getCircleMembers } from '@/data/db';
 import { createPost } from '@/features/post/usecases/create-post';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
@@ -145,9 +145,9 @@ const styles = StyleSheet.create({
   },
   captionInput: {
     minHeight: 60,
-    fontFamily: Fonts.serif,
-    fontSize: 16.5,
-    lineHeight: 16.5 * 1.5,
+    fontFamily: Type.captionDetail.fontFamily,
+    fontSize: Type.captionDetail.fontSize,
+    lineHeight: Type.captionDetail.lineHeight,
     textAlignVertical: 'top',
   },
   albumRow: {

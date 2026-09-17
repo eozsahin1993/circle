@@ -132,7 +132,7 @@ export default function AlbumScreen() {
           contentContainerStyle={styles.list}
           renderItem={({ item }) =>
             item.kind === 'month' ? (
-              <ThemedText type="eyebrow" themeColor="muted" style={styles.monthLabel}>
+              <ThemedText type="sectionTitle" style={styles.monthLabel}>
                 {item.label}
               </ThemedText>
             ) : (

@@ -159,34 +159,26 @@ export const Tints = {
 } as const;
 
 export const Fonts = {
-  serif: 'Newsreader_400Regular',
-  serifLight: 'Newsreader_300Light',
-  serifMedium: 'Newsreader_500Medium',
-  sans: 'Figtree_400Regular',
-  sansMedium: 'Figtree_500Medium',
-  sansSemiBold: 'Figtree_600SemiBold',
+  title: 'Outfit_600SemiBold',
+  sans: 'Outfit_400Regular',
+  sansMedium: 'Outfit_500Medium',
+  sansSemiBold: 'Outfit_600SemiBold',
   mono: Platform.select({ ios: 'Menlo', default: 'ui-monospace' }) ?? 'monospace',
 } as const;
 
 /** Font family + size/lineHeight/weight per the handoff's numbered type scale. */
 export const Type = {
-  onboardingHeadline: { fontFamily: Fonts.serifLight, fontSize: 37, lineHeight: 37 * 1.12 },
-  circleListHeader: { fontFamily: Fonts.serifLight, fontSize: 32, lineHeight: 32 * 1.0 },
-  screenTitle: { fontFamily: Fonts.serifLight, fontSize: 30, lineHeight: 30 * 1.1 },
-  cardTitle: { fontFamily: Fonts.serif, fontSize: 21, lineHeight: 21 * 1.15 },
-  captionDetail: { fontFamily: Fonts.serif, fontSize: 16.5, lineHeight: 16.5 * 1.5 },
+  onboardingHeadline: { fontFamily: Fonts.title, fontSize: 32, lineHeight: 32 * 1.12, letterSpacing: 32 * -0.02 },
+  /** Labels a group of cards within a screen — quieter than a card's own title. */
+  sectionTitle: { fontFamily: Fonts.sansMedium, fontSize: 15, lineHeight: 15 * 1.3 },
+  screenTitle: { fontFamily: Fonts.title, fontSize: 24, lineHeight: 24 * 1.15, letterSpacing: 24 * -0.02 },
+  cardTitle: { fontFamily: Fonts.title, fontSize: 21, lineHeight: 21 * 1.15, letterSpacing: 21 * -0.01 },
+  captionDetail: { fontFamily: Fonts.sans, fontSize: 16.5, lineHeight: 16.5 * 1.5 },
   postAuthor: { fontFamily: Fonts.sansMedium, fontSize: 16, lineHeight: 16 * 1.3 },
   captionFeed: { fontFamily: Fonts.sans, fontSize: 15, lineHeight: 15 * 1.5 },
   comment: { fontFamily: Fonts.sans, fontSize: 14, lineHeight: 14 * 1.5 },
   buttonLabel: { fontFamily: Fonts.sansSemiBold, fontSize: 15, lineHeight: 15 * 1.2 },
   meta: { fontFamily: Fonts.sans, fontSize: 12.5, lineHeight: 12.5 * 1.4 },
-  eyebrow: {
-    fontFamily: Fonts.mono,
-    fontSize: 9.5,
-    lineHeight: 9.5 * 1.4,
-    letterSpacing: 9.5 * 0.13,
-    textTransform: 'uppercase',
-  },
   inviteKey: {
     fontFamily: Fonts.mono,
     fontSize: 22,

@@ -119,9 +119,9 @@ export function SettingsRow({ label, description, icon, control, destructive, on
 }
 
 export type SettingsGroup = {
-  /** The eyebrow above the rows. */
+  /** The section title above the rows. */
   title: string;
-  /** Danger tone on that eyebrow, for a group of things you can't undo. */
+  /** Danger tone on that title, for a group of things you can't undo. */
   destructive?: boolean;
   /**
    * Falsy entries are dropped, so a row can be gated inline
@@ -137,7 +137,7 @@ export type SettingsGroup = {
  * adding a setting is one object in that list — no new markup, no new
  * spacing decision, and nothing to keep in sync with the group beside it.
  *
- * The eyebrow-over-a-bordered-card shape is the account screen's, kept as
+ * The title-over-a-bordered-card shape is the account screen's, kept as
  * the single form so every settings surface in the app reads the same.
  * A group with no surviving rows renders nothing, so gating a whole
  * section on `admin` needs no wrapper.
@@ -153,7 +153,7 @@ export function SettingsGroups({ groups }: { groups: SettingsGroup[] }) {
 
         return (
           <View key={group.title} style={styles.section}>
-            <ThemedText type="eyebrow" themeColor={group.destructive ? 'danger' : 'muted'}>
+            <ThemedText type="sectionTitle" themeColor={group.destructive ? 'danger' : undefined}>
               {group.title}
             </ThemedText>
 

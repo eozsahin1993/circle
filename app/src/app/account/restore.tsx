@@ -9,7 +9,7 @@ import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Radius, Spacing } from '@/ui/theme/tokens';
+import { Fonts, Radius, Spacing } from '@/ui/theme/tokens';
 import { pickRecoveryCard } from '@/features/account/usecases/recovery-card';
 import { restoreFromPhrase } from '@/features/account/usecases/restore-from-phrase';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
@@ -160,6 +160,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: Radius.input,
     borderWidth: 1,
+    fontFamily: Fonts.sans,
     fontSize: 16,
     textAlignVertical: 'top',
   },

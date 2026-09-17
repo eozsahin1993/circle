@@ -13,7 +13,7 @@ export type ThemedTextProps = TextProps & {
 /** Default text color per type, per the handoff's text ramp — override with `themeColor`. */
 const defaultColor: Record<ThemedTextType, ThemeColor> = {
   onboardingHeadline: 'text',
-  circleListHeader: 'text',
+  sectionTitle: 'secondary',
   screenTitle: 'text',
   cardTitle: 'text',
   postAuthor: 'text',
@@ -22,7 +22,6 @@ const defaultColor: Record<ThemedTextType, ThemeColor> = {
   comment: 'secondary',
   buttonLabel: 'text',
   meta: 'faint',
-  eyebrow: 'faint',
   inviteKey: 'accentBright',
 };
 

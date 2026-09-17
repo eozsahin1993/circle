@@ -31,7 +31,6 @@ export type Post = {
   photoUri?: string;
   /** Why there's no photo yet, when there isn't one — see `PhotoPlaceholder`. */
   missingPhoto?: MissingPhoto;
-  photoLabel?: string;
   caption: string;
   reactions: Reaction[];
   /** The single comment a card shows — the newest. Absent on a post nobody has replied to. */
@@ -147,11 +146,6 @@ export function PostCard({
         ) : (
           <PhotoPlaceholder style={styles.photo} missing={post.missingPhoto} />
         )}
-        {post.photoLabel ? (
-          <ThemedText type="eyebrow" style={styles.photoLabel}>
-            {post.photoLabel}
-          </ThemedText>
-        ) : null}
       </Pressable>
 
       {/* Two lines in the feed; the post's own screen carries the rest.
@@ -251,11 +245,6 @@ const styles = StyleSheet.create({
   },
   photo: {
     aspectRatio: PhotoAspect.post,
-  },
-  photoLabel: {
-    position: 'absolute',
-    left: Spacing.feedTextPadding,
-    bottom: 16,
   },
   caption: {
     paddingHorizontal: Spacing.feedTextPadding,

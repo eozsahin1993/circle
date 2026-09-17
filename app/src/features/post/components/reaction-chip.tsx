@@ -8,7 +8,7 @@ import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 export type ReactionChipProps = Omit<PressableProps, 'style'> & {
   /**
    * Rendered with the platform's default font, not this app's custom
-   * Figtree/Newsreader families — a custom `fontFamily` can suppress the
+   * Outfit family — a custom `fontFamily` can suppress the
    * OS's automatic fallback to its color emoji font, leaving the emoji
    * blank. Keep emoji out of `label` for this reason.
    */
