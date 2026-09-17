@@ -14,11 +14,13 @@ import { createCircle } from '@/features/circle/usecases/create-circle';
 import { encrypt, generateUUID, hashBytes } from '@/core/crypto/primitives';
 import { getCurrentContentKey } from '@/core/services/keystore/circle-keys';
 import { saveMasterSeed } from '@/core/services/keystore/master-seed';
+import { deleteAuthToken, saveAuthToken } from '@/core/services/keystore/auth-token';
 import { appendEntry, bootstrapCircle } from '@/core/services/log-relay';
 import { getBlob } from '@/core/services/blob-relay';
 import { drainPhotoQueue } from '@/core/photo/photo-queue';
 
 beforeAll(async () => {
+  await saveAuthToken('session-token');
   await initDatabase();
   await saveMasterSeed(new Uint8Array(16));
 });
@@ -63,6 +65,21 @@ test('downloads, decrypts, and stores a pending photo', async () => {
   expect(attachment?.bytes).toEqual(photo);
   expect(attachment?.status).toBe('fetched');
   expect(attachment?.fetchAttempts).toBe(0);
+});
+
+test('stops without a session, rather than backing every photo off', async () => {
+  const { id: circleId } = await createCircle({ name: 'Family Circle' });
+  const postId = await makePendingPost(circleId, new Uint8Array([1]), 1000);
+  await deleteAuthToken();
+
+  try {
+    await drainPhotoQueue();
+  } finally {
+    await saveAuthToken('session-token');
+  }
+
+  expect(getBlob).not.toHaveBeenCalled();
+  expect((await getAttachment(circleId, postId))?.fetchAttempts).toBe(0);
 });
 
 test('fetches newest first, across circles rather than finishing one circle at a time', async () => {

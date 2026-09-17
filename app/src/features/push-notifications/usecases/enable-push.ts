@@ -1,8 +1,9 @@
 import { getPermissionsAsync } from 'expo-notifications';
 
 import { getAllCircles } from '@/data/db';
+import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { circlePushPreferences } from '@/features/push-notifications/usecases/push-preferences';
-import { registerPushForCircle } from '@/features/push-notifications/usecases/push-registration';
+import { registerPushForCircle, unregisterDeviceForCircle } from '@/features/push-notifications/usecases/push-registration';
 import { refreshPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
 import { getDevicePushToken } from '@/features/push-notifications/services/tokens';
 
@@ -19,6 +20,9 @@ import { getDevicePushToken } from '@/features/push-notifications/services/token
  * ever surface as an error to whoever just opened the app.
  */
 export async function enablePushEverywhere(): Promise<void> {
+  // Every registration route is session-gated.
+  if (!(await getAuthToken())) return;
+
   // Even without permission (or a token), the iOS extension's snapshot
   // should reflect this launch's circles.
   await refreshPushSnapshot();
@@ -36,6 +40,21 @@ export async function enablePushEverywhere(): Promise<void> {
       await registerPushForCircle(circle.id, { ...device, categories });
     } catch (err) {
       console.error(`Failed to enable notifications for circle ${circle.id}`, err);
+    }
+  }
+}
+
+/**
+ * Stops this device receiving notifications for any circle — for signing
+ * out, and must run while the session is still valid, since the relay's
+ * push routes require one. Other devices on the account keep theirs.
+ */
+export async function unregisterPushEverywhere(): Promise<void> {
+  for (const circle of await getAllCircles()) {
+    try {
+      await unregisterDeviceForCircle(circle.id);
+    } catch (err) {
+      console.error(`Failed to disable notifications for circle ${circle.id}`, err);
     }
   }
 }

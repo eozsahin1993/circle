@@ -3,6 +3,8 @@ import { GoogleSignin, isErrorWithCode, isSuccessResponse, statusCodes } from '@
 import { Platform } from 'react-native';
 
 import { deleteAuthToken, getAuthToken, saveAuthToken } from '@/core/services/keystore/auth-token';
+import { unregisterPushEverywhere } from '@/features/push-notifications/usecases/enable-push';
+import { clearPushSnapshot } from '@/features/push-notifications/usecases/push-snapshot';
 import {
   logout as relayLogout,
   signInWithApple as relaySignInWithApple,
@@ -147,10 +149,18 @@ export async function signOut(): Promise<void> {
   const token = await getAuthToken();
   if (token) {
     try {
+      await unregisterPushEverywhere();
+    } catch (err) {
+      console.error('Failed to disable notifications while signing out', err);
+    }
+    try {
       await relayLogout(token);
     } catch (err) {
       console.error('Failed to revoke session server-side', err);
     }
   }
   await deleteAuthToken();
+  // After the token is gone, not before: a sync pass still running would
+  // otherwise write the snapshot back — see clearPushSnapshot.
+  await clearPushSnapshot();
 }

@@ -7,6 +7,7 @@ import {
   type FetchableAttachment,
 } from '@/data/db';
 import { decrypt, hashBytes } from '@/core/crypto/primitives';
+import { getAuthToken } from '@/core/services/keystore/auth-token';
 import { getCircleKeyMap } from '@/core/services/keystore/circle-keys';
 import { writeCoverFile, writePhotoFile } from '@/core/photo/photo-cache';
 import { notifyPhotoFetched } from '@/core/photo/photo-events';
@@ -85,6 +86,9 @@ async function drain(budget: DrainBudget): Promise<void> {
 
   for (let fetched = 0; fetched < maxPhotos; fetched += 1) {
     if (budget.deadlineMs !== undefined && Date.now() - startedAt >= budget.deadlineMs) return;
+    // Checked per photo so signing out stops a drain already running.
+    // Carrying on would fail every fetch and back each photo off for up to a day.
+    if (!(await getAuthToken())) return;
 
     // Re-queried every iteration rather than taking a batch up front, so
     // the next photo is always the newest one eligible *right now* — a
