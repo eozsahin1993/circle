@@ -6,7 +6,7 @@
 # profile) and passes the account id as TF_VAR_aws_account_id from a GitHub
 # Environment variable.
 
-aws_profile    = "mimoza-staging"
+aws_profile    = "mimoza-staging-admin"
 aws_account_id = ""
 
 # Where the billing alarm mails. Empty means no alarm — AWS has no spending
