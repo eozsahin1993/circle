@@ -21,7 +21,7 @@ module "lambda" {
 
   # Locks the function URL to signed requests once there is a distribution
   # to sign them. Both flip together on the apply that sets api_domain.
-  behind_cloudfront    = var.api_domain != ""
+  behind_cloudfront    = var.lock_function_url
   reserved_concurrency = var.reserved_concurrency
 }
 
@@ -38,6 +38,7 @@ module "cdn" {
   origin_function_name = module.lambda.function_name
 
   api_domain_name         = var.api_domain
+  sign_origin_requests    = var.lock_function_url
   blob_domain_name        = var.blob_domain
   blob_signing_public_key = var.blob_signing_public_key
 

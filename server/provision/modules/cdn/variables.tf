@@ -19,6 +19,12 @@ variable "origin_function_name" {
   type        = string
 }
 
+variable "sign_origin_requests" {
+  description = "Lock the function URL to this distribution (origin access control). Requires the client to send x-amz-content-sha256 on every request with a body — Lambda rejects unsigned payloads."
+  type        = bool
+  default     = false
+}
+
 variable "blob_domain_name" {
   description = "The hostname photo downloads are served from (cdn.mimoza.app). Empty leaves reads on presigned S3 URLs."
   type        = string

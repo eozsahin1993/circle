@@ -45,3 +45,9 @@ variable "reserved_concurrency" {
   type        = number
   default     = 50
 }
+
+variable "lock_function_url" {
+  description = "Require signed origin requests, so only CloudFront can invoke the relay. Clients must send x-amz-content-sha256 with each body's hash first."
+  type        = bool
+  default     = false
+}
