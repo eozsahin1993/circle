@@ -32,6 +32,10 @@ const ENVIRONMENTS = {
     nameSuffix: ' Staging',
     idSuffix: '.staging',
     scheme: 'mimoza-staging',
+    // The same corner ribbon the app draws over its screens, so a home
+    // screen says which build it is too.
+    icon: './assets/images/icon-staging.png',
+    androidForeground: './assets/images/android-icon-foreground-staging.png',
   },
 };
 
@@ -52,10 +56,10 @@ module.exports = ({ config }) => {
     ...config,
     name: `${config.name}${env.nameSuffix}`,
     scheme: env.scheme,
-    icon: env.icon,
+    icon: env.icon ?? config.icon,
     ios: {
       ...config.ios,
-      icon: env.icon,
+      icon: env.icon ?? config.ios.icon,
       bundleIdentifier,
       entitlements: {
         ...config.ios.entitlements,
@@ -64,7 +68,10 @@ module.exports = ({ config }) => {
     },
     android: {
       ...config.android,
-      adaptiveIcon: { ...config.android.adaptiveIcon, foregroundImage: env.androidForeground },
+      adaptiveIcon: {
+        ...config.android.adaptiveIcon,
+        foregroundImage: env.androidForeground ?? config.android.adaptiveIcon.foregroundImage,
+      },
       package: `${config.android.package}${env.idSuffix}`,
       // One file per environment, so a build can only ever carry the
       // Firebase config it is meant to — a shared file works (the SDK
