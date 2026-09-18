@@ -18,6 +18,10 @@ module "lambda" {
   aws_region  = local.aws_region
   binary_path = "${path.root}/../../build/bootstrap"
   storage     = module.storage
+
+  # Locks the function URL to signed requests once there is a distribution
+  # to sign them. Both flip together on the apply that sets api_domain.
+  behind_cloudfront = var.api_domain != ""
 }
 
 module "cdn" {
@@ -28,8 +32,9 @@ module "cdn" {
     aws.us_east_1 = aws.us_east_1
   }
 
-  name_prefix = local.name_prefix
-  origin_url  = module.lambda.api_endpoint
+  name_prefix          = local.name_prefix
+  origin_url           = module.lambda.api_endpoint
+  origin_function_name = module.lambda.function_name
 
   api_domain_name         = var.api_domain
   blob_domain_name        = var.blob_domain

@@ -55,6 +55,10 @@ we control before any build ships to a real user.
   `AllViewerExceptHostHeader` — the relay serves per-user encrypted data,
   so nothing here is cached. Blobs are the opposite; see below.
 - DNS at Cloudflare, **"DNS only"**. Proxying would stack two CDNs.
+- **The function URL is locked to the distribution** (origin access
+  control, `AWS_IAM`), so nobody can dial the Lambda directly and bypass
+  the CDN — or the WAF that may sit on it later. It stays unsigned while
+  `api_domain` is empty: there is nothing to sign the requests.
 - Free tier covers it: 1 TB out, 10M requests/month, permanent.
 
 Sync payloads still gain from the nearby TLS handshake and the AWS

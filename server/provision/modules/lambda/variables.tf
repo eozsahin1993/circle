@@ -31,3 +31,9 @@ variable "storage" {
     push_table_arn       = string
   })
 }
+
+variable "behind_cloudfront" {
+  description = "Whether a CloudFront distribution fronts this function. True locks the function URL to signed requests from it; false leaves it publicly callable. Must not be true before the distribution exists."
+  type        = bool
+  default     = false
+}

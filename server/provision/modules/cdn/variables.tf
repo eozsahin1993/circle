@@ -14,6 +14,11 @@ variable "origin_url" {
   type        = string
 }
 
+variable "origin_function_name" {
+  description = "The relay Lambda's name, for the invoke permission scoped to this distribution."
+  type        = string
+}
+
 variable "blob_domain_name" {
   description = "The hostname photo downloads are served from (cdn.mimoza.app). Empty leaves reads on presigned S3 URLs."
   type        = string

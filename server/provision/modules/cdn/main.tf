@@ -25,6 +25,29 @@ data "aws_cloudfront_origin_request_policy" "all_viewer_except_host" {
   name = "Managed-AllViewerExceptHostHeader"
 }
 
+# Signs every request to the origin, so the function URL can refuse
+# anything that didn't come through this distribution.
+resource "aws_cloudfront_origin_access_control" "relay" {
+  count                             = local.api_enabled
+  name                              = "${var.name_prefix}-relay"
+  origin_access_control_origin_type = "lambda"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+# The counterpart to modules/lambda's public permission, scoped to this
+# distribution. Granted here because the ARN lives here — the lambda
+# module can't reference it without a cycle.
+resource "aws_lambda_permission" "cloudfront" {
+  count                  = local.api_enabled
+  statement_id           = "AllowCloudFrontInvoke"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = var.origin_function_name
+  principal              = "cloudfront.amazonaws.com"
+  source_arn             = aws_cloudfront_distribution.relay[0].arn
+  function_url_auth_type = "AWS_IAM"
+}
+
 resource "aws_acm_certificate" "relay" {
   count             = local.api_enabled
   provider          = aws.us_east_1
@@ -57,8 +80,9 @@ resource "aws_cloudfront_distribution" "relay" {
   aliases = [var.api_domain_name]
 
   origin {
-    origin_id   = local.origin_id
-    domain_name = local.origin_host
+    origin_id                = local.origin_id
+    domain_name              = local.origin_host
+    origin_access_control_id = aws_cloudfront_origin_access_control.relay[0].id
 
     custom_origin_config {
       origin_protocol_policy = "https-only"
