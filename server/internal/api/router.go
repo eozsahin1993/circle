@@ -110,13 +110,13 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	deleteentry.Register(circleMux, &deleteentry.Service{Log: logService, BlobStore: deps.Blob}, writeLimit)
 	deleteauthorcontent.Register(circleMux, &deleteauthorcontent.Service{Log: logService, BlobStore: deps.Blob}, writeLimit)
 	getcoverphotouploadtarget.Register(circleMux, &getcoverphotouploadtarget.Service{BlobStore: deps.Blob, LogStore: deps.Log}, writeLimit)
-	mux.Handle("/circles/", auth.RequireSession(deps.Auth, circleMux))
+	mux.Handle("/circles/", auth.RequireSession(deps.Auth, httputil.LogRoutes(circleMux)))
 
 	// Account-scoped, not circle-scoped — its own sub-mux, same
 	// RequireSession wrapping as circleMux above.
 	accountMux := http.NewServeMux()
 	manifest.Register(accountMux, &manifest.Service{ManifestStore: deps.Manifest})
-	mux.Handle("/account/", auth.RequireSession(deps.Auth, accountMux))
+	mux.Handle("/account/", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
 	deleteaccount.Register(mux, &deleteaccount.Service{ManifestStore: deps.Manifest, AuthStore: deps.Auth}, func(h http.Handler) http.Handler {
 		return auth.RequireSession(deps.Auth, h)
 	})
@@ -129,7 +129,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	// some authenticated session is.
 	invitesMux := http.NewServeMux()
 	invitehttp.Register(invitesMux, &invitehttp.Service{InviteStore: deps.Invite})
-	mux.Handle("/invites/", auth.RequireSession(deps.Auth, invitesMux))
+	mux.Handle("/invites/", auth.RequireSession(deps.Auth, httputil.LogRoutes(invitesMux)))
 
 	// Not circle-scoped in the path (it spans however many circles a
 	// device is in, in one call) — its own sub-mux rather than nested
@@ -138,7 +138,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	// once this is actually polled on its intended ~30s cadence.
 	epochsMux := http.NewServeMux()
 	getepochs.Register(epochsMux, &getepochs.Service{LogStore: deps.Log}, readLimit)
-	mux.Handle("/epochs/", auth.RequireSession(deps.Auth, epochsMux))
+	mux.Handle("/epochs/", auth.RequireSession(deps.Auth, httputil.LogRoutes(epochsMux)))
 
 	// Registration is session-gated; the send route is not, and mounts on
 	// the parent mux — see pushhttp.FanoutHandler. "POST /push/send" is more
@@ -149,7 +149,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 
 		pushMux := http.NewServeMux()
 		pushhttp.Register(pushMux, pushService)
-		mux.Handle("/push/", auth.RequireSession(deps.Auth, pushMux))
+		mux.Handle("/push/", auth.RequireSession(deps.Auth, httputil.LogRoutes(pushMux)))
 
 		dispatch := deps.Push.Dispatch
 		if dispatch == nil {

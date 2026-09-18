@@ -1,6 +1,7 @@
 package httputil
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"time"
@@ -18,20 +19,55 @@ func LogRequests(next http.Handler) http.Handler {
 		started := time.Now()
 		recorder := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 
+		matched := &matchedRoute{}
+		r = r.WithContext(context.WithValue(r.Context(), routeKey{}, matched))
+
 		next.ServeHTTP(recorder, r)
 
-		// Pattern is empty for a request nothing matched, which is worth
-		// seeing as itself: a client calling a route that doesn't exist.
-		route := r.Pattern
-		if route == "" {
-			route = "(no route)"
-		}
 		slog.InfoContext(r.Context(), "request",
 			"method", r.Method,
-			"route", route,
+			"route", route(r, matched),
 			"status", recorder.status,
 			"ms", time.Since(started).Milliseconds())
 	})
+}
+
+// LogRoutes makes LogRequests name the endpoint a nested mux matched,
+// rather than the group it is mounted under.
+//
+// Middleware between the two muxes copies the request (RequireSession adds
+// the session to its context), and the inner mux then records its pattern
+// on that copy — so without this, everything under a mount logs as
+// "/circles/". Handler reports the match without performing it.
+//
+// It resolves one level. A mux nested inside a mux needs this at each
+// mount, or the deeper pattern is the one that goes missing.
+func LogRoutes(mux *http.ServeMux) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, pattern := mux.Handler(r); pattern != "" {
+			if matched, ok := r.Context().Value(routeKey{}).(*matchedRoute); ok {
+				matched.pattern = pattern
+			}
+		}
+		mux.ServeHTTP(w, r)
+	})
+}
+
+type routeKey struct{}
+
+type matchedRoute struct{ pattern string }
+
+// A request nothing matched has no pattern anywhere, which is worth seeing
+// as itself: a client calling a route that doesn't exist.
+func route(r *http.Request, matched *matchedRoute) string {
+	switch {
+	case matched.pattern != "":
+		return matched.pattern
+	case r.Pattern != "":
+		return r.Pattern
+	default:
+		return "(no route)"
+	}
 }
 
 type statusRecorder struct {
