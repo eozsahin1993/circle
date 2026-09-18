@@ -45,13 +45,11 @@ export default function NewCircleScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
-        <ScreenHeader variant="close" />
+        <ScreenHeader variant="close" title={t('circle.create.title')} />
 
         <KeyboardAvoider style={styles.form}>
-          <ThemedText type="screenTitle">{t('circle.create.title')}</ThemedText>
-
           <View>
-            <ThemedText type="sectionTitle" style={styles.fieldLabel}>
+            <ThemedText type="labelMedium" style={styles.fieldLabel}>
               {t('circle.create.name')}
             </ThemedText>
             <TextInput
@@ -64,7 +62,7 @@ export default function NewCircleScreen() {
           </View>
 
           <View>
-            <ThemedText type="sectionTitle" style={styles.fieldLabel}>
+            <ThemedText type="labelMedium" style={styles.fieldLabel}>
               {t('circle.create.cover')}
             </ThemedText>
             <PhotoPicker
@@ -76,14 +74,14 @@ export default function NewCircleScreen() {
           </View>
 
           {error ? (
-            <ThemedText type="captionFeed" themeColor="accent" style={styles.error}>
+            <ThemedText type="bodyMedium" themeColor="accent" style={styles.error}>
               {error}
             </ThemedText>
           ) : null}
 
           <PrimaryButton label={t('circle.create.submit')} disabled={!name.trim() || creating} onPress={handleCreate} />
 
-          <ThemedText type="meta" themeColor="faint" style={styles.footnote}>
+          <ThemedText type="labelSmall" themeColor="faint" style={styles.footnote}>
             {t('circle.create.footnote')}
           </ThemedText>
         </KeyboardAvoider>

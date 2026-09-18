@@ -40,10 +40,10 @@ export default function ReturningAccountScreen() {
         <ScreenHeader title={t('account.returning.header')} hideBack />
 
         <View style={styles.content}>
-          <ThemedText type="screenTitle">
+          <ThemedText type="headlineSmall">
             {certain ? t('account.returning.titleCertain') : t('account.returning.titleUncertain')}
           </ThemedText>
-          <ThemedText type="captionFeed" themeColor="secondary">
+          <ThemedText type="bodyMedium" themeColor="secondary">
             {certain ? t('account.returning.bodyCertain') : t('account.returning.bodyUncertain')}
           </ThemedText>
 
@@ -66,7 +66,7 @@ export default function ReturningAccountScreen() {
         </View>
 
         <Pressable style={styles.startFresh} onPress={() => router.push('/account/start-fresh')}>
-          <ThemedText type="meta" themeColor="accent" style={styles.startFreshText}>
+          <ThemedText type="labelSmall" themeColor="accent" style={styles.startFreshText}>
             {t('account.returning.startFresh')}
           </ThemedText>
         </Pressable>
@@ -97,8 +97,8 @@ function OptionCard({ icon, label, description, onPress }: OptionCardProps) {
           ]}>
           <Icon icon={icon} size={24} color={theme.accent} />
           <View style={styles.optionText}>
-            <ThemedText type="cardTitle">{label}</ThemedText>
-            <ThemedText type="meta" themeColor="muted">
+            <ThemedText type="titleMedium">{label}</ThemedText>
+            <ThemedText type="labelSmall" themeColor="muted">
               {description}
             </ThemedText>
           </View>

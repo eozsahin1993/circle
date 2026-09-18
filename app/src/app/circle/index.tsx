@@ -217,7 +217,7 @@ export default function CircleListScreen() {
               <PrivacyNotice onPress={() => setShowPrivacyInfo(true)} style={styles.privacyNotice} />
               {pending.length ? (
                 <View style={styles.pending}>
-                  <ThemedText type="sectionTitle">
+                  <ThemedText type="labelMedium">
                     {t('circle.list.waitingToJoin', { count: pending.length })}
                   </ThemedText>
                   {pending.map((request) => (
@@ -233,7 +233,7 @@ export default function CircleListScreen() {
                 </View>
               ) : null}
               {loaded && circles.length ? (
-                <ThemedText type="sectionTitle" style={styles.sectionTitle}>
+                <ThemedText type="labelMedium" style={styles.sectionTitle}>
                   {t('circle.list.yourCircles')}
                 </ThemedText>
               ) : null}
@@ -262,10 +262,10 @@ export default function CircleListScreen() {
             loaded && !pending.length ? (
               <View style={styles.empty}>
                 <EmptyCirclesIcon />
-                <ThemedText type="screenTitle" style={styles.emptyTitle}>
+                <ThemedText type="titleMedium" style={styles.emptyTitle}>
                   {t('circle.list.emptyTitle')}
                 </ThemedText>
-                <ThemedText type="captionFeed" themeColor="muted" style={styles.emptyBody}>
+                <ThemedText type="bodyMedium" themeColor="muted" style={styles.emptyBody}>
                   {t('circle.list.emptyBody')}
                 </ThemedText>
                 <SecondaryButton label={t('circle.list.createCircle')} onPress={() => router.push('/circle/new')} style={styles.emptyButton} />

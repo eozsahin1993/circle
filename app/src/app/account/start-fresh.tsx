@@ -47,11 +47,11 @@ export default function StartFreshScreen() {
         <ScreenHeader title={t('account.startFresh.header')} />
 
         <View style={styles.content}>
-          <ThemedText type="screenTitle">{t('account.startFresh.title')}</ThemedText>
-          <ThemedText type="captionFeed" themeColor="secondary">
+          <ThemedText type="headlineSmall">{t('account.startFresh.title')}</ThemedText>
+          <ThemedText type="bodyMedium" themeColor="secondary">
             {t('account.startFresh.body')}
           </ThemedText>
-          <ThemedText type="captionFeed" themeColor="secondary">
+          <ThemedText type="bodyMedium" themeColor="secondary">
             {t('account.startFresh.recordNote')}
           </ThemedText>
         </View>

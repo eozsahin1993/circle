@@ -39,8 +39,8 @@ export function PendingJoinRequestCard({ request, busy, onApprove, onDeny }: Pen
       <View style={styles.header}>
         <Avatar size={44} uri={request.pictureUri} name={request.selfReportedName} />
         <View style={styles.text}>
-          <ThemedText type="cardTitle">{request.selfReportedName || t('invite.request.someone')}</ThemedText>
-          <ThemedText type="meta" themeColor="muted">
+          <ThemedText type="titleMedium">{request.selfReportedName || t('invite.request.someone')}</ThemedText>
+          <ThemedText type="labelSmall" themeColor="muted">
             {t('invite.request.tappedLink', { ago: formatAgo(request.createdAt, language) })}
           </ThemedText>
         </View>

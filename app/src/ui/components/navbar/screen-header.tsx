@@ -45,12 +45,12 @@ export function ScreenHeader({ title, subtitle, onPressTitle, actions, hideBack,
           against the right edge, with or without a title in it. */}
       <Pressable style={styles.titles} onPress={onPressTitle} disabled={!onPressTitle}>
         {title ? (
-          <ThemedText type="cardTitle" numberOfLines={1}>
+          <ThemedText type="titleLarge" numberOfLines={1}>
             {title}
           </ThemedText>
         ) : null}
         {subtitle ? (
-          <ThemedText type="meta" themeColor="muted" numberOfLines={1}>
+          <ThemedText type="labelSmall" themeColor="muted" numberOfLines={1}>
             {subtitle}
           </ThemedText>
         ) : null}

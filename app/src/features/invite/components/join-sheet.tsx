@@ -93,8 +93,8 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
       <View style={styles.content}>
         {phase === 'error' ? (
           <>
-            <ThemedText type="cardTitle">{t('invite.join.cantOpen')}</ThemedText>
-            <ThemedText type="meta" themeColor="muted">
+            <ThemedText type="titleLarge">{t('invite.join.cantOpen')}</ThemedText>
+            <ThemedText type="labelSmall" themeColor="muted">
               {t('invite.join.expired')}
             </ThemedText>
             <PrimaryButton label={t('invite.join.close')} onPress={onClose} style={styles.button} />
@@ -107,16 +107,16 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
             <View style={styles.header}>
               <Avatar size={48} uri={inviterPictureUri} name={inviterName} colorSeed={inviterPublicKey} />
               <View style={styles.headerText}>
-                <ThemedText type="meta" themeColor="muted" numberOfLines={1}>
+                <ThemedText type="labelSmall" themeColor="muted" numberOfLines={1}>
                   {inviterName ? t('invite.join.invitedBy', { name: inviterName }) : t('invite.join.invited')}
                 </ThemedText>
-                <ThemedText type="cardTitle" numberOfLines={2}>
+                <ThemedText type="titleLarge" numberOfLines={2}>
                   {circleName}
                 </ThemedText>
               </View>
             </View>
 
-            <ThemedText type="meta" themeColor="muted">
+            <ThemedText type="labelSmall" themeColor="muted">
               {phase === 'waiting'
                 ? inviterName
                   ? t('invite.join.waitingOn', { name: inviterName })

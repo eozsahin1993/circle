@@ -137,7 +137,7 @@ export default function AlbumScreen() {
           contentContainerStyle={styles.list}
           renderItem={({ item }) =>
             item.kind === 'month' ? (
-              <ThemedText type="sectionTitle" style={styles.monthLabel}>
+              <ThemedText type="labelMedium" style={styles.monthLabel}>
                 {formatMonth(item.start, language)}
               </ThemedText>
             ) : (
@@ -166,10 +166,10 @@ export default function AlbumScreen() {
           ListEmptyComponent={
             loaded ? (
               <View style={styles.empty}>
-                <ThemedText type="screenTitle" style={styles.emptyText}>
+                <ThemedText type="titleMedium" style={styles.emptyText}>
                   {t('circle.album.emptyTitle')}
                 </ThemedText>
-                <ThemedText type="captionFeed" themeColor="muted" style={styles.emptyText}>
+                <ThemedText type="bodyMedium" themeColor="muted" style={styles.emptyText}>
                   {t('circle.album.emptyBody')}
                 </ThemedText>
               </View>

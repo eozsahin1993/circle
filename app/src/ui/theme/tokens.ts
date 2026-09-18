@@ -166,20 +166,48 @@ export const Fonts = {
   mono: Platform.select({ ios: 'Menlo', default: 'ui-monospace' }) ?? 'monospace',
 } as const;
 
-/** Font family + size/lineHeight/weight per the handoff's numbered type scale. */
+/**
+ * The type scale, named for Material 3's roles and sizes — headline, title,
+ * body and label, each Large to Small — so a new style has an obvious home
+ * instead of becoming another `somethingTitle`. `code` is ours; neither
+ * system names a monospaced style.
+ *
+ * The names are M3's; the sizes are not. M3's assume Roboto and Apple's
+ * assume SF Pro, both of which carry more x-height than Outfit's 0.480 em,
+ * so each step is matched optically rather than numerically — set at their
+ * numbers this face reads about a twentieth small. `titleLarge` at 20 is
+ * iOS's 17pt navigation bar.
+ */
 export const Type = {
-  onboardingHeadline: { fontFamily: Fonts.title, fontSize: 32, lineHeight: 32 * 1.12, letterSpacing: 32 * -0.02 },
-  /** Labels a group of cards within a screen — quieter than a card's own title. */
-  sectionTitle: { fontFamily: Fonts.sansMedium, fontSize: 15, lineHeight: 15 * 1.3 },
-  screenTitle: { fontFamily: Fonts.title, fontSize: 24, lineHeight: 24 * 1.15, letterSpacing: 24 * -0.02 },
-  cardTitle: { fontFamily: Fonts.title, fontSize: 21, lineHeight: 21 * 1.15, letterSpacing: 21 * -0.01 },
-  captionDetail: { fontFamily: Fonts.sans, fontSize: 16.5, lineHeight: 16.5 * 1.5 },
-  postAuthor: { fontFamily: Fonts.sansMedium, fontSize: 16, lineHeight: 16 * 1.3 },
-  captionFeed: { fontFamily: Fonts.sans, fontSize: 15, lineHeight: 15 * 1.5 },
-  comment: { fontFamily: Fonts.sans, fontSize: 14, lineHeight: 14 * 1.5 },
-  buttonLabel: { fontFamily: Fonts.sansSemiBold, fontSize: 15, lineHeight: 15 * 1.2 },
-  meta: { fontFamily: Fonts.sans, fontSize: 12.5, lineHeight: 12.5 * 1.4 },
-  inviteKey: {
+  /** Carries a whole screen on its own. Sign-in, and nothing else so far. */
+  headlineLarge: { fontFamily: Fonts.title, fontSize: 30, lineHeight: 30 * 1.12, letterSpacing: 30 * -0.02 },
+  /**
+   * The one headline in a screen's body, and only ever a sentence — what
+   * the screen is *called* goes in `titleLarge`, up in the header. A
+   * two-word label set at this size reads like shouting.
+   */
+  headlineSmall: { fontFamily: Fonts.title, fontSize: 22, lineHeight: 22 * 1.15, letterSpacing: 22 * -0.02 },
+  /**
+   * Names the surface you're on, screen header or sheet alike — one job,
+   * so one token. Chrome rather than content: sans, not the title face, so
+   * it never competes with the `headlineSmall` beneath it.
+   */
+  titleLarge: { fontFamily: Fonts.sansMedium, fontSize: 20, lineHeight: 20 * 1.25, letterSpacing: 20 * -0.01 },
+  /** A card or row's own title, and the line an empty state leads with. */
+  titleMedium: { fontFamily: Fonts.sansMedium, fontSize: 18, lineHeight: 18 * 1.15, letterSpacing: 18 * -0.01 },
+  /** A person's name, wherever one appears — post author, member, profile. */
+  titleSmall: { fontFamily: Fonts.sansMedium, fontSize: 16, lineHeight: 16 * 1.3 },
+  /** A caption read on its own, with room around it. */
+  bodyLarge: { fontFamily: Fonts.sans, fontSize: 16.5, lineHeight: 16.5 * 1.5 },
+  bodyMedium: { fontFamily: Fonts.sans, fontSize: 15, lineHeight: 15 * 1.5 },
+  bodySmall: { fontFamily: Fonts.sans, fontSize: 14, lineHeight: 14 * 1.5 },
+  /** Shares `labelMedium`'s size and separates on weight, as M3's emphasized styles do. */
+  labelLarge: { fontFamily: Fonts.sansSemiBold, fontSize: 15, lineHeight: 15 * 1.2 },
+  /** Labels a group of cards or a form field — quieter than the titles inside it. */
+  labelMedium: { fontFamily: Fonts.sansMedium, fontSize: 15, lineHeight: 15 * 1.3 },
+  labelSmall: { fontFamily: Fonts.sans, fontSize: 12.5, lineHeight: 12.5 * 1.4 },
+  /** Read aloud and typed in by hand, so it never uses the proportional face. */
+  code: {
     fontFamily: Fonts.mono,
     fontSize: 22,
     lineHeight: 22 * 1.3,

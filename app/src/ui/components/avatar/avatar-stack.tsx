@@ -45,7 +45,7 @@ export function AvatarStack({ count, size = 34, max = 5 }: AvatarStackProps) {
               backgroundColor: theme.surface,
             },
           ]}>
-          <ThemedText type="meta" themeColor="text">
+          <ThemedText type="labelSmall" themeColor="text">
             +{hiddenCount}
           </ThemedText>
         </View>

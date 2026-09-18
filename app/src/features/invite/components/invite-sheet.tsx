@@ -40,8 +40,8 @@ export function InviteSheet({ visible, onClose, link, code, expiry }: InviteShee
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        <ThemedText type="screenTitle">{t('invite.sheet.title')}</ThemedText>
-        <ThemedText type="captionFeed" themeColor="secondary" style={styles.subtitle}>
+        <ThemedText type="titleLarge">{t('invite.sheet.title')}</ThemedText>
+        <ThemedText type="bodyMedium" themeColor="secondary" style={styles.subtitle}>
           {t('invite.sheet.subtitle')}
         </ThemedText>
 
@@ -60,16 +60,16 @@ export function InviteSheet({ visible, onClose, link, code, expiry }: InviteShee
           </View>
         </View>
 
-        <ThemedText type="inviteKey" themeColor="accentBright" style={styles.code}>
+        <ThemedText type="code" themeColor="accentBright" style={styles.code}>
           {code}
         </ThemedText>
         {expiry ? (
-          <ThemedText type="meta" themeColor="muted" style={styles.expiry}>
+          <ThemedText type="labelSmall" themeColor="muted" style={styles.expiry}>
             {expiry}
           </ThemedText>
         ) : null}
 
-        <ThemedText type="meta" themeColor="faint" style={styles.footnote}>
+        <ThemedText type="labelSmall" themeColor="faint" style={styles.footnote}>
           {t('invite.sheet.footnote')}
         </ThemedText>
 

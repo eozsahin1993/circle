@@ -89,12 +89,12 @@ export function PostComments({
             colorSeed={latest.authorPublicKey}
           />
           <View style={styles.commentBody}>
-            <ThemedText type="comment" themeColor="secondary">
-              <ThemedText type="postAuthor">{latest.authorName}</ThemedText>
+            <ThemedText type="bodySmall" themeColor="secondary">
+              <ThemedText type="titleSmall">{latest.authorName}</ThemedText>
               {'  '}
               {latest.body}
             </ThemedText>
-            <ThemedText type="meta" themeColor="faint">
+            <ThemedText type="labelSmall" themeColor="faint">
               {latest.timestamp}
             </ThemedText>
           </View>
@@ -103,7 +103,7 @@ export function PostComments({
 
       {total > 1 ? (
         <Pressable style={styles.showAll} onPress={onPressShowAll} disabled={!onPressShowAll} hitSlop={6}>
-          <ThemedText type="comment" themeColor="secondary">
+          <ThemedText type="bodySmall" themeColor="secondary">
             {t('post.showAllComments', { count: total })}
           </ThemedText>
         </Pressable>
@@ -185,8 +185,8 @@ const styles = StyleSheet.create({
     // Matches the comment rows above it — what you type should look like
     // what it becomes. `lineHeight` is left off deliberately: on a
     // multiline TextInput it throws the vertical centring out on Android.
-    fontFamily: Type.comment.fontFamily,
-    fontSize: Type.comment.fontSize,
+    fontFamily: Type.bodySmall.fontFamily,
+    fontSize: Type.bodySmall.fontSize,
   },
   send: {
     width: COMPOSER_HEIGHT,

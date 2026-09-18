@@ -65,7 +65,7 @@ export default function RecoveryPhraseScreen() {
         <ScreenHeader title={t('account.recovery.title')} />
 
         <View style={styles.content}>
-          <ThemedText type="captionFeed" themeColor="secondary">
+          <ThemedText type="bodyMedium" themeColor="secondary">
             {t('account.recovery.intro')}
           </ThemedText>
 
@@ -74,10 +74,10 @@ export default function RecoveryPhraseScreen() {
               <View style={styles.grid}>
                 {words.map((word, index) => (
                   <View key={`${index}-${word}`} style={styles.wordCell}>
-                    <ThemedText type="meta" themeColor="faint" style={styles.wordIndex}>
+                    <ThemedText type="labelSmall" themeColor="faint" style={styles.wordIndex}>
                       {index + 1}
                     </ThemedText>
-                    <ThemedText type="inviteKey" style={styles.word}>
+                    <ThemedText type="code" style={styles.word}>
                       {word}
                     </ThemedText>
                   </View>

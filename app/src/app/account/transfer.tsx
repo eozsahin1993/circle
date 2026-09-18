@@ -88,7 +88,7 @@ export default function DeviceTransferScreen() {
         <ScreenHeader title={t('account.transfer.header')} />
 
         <View style={styles.content}>
-          <ThemedText type="captionFeed" themeColor="secondary">
+          <ThemedText type="bodyMedium" themeColor="secondary">
             {t('account.transfer.instructions')}
           </ThemedText>
 
@@ -113,23 +113,23 @@ export default function DeviceTransferScreen() {
           </View>
 
           {failed ? (
-            <ThemedText type="meta" themeColor="muted" style={styles.status}>
+            <ThemedText type="labelSmall" themeColor="muted" style={styles.status}>
               {t('account.transfer.somethingWrong')}
             </ThemedText>
           ) : (
-            <ThemedText type="meta" themeColor="muted" style={styles.status}>
+            <ThemedText type="labelSmall" themeColor="muted" style={styles.status}>
               {t('account.transfer.waiting')}
             </ThemedText>
           )}
 
           <View style={styles.spacer} />
 
-          <ThemedText type="meta" themeColor="faint">
+          <ThemedText type="labelSmall" themeColor="faint">
             {t('account.transfer.reassurance')}
           </ThemedText>
 
           <Pressable style={styles.noOtherPhone} onPress={() => router.replace('/account/restore')}>
-            <ThemedText type="buttonLabel" themeColor="accentBright">
+            <ThemedText type="labelLarge" themeColor="accentBright">
               {t('account.transfer.noOldPhone')}
             </ThemedText>
           </Pressable>

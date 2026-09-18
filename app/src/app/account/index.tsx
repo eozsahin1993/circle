@@ -311,23 +311,23 @@ export default function AccountScreen() {
               colorSeed={ownColorSeed}
             />
             <View style={styles.profileText}>
-              <ThemedText type="cardTitle" numberOfLines={1}>
+              <ThemedText type="titleSmall" numberOfLines={1}>
                 {profile?.name || t('settings.addName')}
               </ThemedText>
-              <ThemedText type="meta" themeColor="muted">
+              <ThemedText type="labelSmall" themeColor="muted">
                 {t('settings.nameVisibility')}
               </ThemedText>
             </View>
             <Pressable
               style={[styles.editButton, { borderColor: tints.secondaryButtonBorder }]}
               onPress={() => router.push('/profile-setup')}>
-              <ThemedText type="buttonLabel">{t('settings.edit')}</ThemedText>
+              <ThemedText type="labelLarge">{t('settings.edit')}</ThemedText>
             </Pressable>
           </View>
 
 
           <View style={styles.section}>
-            <ThemedText type="sectionTitle" style={styles.sectionLabel}>
+            <ThemedText type="labelMedium" style={styles.sectionLabel}>
               {t('settings.appearance')}
             </ThemedText>
 
@@ -348,7 +348,7 @@ export default function AccountScreen() {
 
           <View style={styles.version}>
             <Wordmark size={21} />
-            <ThemedText type="meta" themeColor="faint">
+            <ThemedText type="labelSmall" themeColor="faint">
               v{appVersion}
             </ThemedText>
           </View>

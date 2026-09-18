@@ -46,11 +46,11 @@ export function LoadingModal({ visible, label, sublabel }: LoadingModalProps) {
       <Animated.View style={[styles.backdrop, { opacity: progress }]}>
         <ThemedView type="surface" style={styles.card}>
           <ActivityIndicator size="large" color={theme.accent} />
-          <ThemedText type="postAuthor" style={styles.label}>
+          <ThemedText type="titleSmall" style={styles.label}>
             {label}
           </ThemedText>
           {sublabel ? (
-            <ThemedText type="meta" themeColor="muted" style={styles.label}>
+            <ThemedText type="labelSmall" themeColor="muted" style={styles.label}>
               {sublabel}
             </ThemedText>
           ) : null}

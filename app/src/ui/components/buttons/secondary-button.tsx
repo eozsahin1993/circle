@@ -20,7 +20,7 @@ export function SecondaryButton({ label, style, ...rest }: SecondaryButtonProps)
             styles.button,
             { borderColor: pressed ? theme.accent : tints.secondaryButtonBorder },
           ]}>
-          <ThemedText type="buttonLabel">{label}</ThemedText>
+          <ThemedText type="labelLarge">{label}</ThemedText>
         </View>
       )}
     </Pressable>

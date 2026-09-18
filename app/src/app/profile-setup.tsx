@@ -103,22 +103,22 @@ export default function ProfileSetupScreen() {
 
         <KeyboardAvoider style={styles.form}>
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-            <ThemedText type="screenTitle">{t('onboarding.profile.title')}</ThemedText>
-            <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
+            <ThemedText type="headlineSmall">{t('onboarding.profile.title')}</ThemedText>
+            <ThemedText type="bodyMedium" themeColor="secondary" style={styles.body}>
               {t('onboarding.profile.body')}
             </ThemedText>
 
             <Pressable style={styles.pictureRow} onPress={handleAddPicture}>
               <Avatar size={64} uri={picture?.uri} name={name} colorSeed={colorSeed} />
               <View style={styles.pictureText}>
-                <ThemedText type="cardTitle">{t('onboarding.profile.addPicture')}</ThemedText>
-                <ThemedText type="meta" themeColor="muted">
+                <ThemedText type="titleMedium">{t('onboarding.profile.addPicture')}</ThemedText>
+                <ThemedText type="labelSmall" themeColor="muted">
                   {t('onboarding.profile.pictureVisibility')}
                 </ThemedText>
               </View>
             </Pressable>
 
-            <ThemedText type="sectionTitle" style={styles.nameLabel}>
+            <ThemedText type="labelMedium" style={styles.nameLabel}>
               {t('onboarding.profile.nameLabel')}
             </ThemedText>
             <TextInput
@@ -131,7 +131,7 @@ export default function ProfileSetupScreen() {
           </ScrollView>
 
           {error ? (
-            <ThemedText type="captionFeed" themeColor="accent" style={styles.error}>
+            <ThemedText type="bodyMedium" themeColor="accent" style={styles.error}>
               {error}
             </ThemedText>
           ) : null}
@@ -152,7 +152,7 @@ export default function ProfileSetupScreen() {
               style={styles.alreadyHaveAccount}
               disabled={saving}
               onPress={() => router.push('/account/transfer')}>
-              <ThemedText type="buttonLabel" themeColor="accentBright">
+              <ThemedText type="labelLarge" themeColor="accentBright">
                 {t('onboarding.profile.alreadyHaveAccount')}
               </ThemedText>
             </Pressable>

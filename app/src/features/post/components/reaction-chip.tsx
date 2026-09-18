@@ -37,7 +37,7 @@ export function ReactionChip({ emoji, icon, label, reacted, style, ...rest }: Re
         // One line, ellipsized. A translated "React"/"Comment" can be far
         // longer than the English (German manages "Kommentieren"), and a
         // label that wraps would grow the chip taller than the row.
-        <ThemedText type="meta" themeColor={contentColor} numberOfLines={1} style={styles.label}>
+        <ThemedText type="labelSmall" themeColor={contentColor} numberOfLines={1} style={styles.label}>
           {label}
         </ThemedText>
       ) : null}

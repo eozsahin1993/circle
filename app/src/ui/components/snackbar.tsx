@@ -119,7 +119,7 @@ export function Snackbar({ message, visible, dismiss, onHidden }: SnackbarProps)
         <ThemedView type="raised" style={[styles.bar, { borderColor: tone.border }]}>
           <Icon icon={message.icon ?? tone.icon} size={18} color={theme[tone.color]} />
 
-          <ThemedText type="captionFeed" themeColor="body" numberOfLines={2} style={styles.text}>
+          <ThemedText type="bodyMedium" themeColor="body" numberOfLines={2} style={styles.text}>
             {message.text}
           </ThemedText>
 
@@ -130,7 +130,7 @@ export function Snackbar({ message, visible, dismiss, onHidden }: SnackbarProps)
                 dismiss();
                 message.action?.onPress();
               }}>
-              <ThemedText type="buttonLabel" themeColor="accentBright">
+              <ThemedText type="labelLarge" themeColor="accentBright">
                 {message.action.label}
               </ThemedText>
             </Pressable>

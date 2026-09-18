@@ -53,9 +53,9 @@ export function PromptSheet({
   return (
     <BottomSheet visible={visible} onClose={onCancel}>
       <View style={styles.body}>
-        <ThemedText type="cardTitle">{title}</ThemedText>
+        <ThemedText type="titleLarge">{title}</ThemedText>
         {description ? (
-          <ThemedText type="meta" themeColor="muted">
+          <ThemedText type="labelSmall" themeColor="muted">
             {description}
           </ThemedText>
         ) : null}

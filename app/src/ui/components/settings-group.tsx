@@ -55,7 +55,7 @@ function SettingsAccessory({ control, disabled }: { control: SettingsControl; di
       );
     case 'value':
       return (
-        <ThemedText type="meta" themeColor="muted">
+        <ThemedText type="labelSmall" themeColor="muted">
           {control.text}
         </ThemedText>
       );
@@ -103,11 +103,11 @@ export function SettingsRow({ label, description, icon, control, destructive, on
       ) : null}
 
       <View style={styles.text}>
-        <ThemedText type="postAuthor" themeColor={destructive ? 'danger' : 'text'}>
+        <ThemedText type="titleSmall" themeColor={destructive ? 'danger' : 'text'}>
           {label}
         </ThemedText>
         {description ? (
-          <ThemedText type="meta" themeColor="muted">
+          <ThemedText type="labelSmall" themeColor="muted">
             {description}
           </ThemedText>
         ) : null}
@@ -153,7 +153,7 @@ export function SettingsGroups({ groups }: { groups: SettingsGroup[] }) {
 
         return (
           <View key={group.title} style={styles.section}>
-            <ThemedText type="sectionTitle" themeColor={group.destructive ? 'danger' : undefined}>
+            <ThemedText type="labelMedium" themeColor={group.destructive ? 'danger' : undefined}>
               {group.title}
             </ThemedText>
 
@@ -168,7 +168,7 @@ export function SettingsGroups({ groups }: { groups: SettingsGroup[] }) {
             </ThemedView>
 
             {group.footnote ? (
-              <ThemedText type="meta" themeColor="faint" style={styles.footnote}>
+              <ThemedText type="labelSmall" themeColor="faint" style={styles.footnote}>
                 {group.footnote}
               </ThemedText>
             ) : null}

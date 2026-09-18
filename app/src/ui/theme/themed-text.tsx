@@ -12,20 +12,21 @@ export type ThemedTextProps = TextProps & {
 
 /** Default text color per type, per the handoff's text ramp — override with `themeColor`. */
 const defaultColor: Record<ThemedTextType, ThemeColor> = {
-  onboardingHeadline: 'text',
-  sectionTitle: 'secondary',
-  screenTitle: 'text',
-  cardTitle: 'text',
-  postAuthor: 'text',
-  captionDetail: 'body',
-  captionFeed: 'body',
-  comment: 'secondary',
-  buttonLabel: 'text',
-  meta: 'faint',
-  inviteKey: 'accentBright',
+  headlineLarge: 'text',
+  headlineSmall: 'text',
+  titleLarge: 'text',
+  titleMedium: 'text',
+  titleSmall: 'text',
+  bodyLarge: 'body',
+  bodyMedium: 'body',
+  bodySmall: 'secondary',
+  labelLarge: 'text',
+  labelMedium: 'secondary',
+  labelSmall: 'faint',
+  code: 'accentBright',
 };
 
-export function ThemedText({ style, type = 'captionFeed', themeColor, ...rest }: ThemedTextProps) {
+export function ThemedText({ style, type = 'bodyMedium', themeColor, ...rest }: ThemedTextProps) {
   const theme = useTheme();
 
   return (

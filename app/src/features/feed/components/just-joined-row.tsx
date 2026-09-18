@@ -40,8 +40,8 @@ function JustJoinedBanner() {
 
   return (
     <ThemedView style={styles.banner} type="surface">
-      <ThemedText type="cardTitle">{t('feed.justJoinedTitle')}</ThemedText>
-      <ThemedText type="meta" themeColor="muted">
+      <ThemedText type="titleMedium">{t('feed.justJoinedTitle')}</ThemedText>
+      <ThemedText type="labelSmall" themeColor="muted">
         {t('feed.justJoinedBody')}
       </ThemedText>
     </ThemedView>

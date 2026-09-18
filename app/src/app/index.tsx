@@ -151,8 +151,8 @@ export default function WelcomeScreen() {
       </View>
 
       <ThemedSafeAreaView edges={['bottom']} style={styles.content}>
-        <ThemedText type="onboardingHeadline">{t('onboarding.headline')}</ThemedText>
-        <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
+        <ThemedText type="headlineLarge">{t('onboarding.headline')}</ThemedText>
+        <ThemedText type="bodyMedium" themeColor="secondary" style={styles.body}>
           {t('onboarding.intro')}
         </ThemedText>
 
@@ -164,7 +164,7 @@ export default function WelcomeScreen() {
         </View>
 
         <Pressable style={styles.footer} onPress={() => setPrivacyVisible(true)}>
-          <ThemedText type="meta" themeColor="muted">
+          <ThemedText type="labelSmall" themeColor="muted">
             {t('onboarding.privacyLink')}
           </ThemedText>
         </Pressable>

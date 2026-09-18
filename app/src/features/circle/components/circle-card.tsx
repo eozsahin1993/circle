@@ -45,12 +45,12 @@ export function CircleCard({ name, memberCount, photoUri, newCount, latestActivi
 
       <View style={styles.content}>
         <View style={styles.titleRow}>
-          <ThemedText type="cardTitle" numberOfLines={1} style={styles.title}>
+          <ThemedText type="titleMedium" numberOfLines={1} style={styles.title}>
             {name}
           </ThemedText>
           {newCount ? (
             <View style={[styles.badge, { backgroundColor: tints.chipReactedBg }]}>
-              <ThemedText type="meta" themeColor="accentBright">
+              <ThemedText type="labelSmall" themeColor="accentBright">
                 {t('circle.newCount', { count: newCount })}
               </ThemedText>
             </View>
@@ -59,13 +59,13 @@ export function CircleCard({ name, memberCount, photoUri, newCount, latestActivi
 
         <View style={styles.metaRow}>
           <Icon icon={Icons.members} size={14} color={theme.muted} />
-          <ThemedText type="meta" themeColor="muted" numberOfLines={1}>
+          <ThemedText type="labelSmall" themeColor="muted" numberOfLines={1}>
             {t('circle.peopleCount', { count: memberCount })}
           </ThemedText>
         </View>
 
         {latestActivity ? (
-          <ThemedText type="meta" themeColor="faint" numberOfLines={1}>
+          <ThemedText type="labelSmall" themeColor="faint" numberOfLines={1}>
             {latestActivity}
           </ThemedText>
         ) : null}

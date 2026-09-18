@@ -40,10 +40,10 @@ export function PendingCircleCard({ circleName, createdByName, submittedAt, onPr
       <Icon icon={Icons.waiting} size={22} color={theme.muted} />
 
       <View style={styles.body}>
-        <ThemedText type="cardTitle" numberOfLines={1}>
+        <ThemedText type="titleMedium" numberOfLines={1}>
           {circleName}
         </ThemedText>
-        <ThemedText type="meta" themeColor="muted">
+        <ThemedText type="labelSmall" themeColor="muted">
           {createdByName
             ? t('invite.card.waitingOn', { name: createdByName, ago: formatAgo(submittedAt, language) })
             : t('invite.card.waitingOnUnknown', { ago: formatAgo(submittedAt, language) })}
@@ -52,7 +52,7 @@ export function PendingCircleCard({ circleName, createdByName, submittedAt, onPr
 
       {onCancel ? (
         <Pressable onPress={onCancel} hitSlop={12}>
-          <ThemedText type="captionFeed" themeColor="secondary">
+          <ThemedText type="bodyMedium" themeColor="secondary">
             {t('common.cancel')}
           </ThemedText>
         </Pressable>

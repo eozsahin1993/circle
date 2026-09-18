@@ -26,11 +26,11 @@ export function PrivacyNotice({ onPress, style }: PrivacyNoticeProps) {
     <Pressable style={[styles.row, style]} onPress={onPress}>
       {/* Matches the "Tap for privacy details" label's own accentBright, so the icon and the label it sits beside read as one color. */}
       <Icon icon={Icons.locked} size={12} color={theme.accentBright} />
-      <ThemedText type="meta" style={styles.text}>
-        <ThemedText type="meta" themeColor="muted">
+      <ThemedText type="labelSmall" style={styles.text}>
+        <ThemedText type="labelSmall" themeColor="muted">
           {t('account.privacyNotice.encrypted')}{' '}
         </ThemedText>
-        <ThemedText type="meta" themeColor="accentBright">
+        <ThemedText type="labelSmall" themeColor="accentBright">
           {t('account.privacyNotice.details')}
         </ThemedText>
       </ThemedText>

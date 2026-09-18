@@ -110,11 +110,11 @@ export function ActionSheet({
               <View style={styles.header}>
                 <Avatar size={44} uri={avatarUri} name={avatarName} colorSeed={avatarColorSeed} radius={avatarRadius} />
                 <View style={styles.headerTitle}>
-                  <ThemedText type="cardTitle" numberOfLines={1}>
+                  <ThemedText type="titleLarge" numberOfLines={1}>
                     {title}
                   </ThemedText>
                   {subtitle ? (
-                    <ThemedText type="meta" themeColor="muted" numberOfLines={1}>
+                    <ThemedText type="labelSmall" themeColor="muted" numberOfLines={1}>
                       {subtitle}
                     </ThemedText>
                   ) : null}
@@ -145,11 +145,11 @@ export function ActionSheet({
                     />
                   </View>
                   <View style={styles.rowText}>
-                    <ThemedText type="postAuthor" themeColor={option.destructive ? 'danger' : 'text'}>
+                    <ThemedText type="titleSmall" themeColor={option.destructive ? 'danger' : 'text'}>
                       {option.label}
                     </ThemedText>
                     {option.description ? (
-                      <ThemedText type="meta" themeColor="muted">
+                      <ThemedText type="labelSmall" themeColor="muted">
                         {option.description}
                       </ThemedText>
                     ) : null}

@@ -82,7 +82,7 @@ export default function RestoreScreen() {
         <ScreenHeader title={t('account.restore.title')} />
 
         <KeyboardAvoider style={styles.body}>
-          <ThemedText type="captionFeed" themeColor="secondary">
+          <ThemedText type="bodyMedium" themeColor="secondary">
             {t('account.restore.intro', { total: WORD_COUNT })}
           </ThemedText>
 
@@ -111,12 +111,12 @@ export default function RestoreScreen() {
             ]}
           />
 
-          <ThemedText type="meta" themeColor={words === WORD_COUNT ? 'accentBright' : 'muted'}>
+          <ThemedText type="labelSmall" themeColor={words === WORD_COUNT ? 'accentBright' : 'muted'}>
             {t('account.restore.wordCount', { typed: words, total: WORD_COUNT })}
           </ThemedText>
 
           {error ? (
-            <ThemedText type="meta" themeColor="danger">
+            <ThemedText type="labelSmall" themeColor="danger">
               {error}
             </ThemedText>
           ) : null}
@@ -126,7 +126,7 @@ export default function RestoreScreen() {
           {/* Said plainly here rather than discovered later: the phrase
               proves who you are, it does not re-open the circles. Only a
               member can do that, by letting you back in. */}
-          <ThemedText type="meta" themeColor="faint">
+          <ThemedText type="labelSmall" themeColor="faint">
             {t('account.restore.identityNote')}
           </ThemedText>
 

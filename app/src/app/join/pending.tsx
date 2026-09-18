@@ -111,25 +111,25 @@ export default function JoinPendingScreen() {
         <View style={styles.content}>
           {gone ? (
             <>
-              <ThemedText type="screenTitle">{t('invite.pending.goneTitle')}</ThemedText>
-              <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
+              <ThemedText type="headlineSmall">{t('invite.pending.goneTitle')}</ThemedText>
+              <ThemedText type="bodyMedium" themeColor="secondary" style={styles.body}>
                 {t('invite.pending.goneBody')}
               </ThemedText>
             </>
           ) : (
             <>
               <View>
-                <ThemedText type="sectionTitle">{t('invite.pending.waiting')}</ThemedText>
-                <ThemedText type="screenTitle">{circleName}</ThemedText>
+                <ThemedText type="labelMedium">{t('invite.pending.waiting')}</ThemedText>
+                <ThemedText type="headlineSmall">{circleName}</ThemedText>
               </View>
-              <ThemedText type="captionFeed" themeColor="secondary" style={styles.body}>
+              <ThemedText type="bodyMedium" themeColor="secondary" style={styles.body}>
                 {inviterName
                   ? t('invite.pending.letYouIn', { name: inviterName })
                   : t('invite.pending.letYouInUnknown')}
               </ThemedText>
 
               <Pressable onPress={handleCancel} style={styles.cancel}>
-                <ThemedText type="captionFeed" themeColor="danger">
+                <ThemedText type="bodyMedium" themeColor="danger">
                   {t('invite.pending.withdraw')}
                 </ThemedText>
               </Pressable>

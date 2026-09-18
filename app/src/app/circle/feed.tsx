@@ -121,10 +121,10 @@ export default function FeedScreen() {
             loaded ? (
               <View style={styles.empty}>
                 <EmptyFeedIcon />
-                <ThemedText type="screenTitle" style={styles.emptyTitle}>
+                <ThemedText type="titleMedium" style={styles.emptyTitle}>
                   {t('circle.feed.emptyTitle')}
                 </ThemedText>
-                <ThemedText type="captionFeed" themeColor="muted" style={styles.emptyBody}>
+                <ThemedText type="bodyMedium" themeColor="muted" style={styles.emptyBody}>
                   {t('circle.feed.emptyBody')}
                 </ThemedText>
                 <SecondaryButton label={t('circle.feed.invitePeople')} onPress={openDetails} style={styles.emptyButton} />

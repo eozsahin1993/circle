@@ -120,20 +120,20 @@ export function PostCard({
       <View style={styles.header}>
         <Avatar uri={post.authorPhotoUri} name={post.authorName} colorSeed={post.authorPublicKey} />
         <View style={styles.byline}>
-          <ThemedText type="postAuthor">{post.authorName}</ThemedText>
+          <ThemedText type="titleSmall">{post.authorName}</ThemedText>
           {/* Everyone can see that a photo is kept; only its author or an
               admin gets the chip below that changes it. */}
           <View style={styles.timestampRow}>
-            <ThemedText type="meta" themeColor="muted">
+            <ThemedText type="labelSmall" themeColor="muted">
               {post.timestamp}
             </ThemedText>
             {post.inAlbum ? (
               <>
-                <ThemedText type="meta" themeColor="muted">
+                <ThemedText type="labelSmall" themeColor="muted">
                   ·
                 </ThemedText>
                 <Icon icon={Icons.inAlbum} size={12} color={theme.accent} filled />
-                <ThemedText type="meta" themeColor="accent">
+                <ThemedText type="labelSmall" themeColor="accent">
                   {t('post.album')}
                 </ThemedText>
               </>
@@ -157,7 +157,7 @@ export function PostCard({
           holding it open. */}
       {post.caption ? (
         <Pressable onPress={onPressPhoto} disabled={!onPressPhoto}>
-          <ThemedText type="captionFeed" style={styles.caption} numberOfLines={2}>
+          <ThemedText type="bodyMedium" style={styles.caption} numberOfLines={2}>
             {post.caption}
           </ThemedText>
         </Pressable>

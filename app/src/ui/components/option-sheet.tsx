@@ -36,7 +36,7 @@ export function OptionSheet<Id extends string>({
   return (
     <BottomSheet visible={visible} onClose={onClose}>
       <View style={styles.body}>
-        <ThemedText type="cardTitle" style={styles.title}>
+        <ThemedText type="titleLarge" style={styles.title}>
           {title}
         </ThemedText>
 
@@ -46,9 +46,9 @@ export function OptionSheet<Id extends string>({
             style={[styles.row, { borderBottomColor: tints.chipIdleBorder }]}
             onPress={() => onSelect(option.id)}>
             <View style={styles.text}>
-              <ThemedText type="postAuthor">{option.label}</ThemedText>
+              <ThemedText type="titleSmall">{option.label}</ThemedText>
               {option.description ? (
-                <ThemedText type="meta" themeColor="muted">
+                <ThemedText type="labelSmall" themeColor="muted">
                   {option.description}
                 </ThemedText>
               ) : null}

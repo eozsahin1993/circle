@@ -78,7 +78,7 @@ export function PhotoPlaceholder({ style, children, missing, compact, ...rest }:
         <View style={styles.note} pointerEvents="none">
           <Icon icon={NOTES[missing].icon} size={compact ? 15 : 18} color={theme.muted} />
           {compact ? null : (
-            <ThemedText type="meta" themeColor="muted">
+            <ThemedText type="labelSmall" themeColor="muted">
               {t(NOTES[missing].label)}
             </ThemedText>
           )}

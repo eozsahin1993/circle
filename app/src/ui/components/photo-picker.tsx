@@ -34,7 +34,7 @@ export function PhotoPicker({ uri, aspectRatio, label, onPress }: PhotoPickerPro
           <View style={styles.iconWrap} pointerEvents="none">
             <Icon icon={Icons.addPhoto} size={40} color={theme.muted} />
           </View>
-          <ThemedText type="meta" themeColor="muted" style={styles.overlay}>
+          <ThemedText type="labelSmall" themeColor="muted" style={styles.overlay}>
             {label}
           </ThemedText>
         </PhotoPlaceholder>

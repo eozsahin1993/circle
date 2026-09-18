@@ -250,14 +250,14 @@ export function MembershipEventGroupRow({ group }: { group: MembershipEventGroup
       {/* Two lines is enough for the longest realistic pair of full
           names; past that the tail is dropped rather than pushing the
           feed around. */}
-      <ThemedText type="meta" themeColor="faintest" style={styles.text} numberOfLines={2}>
+      <ThemedText type="labelSmall" themeColor="faintest" style={styles.text} numberOfLines={2}>
         {segments.map((segment, index) =>
           segment.interactive ? (
-            <ThemedText key={index} type="meta" themeColor="accent" onPress={() => setExpanded((current) => !current)}>
+            <ThemedText key={index} type="labelSmall" themeColor="accent" onPress={() => setExpanded((current) => !current)}>
               {segment.text}
             </ThemedText>
           ) : segment.name ? (
-            <ThemedText key={index} type="meta" themeColor="secondary">
+            <ThemedText key={index} type="labelSmall" themeColor="secondary">
               {segment.text}
             </ThemedText>
           ) : (
@@ -265,7 +265,7 @@ export function MembershipEventGroupRow({ group }: { group: MembershipEventGroup
           ),
         )}
         {collapsible && expanded && (
-          <ThemedText type="meta" themeColor="accent" onPress={() => setExpanded((current) => !current)}>
+          <ThemedText type="labelSmall" themeColor="accent" onPress={() => setExpanded((current) => !current)}>
             {` ${t('feed.membership.showLess')}`}
           </ThemedText>
         )}
@@ -290,7 +290,7 @@ export function DayDivider({ day }: { day: string }) {
   return (
     <View style={styles.row}>
       <View style={[styles.rule, rule]} />
-      <ThemedText type="meta" themeColor="faintest" style={styles.dayText}>
+      <ThemedText type="labelSmall" themeColor="faintest" style={styles.dayText}>
         {upperCase(day, language)}
       </ThemedText>
       <View style={[styles.rule, rule]} />

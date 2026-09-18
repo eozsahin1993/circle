@@ -82,7 +82,7 @@ export default function ScanDeviceScreen() {
         <ScreenHeader title={t('account.scanDevice.header')} />
 
         <View style={styles.content}>
-          <ThemedText type="captionFeed" themeColor="secondary">
+          <ThemedText type="bodyMedium" themeColor="secondary">
             {t('account.scanDevice.instructions')}
           </ThemedText>
 
@@ -96,7 +96,7 @@ export default function ScanDeviceScreen() {
               />
             ) : (
               <View style={styles.permissionPrompt}>
-                <ThemedText type="meta" themeColor="faint" style={styles.placeholder}>
+                <ThemedText type="labelSmall" themeColor="faint" style={styles.placeholder}>
                   {permission?.canAskAgain === false
                     ? t('account.scanDevice.cameraOff')
                     : t('account.scanDevice.cameraNeeded')}
@@ -115,7 +115,7 @@ export default function ScanDeviceScreen() {
 
           <View style={styles.spacer} />
 
-          <ThemedText type="meta" themeColor="faint">
+          <ThemedText type="labelSmall" themeColor="faint">
             {t('account.scanDevice.confirmNote')}
           </ThemedText>
 

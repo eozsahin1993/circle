@@ -470,10 +470,10 @@ export default function CircleDetailsScreen() {
     return (
       <>
         <View style={styles.sectionHeader}>
-          <ThemedText type="sectionTitle">
+          <ThemedText type="labelMedium">
             {t('circle.details.members')}
           </ThemedText>
-          <ThemedText type="meta" themeColor="muted">
+          <ThemedText type="labelSmall" themeColor="muted">
             {t('circle.details.inTheCircle', { count: members.length })}
           </ThemedText>
         </View>
@@ -481,7 +481,7 @@ export default function CircleDetailsScreen() {
         {members.map(renderMember)}
 
         {soleAdmin && members.length > 1 ? (
-          <ThemedText type="meta" themeColor="faint" style={styles.adminNotice}>
+          <ThemedText type="labelSmall" themeColor="faint" style={styles.adminNotice}>
             {t('circle.details.soleAdminNotice')}
           </ThemedText>
         ) : null}
@@ -502,16 +502,16 @@ export default function CircleDetailsScreen() {
 
         <View style={styles.memberInfo}>
           <View style={styles.memberNameRow}>
-            <ThemedText type="postAuthor">{member.name || t('circle.details.unnamedMember')}</ThemedText>
+            <ThemedText type="titleSmall">{member.name || t('circle.details.unnamedMember')}</ThemedText>
             {member.role === MemberRoles.admin ? (
               <View style={[styles.adminBadge, { backgroundColor: theme.accent }]}>
-                <ThemedText type="meta" themeColor="accentLabel" style={styles.adminBadgeText}>
+                <ThemedText type="labelSmall" themeColor="accentLabel" style={styles.adminBadgeText}>
                   {t('circle.details.admin')}
                 </ThemedText>
               </View>
             ) : null}
           </View>
-          <ThemedText type="meta" themeColor="muted">
+          <ThemedText type="labelSmall" themeColor="muted">
             {t('circle.details.joined', { month: formatMonth(member.joinedAt, language) })}
           </ThemedText>
         </View>
@@ -531,8 +531,8 @@ export default function CircleDetailsScreen() {
         <ScreenHeader title={t('circle.details.title')} />
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-          <ThemedText type="screenTitle">{circle?.name ?? ''}</ThemedText>
-          <ThemedText type="meta" themeColor="muted" style={styles.memberCount}>
+          <ThemedText type="headlineSmall">{circle?.name ?? ''}</ThemedText>
+          <ThemedText type="labelSmall" themeColor="muted" style={styles.memberCount}>
             {t('circle.peopleCount', { count: members.length })}
           </ThemedText>
 
@@ -544,7 +544,7 @@ export default function CircleDetailsScreen() {
 
           {__DEV__ ? (
             <View style={styles.debugZone}>
-              <ThemedText type="sectionTitle">
+              <ThemedText type="labelMedium">
                 Debug
               </ThemedText>
               <SecondaryButton label="Copy keyset for decryptlog" onPress={handleCopyDebugKeyset} />

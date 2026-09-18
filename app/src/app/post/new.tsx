@@ -59,13 +59,11 @@ export default function NewPostScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ThemedSafeAreaView style={styles.safeArea}>
-        <ScreenHeader variant="close" />
-
-        <ThemedText type="screenTitle">{t('post.create.title')}</ThemedText>
+        <ScreenHeader variant="close" title={t('post.create.title')} />
 
         <View style={styles.postingToRow}>
-          <ThemedText type="postAuthor">{circleName}</ThemedText>
-          <ThemedText type="meta" themeColor="muted">
+          <ThemedText type="titleSmall">{circleName}</ThemedText>
+          <ThemedText type="labelSmall" themeColor="muted">
             {' '}
             · {t('post.create.audience', { count: memberCount })}
           </ThemedText>
@@ -91,8 +89,8 @@ export default function NewPostScreen() {
 
             <View style={[styles.albumRow, { backgroundColor: tints.chipIdleBg, borderColor: tints.chipIdleBorder }]}>
               <View style={styles.albumText}>
-                <ThemedText type="postAuthor">{t('post.create.addToAlbum')}</ThemedText>
-                <ThemedText type="meta" themeColor="muted">
+                <ThemedText type="titleSmall">{t('post.create.addToAlbum')}</ThemedText>
+                <ThemedText type="labelSmall" themeColor="muted">
                   {t('post.create.albumHint')}
                 </ThemedText>
               </View>
@@ -106,7 +104,7 @@ export default function NewPostScreen() {
           </ScrollView>
 
           {error ? (
-            <ThemedText type="captionFeed" themeColor="accent" style={styles.error}>
+            <ThemedText type="bodyMedium" themeColor="accent" style={styles.error}>
               {error}
             </ThemedText>
           ) : null}
@@ -147,9 +145,9 @@ const styles = StyleSheet.create({
   },
   captionInput: {
     minHeight: 60,
-    fontFamily: Type.captionDetail.fontFamily,
-    fontSize: Type.captionDetail.fontSize,
-    lineHeight: Type.captionDetail.lineHeight,
+    fontFamily: Type.bodyLarge.fontFamily,
+    fontSize: Type.bodyLarge.fontSize,
+    lineHeight: Type.bodyLarge.lineHeight,
     textAlignVertical: 'top',
   },
   albumRow: {

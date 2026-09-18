@@ -54,7 +54,7 @@ function SocialButton({ label, icon, contentColor, fillStyle, disabled, ...rest 
             see photo-placeholder.tsx.
           */}
           <View style={styles.icon}>{icon}</View>
-          <ThemedText type="buttonLabel" style={{ color: contentColor }}>
+          <ThemedText type="labelLarge" style={{ color: contentColor }}>
             {label}
           </ThemedText>
         </View>

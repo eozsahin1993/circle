@@ -77,16 +77,16 @@ export function PrivacyInfoModal({ visible, onClose }: PrivacyInfoModalProps) {
             <View style={[styles.grabber, { backgroundColor: theme.faintest }]} />
 
             <ScrollView contentContainerStyle={styles.content}>
-              <ThemedText type="screenTitle" style={styles.title}>
+              <ThemedText type="titleLarge" style={styles.title}>
                 {t('account.privacy.title')}
               </ThemedText>
 
               {SECTIONS.map((section) => (
                 <View key={section} style={styles.section}>
-                  <ThemedText type="sectionTitle">
+                  <ThemedText type="labelMedium">
                     {t(`account.privacy.${section}Label`)}
                   </ThemedText>
-                  <ThemedText type="captionFeed" themeColor="secondary">
+                  <ThemedText type="bodyMedium" themeColor="secondary">
                     {t(`account.privacy.${section}Body`)}
                   </ThemedText>
                 </View>

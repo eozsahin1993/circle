@@ -247,7 +247,7 @@ export default function PostDetailsScreen() {
             {post ? (
               <>
                 {post.caption ? (
-                  <ThemedText type="captionDetail" style={styles.caption}>
+                  <ThemedText type="bodyLarge" style={styles.caption}>
                     {post.caption}
                   </ThemedText>
                 ) : null}
@@ -256,16 +256,16 @@ export default function PostDetailsScreen() {
                     marker shows for everyone; only the author or an admin
                     gets the bookmark in the header that changes it. */}
                 <View style={[styles.byline, post.caption ? null : styles.bylineAlone]}>
-                  <ThemedText type="meta" themeColor="muted">
+                  <ThemedText type="labelSmall" themeColor="muted">
                     {post.authorName || profileName || t('post.unknownMember')} · {formatTimestamp(post.createdAt, language)}
                   </ThemedText>
                   {post.inAlbum ? (
                     <>
-                      <ThemedText type="meta" themeColor="muted">
+                      <ThemedText type="labelSmall" themeColor="muted">
                         ·
                       </ThemedText>
                       <Icon icon={Icons.inAlbum} size={12} color={theme.accent} filled />
-                      <ThemedText type="meta" themeColor="accent">
+                      <ThemedText type="labelSmall" themeColor="accent">
                         {t('post.album')}
                       </ThemedText>
                     </>
@@ -303,14 +303,14 @@ export default function PostDetailsScreen() {
             {/* Who reacted, as people rather than per emoji — the chips
                 above already carry which emoji and how many. */}
             {reactors.length > 0 ? (
-              <ThemedText type="comment" themeColor="secondary" style={styles.reactors}>
+              <ThemedText type="bodySmall" themeColor="secondary" style={styles.reactors}>
                 {describeReactors(reactors, showAllReactors, t)}
                 {reactors.length > PREVIEW_NAMES ? (
                   <>
                     {' '}
                     {/* Nested so it flows with the names instead of being
                         pinned somewhere a long list can't wrap to. */}
-                    <ThemedText type="comment" themeColor="accentBright" onPress={() => setShowAllReactors((v) => !v)}>
+                    <ThemedText type="bodySmall" themeColor="accentBright" onPress={() => setShowAllReactors((v) => !v)}>
                       {showAllReactors ? t('post.details.seeLess') : t('post.details.seeAll')}
                     </ThemedText>
                   </>
@@ -331,12 +331,12 @@ export default function PostDetailsScreen() {
                   />
                   <View style={styles.commentBody}>
                     <View style={styles.commentByline}>
-                      <ThemedText type="postAuthor">{comment.authorName || profileName || t('post.unknownMember')}</ThemedText>
-                      <ThemedText type="meta" themeColor="faint">
+                      <ThemedText type="titleSmall">{comment.authorName || profileName || t('post.unknownMember')}</ThemedText>
+                      <ThemedText type="labelSmall" themeColor="faint">
                         {formatRelative(comment.createdAt, language)}
                       </ThemedText>
                     </View>
-                    <ThemedText type="comment" themeColor="secondary">
+                    <ThemedText type="bodySmall" themeColor="secondary">
                       {comment.body}
                     </ThemedText>
                   </View>
