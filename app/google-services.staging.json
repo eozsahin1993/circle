@@ -1,79 +1,26 @@
 {
   "project_info": {
-    "project_number": "126380695721",
-    "project_id": "mimozaapp-1587f",
-    "storage_bucket": "mimozaapp-1587f.firebasestorage.app"
+    "project_number": "1049240173156",
+    "project_id": "mimoza-staging",
+    "storage_bucket": "mimoza-staging.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:126380695721:android:7b0a9ad8e9aa270b97c9b8",
-        "android_client_info": {
-          "package_name": "com.eozsahin.mimoza"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "126380695721-218o7ggphbk20aj5d50j5gt302b95v5j.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyAHHjplivjGrX5SJ62yjqtEihdaDsguXko"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "126380695721-218o7ggphbk20aj5d50j5gt302b95v5j.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "126380695721-imanar03u5smpufg9sj6a88jpksl471e.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.eozsahin.mimoza"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:126380695721:android:14ca7b7f8ca1027797c9b8",
+        "mobilesdk_app_id": "1:1049240173156:android:f139763b32092d5ac97d71",
         "android_client_info": {
           "package_name": "com.eozsahin.mimoza.staging"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "126380695721-218o7ggphbk20aj5d50j5gt302b95v5j.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAHHjplivjGrX5SJ62yjqtEihdaDsguXko"
+          "current_key": "AIzaSyAKRej8Lk2tjUbF_dnZi2SUj0WqOaOA6os"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "126380695721-218o7ggphbk20aj5d50j5gt302b95v5j.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "126380695721-imanar03u5smpufg9sj6a88jpksl471e.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.eozsahin.mimoza"
-              }
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

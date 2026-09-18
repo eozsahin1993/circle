@@ -6,6 +6,7 @@ import { useFonts } from 'expo-font';
 import { useEffect, useState } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 
+import { EnvBadge } from '@/ui/components/env-badge';
 import { Snackbar } from '@/ui/components/snackbar';
 import { Colors } from '@/ui/theme/tokens';
 import { initDatabase } from '@/data/db';
@@ -81,6 +82,8 @@ function AppShell() {
       {/* Outside the stack, so a message survives the screen that caused
           it — including one that navigates away as it reports. */}
       <Snackbar message={message} visible={visible} dismiss={dismiss} onHidden={settle} />
+      {/* Last, so it sits over every screen and the snackbar alike. */}
+      <EnvBadge />
     </ThemeProvider>
   );
 }

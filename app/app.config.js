@@ -26,6 +26,7 @@ function iosUrlScheme() {
  * server/.env.example and docs/INFRASTRUCTURE.md.
  */
 const ENVIRONMENTS = {
+  local: {},
   production: {},
   staging: {
     nameSuffix: ' (Staging)',
@@ -35,17 +36,17 @@ const ENVIRONMENTS = {
 };
 
 module.exports = ({ config }) => {
-  const name = process.env.APP_ENV ?? 'production';
+  const name = process.env.APP_ENV || 'local';
   const env = ENVIRONMENTS[name];
   if (!env) {
     throw new Error(`APP_ENV=${name} is not an environment (${Object.keys(ENVIRONMENTS).join(', ')})`);
   }
-  if (!env.idSuffix) return withGoogleScheme(config);
+  if (!env.idSuffix) return withGoogleScheme(withEnv(config, name));
 
   const bundleIdentifier = `${config.ios.bundleIdentifier}${env.idSuffix}`;
   const appGroup = `group.${bundleIdentifier}`;
 
-  return withGoogleScheme({
+  return withGoogleScheme(withEnv({
     ...config,
     name: `${config.name}${env.nameSuffix}`,
     scheme: env.scheme,
@@ -65,8 +66,15 @@ module.exports = ({ config }) => {
       // picks the client matching the running package) but ships both.
       googleServicesFile: './google-services.staging.json',
     },
-  });
+  }, name));
 };
+
+// Readable at runtime through Constants.expoConfig.extra, so the app can
+// say which environment it is — see ui/components/env-badge.tsx. A build
+// that reaches the wrong relay is otherwise indistinguishable on screen.
+function withEnv(config, name) {
+  return { ...config, extra: { ...config.extra, appEnv: name } };
+}
 
 function withGoogleScheme(config) {
   return {
