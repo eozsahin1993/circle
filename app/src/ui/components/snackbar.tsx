@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon, type IconGlyph } from '@/ui/components/icon';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Icons, Radius, Spacing, type ThemeColor } from '@/ui/theme/tokens';
+import { Icons, Radius, Space, Spacing, type ThemeColor } from '@/ui/theme/tokens';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import type { MessageController } from '@/core/hooks/use-messages';
 import type { Message } from '@/core/services/messages';
@@ -152,9 +152,9 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 11,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
+    gap: Space.s300,
+    paddingHorizontal: Space.s400,
+    paddingVertical: Space.s300,
     borderRadius: Radius.input,
     borderWidth: 1,
     shadowColor: '#000',

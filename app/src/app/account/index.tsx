@@ -16,7 +16,7 @@ import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { SettingsGroups, type SettingsGroup } from '@/ui/components/settings-group';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Radius, Spacing } from '@/ui/theme/tokens';
+import { Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { getProfile, listCircles, type Profile } from '@/data/db';
 import { deleteAccount, finishAccountDeletionIfPending, isAccountDeletionPending } from '@/features/account/usecases/delete-account';
 import { resetEverythingForTesting } from '@/features/dev/dev-reset';
@@ -408,27 +408,27 @@ const styles = StyleSheet.create({
   profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: Space.s400,
   },
   profileText: {
     flex: 1,
-    gap: 4,
+    gap: Space.s100,
   },
   editButton: {
     borderRadius: Radius.pill,
     borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    paddingHorizontal: Space.s500,
+    paddingVertical: Space.s300,
   },
   section: {
-    gap: 10,
+    gap: Space.s300,
   },
   sectionLabel: {
-    marginBottom: 0,
+    marginBottom: Space.s0,
   },
   appearanceRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: Space.s300,
   },
   appearanceChip: {
     flex: 1,

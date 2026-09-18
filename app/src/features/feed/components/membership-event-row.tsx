@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Spacing } from '@/ui/theme/tokens';
+import { Space, Spacing } from '@/ui/theme/tokens';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
 import { upperCase } from '@/core/i18n/text';
 import { useLanguage } from '@/core/i18n/use-language';
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Space.s200,
     paddingHorizontal: Spacing.feedTextPadding,
     opacity: 0.75,
   },

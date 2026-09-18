@@ -5,7 +5,7 @@ import { Icon, type IconGlyph } from '@/ui/components/icon';
 import { PhotoPlaceholder } from '@/ui/components/photo-placeholder';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Icons, Radius, Spacing } from '@/ui/theme/tokens';
+import { Icons, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
 /**
@@ -182,7 +182,7 @@ export function SettingsGroups({ groups }: { groups: SettingsGroup[] }) {
 const styles = StyleSheet.create({
   section: {
     marginTop: Spacing.cardListGap,
-    gap: 10,
+    gap: Space.s300,
   },
   card: {
     borderWidth: 1,
@@ -193,13 +193,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   footnote: {
-    paddingHorizontal: 4,
+    paddingHorizontal: Space.s100,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
+    gap: Space.s300,
+    paddingVertical: Space.s400,
   },
   pressed: {
     opacity: 0.6,
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   },
   text: {
     flex: 1,
-    gap: 2,
+    gap: Space.s100,
   },
   image: {
     width: 64,

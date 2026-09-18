@@ -11,7 +11,7 @@ import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Radius, Spacing } from '@/ui/theme/tokens';
+import { Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTints } from '@/ui/theme/hooks/use-theme';
 import { saveRecoveryCard } from '@/features/account/usecases/recovery-card';
 import { getMasterSeed } from '@/core/services/keystore/master-seed';
@@ -131,13 +131,13 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 14,
+    gap: Space.s400,
   },
   wordCell: {
     width: '45%',
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 8,
+    gap: Space.s200,
   },
   wordIndex: {
     width: 16,

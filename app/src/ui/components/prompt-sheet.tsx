@@ -6,7 +6,7 @@ import { BottomSheet } from '@/ui/components/bottom-sheet';
 import { PrimaryButton } from '@/ui/components/buttons/primary-button';
 import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Fonts, Radius, Spacing } from '@/ui/theme/tokens';
+import { Fonts, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
 
 export type PromptSheetProps = {
@@ -87,12 +87,12 @@ export function PromptSheet({
 
 const styles = StyleSheet.create({
   body: {
-    gap: 12,
+    gap: Space.s300,
     paddingHorizontal: Spacing.screenPadding,
   },
   input: {
     height: 48,
-    paddingHorizontal: 16,
+    paddingHorizontal: Space.s400,
     borderRadius: Radius.input,
     borderWidth: 1,
     fontFamily: Fonts.sans,
@@ -100,8 +100,8 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 4,
+    gap: Space.s300,
+    marginTop: Space.s100,
   },
   action: {
     flex: 1,

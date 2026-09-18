@@ -7,7 +7,7 @@ import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Icons, Radius, Spacing } from '@/ui/theme/tokens';
+import { Icons, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
 /**
@@ -123,13 +123,13 @@ const styles = StyleSheet.create({
     gap: Spacing.cardListGap,
   },
   options: {
-    gap: 12,
-    marginTop: 8,
+    gap: Space.s300,
+    marginTop: Space.s200,
   },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: Space.s400,
     borderWidth: 1,
     borderRadius: Radius.notice,
     padding: Spacing.screenPadding,
@@ -139,11 +139,11 @@ const styles = StyleSheet.create({
   },
   optionText: {
     flex: 1,
-    gap: 2,
+    gap: Space.s100,
   },
   startFresh: {
     alignSelf: 'center',
-    paddingVertical: 12,
+    paddingVertical: Space.s300,
     paddingHorizontal: Spacing.screenPadding,
   },
   startFreshText: {

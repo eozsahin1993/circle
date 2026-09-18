@@ -10,7 +10,7 @@ import { PrimaryButton } from '@/ui/components/buttons/primary-button';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Colors, Radius, Spacing } from '@/ui/theme/tokens';
+import { Colors, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import {
   checkDeviceTransfer,
   startDeviceTransfer,
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   qrPlate: {
-    padding: 14,
+    padding: Space.s400,
     borderRadius: Radius.notice,
     backgroundColor: Colors.dark.accentBright,
   },
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   },
   noOtherPhone: {
     alignSelf: 'center',
-    paddingVertical: 12,
+    paddingVertical: Space.s300,
   },
   spacer: {
     flex: 1,

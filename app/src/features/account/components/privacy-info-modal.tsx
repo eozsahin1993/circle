@@ -6,7 +6,7 @@ import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Radius, Spacing } from '@/ui/theme/tokens';
+import { Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
 
 export type PrivacyInfoModalProps = {
@@ -129,18 +129,18 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    marginTop: 10,
-    marginBottom: 8,
+    marginTop: Space.s300,
+    marginBottom: Space.s200,
   },
   content: {
     paddingHorizontal: Spacing.screenPadding,
     gap: Spacing.cardListGap,
   },
   title: {
-    marginBottom: 4,
+    marginBottom: Space.s100,
   },
   section: {
-    gap: 6,
+    gap: Space.s200,
   },
   footer: {
     paddingHorizontal: Spacing.screenPadding,

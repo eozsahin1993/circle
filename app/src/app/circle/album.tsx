@@ -9,7 +9,7 @@ import { missingPhotoFor, PhotoPlaceholder } from '@/ui/components/photo-placeho
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Spacing } from '@/ui/theme/tokens';
+import { Space, Spacing } from '@/ui/theme/tokens';
 import { getAlbumPhotos, getAttachment, getCircleSummary, type AlbumPhoto } from '@/data/db';
 import { ensurePhotoUri, writePhotoFile } from '@/core/photo/photo-cache';
 import { formatMonth } from '@/core/utils/time';
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   monthLabel: {
     paddingHorizontal: Spacing.screenPadding,
     paddingTop: Spacing.cardListGap,
-    paddingBottom: 8,
+    paddingBottom: Space.s200,
   },
   photoRow: {
     flexDirection: 'row',

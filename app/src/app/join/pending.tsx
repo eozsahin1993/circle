@@ -7,7 +7,7 @@ import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Spacing } from '@/ui/theme/tokens';
+import { Space, Spacing } from '@/ui/theme/tokens';
 import { getPendingJoinRequest } from '@/data/db';
 import { cancelPendingJoinRequest, checkPendingJoinRequest } from '@/features/invite/usecases/join-circle';
 
@@ -159,6 +159,6 @@ const styles = StyleSheet.create({
   },
   cancel: {
     alignSelf: 'flex-start',
-    paddingVertical: 8,
+    paddingVertical: Space.s200,
   },
 });

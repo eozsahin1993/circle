@@ -3,7 +3,7 @@ import { ActivityIndicator, Animated, Modal, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Radius, Spacing } from '@/ui/theme/tokens';
+import { Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
 
 export type LoadingModalProps = {
@@ -70,10 +70,10 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: Radius.panel,
-    paddingVertical: 28,
-    paddingHorizontal: 28,
+    paddingVertical: Space.s700,
+    paddingHorizontal: Space.s700,
     alignItems: 'center',
-    gap: 10,
+    gap: Space.s300,
     minWidth: 220,
   },
   label: {

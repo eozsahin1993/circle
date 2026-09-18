@@ -5,7 +5,7 @@ import { StyleSheet } from 'react-native';
 import type { FeedRow, FeedRows } from '@/features/feed/components/rows';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Radius, Spacing } from '@/ui/theme/tokens';
+import { Radius, Space, Spacing } from '@/ui/theme/tokens';
 
 export type JustJoinedRowsInput = {
   /** Whether this arrival was a join at all — the route carries that, not the feed. */
@@ -52,9 +52,9 @@ const styles = StyleSheet.create({
   banner: {
     marginHorizontal: Spacing.feedTextPadding,
     marginTop: Spacing.gapBetweenPosts,
-    padding: 16,
+    padding: Space.s400,
     borderRadius: Radius.panel,
     alignItems: 'center',
-    gap: 2,
+    gap: Space.s100,
   },
 });

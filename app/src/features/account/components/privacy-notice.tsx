@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-nat
 
 import { Icon } from '@/ui/components/icon';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Icons, Spacing } from '@/ui/theme/tokens';
+import { Icons, Space, Spacing } from '@/ui/theme/tokens';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
 
 export type PrivacyNoticeProps = {
@@ -42,9 +42,9 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: Space.s300,
     paddingHorizontal: Spacing.feedTextPadding,
-    paddingVertical: 4,
+    paddingVertical: Space.s100,
   },
   text: {
     flex: 1,

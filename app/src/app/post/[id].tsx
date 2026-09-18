@@ -19,7 +19,7 @@ import { EmojiPicker } from '@/ui/components/emoji-picker';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Fonts, Icons, PhotoAspect, Radius, Spacing } from '@/ui/theme/tokens';
+import { Fonts, Icons, PhotoAspect, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import {
   getAttachment,
   getCircleSummary,
@@ -419,9 +419,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 5,
+    gap: Space.s100,
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: 6,
+    paddingTop: Space.s200,
   },
   bylineAlone: {
     paddingTop: Spacing.cardListGap,
@@ -429,17 +429,17 @@ const styles = StyleSheet.create({
   reactions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: Space.s200,
     paddingHorizontal: Spacing.screenPadding,
     paddingTop: Spacing.cardListGap,
   },
   picker: {
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: 12,
+    paddingTop: Space.s300,
   },
   reactors: {
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: 14,
+    paddingTop: Space.s400,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
@@ -447,35 +447,35 @@ const styles = StyleSheet.create({
     marginTop: Spacing.cardListGap + 4,
   },
   comments: {
-    gap: 14,
+    gap: Space.s400,
     paddingHorizontal: Spacing.screenPadding,
     paddingTop: Spacing.cardListGap,
   },
   commentRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: Space.s300,
   },
   commentByline: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 8,
+    gap: Space.s200,
   },
   commentBody: {
     flex: 1,
-    gap: 2,
-    paddingTop: 2,
+    gap: Space.s100,
+    paddingTop: Space.s100,
   },
   composer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: Space.s300,
     paddingHorizontal: Spacing.screenPadding,
-    paddingVertical: 12,
+    paddingVertical: Space.s300,
   },
   composerInput: {
     flex: 1,
     height: 44,
-    paddingHorizontal: 16,
+    paddingHorizontal: Space.s400,
     borderRadius: 999,
     borderWidth: 1,
     fontFamily: Fonts.sans,

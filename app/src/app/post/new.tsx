@@ -10,7 +10,7 @@ import { PrimaryButton } from '@/ui/components/buttons/primary-button';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { PhotoAspect, Radius, Spacing, Type } from '@/ui/theme/tokens';
+import { PhotoAspect, Radius, Space, Spacing, Type } from '@/ui/theme/tokens';
 import { getCircleSummary, getCircleMembers } from '@/data/db';
 import { createPost } from '@/features/post/usecases/create-post';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    marginTop: 8,
+    marginTop: Space.s200,
     marginBottom: Spacing.cardListGap,
   },
   form: {
@@ -153,14 +153,14 @@ const styles = StyleSheet.create({
   albumRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: Space.s400,
     borderWidth: 1,
     borderRadius: Radius.notice,
     padding: Spacing.screenPadding,
   },
   albumText: {
     flex: 1,
-    gap: 4,
+    gap: Space.s100,
   },
   error: {
     textAlign: 'center',

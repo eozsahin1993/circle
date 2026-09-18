@@ -5,7 +5,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { BottomSheet } from '@/ui/components/bottom-sheet';
 import { PrimaryButton } from '@/ui/components/buttons/primary-button';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Colors, Radius, Spacing } from '@/ui/theme/tokens';
+import { Colors, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTints } from '@/ui/theme/hooks/use-theme';
 
 export type InviteSheetProps = {
@@ -84,17 +84,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.screenPadding,
   },
   subtitle: {
-    marginTop: 6,
+    marginTop: Space.s200,
   },
   qrFrame: {
     borderWidth: 1,
     borderRadius: Radius.panel,
     alignSelf: 'center',
-    padding: 14,
+    padding: Space.s400,
     marginTop: Spacing.cardListGap,
   },
   qrPlate: {
-    padding: 12,
+    padding: Space.s300,
     borderRadius: Radius.notice,
     backgroundColor: Colors.dark.accentBright,
   },
@@ -103,14 +103,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   expiry: {
-    marginTop: 4,
+    marginTop: Space.s100,
     textAlign: 'center',
   },
   done: {
     marginTop: Spacing.cardListGap,
   },
   footnote: {
-    marginTop: 10,
+    marginTop: Space.s300,
     textAlign: 'center',
   },
 });

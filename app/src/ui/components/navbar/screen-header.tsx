@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { BackButton, type BackButtonProps } from '@/ui/components/navbar/back-button';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Spacing } from '@/ui/theme/tokens';
+import { Space, Spacing } from '@/ui/theme/tokens';
 
 export type ScreenHeaderProps = BackButtonProps & {
   /** What this screen is — "Post", "Album". Omit for a bare arrow. */
@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: Space.s400,
     // iOS's standard navigation bar, and comfortably above the 44pt
     // minimum tap target. A subtitle still fits inside it — `minHeight`
     // only so a longer type ramp can't clip.
@@ -80,6 +80,6 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 18,
+    gap: Space.s500,
   },
 });

@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, type PressableProps } from 'react-native';
 
-import { ButtonHeight, Radius } from '@/ui/theme/tokens';
+import { ButtonHeight, Radius, Space } from '@/ui/theme/tokens';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: Space.s600,
   },
   pressed: {
     opacity: 0.85,

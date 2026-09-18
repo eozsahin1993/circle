@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Avatar } from '@/ui/components/avatar/avatar';
 import { Icon } from '@/ui/components/icon';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Icons, Radius, Type } from '@/ui/theme/tokens';
+import { Icons, Radius, Space, Type } from '@/ui/theme/tokens';
 import { useOwnColorSeed } from '@/ui/theme/hooks/use-own-color-seed';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
@@ -147,21 +147,21 @@ const styles = StyleSheet.create({
   container: {
     // Its own rhythm, tighter than the card's bands: comment, link and
     // composer are one group, not three.
-    gap: 12,
+    gap: Space.s300,
   },
   commentRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
+    gap: Space.s300,
   },
   commentBody: {
     flex: 1,
-    gap: 2,
+    gap: Space.s100,
   },
   showAll: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Space.s200,
   },
   composer: {
     flexDirection: 'row',
@@ -169,17 +169,17 @@ const styles = StyleSheet.create({
     // flex-end left it hanging off the bottom edge rather than reading as
     // one row.
     alignItems: 'center',
-    gap: 10,
+    gap: Space.s300,
   },
   input: {
     flex: 1,
     minHeight: COMPOSER_HEIGHT,
     maxHeight: COMPOSER_HEIGHT * 3,
-    paddingHorizontal: 16,
+    paddingHorizontal: Space.s400,
     // Centres a single line the way `height` would, without stopping the
     // field growing once the text wraps.
-    paddingTop: 11,
-    paddingBottom: 11,
+    paddingTop: Space.s300,
+    paddingBottom: Space.s300,
     borderRadius: Radius.pill,
     borderWidth: 1,
     // Matches the comment rows above it — what you type should look like

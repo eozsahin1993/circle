@@ -13,7 +13,7 @@ import { Wordmark } from '@/ui/components/wordmark';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Colors, Spacing } from '@/ui/theme/tokens';
+import { Colors, Space, Spacing } from '@/ui/theme/tokens';
 import { getProfile } from '@/data/db';
 import { hasUnreadableAccountManifest, recordSignInProviderBestEffort } from '@/features/account/usecases/account-manifest';
 import { signInWithApple, signInWithGoogle } from '@/features/account/usecases/sign-in';
@@ -198,18 +198,18 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: 32,
+    paddingTop: Space.s800,
     gap: Spacing.cardListGap,
   },
   body: {
-    marginTop: 0,
+    marginTop: Space.s0,
   },
   actions: {
-    gap: 12,
-    marginTop: 16,
+    gap: Space.s300,
+    marginTop: Space.s400,
   },
   footer: {
     alignSelf: 'center',
-    paddingVertical: 8,
+    paddingVertical: Space.s200,
   },
 });

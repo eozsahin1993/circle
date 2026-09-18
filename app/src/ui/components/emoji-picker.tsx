@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/ui/components/icon';
-import { Icons, Radius } from '@/ui/theme/tokens';
+import { Icons, Radius, Space } from '@/ui/theme/tokens';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
 export type EmojiPickerProps = {
@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: Radius.panel,
     borderWidth: 1,
-    paddingHorizontal: 4,
+    paddingHorizontal: Space.s100,
   },
   /**
    * `flex: 1` on every slot is what divides the panel evenly however many

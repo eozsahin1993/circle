@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, type PressableProps, type StyleProp, type 
 
 import { Icon, type IconGlyph } from '@/ui/components/icon';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Radius } from '@/ui/theme/tokens';
+import { Radius, Space } from '@/ui/theme/tokens';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
 export type ReactionChipProps = Omit<PressableProps, 'style'> & {
@@ -49,9 +49,9 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: Space.s200,
     height: 34,
-    paddingHorizontal: 12,
+    paddingHorizontal: Space.s300,
     borderRadius: Radius.pill,
     borderWidth: 1,
   },

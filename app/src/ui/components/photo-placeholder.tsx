@@ -4,7 +4,7 @@ import { StyleSheet, View, type ViewProps } from 'react-native';
 
 import { Icon, type IconGlyph } from '@/ui/components/icon';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Icons, PhotoSlotLight } from '@/ui/theme/tokens';
+import { Icons, PhotoSlotLight, Space } from '@/ui/theme/tokens';
 import { useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
@@ -103,6 +103,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: Space.s200,
   },
 });

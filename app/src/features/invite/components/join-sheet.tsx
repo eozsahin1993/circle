@@ -6,7 +6,7 @@ import { Avatar } from '@/ui/components/avatar/avatar';
 import { BottomSheet } from '@/ui/components/bottom-sheet';
 import { PrimaryButton } from '@/ui/components/buttons/primary-button';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Spacing } from '@/ui/theme/tokens';
+import { Space, Spacing } from '@/ui/theme/tokens';
 import { findPendingJoinRequestForInvite, previewInvite, requestToJoin } from '@/features/invite/usecases/join-circle';
 import { bytesToDataUri, parsePictureThumbnail } from '@/core/photo/image';
 import { showError } from '@/core/services/messages';
@@ -148,19 +148,19 @@ export function JoinSheet({ code, onClose, onRequested }: JoinSheetProps) {
 const styles = StyleSheet.create({
   content: {
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: 4,
-    gap: 14,
+    paddingTop: Space.s100,
+    gap: Space.s400,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: Space.s400,
   },
   headerText: {
     flex: 1,
-    gap: 2,
+    gap: Space.s100,
   },
   button: {
-    marginTop: 2,
+    marginTop: Space.s100,
   },
 });

@@ -10,7 +10,7 @@ import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Fonts, Radius, Spacing } from '@/ui/theme/tokens';
+import { Fonts, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { NoRecoveryPhraseError, pickRecoveryCard } from '@/features/account/usecases/recovery-card';
 import { PhoneInCircleError, restoreFromPhrase } from '@/features/account/usecases/restore-from-phrase';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
@@ -151,11 +151,11 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    gap: 12,
+    gap: Space.s300,
   },
   input: {
     minHeight: 110,
-    padding: 16,
+    padding: Space.s400,
     borderRadius: Radius.input,
     borderWidth: 1,
     fontFamily: Fonts.sans,

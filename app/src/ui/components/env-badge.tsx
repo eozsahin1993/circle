@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import { StyleSheet, Text, View } from 'react-native';
+import { Space } from '@/ui/theme/tokens';
 
 /** Set by app.config.js; absent in tests and in a bare `expo start`. */
 const APP_ENV = (Constants.expoConfig?.extra as { appEnv?: string } | undefined)?.appEnv;
@@ -44,7 +45,7 @@ const styles = StyleSheet.create({
     left: -SIZE / 2,
     bottom: SIZE / 5,
     width: SIZE * 1.5,
-    paddingVertical: 3,
+    paddingVertical: Space.s100,
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
     transform: [{ rotate: '45deg' }],

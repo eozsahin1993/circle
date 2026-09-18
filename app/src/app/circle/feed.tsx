@@ -13,7 +13,7 @@ import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Icons, Spacing } from '@/ui/theme/tokens';
+import { Icons, Space, Spacing } from '@/ui/theme/tokens';
 import { markCircleViewed } from '@/data/db';
 import { askForPushOnCircle } from '@/features/push-notifications/usecases/enable-push';
 import { useCircleFeed } from '@/features/feed/hooks/use-circle-feed';
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   emptyButton: {
-    marginTop: 4,
+    marginTop: Space.s100,
   },
   // Full width so the FAB still anchors bottom-right, without intercepting
   // touches over the rest of that width (see `pointerEvents` on the JSX).

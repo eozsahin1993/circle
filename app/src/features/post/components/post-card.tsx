@@ -11,7 +11,7 @@ import { ReactionChip } from '@/features/post/components/reaction-chip';
 import { EmojiPicker } from '@/ui/components/emoji-picker';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Icons, PhotoAspect, Radius, Spacing } from '@/ui/theme/tokens';
+import { Icons, PhotoAspect, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
 
 export type Reaction = {
@@ -224,15 +224,15 @@ export function PostCard({
 
 const styles = StyleSheet.create({
   card: {
-    gap: 0,
+    gap: Space.s0,
   },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: Space.s300,
     paddingHorizontal: Spacing.feedTextPadding,
-    paddingVertical: 14,
+    paddingVertical: Space.s400,
   },
   byline: {
     flex: 1,
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   timestampRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: Space.s100,
   },
   photoWrap: {
     justifyContent: 'flex-end',
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 8,
+    gap: Space.s200,
     paddingHorizontal: Spacing.feedTextPadding,
     paddingTop: BAND_GAP,
   },
@@ -282,6 +282,6 @@ const styles = StyleSheet.create({
     paddingTop: BAND_GAP,
     // The feed's own gap follows this card; only enough here to keep the
     // last line off the join.
-    paddingBottom: 4,
+    paddingBottom: Space.s100,
   },
 });

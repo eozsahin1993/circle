@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/ui/components/icon';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Icons, Radius } from '@/ui/theme/tokens';
+import { Icons, Radius, Space } from '@/ui/theme/tokens';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { formatAgo } from '@/core/utils/time';
 import { useLanguage } from '@/core/i18n/use-language';
@@ -65,14 +65,14 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    padding: 18,
+    gap: Space.s400,
+    padding: Space.s500,
     borderRadius: Radius.panel,
     borderWidth: 1,
     borderStyle: 'dashed',
   },
   body: {
     flex: 1,
-    gap: 4,
+    gap: Space.s100,
   },
 });

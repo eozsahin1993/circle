@@ -17,7 +17,7 @@ import { PrivacyInfoModal } from '@/features/account/components/privacy-info-mod
 import { PrivacyNotice } from '@/features/account/components/privacy-notice';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Icons, Spacing } from '@/ui/theme/tokens';
+import { Icons, Space, Spacing } from '@/ui/theme/tokens';
 import {
   getAllPendingJoinRequests,
   getCircleMemberCount,
@@ -320,15 +320,15 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.cardListGap,
   },
   privacyNotice: {
-    paddingHorizontal: 0,
-    paddingBottom: 8,
+    paddingHorizontal: Space.s0,
+    paddingBottom: Space.s200,
   },
   sectionTitle: {
-    marginTop: 8,
+    marginTop: Space.s200,
   },
   pending: {
-    gap: 12,
-    paddingBottom: 8,
+    gap: Space.s300,
+    paddingBottom: Space.s200,
   },
   empty: {
     flex: 1,
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   emptyButton: {
-    marginTop: 4,
+    marginTop: Space.s100,
   },
   fab: {
     position: 'absolute',

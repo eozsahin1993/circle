@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 
 import type { FeedRow, FeedRows } from '@/features/feed/components/rows';
 import { DayDivider, MembershipEventGroupRow, type MembershipEventGroupItem } from '@/features/feed/components/membership-event-row';
-import { Spacing } from '@/ui/theme/tokens';
+import { Space, Spacing } from '@/ui/theme/tokens';
 import type { MemberEvent } from '@/data/db';
 import { groupMemberEvents, type MembershipEventGroup } from '@/features/feed/usecases/group-member-events';
 import { i18n } from '@/core/i18n/i18n';
@@ -55,7 +55,7 @@ export function rosterChangeRows(
   return blocks.flatMap((block, blockIndex) => [
     {
       key: `member-event-day-${blockIndex}-${block.occurredAt}`,
-      spacing: Spacing.gapAroundMemberEvent,
+      spacing: Space.s500,
       // A hair after the block's newest row, so the header always sorts
       // immediately above it rather than tying with it.
       at: block.occurredAt + 1,
@@ -69,7 +69,7 @@ export function rosterChangeRows(
     // full-width on its other side.
     {
       key: `member-event-block-end-${blockIndex}`,
-      spacing: Spacing.gapAroundMemberEvent,
+      spacing: Space.s500,
       at: block.groups[block.groups.length - 1].occurredAt - 1,
       render: () => <></>,
     },
@@ -100,7 +100,10 @@ function groupRow(
 
   return {
     key: `member-event-${blockIndex}-${groupIndex}`,
-    spacing: Spacing.gapWithinMemberEventBlock,
+    // Tighter than the gap around the day divider above: these rows carry
+    // no rule of their own, so the gap is the only thing saying they
+    // belong to it rather than floating on their own.
+    spacing: Space.s300,
     at: group.occurredAt,
     render: () => <MembershipEventGroupRow group={item} />,
   };

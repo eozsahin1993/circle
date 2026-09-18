@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon } from '@/ui/components/icon';
 import { PhotoPlaceholder } from '@/ui/components/photo-placeholder';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Icons, Radius } from '@/ui/theme/tokens';
+import { Icons, Radius, Space } from '@/ui/theme/tokens';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
 export type CircleCardProps = {
@@ -88,14 +88,14 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 12,
+    padding: Space.s300,
     justifyContent: 'center',
-    gap: 4,
+    gap: Space.s100,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Space.s200,
   },
   title: {
     flex: 1,
@@ -103,11 +103,11 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: Space.s200,
   },
   badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: Space.s300,
+    paddingVertical: Space.s100,
     borderRadius: Radius.pill,
   },
 });

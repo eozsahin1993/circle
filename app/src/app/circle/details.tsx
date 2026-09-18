@@ -16,7 +16,7 @@ import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
 import { SettingsGroups, type SettingsGroup } from '@/ui/components/settings-group';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Fonts, Icons, Radius, Spacing } from '@/ui/theme/tokens';
+import { Fonts, Icons, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { MemberRoles, type Member, type MemberRole } from '@/data/db';
 import { setMemberRole } from '@/features/circle/usecases/change-member-role';
 import { resolveCircleCoverUri } from '@/features/circle/usecases/circle-cover';
@@ -603,7 +603,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.screenPadding,
   },
   memberCount: {
-    marginTop: 4,
+    marginTop: Space.s100,
   },
   scroll: {
     flex: 1,
@@ -616,41 +616,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: Spacing.cardListGap,
-    marginBottom: 4,
+    marginBottom: Space.s100,
   },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
+    gap: Space.s300,
+    paddingVertical: Space.s300,
     borderBottomWidth: 1,
   },
   memberInfo: {
     flex: 1,
-    gap: 2,
+    gap: Space.s100,
   },
   memberMenuButton: {
-    padding: 4,
+    padding: Space.s100,
   },
   memberNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Space.s200,
   },
   adminBadge: {
     borderRadius: Radius.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: Space.s200,
+    paddingVertical: Space.s100,
   },
   adminBadgeText: {
     fontFamily: Fonts.sansSemiBold,
     fontSize: 10.5,
   },
   adminNotice: {
-    marginTop: 10,
+    marginTop: Space.s300,
   },
   debugZone: {
     marginTop: Spacing.cardListGap,
-    gap: 8,
+    gap: Space.s200,
   },
 });

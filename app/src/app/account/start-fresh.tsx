@@ -8,7 +8,7 @@ import { PrimaryButton } from '@/ui/components/buttons/primary-button';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Spacing } from '@/ui/theme/tokens';
+import { Space, Spacing } from '@/ui/theme/tokens';
 import { abandonPriorAccount } from '@/features/account/usecases/onboarding';
 import { showError } from '@/core/services/messages';
 
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     gap: Spacing.cardListGap,
   },
   actions: {
-    gap: 10,
-    marginBottom: 12,
+    gap: Space.s300,
+    marginBottom: Space.s300,
   },
 });

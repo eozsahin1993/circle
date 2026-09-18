@@ -10,7 +10,7 @@ import { PrimaryButton } from '@/ui/components/buttons/primary-button';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Fonts, Radius, Spacing } from '@/ui/theme/tokens';
+import { Fonts, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { getProfile } from '@/data/db';
 import { bytesToDataUri, downloadAndCompressImage, pickAndCompressImage, type CompressedImage } from '@/core/photo/image';
 import { completeProfileSetup, ensureMasterSeed } from '@/features/account/usecases/onboarding';
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   alreadyHaveAccount: {
     alignSelf: 'center',
     marginTop: Spacing.cardListGap,
-    paddingVertical: 14,
+    paddingVertical: Space.s400,
     paddingHorizontal: Spacing.screenPadding,
   },
   form: {
@@ -190,19 +190,19 @@ const styles = StyleSheet.create({
   pictureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    marginTop: 8,
+    gap: Space.s400,
+    marginTop: Space.s200,
   },
   pictureText: {
     flex: 1,
-    gap: 4,
+    gap: Space.s100,
   },
   nameLabel: {
-    marginTop: 8,
+    marginTop: Space.s200,
   },
   input: {
     height: 60,
-    paddingHorizontal: 20,
+    paddingHorizontal: Space.s500,
     borderRadius: Radius.input,
     borderWidth: 1,
     fontFamily: Fonts.sans,

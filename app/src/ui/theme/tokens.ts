@@ -282,16 +282,52 @@ export const Radius = {
   bottomSheet: 22,
 } as const;
 
+/**
+ * The 4pt grid. Named the way Polaris names it: the number is the
+ * percentage of the 4px base, so `Space.s400` is 16px and `Space.s200` is
+ * 8px. Whole steps only — no 150 or 225 — because a distance that needs a
+ * half step is a distance off the grid.
+ *
+ * The name abstracts the value on purpose: retuning the scale is one edit
+ * here rather than a rename of every call site. 4 because it's what the
+ * platform lays out on — a view controller's root view takes 16pt side
+ * margins, a subview 8pt, and Auto Layout's standard sibling spacing is
+ * 8pt.
+ */
+export const Space = {
+  s0: 0,
+  s100: 4,
+  s200: 8,
+  s300: 12,
+  s400: 16,
+  s500: 20,
+  s600: 24,
+  s700: 28,
+  s800: 32,
+  s900: 36,
+  s1000: 40,
+} as const;
+
+/** Every distance in the app is one of these — anything else fails to compile. */
+export type SpaceToken = (typeof Space)[keyof typeof Space];
+
+/**
+ * The distances more than one file has to agree on, which `Space` can't
+ * express: change `screenPadding` here and every screen moves together,
+ * where changing a 24 means finding which 24s meant this and which were
+ * coincidence. Reach for `Space` inside a component and for these across
+ * components.
+ */
 export const Spacing = {
-  screenPadding: 22,
-  cardListGap: 16,
+  screenPadding: Space.s600,
+  cardListGap: Space.s400,
   /**
    * The feed column's inset — captions, action chips, comments, roster
    * rows, and the header above them. Narrower than `screenPadding` so the
    * photographs, which run edge to edge, aren't squeezed by text margins
    * meant for a form.
    */
-  feedTextPadding: 18,
+  feedTextPadding: Space.s500,
   /**
    * The gap above a screen's header row — `ScreenHeader` applies it, so
    * only `circle/index.tsx`, the stack root without one, names it
@@ -304,24 +340,9 @@ export const Spacing = {
    * 24dp against an iPhone's ~59pt, and anything relying on the inset for
    * breathing room reads as cramped there.
    */
-  topPadUnderSafeArea: 16,
-  gapBetweenPosts: 34,
-  /**
-   * Above and below a day divider — see `DayDivider`. Tighter than
-   * `gapBetweenPosts` because that row is itself a rule across the feed —
-   * it already reads as the break between two photographs, and a full gap
-   * on both sides would leave it floating in a band of empty ground.
-   */
-  gapAroundMemberEvent: 20,
-  /**
-   * Above and below one roster-change row within a day's block — see
-   * `MembershipEventGroupRow`. Tighter still than `gapAroundMemberEvent`:
-   * these rows carry no rule of their own, so the gap is the only thing
-   * saying they belong to the day divider above them rather than floating
-   * independently.
-   */
-  gapWithinMemberEventBlock: 10,
-  pinnedButtonFromBottom: 28,
+  topPadUnderSafeArea: Space.s400,
+  gapBetweenPosts: Space.s900,
+  pinnedButtonFromBottom: Space.s700,
 } as const;
 
 export const ButtonHeight = { primary: 52 } as const;

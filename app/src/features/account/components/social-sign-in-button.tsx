@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/ui/theme/themed-text';
-import { ButtonHeight, Radius } from '@/ui/theme/tokens';
+import { ButtonHeight, Radius, Space } from '@/ui/theme/tokens';
 import { useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
@@ -127,8 +127,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    paddingHorizontal: 24,
+    gap: Space.s300,
+    paddingHorizontal: Space.s600,
   },
   google: {
     borderWidth: 1,

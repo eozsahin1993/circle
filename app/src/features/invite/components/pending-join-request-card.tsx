@@ -6,7 +6,7 @@ import { PrimaryButton } from '@/ui/components/buttons/primary-button';
 import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Radius } from '@/ui/theme/tokens';
+import { Radius, Space } from '@/ui/theme/tokens';
 import { useTints } from '@/ui/theme/hooks/use-theme';
 import type { PendingRequest } from '@/features/invite/usecases/invite-to-circle';
 import { formatAgo } from '@/core/utils/time';
@@ -57,21 +57,21 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: Radius.panel,
     borderWidth: 1,
-    padding: 16,
-    gap: 14,
+    padding: Space.s400,
+    gap: Space.s400,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: Space.s300,
   },
   text: {
     flex: 1,
-    gap: 2,
+    gap: Space.s100,
   },
   actions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: Space.s300,
   },
   actionButton: {
     flex: 1,

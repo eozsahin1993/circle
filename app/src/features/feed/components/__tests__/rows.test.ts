@@ -2,7 +2,7 @@ import { justJoinedRow } from '@/features/feed/components/just-joined-row';
 import { pendingRequestRow } from '@/features/feed/components/pending-request-row';
 import { rosterChangeRows } from '@/features/feed/components/roster-change-row';
 import { buildFeedRows, gapBetween, stickyIndices, type FeedRow } from '@/features/feed/components/rows';
-import { Spacing } from '@/ui/theme/tokens';
+import { Space, Spacing } from '@/ui/theme/tokens';
 import type { MemberEvent } from '@/data/db';
 
 function event(id: string, occurredAt: number): MemberEvent {
@@ -104,13 +104,13 @@ describe('each row decides for itself', () => {
   });
 
   test('a roster change asks for a tighter gap than a card', () => {
-    expect(eventRow(1).spacing).toBe(Spacing.gapWithinMemberEventBlock);
+    expect(eventRow(1).spacing).toBe(Space.s300);
   });
 });
 
 describe('gapBetween', () => {
   const post: FeedRow = { key: 'p', spacing: Spacing.gapBetweenPosts, render: () => null! };
-  const rosterChange: FeedRow = { key: 'e', spacing: Spacing.gapWithinMemberEventBlock, render: () => null! };
+  const rosterChange: FeedRow = { key: 'e', spacing: Space.s300, render: () => null! };
 
   test('two cards take the full gap', () => {
     expect(gapBetween(post, post)).toBe(Spacing.gapBetweenPosts);
@@ -121,11 +121,11 @@ describe('gapBetween', () => {
     ['before', post, rosterChange],
     ['after', rosterChange, post],
   ])('a roster change tightens the gap %s it', (_label, leading, trailing) => {
-    expect(gapBetween(leading, trailing)).toBe(Spacing.gapWithinMemberEventBlock);
+    expect(gapBetween(leading, trailing)).toBe(Space.s300);
   });
 
   test('the last row falls back to its own spacing', () => {
-    expect(gapBetween(rosterChange, undefined)).toBe(Spacing.gapWithinMemberEventBlock);
+    expect(gapBetween(rosterChange, undefined)).toBe(Space.s300);
   });
 });
 

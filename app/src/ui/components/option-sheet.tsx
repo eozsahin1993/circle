@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { BottomSheet } from '@/ui/components/bottom-sheet';
 import { Icon } from '@/ui/components/icon';
 import { ThemedText } from '@/ui/theme/themed-text';
-import { Icons, Spacing } from '@/ui/theme/tokens';
+import { Icons, Space, Spacing } from '@/ui/theme/tokens';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
 export type SheetOption<Id extends string> = {
@@ -66,17 +66,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.screenPadding,
   },
   title: {
-    marginBottom: 6,
+    marginBottom: Space.s200,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
+    gap: Space.s300,
+    paddingVertical: Space.s400,
     borderBottomWidth: 1,
   },
   text: {
     flex: 1,
-    gap: 2,
+    gap: Space.s100,
   },
 });

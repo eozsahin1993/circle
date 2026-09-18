@@ -10,7 +10,7 @@ import { PrimaryButton } from '@/ui/components/buttons/primary-button';
 import { ScreenHeader } from '@/ui/components/navbar/screen-header';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Fonts, PhotoAspect, Radius, Spacing } from '@/ui/theme/tokens';
+import { Fonts, PhotoAspect, Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { createCircle } from '@/features/circle/usecases/create-circle';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 import { pickAndCompressImage, type CompressedImage } from '@/core/photo/image';
@@ -104,14 +104,14 @@ const styles = StyleSheet.create({
   },
   input: {
     height: 60,
-    paddingHorizontal: 20,
+    paddingHorizontal: Space.s500,
     borderRadius: Radius.input,
     borderWidth: 1,
     fontFamily: Fonts.sans,
     fontSize: 18,
   },
   fieldLabel: {
-    marginBottom: 10,
+    marginBottom: Space.s300,
   },
   footnote: {
     textAlign: 'center',

@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAvoider } from '@/ui/components/keyboard-avoider';
 import { ThemedSafeAreaView } from '@/ui/theme/themed-safe-area-view';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Radius, Spacing } from '@/ui/theme/tokens';
+import { Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTheme } from '@/ui/theme/hooks/use-theme';
 
 export type BottomSheetProps = {
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   inner: {
-    paddingTop: 10,
+    paddingTop: Space.s300,
     paddingBottom: Spacing.cardListGap,
   },
   grabber: {
@@ -100,6 +100,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    marginBottom: 14,
+    marginBottom: Space.s400,
   },
 });

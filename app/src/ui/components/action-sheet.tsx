@@ -8,7 +8,7 @@ import { Icon, type IconGlyph } from '@/ui/components/icon';
 import { SecondaryButton } from '@/ui/components/buttons/secondary-button';
 import { ThemedText } from '@/ui/theme/themed-text';
 import { ThemedView } from '@/ui/theme/themed-view';
-import { Radius, Spacing } from '@/ui/theme/tokens';
+import { Radius, Space, Spacing } from '@/ui/theme/tokens';
 import { useTheme, useTints } from '@/ui/theme/hooks/use-theme';
 
 export type ActionSheetOption = {
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   },
   sheetInner: {
     paddingHorizontal: Spacing.screenPadding,
-    paddingTop: 10,
+    paddingTop: Space.s300,
     paddingBottom: Spacing.cardListGap,
   },
   grabber: {
@@ -196,13 +196,13 @@ const styles = StyleSheet.create({
     width: 36,
     height: 4,
     borderRadius: 2,
-    marginBottom: 14,
+    marginBottom: Space.s400,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
+    gap: Space.s300,
+    marginBottom: Space.s400,
   },
   headerTitle: {
     flex: 1,
@@ -210,14 +210,14 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: Radius.panel,
     overflow: 'hidden',
-    marginBottom: 12,
+    marginBottom: Space.s300,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: Space.s400,
     paddingHorizontal: Spacing.screenPadding,
-    paddingVertical: 16,
+    paddingVertical: Space.s400,
     borderBottomWidth: 1,
   },
   rowLast: {
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   },
   rowText: {
     flex: 1,
-    gap: 2,
+    gap: Space.s100,
   },
   cancelButton: {
     alignSelf: 'stretch',
