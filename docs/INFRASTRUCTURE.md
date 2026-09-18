@@ -10,6 +10,95 @@ or deferred.
 
 ---
 
+## The shape of it
+
+One Go binary on Lambda, two CloudFront distributions in front of it, and
+six DynamoDB tables plus one S3 bucket behind. No servers, no containers,
+no VPC, no database to patch or scale. Everything is on-demand, so an idle
+environment costs almost nothing and a busy one needs no capacity plan.
+
+```
+Cloudflare DNS — "DNS only", never proxied: proxying would stack two CDNs
+  │
+  ├─ api.<zone> ──→ CloudFront ──→ Lambda URL ──→ relay (Go, arm64)
+  │                 CachingDisabled                no VPC, on-demand
+  │                 all headers but Host                │
+  │                                                     ├─→ DynamoDB ×6
+  │                                                     │   PAY_PER_REQUEST
+  │                                                     ├─→ S3  issue URLs,
+  │                                                     │       delete objects
+  │                                                     └─→ SSM config + keys
+  │
+  └─ cdn.<zone> ──→ CloudFront ──→ S3 bucket
+                    cached          OAC only — no direct reads
+                    signed URLs      ▲
+                                     └── presigned POST, straight from the app
+
+One AWS account per environment, all of it in us-east-1.
+```
+
+ACM issues one wildcard certificate per environment, in us-east-1 because
+CloudFront accepts them from nowhere else. Validation is a DNS record
+added at Cloudflare by hand — the first apply in a new environment blocks
+until it exists.
+
+**Photo bytes never pass through the relay.** Uploads go straight to S3 on
+a presigned POST the relay hands out; downloads come from the edge on a
+CloudFront signed URL. The relay only ever issues the URL and records that
+the entry exists — which is what keeps a 2 MB photo off a Lambda that
+charges by the millisecond, and what makes the same object cacheable for
+every member of a circle.
+
+**Where the data lives:**
+
+| | |
+|---|---|
+| `<prefix>-sync-log` | The archive. One partition per circle, append-only, never mutated. |
+| `<prefix>-accounts` | One document per account: the encrypted recovery manifest, and the Apple refresh token deletion revokes with. |
+| `<prefix>-sessions` | Bearer tokens this relay issued. |
+| `<prefix>-invites` | Invites and pending join requests, on a TTL. |
+| `<prefix>-rate-limit` | Per-account request budgets. |
+| `<prefix>-push` | Routing preferences and one row per device. |
+| `<prefix>-blobs` (S3) | Photo ciphertext. Glacier IR after 90 days. |
+| SSM `/<prefix>/*` | Settings, and the four SecureString credentials. |
+
+Every one of those names derives from `RESOURCE_PREFIX` on both sides —
+`internal/config` and `modules/storage` — so an environment is one string,
+and nothing can be pointed at another environment's data piecemeal.
+
+**Configuration and secrets both live in SSM, but reach the relay by two
+different routes**, and the difference matters when something looks stale:
+
+| | | |
+|---|---|---|
+| Tuning — blob size cap, retention, rate limits | `envs/*/main.tf` | In git; a change is a reviewable diff, applied by `terraform apply` alone |
+| Settings only a human has — sign-in client IDs, APNs/Apple key ids | SSM `/<prefix>/config/*` | Uploaded by `push-config.sh`, read by Terraform **at apply time** and baked into the function's environment |
+| Credentials — the four `.p8`/JSON/RSA keys | SSM SecureStrings | Never in Terraform state; read by the relay **at runtime**, cached per cold start |
+| Where the blob CDN is | SSM `/<prefix>/cdn` | Written by Terraform, read by the relay at runtime — closes a dependency cycle, see *How the relay finds the CDN* |
+
+The consequence worth remembering: a `/config/*` change needs
+`push-config.sh` **and** an apply, because nothing re-reads it at runtime;
+a SecureString change needs only a cold start. Nothing is stored in the
+repo, in CI, or on a developer's machine except `<env>.env`, which is
+gitignored.
+
+**Everything the relay serves is ciphertext it cannot read.** That is the
+constraint the rest of this document keeps running into: it is why blobs
+can be cached and shared, why logs carry no identifiers, why a backup
+restores something only the user's device can open, and why the relay
+cannot select a circle's rows to fix them.
+
+**Auth and rate limiting are both the relay's own, not AWS's.** Sign-in
+verifies a Google or Apple ID token against that provider's JWKS over
+plain HTTPS — no AWS permission involved — and issues a bearer token of
+the relay's own. Every route requires it except sign-in and `POST
+/push/send`, which is unauthenticated by design (`PUSH_DESIGN.md`).
+Budgets are counters in DynamoDB, applied per handler: writes and reads
+carry different limits, and push recipients carry a third. There is no
+WAF; see *Cost* for why.
+
+---
+
 ## Accounts
 
 One AWS account per environment. A mistake in staging cannot reach prod
@@ -30,21 +119,21 @@ email whose domain is registered inside the account it recovers.
 Per account: Terraform state bucket (`mimoza-terraform-<env>`), deploy
 role, and the SSM SecureStrings created by hand because Terraform would
 put them in state as plaintext — `/mimoza-<env>/fcm-service-account`,
-`/mimoza-<env>/apns-auth-key`, `/mimoza-<env>/cloudfront-signing-key`.
+`/mimoza-<env>/apns-auth-key`, `/mimoza-<env>/apple-signin-key`,
+`/mimoza-<env>/cloudfront-signing-key`. The last two differ by one letter
+and are unrelated: `signin` is the Sign in with Apple key, `signing` the
+RSA key that signs blob URLs.
 
-**Where settings live**, now that there are three places they could:
+The Lambda's environment merges the tuning block with the `/config/*`
+parameters, prefix last (`modules/lambda/lambda.tf`), so nothing can
+override `RESOURCE_PREFIX` — every table, bucket and parameter path
+derives from it.
 
-| | |
-|---|---|
-| `envs/*/main.tf` (`settings`) | Tuning — blob size cap, invite retention, rate limits. In git, so a change is a reviewable diff, and applied by `terraform apply` alone. |
-| `<env>.env` → `push-config.sh` → SSM `/config/*` | Values only a human has: Google/Apple client IDs, APNs key/team/topic. |
-| SSM, written by Terraform | Things Terraform created that the Lambda can't be told directly — see *How the relay finds the CDN*. |
-
-The Lambda's environment is those first two merged, prefix last
-(`modules/lambda/lambda.tf`), so nothing can override `RESOURCE_PREFIX` —
-every table, bucket and parameter path derives from it.
-
-Shared across accounts: APNs `.p8` key, Google/Apple sign-in client IDs.
+Shared across accounts: the APNs `.p8` key, which is team-wide and works
+against both Apple's sandbox and production hosts. Everything else is
+per-environment, because it is tied to that environment's bundle id — the
+sign-in client IDs, `APNS_TOPIC`, and the Sign in with Apple key, whose
+primary App ID is the app it belongs to.
 
 Providers take `aws_profile` and `aws_account_id`, so applying with the
 wrong credentials fails instead of building in the wrong place. Neither is
@@ -186,11 +275,13 @@ dead phone leaves nothing to re-upload from. At $0.20/GB-month against
 tables holding ciphertext and metadata — the photos are in S3, not here —
 this is cents a month for years.
 
-**Open: blobs have no backup at all.** The bucket has neither versioning
-nor replication, so a deleted or corrupted photo is gone, and photos are
-the part of this product users would actually grieve. Versioning plus a
-lifecycle rule expiring old versions is the obvious answer; it is not
-built.
+**Blobs have no backup, and the obvious fix is ruled out.** Versioning is
+off deliberately (`modules/storage/s3.tf`): deleting a post, a circle or
+an account has to actually destroy the bytes, and versioning would lay
+delete markers over recoverable copies instead — the delete would appear
+to work while quietly keeping everything. So the gap is real, but closing
+it needs something that can tell "deleted on purpose" from "lost", which
+versioning cannot. Nothing here is built.
 
 ## Deploys
 
