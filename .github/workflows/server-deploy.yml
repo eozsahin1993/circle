@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   staging:
-    name: Staging
+    name: Deploy Staging
     runs-on: ubuntu-latest
     environment: staging
     # workflow_dispatch has no triggering run to inspect, so deploying by

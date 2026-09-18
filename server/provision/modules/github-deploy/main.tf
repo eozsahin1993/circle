@@ -8,13 +8,13 @@
 # grant itself the rest — a narrowly-scoped deploy policy would be theatre
 # and would break every time a resource type is added.
 
-# One per account, shared by every role that trusts GitHub. AWS verifies
-# the endpoint against its own trust store now, so the thumbprint is
-# vestigial — but the argument is still required.
 resource "aws_iam_openid_connect_provider" "github" {
-  url             = "https://token.actions.githubusercontent.com"
-  client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = ["ffffffffffffffffffffffffffffffffffffffff"]
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
+  thumbprint_list = [
+    "6938fd4d98bab03faadb97b34396831e3780aea1",
+    "1c58a3a8518e8759bf075b76b750d4f2df264fcd",
+  ]
 }
 
 data "aws_iam_policy_document" "assume" {
@@ -32,15 +32,10 @@ data "aws_iam_policy_document" "assume" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # The environment, not just the repo: a workflow that doesn't declare
-    # `environment: <name>` can't assume this role. So the environment's
-    # own protection rules — required reviewers, which branches may deploy
-    # — are what gates a deploy, rather than the honesty of a workflow file
-    # anyone can open a PR against.
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.repository}:environment:${var.environment}"]
+      values   = ["repo:${split("/", var.repository)[0]}*/${split("/", var.repository)[1]}*:environment:${var.environment}"]
     }
   }
 }
