@@ -40,7 +40,8 @@ export function PrimaryButton({ label, style, disabled, ...rest }: PrimaryButton
 
 const styles = StyleSheet.create({
   button: {
-    height: ButtonHeight.primary,
+    minHeight: ButtonHeight.primary,
+    paddingVertical: Space.s300,
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',

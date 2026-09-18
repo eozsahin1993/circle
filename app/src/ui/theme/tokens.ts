@@ -345,6 +345,13 @@ export const Spacing = {
   pinnedButtonFromBottom: Space.s700,
 } as const;
 
+/**
+ * A floor, not a fixed height — buttons pair `minHeight` with vertical
+ * padding. At the default text size every button is exactly this tall,
+ * which is what keeps the Apple and Google buttons identical where they
+ * stack; labels scale with Dynamic Type, though, and a fixed height would
+ * clip them rather than grow. Comfortably over the 44pt tap target.
+ */
 export const ButtonHeight = { primary: 52 } as const;
 
 /** Feed/detail posts: 4/5, edge to edge, no radius. Covers/memories: 16/9, radius = Radius.panel. */

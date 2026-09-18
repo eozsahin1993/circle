@@ -122,7 +122,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   button: {
-    height: ButtonHeight.primary,
+    minHeight: ButtonHeight.primary,
+    paddingVertical: Space.s300,
     borderRadius: Radius.pill,
     flexDirection: 'row',
     alignItems: 'center',

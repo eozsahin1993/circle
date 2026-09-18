@@ -29,7 +29,8 @@ export function SecondaryButton({ label, style, ...rest }: SecondaryButtonProps)
 
 const styles = StyleSheet.create({
   button: {
-    height: ButtonHeight.primary,
+    minHeight: ButtonHeight.primary,
+    paddingVertical: Space.s300,
     borderRadius: Radius.pill,
     borderWidth: 1,
     alignItems: 'center',
