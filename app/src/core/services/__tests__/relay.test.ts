@@ -47,6 +47,7 @@ describe('the relay address in development', () => {
   afterEach(() => {
     delete (Constants.expoConfig as { hostUri?: string }).hostUri;
     delete process.env.EXPO_PUBLIC_RELAY_PORT;
+    process.env.EXPO_PUBLIC_RELAY_URL = RELAY_URL;
   });
 
   test('follows the dev server, keeping the configured relay port', async () => {
@@ -57,6 +58,17 @@ describe('the relay address in development', () => {
     await fetchEpochs([]);
 
     expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe('http://192.168.0.126:8090/v1/epochs/peek');
+  });
+
+  // A staging build is a dev build with a packager attached.
+  test('keeps a non-loopback URL even with a dev server running', async () => {
+    (Constants.expoConfig as { hostUri?: string }).hostUri = '192.168.0.126:8081';
+    process.env.EXPO_PUBLIC_RELAY_URL = 'https://staging-api.joinmimoza.com';
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({ circles: [] }));
+
+    await fetchEpochs([]);
+
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe('https://staging-api.joinmimoza.com/v1/epochs/peek');
   });
 
   test('falls back to the configured URL when there is no dev server to ask', async () => {

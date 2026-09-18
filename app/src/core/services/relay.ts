@@ -33,14 +33,24 @@ function devHost(): string | null {
   }
 }
 
+/** Unset counts: both mean "wherever this machine is". */
+function isLoopback(url: string | undefined): boolean {
+  return !url || /^https?:\/\/(localhost|127\.0\.0\.1)([:/]|$)/.test(url);
+}
+
 /** Logged once per address: "could not connect" is unreadable without knowing what was dialled. */
 let announced: string | null = null;
 
 /**
- * The dev machine on `EXPO_PUBLIC_RELAY_PORT` while a packager is
- * serving, else `EXPO_PUBLIC_RELAY_URL`. Inferring the address is what
- * keeps a new DHCP lease from silently breaking every request — the port
- * is configuration, the address isn't.
+ * `EXPO_PUBLIC_RELAY_URL` when it is set, else the dev machine on
+ * `EXPO_PUBLIC_RELAY_PORT` while a packager is serving.
+ *
+ * A configured address wins even in a dev build — a staging build is
+ * still a dev build, and must not quietly reach localhost.
+ *
+ * Loopback is the exception: on a phone it means the phone. There the dev
+ * server's address is inferred, which also survives a new DHCP lease —
+ * the port is configuration, the address isn't.
  *
  * The Android emulator can't reach the host as `localhost` (that resolves
  * to the emulator); 10.0.2.2 is its alias for the host's loopback. Never
@@ -48,7 +58,7 @@ let announced: string | null = null;
  * would hang ~20s before the kernel gave up.
  */
 export function baseUrl(): string {
-  const host = __DEV__ ? devHost() : null;
+  const host = __DEV__ && isLoopback(process.env.EXPO_PUBLIC_RELAY_URL) ? devHost() : null;
   const configured = host ? `http://${host}:${DEV_RELAY_PORT}` : process.env.EXPO_PUBLIC_RELAY_URL;
   if (!configured) throw new Error('EXPO_PUBLIC_RELAY_URL is not set.');
 
