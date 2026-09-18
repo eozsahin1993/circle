@@ -13,20 +13,22 @@ on:
     workflows: [Server Tests]
     types: [completed]
     branches: [main]
+  push:
+    tags: ['server-v*']
   workflow_dispatch:
-
-# One deploy at a time, and never cancel one midway: Terraform holds a
-# state lock, and a killed apply leaves it held by a run that no longer
-# exists.
-concurrency:
-  group: deploy-staging
-  cancel-in-progress: false
 
 jobs:
   staging:
     name: Server Deploy Staging
     runs-on: ubuntu-latest
     environment: staging
+    # One deploy at a time per environment, and never cancel one midway:
+    # Terraform holds a state lock, and a killed apply leaves it held by a
+    # run that no longer exists. Grouped per environment so a release to
+    # prod doesn't queue behind a merge to main.
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
     # workflow_dispatch has no triggering run to inspect, so deploying by
     # hand stays possible.
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
@@ -85,4 +87,62 @@ jobs:
 
       - name: Show what it deployed
         working-directory: server/provision/envs/staging
+        run: terraform output api_endpoint
+
+  prod:
+    name: Server Deploy Prod
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    if: startsWith(github.ref, 'refs/tags/server-v')
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+
+      - name: Build the Lambda binary
+        run: ./provision/build.sh
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+
+      - name: Refuse to apply a half-configured environment
+        run: |
+          for name in AWS_ACCOUNT_ID ENV_DOMAIN; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set on the prod environment"
+              exit 1
+            fi
+          done
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          ENV_DOMAIN: ${{ secrets.ENV_DOMAIN }}
+
+      - name: Apply
+        working-directory: server/provision/envs/prod
+        env:
+          TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+          TF_VAR_env_domain: ${{ secrets.ENV_DOMAIN }}
+          TF_VAR_github_repository: ${{ github.repository }}
+          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+        run: |
+          terraform init -input=false
+          terraform apply -input=false -auto-approve
+
+      - name: Show what it deployed
+        working-directory: server/provision/envs/prod
         run: terraform output api_endpoint

@@ -103,5 +103,5 @@ module "github_deploy" {
 
   name_prefix = local.name_prefix
   repository  = var.github_repository
-  environment = "prod"
+  environment = "production"
 }
