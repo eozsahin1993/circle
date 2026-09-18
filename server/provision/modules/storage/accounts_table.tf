@@ -18,5 +18,9 @@ resource "aws_dynamodb_table" "accounts" {
     type = "S"
   }
 
+  point_in_time_recovery {
+    enabled = var.point_in_time_recovery
+  }
+
   deletion_protection_enabled = var.deletion_protection
 }

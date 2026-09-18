@@ -12,8 +12,8 @@ module "storage" {
   source      = "../../modules/storage"
   name_prefix = local.name_prefix
 
-  # Off until launch; turn on before real user data lands here.
-  deletion_protection = false
+  deletion_protection    = true
+  point_in_time_recovery = true
 }
 
 module "lambda" {

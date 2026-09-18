@@ -42,5 +42,9 @@ resource "aws_dynamodb_table" "sync_log" {
     enabled        = true
   }
 
+  point_in_time_recovery {
+    enabled = var.point_in_time_recovery
+  }
+
   deletion_protection_enabled = var.deletion_protection
 }

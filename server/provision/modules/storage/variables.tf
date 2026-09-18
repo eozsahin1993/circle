@@ -9,6 +9,12 @@ variable "deletion_protection" {
   default     = false
 }
 
+variable "point_in_time_recovery" {
+  description = "Continuous backups on the two tables holding data no one else can reconstruct — the sync log and accounts. Not snapshots: restoring builds a new table at a chosen second within the last 35 days, so it is disaster recovery, never row history. Off elsewhere; the ephemeral tables (sessions, invites, rate limit) are cheaper to lose than to back up."
+  type        = bool
+  default     = false
+}
+
 variable "blob_glacier_transition_days" {
   description = "Age at which S3 transitions a blob to Glacier Instant Retrieval (see s3.tf) — nothing expires on a timer, it is only tiered — a blob goes when its post is deleted (see internal/synclog/http/deleteblob). Defaults to Glacier IR's own 90-day minimum billable duration."
   type        = number
