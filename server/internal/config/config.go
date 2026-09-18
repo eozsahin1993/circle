@@ -91,7 +91,23 @@ type Config struct {
 	// AppleClientIDIOS is the accepted "aud" value for Sign in with Apple
 	// ID tokens — the app's iOS bundle ID. A Services ID would join this
 	// as a second named field if a web/Android Apple flow is ever added.
+	// Also the "sub" of the client secret internal/auth/appleid signs.
 	AppleClientIDIOS string
+	// AppleSignInKeyParameter is the SSM SecureString holding the Sign in
+	// with Apple .p8 key — the one account deletion revokes an Apple grant
+	// with. Same reasoning as FCMCredentialParameter: created by hand,
+	// never by Terraform. A different key from the APNs one above; the
+	// developer portal issues them separately and they aren't
+	// interchangeable.
+	AppleSignInKeyParameter string
+	// AppleSignInKeyFile is a local path read instead of SSM — for LocalStack.
+	AppleSignInKeyFile string
+	// AppleSignInKeyID identifies that key at Apple. AppleTeamID is the
+	// same team APNS_TEAM_ID names, kept a separate setting so one can be
+	// configured without the other. Both empty means revocation is off:
+	// deleting an account still works, it just leaves the Apple grant.
+	AppleSignInKeyID string
+	AppleTeamID      string
 	// BlobCDNSettingsParameter holds where the blob CDN is — base URL, key
 	// pair id, distribution id — as JSON. Written by modules/cdn rather
 	// than set here: the distribution needs the Lambda's function URL, so

@@ -12,6 +12,7 @@ import (
 	"mimoza-relay/internal/account/http/deleteaccount"
 	"mimoza-relay/internal/account/http/manifest"
 	"mimoza-relay/internal/auth"
+	"mimoza-relay/internal/auth/appleid"
 	"mimoza-relay/internal/auth/http/apple"
 	"mimoza-relay/internal/auth/http/google"
 	"mimoza-relay/internal/auth/http/logout"
@@ -65,7 +66,13 @@ type Deps struct {
 	ReadLimit  ratelimit.Store
 	Google     *oidcverify.Verifier
 	Apple      *oidcverify.Verifier
-	Push       PushDeps
+	// AppleID and AppleCredentials are nil unless this environment has a
+	// Sign in with Apple key configured — see appleid.NewClient. Without
+	// them, sign-in and deletion both still work; deletion just can't
+	// revoke the Apple grant behind the account (Guideline 5.1.1(v)).
+	AppleID          *appleid.Client
+	AppleCredentials auth.AppleCredentialStore
+	Push             PushDeps
 }
 
 func NewRouter(deps Deps) *http.ServeMux {
@@ -117,7 +124,12 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	accountMux := http.NewServeMux()
 	manifest.Register(accountMux, &manifest.Service{ManifestStore: deps.Manifest})
 	mux.Handle("/account/", auth.RequireSession(deps.Auth, httputil.LogRoutes(accountMux)))
-	deleteaccount.Register(mux, &deleteaccount.Service{ManifestStore: deps.Manifest, AuthStore: deps.Auth}, func(h http.Handler) http.Handler {
+	deleteAccountService := &deleteaccount.Service{ManifestStore: deps.Manifest, AuthStore: deps.Auth}
+	if deps.AppleID != nil {
+		deleteAccountService.AppleCredentials = deps.AppleCredentials
+		deleteAccountService.RevokeApple = deps.AppleID.Revoke
+	}
+	deleteaccount.Register(mux, deleteAccountService, func(h http.Handler) http.Handler {
 		return auth.RequireSession(deps.Auth, h)
 	})
 
@@ -159,7 +171,7 @@ func newV1Mux(deps Deps) *http.ServeMux {
 	}
 
 	google.Register(mux, &google.Service{AuthStore: deps.Auth, Verifier: deps.Google})
-	apple.Register(mux, &apple.Service{AuthStore: deps.Auth, Verifier: deps.Apple})
+	apple.Register(mux, &apple.Service{AuthStore: deps.Auth, Verifier: deps.Apple, AppleID: deps.AppleID, Credentials: deps.AppleCredentials})
 	logout.Register(mux, &logout.Service{AuthStore: deps.Auth})
 
 	return mux

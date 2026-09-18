@@ -16,6 +16,7 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"mimoza-relay/internal/api"
+	"mimoza-relay/internal/auth/appleid"
 	"mimoza-relay/internal/auth/oidcverify"
 	"mimoza-relay/internal/config"
 	"mimoza-relay/internal/push"
@@ -89,6 +90,18 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 		KeyParameter:      cfg.BlobCDNSigningKeyParameter,
 	}, awsCfg))
 
+	// Nil unless a Sign in with Apple key is configured — everything
+	// downstream treats that as "revocation is off" (see appleid.NewClient).
+	appleID := appleid.NewClient(awsCfg, cfg.AppleSignInKeyParameter, cfg.AppleSignInKeyFile, cfg.AppleSignInKeyID, cfg.AppleTeamID, cfg.AppleClientIDIOS)
+	// Said once at startup rather than per deletion: accepting Apple
+	// sign-ins without being able to revoke their grants is what fails
+	// App Store review (Guideline 5.1.1(v)), and the failure is otherwise
+	// invisible until someone deletes an account and checks Settings.
+	if appleID == nil && cfg.AppleClientIDIOS != "" {
+		slog.Warn("Sign in with Apple accepted, but deleting an account can't revoke its grant",
+			"reason", "apple_revocation_not_configured")
+	}
+
 	return api.Deps{
 		Log:        logdynamodb.New(dynamo(), cfg.TableName),
 		Blob:       blob,
@@ -99,6 +112,10 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 		ReadLimit:  limit("read", cfg.RateLimitReadMaxRequests),
 		Google:     oidcverify.New(googleIssuer, googleJWKSURL, nonEmpty(cfg.GoogleClientIDIOS, cfg.GoogleClientIDAndroid, cfg.GoogleClientIDWeb)),
 		Apple:      oidcverify.New(appleIssuer, appleJWKSURL, nonEmpty(cfg.AppleClientIDIOS)),
+		AppleID:    appleID,
+		// Shares the accounts table rather than taking one of its own —
+		// see auth/dynamodb's AppleCredentialStore for the key spacing.
+		AppleCredentials: authdynamodb.NewAppleCredentialStore(dynamo(), cfg.AccountsTableName),
 		Push: api.PushDeps{
 			Store:          pushdynamodb.New(dynamo(), cfg.PushTableName),
 			RecipientLimit: limit("push", cfg.RateLimitPushMaxRequests),

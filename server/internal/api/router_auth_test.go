@@ -36,6 +36,19 @@ func postSignIn(t *testing.T, serverURL, path, idToken string) *http.Response {
 	return resp
 }
 
+// postAppleSignIn is postSignIn plus the authorization code /auth/apple
+// requires. The code goes unspent here: these routers have no Sign in
+// with Apple key wired, so nothing tries to exchange it at Apple.
+func postAppleSignIn(t *testing.T, serverURL, idToken string) *http.Response {
+	t.Helper()
+	body := `{"idToken":"` + idToken + `","authorizationCode":"test-authorization-code"}`
+	resp, err := http.Post(serverURL+"/v1/auth/apple", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp
+}
+
 func decodeToken(t *testing.T, resp *http.Response) string {
 	t.Helper()
 	defer resp.Body.Close()
@@ -81,7 +94,7 @@ func TestEndToEnd_AppleSignIn(t *testing.T) {
 	claims["email_verified"] = "true"
 	idToken := apple.SignToken(t, claims)
 
-	resp := postSignIn(t, server.URL, "/v1/auth/apple", idToken)
+	resp := postAppleSignIn(t, server.URL, idToken)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -108,7 +121,7 @@ func TestEndToEnd_AppleSignIn_MissingEmailStillSucceeds(t *testing.T) {
 	}
 	idToken := apple.SignToken(t, claims)
 
-	resp := postSignIn(t, server.URL, "/v1/auth/apple", idToken)
+	resp := postAppleSignIn(t, server.URL, idToken)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -160,6 +173,28 @@ func TestEndToEnd_SignInWithMissingIDTokenReturns400(t *testing.T) {
 	defer server.Close()
 
 	resp, err := http.Post(server.URL+"/v1/auth/google", "application/json", strings.NewReader(`{"idToken":""}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+// Without the code there's nothing to revoke at deletion, which
+// Guideline 5.1.1(v) requires — so /auth/apple refuses the sign-in
+// outright rather than creating an account it can't fully delete.
+func TestEndToEnd_AppleSignInWithoutAnAuthorizationCodeReturns400(t *testing.T) {
+	mux, _, apple := testsupport.NewRouterWithAuth(t)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	claims := validClaims(t, testsupport.UniqueEmail(t), testsupport.TestAppleClientID)
+	claims["iss"] = apple.Issuer
+	idToken := apple.SignToken(t, claims)
+
+	resp, err := http.Post(server.URL+"/v1/auth/apple", "application/json", strings.NewReader(`{"idToken":"`+idToken+`"}`))
 	if err != nil {
 		t.Fatal(err)
 	}

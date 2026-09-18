@@ -28,7 +28,7 @@ set +a
 # the LocalStack switches that may sit in the same file.
 settings=(
   GOOGLE_CLIENT_ID_IOS GOOGLE_CLIENT_ID_ANDROID GOOGLE_CLIENT_ID_WEB
-  APPLE_CLIENT_ID_IOS
+  APPLE_CLIENT_ID_IOS APPLE_SIGNIN_KEY_ID APPLE_TEAM_ID
   APNS_KEY_ID APNS_TEAM_ID APNS_TOPIC APNS_PRODUCTION
 )
 
@@ -48,7 +48,7 @@ for key in "${settings[@]}"; do
   fi
 done
 
-for pair in FCM_CREDENTIAL_FILE=fcm-service-account APNS_AUTH_KEY_FILE=apns-auth-key; do
+for pair in FCM_CREDENTIAL_FILE=fcm-service-account APNS_AUTH_KEY_FILE=apns-auth-key APPLE_SIGNIN_KEY_FILE=apple-signin-key; do
   key="${pair%%=*}"
   name="/$RESOURCE_PREFIX/${pair#*=}"
   path="${!key:-}"

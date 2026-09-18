@@ -1,0 +1,74 @@
+package dynamodb
+
+import (
+	"context"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+
+	"mimoza-relay/internal/auth"
+	"mimoza-relay/internal/util/dynamoutil"
+)
+
+// applePKPrefix keeps these rows in their own key space inside whatever
+// table they share. They live in the accounts table, not the sessions
+// one, because sessions are TTL'd and these must outlive every session
+// the account ever has — but the account manifest is keyed on the bare
+// accountID, so the prefix is what stops the two colliding.
+const applePKPrefix = "apple-refresh#"
+
+// AppleCredentialStore implements auth.AppleCredentialStore against the
+// accounts table. Deliberately not folded into account.Store: what it
+// holds is a sign-in provider credential, which belongs to the auth
+// column even though it's account-keyed and shares that column's table.
+type AppleCredentialStore struct {
+	client    *dynamodb.Client
+	tableName string
+}
+
+func NewAppleCredentialStore(client *dynamodb.Client, tableName string) *AppleCredentialStore {
+	return &AppleCredentialStore{client: client, tableName: tableName}
+}
+
+var _ auth.AppleCredentialStore = (*AppleCredentialStore)(nil)
+
+func (s *AppleCredentialStore) key(accountID string) map[string]types.AttributeValue {
+	return map[string]types.AttributeValue{
+		dynamoutil.PKAttr: &types.AttributeValueMemberS{Value: applePKPrefix + accountID},
+	}
+}
+
+func (s *AppleCredentialStore) SaveAppleRefreshToken(ctx context.Context, accountID, refreshToken string) error {
+	item := s.key(accountID)
+	item["refreshToken"] = &types.AttributeValueMemberS{Value: refreshToken}
+	_, err := s.client.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(s.tableName),
+		Item:      item,
+	})
+	return err
+}
+
+func (s *AppleCredentialStore) GetAppleRefreshToken(ctx context.Context, accountID string) (string, error) {
+	out, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName:      aws.String(s.tableName),
+		Key:            s.key(accountID),
+		ConsistentRead: aws.Bool(true),
+	})
+	if err != nil {
+		return "", err
+	}
+	if out.Item == nil {
+		return "", nil
+	}
+	token, _ := dynamoutil.AttrString(out.Item, "refreshToken")
+	return token, nil
+}
+
+func (s *AppleCredentialStore) DeleteAppleRefreshToken(ctx context.Context, accountID string) error {
+	_, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(s.tableName),
+		Key:       s.key(accountID),
+	})
+	return err
+}

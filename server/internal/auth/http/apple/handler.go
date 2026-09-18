@@ -10,7 +10,8 @@ import (
 )
 
 type request struct {
-	IDToken string `json:"idToken"`
+	IDToken           string `json:"idToken"`
+	AuthorizationCode string `json:"authorizationCode"`
 }
 
 type response struct {
@@ -31,8 +32,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusBadRequest, "idToken is required")
 		return
 	}
+	if req.AuthorizationCode == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "authorizationCode is required")
+		return
+	}
 
-	token, err := h.Service.SignIn(r.Context(), req.IDToken)
+	token, err := h.Service.SignIn(r.Context(), req.IDToken, req.AuthorizationCode)
 	if err != nil {
 		slog.WarnContext(r.Context(), "sign-in failed",
 			"provider", "apple",

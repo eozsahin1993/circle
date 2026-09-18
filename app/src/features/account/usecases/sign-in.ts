@@ -113,7 +113,10 @@ export async function signInWithApple(): Promise<SignInResult> {
   if (!credential.identityToken) {
     throw new Error("Apple didn't return an identity token — try again.");
   }
-  const token = await relaySignInWithApple(credential.identityToken);
+  if (!credential.authorizationCode) {
+    throw new Error("Apple didn't return an authorization code — try again.");
+  }
+  const token = await relaySignInWithApple(credential.identityToken, credential.authorizationCode);
   await saveAuthToken(token);
 
   const suggestedName = [credential.fullName?.givenName, credential.fullName?.familyName].filter(Boolean).join(' ');

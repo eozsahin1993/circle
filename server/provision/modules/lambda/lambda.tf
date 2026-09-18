@@ -105,18 +105,20 @@ data "aws_iam_policy_document" "lambda_storage_access" {
     resources = [var.storage.bucket_arn]
   }
 
-  # The FCM service-account key and APNs auth key, created by hand at
-  # /<prefix>/fcm-service-account and /<prefix>/apns-auth-key (the paths
+  # The FCM service-account key, the APNs auth key and the Sign in with
+  # Apple key, created by hand at /<prefix>/fcm-service-account,
+  # /<prefix>/apns-auth-key and /<prefix>/apple-signin-key (the paths
   # internal/config derives) and deliberately not Terraform resources —
-  # declaring them would put the values in state. Scoped to the two
-  # parameters, not "*": either key can put arbitrary text on every
-  # user's lock screen.
+  # declaring them would put the values in state. Scoped to the named
+  # parameters, not "*": the push keys can put arbitrary text on every
+  # user's lock screen, and the sign-in key speaks for the app to Apple.
   statement {
     sid     = "PushCredentialAccess"
     actions = ["ssm:GetParameter"]
     resources = [
       "arn:aws:ssm:${var.aws_region}:*:parameter/${var.name_prefix}/fcm-service-account",
       "arn:aws:ssm:${var.aws_region}:*:parameter/${var.name_prefix}/apns-auth-key",
+      "arn:aws:ssm:${var.aws_region}:*:parameter/${var.name_prefix}/apple-signin-key",
       # Signs blob download URLs — see internal/synclog/cdn.
       "arn:aws:ssm:${var.aws_region}:*:parameter/${var.name_prefix}/cloudfront-signing-key",
     ]
