@@ -35,6 +35,7 @@ import (
 	"mimoza-relay/internal/synclog/http/getlog"
 	"mimoza-relay/internal/synclog/http/getuploadtarget"
 	"mimoza-relay/internal/synclog/http/rotatelog"
+	"mimoza-relay/internal/util/httputil"
 )
 
 // PushDeps groups the push slice's dependencies. A struct because
@@ -69,7 +70,10 @@ type Deps struct {
 
 func NewRouter(deps Deps) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.Handle("/v1/", http.StripPrefix("/v1", newV1Mux(deps)))
+	// Logging wraps the inner mux, not this one: the route pattern is set
+	// by whichever mux matched, and StripPrefix hands the inner one its own
+	// copy of the request — from out here every route would read "/v1/".
+	mux.Handle("/v1/", http.StripPrefix("/v1", httputil.LogRequests(newV1Mux(deps))))
 	return mux
 }
 

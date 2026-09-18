@@ -2,9 +2,10 @@ package apple
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 
+	"mimoza-relay/internal/auth/oidcverify"
 	"mimoza-relay/internal/util/httputil"
 )
 
@@ -33,8 +34,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	token, err := h.Service.SignIn(r.Context(), req.IDToken)
 	if err != nil {
-		// Client gets a generic 401; real reason is server-side only.
-		log.Printf("apple sign-in failed: %v", err)
+		slog.WarnContext(r.Context(), "sign-in failed",
+			"provider", "apple",
+			"reason", oidcverify.Reason(err),
+			"error", err)
 		httputil.WriteError(w, http.StatusUnauthorized, "invalid Apple sign-in")
 		return
 	}

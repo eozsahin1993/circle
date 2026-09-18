@@ -54,6 +54,40 @@ func (v *Verifier) VerifyAndGetClaims(rawToken string) (Claims, error) {
 // verifyAndGetClaims is split out from the method above purely so tests can
 // supply a fake keyFunc (a locally-generated RSA key signing a test token)
 // instead of needing a real network call to Google/Apple's JWKS endpoint.
+// The two failures a caller can act on, as sentinels rather than strings:
+// an audience mismatch means this environment's client ids and the app's
+// build disagree, which is a configuration problem, not a bad token.
+var (
+	ErrAudienceNotAccepted = errors.New("oidcverify: audience not accepted")
+	ErrNoSubject           = errors.New("oidcverify: token has no sub claim")
+)
+
+// Reason classifies a verification failure for logging: a small, fixed
+// vocabulary, so the log line can be filtered and counted rather than
+// grepped. Never includes the token or anything from it.
+func Reason(err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case errors.Is(err, ErrAudienceNotAccepted):
+		return "audience_mismatch"
+	case errors.Is(err, ErrNoSubject):
+		return "no_subject"
+	case errors.Is(err, jwt.ErrTokenExpired):
+		return "expired"
+	case errors.Is(err, jwt.ErrTokenSignatureInvalid):
+		return "bad_signature"
+	case errors.Is(err, jwt.ErrTokenInvalidIssuer):
+		return "issuer_mismatch"
+	case errors.Is(err, jwt.ErrTokenMalformed):
+		return "malformed"
+	case errors.Is(err, ErrKeysUnavailable):
+		return "provider_unreachable"
+	default:
+		return "unknown"
+	}
+}
+
 func verifyAndGetClaims(rawToken string, keyFunc jwt.Keyfunc, issuer string, audiences map[string]struct{}) (Claims, error) {
 	// RS256 only — restricting accepted algorithms up front is standard
 	// defense against JWT algorithm-confusion attacks (e.g. an attacker
@@ -74,12 +108,12 @@ func verifyAndGetClaims(rawToken string, keyFunc jwt.Keyfunc, issuer string, aud
 	}
 
 	if !audienceAccepted(claims, audiences) {
-		return Claims{}, errors.New("oidcverify: audience not accepted")
+		return Claims{}, ErrAudienceNotAccepted
 	}
 
 	sub, _ := claims["sub"].(string)
 	if sub == "" {
-		return Claims{}, errors.New("oidcverify: token has no sub claim")
+		return Claims{}, ErrNoSubject
 	}
 
 	return Claims{Sub: sub}, nil

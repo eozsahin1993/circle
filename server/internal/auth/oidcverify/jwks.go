@@ -44,6 +44,10 @@ type jwks struct {
 	fetchedAt time.Time
 }
 
+// The provider's own key endpoint being unreachable is not a bad token —
+// it is an outage, and every sign-in fails until it clears.
+var ErrKeysUnavailable = errors.New("oidcverify: signing keys unavailable")
+
 func newJWKS(url string) *jwks {
 	return &jwks{url: url}
 }
@@ -89,11 +93,11 @@ func (j *jwks) get() (map[string]*rsa.PublicKey, error) {
 func fetchJWKS(url string) (map[string]*rsa.PublicKey, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("oidcverify: fetching JWKS: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrKeysUnavailable, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("oidcverify: JWKS fetch returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("%w: status %d", ErrKeysUnavailable, resp.StatusCode)
 	}
 	var parsed jwksResponse
 	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {

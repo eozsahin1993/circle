@@ -6,7 +6,9 @@ package app
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -40,6 +42,20 @@ const (
 // New returns the relay's handler, wired to real DynamoDB and S3 from the
 // ambient AWS configuration. Returns an error rather than exiting, so a
 // caller that isn't a `main` — a test, say — gets to decide.
+// SetUpLogging installs the process-wide logger: JSON, because CloudWatch
+// filters and metric filters read fields ({ $.reason = "..." }) and can
+// only pattern-match a sentence.
+//
+// Called by the cmd/ entry points before anything else, so a failure while
+// building the relay is logged the same way as everything after it.
+func SetUpLogging(level string) {
+	var parsed slog.Level
+	if err := parsed.UnmarshalText([]byte(level)); err != nil {
+		parsed = slog.LevelInfo
+	}
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: parsed})))
+}
+
 func New(ctx context.Context, cfg config.Config) (*http.ServeMux, error) {
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx)
 	if err != nil {

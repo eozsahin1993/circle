@@ -114,6 +114,9 @@ type Config struct {
 	// (see provision/modules/storage/dynamodb.tf), not this process — this
 	// only controls what expiresAt gets written as.
 	InviteRetentionDays int64
+	// LogLevel is debug|info|warn|error — info in deployed environments,
+	// debug locally where the volume costs nothing and the detail helps.
+	LogLevel string
 	// Port is only used by cmd/server (cmd/lambda doesn't listen on a port).
 	Port string
 	// S3ForcePathStyle is only ever true for local testing against
@@ -161,6 +164,7 @@ func Load() Config {
 		BlobCDNSigningKeyParameter: "/" + prefix + "/cloudfront-signing-key",
 		MaxBlobSize:                intEnv("MAX_BLOB_SIZE_BYTES", 0),
 		InviteRetentionDays:        intEnv("INVITE_RETENTION_DAYS", 0),
+		LogLevel:                   envOr("LOG_LEVEL", "info"),
 		Port:                       envOr("PORT", "8080"),
 		S3ForcePathStyle:           envOr("S3_FORCE_PATH_STYLE", "false") == "true",
 		AWSEndpointURL:             os.Getenv("AWS_ENDPOINT_URL"),

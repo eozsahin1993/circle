@@ -17,6 +17,7 @@ import (
 
 func main() {
 	cfg := config.Load()
+	app.SetUpLogging(cfg.LogLevel)
 
 	handler, err := app.New(context.Background(), cfg)
 	if err != nil {
