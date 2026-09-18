@@ -26,21 +26,19 @@ function iosUrlScheme() {
  * server/.env.example and docs/INFRASTRUCTURE.md.
  */
 const ENVIRONMENTS = {
-  local: {},
+  dev: {},
   production: {},
   staging: {
     nameSuffix: ' Staging',
     idSuffix: '.staging',
     scheme: 'mimoza-staging',
-    // The same corner ribbon the app draws over its screens, so a home
-    // screen says which build it is too.
     icon: './assets/images/icon-staging.png',
     androidForeground: './assets/images/android-icon-foreground-staging.png',
   },
 };
 
 module.exports = ({ config }) => {
-  const name = process.env.APP_ENV || 'local';
+  const name = process.env.APP_ENV || 'dev';
   const env = ENVIRONMENTS[name];
   if (!env) {
     throw new Error(`APP_ENV=${name} is not an environment (${Object.keys(ENVIRONMENTS).join(', ')})`);
@@ -73,9 +71,6 @@ module.exports = ({ config }) => {
         foregroundImage: env.androidForeground ?? config.android.adaptiveIcon.foregroundImage,
       },
       package: `${config.android.package}${env.idSuffix}`,
-      // One file per environment, so a build can only ever carry the
-      // Firebase config it is meant to — a shared file works (the SDK
-      // picks the client matching the running package) but ships both.
       googleServicesFile: './google-services.staging.json',
     },
   }, name));
@@ -85,10 +80,10 @@ module.exports = ({ config }) => {
  * Refuses to build an environment against the wrong relay.
  *
  * EXPO_PUBLIC_* values are inlined by Metro, so a bundler started without
- * the environment's own file quietly compiles in whatever .env.local said
- * — producing a staging app, with staging's bundle id, talking to
- * localhost. The relay then rejects every token for an audience it
- * doesn't expect, which reads like a sign-in bug rather than a build one.
+ * the environment's own file quietly compiles in dev's relay — producing
+ * a staging app, with staging's bundle id, talking to localhost. The
+ * relay then rejects every token for an audience it doesn't expect, which
+ * reads like a sign-in bug rather than a build one.
  */
 function requireEnvironment(name, env) {
   if (!env.idSuffix) return;

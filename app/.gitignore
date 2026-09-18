@@ -30,8 +30,9 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# Every env file but the template: .env, .env.local, .env.staging, and
-# whatever comes next.
+# Every env file but the template: .env.dev, .env.staging, and whatever
+# comes next. Never .env or .env.local — Expo loads those itself, on top
+# of the file a script passed in, so their values end up in every build.
 .env*
 !.env.example
 
