@@ -57,15 +57,19 @@ module "cdn" {
   blob_bucket_regional_domain_name = module.storage.bucket_regional_domain_name
 }
 
-module "billing_alarm" {
-  count  = var.billing_alert_email == "" ? 0 : 1
-  source = "../../modules/billing-alarm"
+module "alarms" {
+  source = "../../modules/alarms"
 
   providers = {
+    aws           = aws
     aws.us_east_1 = aws.us_east_1
   }
 
   name_prefix   = local.name_prefix
-  alert_email   = var.billing_alert_email
-  threshold_usd = var.billing_threshold_usd
+  aws_region    = local.aws_region
+  alert_email   = var.alert_email
+  function_name = module.lambda.function_name
+  table_names   = module.storage.table_names
+
+  billing_threshold_usd = var.billing_threshold_usd
 }

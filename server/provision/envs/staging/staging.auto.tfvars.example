@@ -9,9 +9,9 @@
 aws_profile    = "mimoza-staging-admin"
 aws_account_id = ""
 
-# Where the billing alarm mails. Empty means no alarm — AWS has no spending
-# cap, so set it.
-billing_alert_email   = ""
+# Where alarms mail — billing, throttles, errors, latency. Empty means
+# none, and for billing that matters: AWS has no spending cap.
+alert_email           = ""
 billing_threshold_usd = 20
 
 # Set once the account exists and DNS is ready; empty leaves the raw

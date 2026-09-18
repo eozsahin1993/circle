@@ -28,8 +28,8 @@ variable "blob_signing_public_key" {
   default     = ""
 }
 
-variable "billing_alert_email" {
-  description = "Where the billing alarm mails. Empty leaves the account with no alarm — AWS has no spending cap, so set it."
+variable "alert_email" {
+  description = "Where alarms mail — billing, and the relay's own throttles, errors and latency. Empty creates none of them, which for billing matters: AWS has no spending cap."
   type        = string
   default     = ""
 }

@@ -57,3 +57,15 @@ output "push_table_name" {
 output "push_table_arn" {
   value = aws_dynamodb_table.push.arn
 }
+
+output "table_names" {
+  description = "Every table, for alarms that watch the lot."
+  value = [
+    aws_dynamodb_table.sync_log.name,
+    aws_dynamodb_table.invites.name,
+    aws_dynamodb_table.sessions.name,
+    aws_dynamodb_table.accounts.name,
+    aws_dynamodb_table.rate_limit.name,
+    aws_dynamodb_table.push.name,
+  ]
+}
