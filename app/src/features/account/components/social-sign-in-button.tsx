@@ -54,7 +54,14 @@ function SocialButton({ label, icon, contentColor, fillStyle, disabled, ...rest 
             see photo-placeholder.tsx.
           */}
           <View style={styles.icon}>{icon}</View>
-          <ThemedText type="labelLarge" style={{ color: contentColor }}>
+          {/* flexShrink so a long label truncates against the icon rather than
+              pushing past the button's edge. */}
+          <ThemedText
+            type="labelLarge"
+            style={{ color: contentColor, flexShrink: 1 }}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}>
             {label}
           </ThemedText>
         </View>
