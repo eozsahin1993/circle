@@ -17,3 +17,8 @@ billing_threshold_usd = 20
 # Set once the account exists and DNS is ready; empty leaves the raw
 # function URL. See docs/INFRASTRUCTURE.md.
 # api_domain = "api.mimoza.app"
+
+# -1 until the account's Lambda concurrency quota is raised above the
+# new-account default of 10 (Service Quotas → Lambda → Concurrent
+# executions). That cap bounds spend on its own meanwhile.
+reserved_concurrency = -1

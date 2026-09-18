@@ -39,3 +39,9 @@ variable "billing_threshold_usd" {
   type        = number
   default     = 20
 }
+
+variable "reserved_concurrency" {
+  description = "Ceiling on concurrent relay executions. -1 leaves it unset, which a new account needs: the default account limit is 10 and AWS refuses to let reservations drop the unreserved pool below 10."
+  type        = number
+  default     = 50
+}

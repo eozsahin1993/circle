@@ -31,3 +31,15 @@ resource "aws_lambda_permission" "function_url" {
   principal              = "*"
   function_url_auth_type = "NONE"
 }
+
+# Both actions are required for an unauthenticated URL: with only
+# InvokeFunctionUrl granted, every request comes back 403
+# AccessDeniedException and the function is never reached, so there is
+# nothing in its logs to explain why.
+resource "aws_lambda_permission" "function_url_invoke" {
+  count         = var.behind_cloudfront ? 0 : 1
+  statement_id  = "AllowFunctionUrlInvokeFunction"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.relay.function_name
+  principal     = "*"
+}
