@@ -1,7 +1,8 @@
 {
   "common": {
     "cancel": "Abbrechen",
-    "settingNotSaved": "Die Einstellung konnte nicht gespeichert werden"
+    "settingNotSaved": "Die Einstellung konnte nicht gespeichert werden",
+    "sessionExpired": "Deine Sitzung ist abgelaufen"
   },
   "settings": {
     "title": "Dein Konto",

@@ -1,7 +1,8 @@
 {
   "common": {
     "cancel": "Annuler",
-    "settingNotSaved": "Impossible d’enregistrer ce réglage"
+    "settingNotSaved": "Impossible d’enregistrer ce réglage",
+    "sessionExpired": "Ta session a expiré"
   },
   "settings": {
     "title": "Ton compte",

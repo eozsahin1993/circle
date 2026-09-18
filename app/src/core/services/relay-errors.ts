@@ -7,6 +7,20 @@
  * catch it.
  */
 
+/**
+ * Thrown on HTTP 401: the relay no longer accepts this device's session.
+ * Expiry is the ordinary cause — sessions last 90 days and nothing
+ * renews them — deleting the account elsewhere the other. Callers needn't
+ * catch it: `authorizedFetch` has already dropped the token and sent the
+ * person back to sign in by the time this surfaces.
+ */
+export class SessionExpiredError extends Error {
+  constructor() {
+    super('Your session ended — sign in again.');
+    this.name = 'SessionExpiredError';
+  }
+}
+
 /** Thrown on HTTP 429 (see server/internal/api/ratelimit) — not handled specially, just identifiable in logs. Callers already retry any thrown error later (outbox, pullMeta, photo-queue.ts), and the budget is sized to make this rare. */
 export class RateLimitedError extends Error {
   constructor() {

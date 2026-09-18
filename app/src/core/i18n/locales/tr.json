@@ -1,7 +1,8 @@
 {
   "common": {
     "cancel": "İptal",
-    "settingNotSaved": "Ayar kaydedilemedi"
+    "settingNotSaved": "Ayar kaydedilemedi",
+    "sessionExpired": "Oturumun sona erdi"
   },
   "settings": {
     "title": "Hesabın",

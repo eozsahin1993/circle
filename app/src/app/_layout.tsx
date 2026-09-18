@@ -15,6 +15,7 @@ import { startPushHandling } from '@/features/push-notifications/services/task';
 import { startPushTapRouting } from '@/features/push-notifications/services/tap';
 import { AppSettingsProvider, useAppSettings } from '@/ui/theme/hooks/use-app-settings';
 import { useMessages } from '@/core/hooks/use-messages';
+import { useSessionExpiry } from '@/core/hooks/use-session-expiry';
 import { getAppSettings, type AppSettings } from '@/core/services/settings';
 import { applyLanguage } from '@/core/i18n/i18n';
 import { startJankMonitor } from '@/core/utils/timing';
@@ -68,6 +69,7 @@ const MimozaLightTheme = {
 function AppShell() {
   const { scheme } = useAppSettings();
   const { message, visible, dismiss, settle } = useMessages();
+  useSessionExpiry();
 
   return (
     <ThemeProvider value={scheme === 'dark' ? MimozaDarkTheme : MimozaLightTheme}>

@@ -14,14 +14,17 @@ jest.mock('expo-file-system', () => ({
 jest.mock('expo-constants', () => ({ __esModule: true, default: { expoConfig: {} } }));
 
 const mockGetAuthToken = jest.fn();
+const mockDeleteAuthToken = jest.fn();
 jest.mock('@/core/services/keystore/auth-token', () => ({
   getAuthToken: () => mockGetAuthToken(),
+  deleteAuthToken: () => mockDeleteAuthToken(),
 }));
 
 import Constants from 'expo-constants';
 import { bytesToHex } from '@noble/curves/utils.js';
 
-import { BlobAlreadyExistsError, RateLimitedError } from '@/core/services/relay-errors';
+import { BlobAlreadyExistsError, RateLimitedError, SessionExpiredError } from '@/core/services/relay-errors';
+import { setSessionExpiredListener } from '@/core/services/session';
 import { appendEntry, bootstrapCircle, fetchEntries, fetchEpochs, rotateLog } from '@/core/services/log-relay';
 import { getBlob, getCoverPhotoUploadTarget, getUploadTarget, uploadBlob } from '@/core/services/blob-relay';
 
@@ -77,6 +80,54 @@ describe('the relay address in development', () => {
     await fetchEpochs([]);
 
     expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe(`${RELAY_URL}/v1/epochs/peek`);
+  });
+});
+
+/**
+ * Sessions last 90 days and nothing renews them, so every device still
+ * installed by then gets a 401 on its next sync — the token has to go,
+ * and someone has to be told, or the app just stops working quietly.
+ */
+describe('a 401 from the relay', () => {
+  afterEach(() => setSessionExpiredListener(null));
+
+  test('drops the dead token and reports the session gone', async () => {
+    const expired = jest.fn();
+    setSessionExpiredListener(expired);
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 401));
+
+    await expect(fetchEntries('sync-a', 'content', 0)).rejects.toBeInstanceOf(SessionExpiredError);
+
+    expect(mockDeleteAuthToken).toHaveBeenCalled();
+    expect(expired).toHaveBeenCalledTimes(1);
+  });
+
+  // A sync pass fans out across circles, so the 401s land together.
+  test('reports once however many requests fail at the same time', async () => {
+    const expired = jest.fn();
+    setSessionExpiredListener(expired);
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 401));
+
+    await Promise.allSettled([
+      fetchEntries('sync-a', 'content', 0),
+      fetchEntries('sync-b', 'content', 0),
+      fetchEntries('sync-c', 'content', 0),
+    ]);
+
+    expect(expired).toHaveBeenCalledTimes(1);
+  });
+
+  // Anything else keeps its own meaning — 429 is the relay throttling a
+  // live session, not disowning it.
+  test('leaves other failures alone', async () => {
+    const expired = jest.fn();
+    setSessionExpiredListener(expired);
+    (global.fetch as jest.Mock).mockResolvedValue(jsonResponse({}, false, 429));
+
+    await expect(fetchEntries('sync-a', 'content', 0)).rejects.toBeInstanceOf(RateLimitedError);
+
+    expect(mockDeleteAuthToken).not.toHaveBeenCalled();
+    expect(expired).not.toHaveBeenCalled();
   });
 });
 

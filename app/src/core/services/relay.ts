@@ -3,6 +3,8 @@ import * as Device from 'expo-device';
 import { NativeModules, Platform } from 'react-native';
 
 import { getAuthToken } from '@/core/services/keystore/auth-token';
+import { SessionExpiredError } from '@/core/services/relay-errors';
+import { noteSessionExpired } from '@/core/services/session';
 
 /**
  * Where the relay is and how to reach it with a session attached. The
@@ -95,14 +97,26 @@ export async function describeError(response: Response, summary: string): Promis
 /**
  * fetch with the stored session token attached — every circle-log route
  * requires one (server's auth.RequireSession).
+ *
+ * A 401 is handled here rather than left to callers: the relay only ever
+ * means one thing by it (`RequireSession` answers missing, invalid and
+ * expired alike), most callers are background sync passes with no way to
+ * ask anyone to sign in, and a token the relay has stopped accepting is
+ * worth nothing to whoever asks next. The sign-in routes don't come
+ * through here, so their own 401 can't be mistaken for this one.
  */
 export async function authorizedFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const token = await getAuthToken();
   if (!token) {
     throw new Error('Not signed in.');
   }
-  return fetch(`${baseUrl()}${path}`, {
+  const response = await fetch(`${baseUrl()}${path}`, {
     ...init,
     headers: { ...init.headers, Authorization: `Bearer ${token}` },
   });
+  if (response.status === 401) {
+    await noteSessionExpired();
+    throw new SessionExpiredError();
+  }
+  return response;
 }

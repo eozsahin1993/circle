@@ -1,7 +1,8 @@
 {
   "common": {
     "cancel": "Cancel",
-    "settingNotSaved": "Could not save that setting"
+    "settingNotSaved": "Could not save that setting",
+    "sessionExpired": "Your session expired"
   },
   "settings": {
     "title": "Your account",
