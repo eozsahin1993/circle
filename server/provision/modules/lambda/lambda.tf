@@ -48,28 +48,47 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
 # action here passes every local test and only fails once deployed:
 # re-check against the store when one gains a call.
 data "aws_iam_policy_document" "lambda_storage_access" {
-  # internal/synclog/dynamodb. The index ARN is for DeleteEntry's
-  # entryId-index lookup.
+  # Every table, item-level only: no Scan (nothing enumerates a table —
+  # deletes paginate a Query instead, see delete_circle.go), and no
+  # table-level actions, so a compromised relay cannot drop or reconfigure
+  # the store it reads. Index ARNs cover the two GSIs (DeleteEntry's
+  # entryId lookup, DeleteAllSessions' accountId lookup).
+  #
+  # LocalStack doesn't enforce IAM, so a missing action here passes every
+  # local test and only fails once deployed.
   statement {
-    sid = "SyncLogTableAccess"
+    sid = "TableAccess"
     actions = [
       "dynamodb:GetItem",
       "dynamodb:PutItem",
       "dynamodb:UpdateItem",
+      "dynamodb:DeleteItem",
       "dynamodb:Query",
       "dynamodb:BatchGetItem",
       "dynamodb:BatchWriteItem",
+      # Only the sync log needs cross-item atomicity, but scoping one
+      # action to one table is the precision this statement gave up.
       "dynamodb:TransactWriteItems",
     ]
-    resources = [var.storage.table_arn, "${var.storage.table_arn}/index/*"]
+    resources = flatten([
+      for arn in [
+        var.storage.table_arn,
+        var.storage.sessions_table_arn,
+        var.storage.accounts_table_arn,
+        var.storage.invite_table_arn,
+        var.storage.rate_limit_table_arn,
+        var.storage.push_table_arn,
+      ] : [arn, "${arn}/index/*"]
+    ])
   }
 
   statement {
-    sid = "S3Access"
+    sid = "BlobAccess"
     actions = [
+      # HeadObject as well as reads: the upload path checks for an
+      # existing object, and deleteblob reads back the uploader recorded
+      # on it.
       "s3:PutObject",
-      # HeadObject as well as reads: the upload path checks for an existing
-      # object, and deleteblob reads back the uploader recorded on it.
       "s3:GetObject",
       # A post's ciphertext, one at a time or in DeleteObjects batches —
       # never a log entry (see internal/synclog/http/deleteblob).
@@ -81,71 +100,9 @@ data "aws_iam_policy_document" "lambda_storage_access" {
   # Deleting a circle lists everything under its prefix first — a
   # bucket-level action, so it can't share the object ARN above.
   statement {
-    sid       = "S3ListAccess"
+    sid       = "BlobListAccess"
     actions   = ["s3:ListBucket"]
     resources = [var.storage.bucket_arn]
-  }
-
-  # internal/auth/dynamodb. Query on accountId-index is DeleteAllSessions,
-  # which account deletion uses to revoke every session at once.
-  statement {
-    sid = "SessionsTableAccess"
-    actions = [
-      "dynamodb:GetItem",
-      "dynamodb:PutItem",
-      "dynamodb:DeleteItem",
-      "dynamodb:Query",
-    ]
-    resources = [var.storage.sessions_table_arn, "${var.storage.sessions_table_arn}/index/*"]
-  }
-
-  # internal/account/dynamodb — DeleteItem is account deletion.
-  statement {
-    sid = "AccountsTableAccess"
-    actions = [
-      "dynamodb:GetItem",
-      "dynamodb:PutItem",
-      "dynamodb:DeleteItem",
-    ]
-    resources = [var.storage.accounts_table_arn]
-  }
-
-  # internal/invite/dynamodb. DeleteItem is for "not now" dismissal only —
-  # most rows still just age out under TTL. No TransactWriteItems (unlike
-  # sync_log, nothing here needs cross-item atomicity).
-  statement {
-    sid = "InviteTableAccess"
-    actions = [
-      "dynamodb:GetItem",
-      "dynamodb:PutItem",
-      "dynamodb:UpdateItem",
-      "dynamodb:DeleteItem",
-      "dynamodb:Query",
-    ]
-    resources = [var.storage.invite_table_arn]
-  }
-
-  # internal/ratelimit/dynamodb — Allow's two-attempt CAS is entirely
-  # UpdateItem, no GetItem.
-  statement {
-    sid       = "RateLimitTableAccess"
-    actions   = ["dynamodb:UpdateItem"]
-    resources = [var.storage.rate_limit_table_arn]
-  }
-
-  # internal/push/dynamodb. UpdateItem is SetSilenced. No Scan — nothing
-  # here ever enumerates the table, which is also what keeps a full read
-  # of it off the hot path.
-  statement {
-    sid = "PushTableAccess"
-    actions = [
-      "dynamodb:PutItem",
-      "dynamodb:GetItem",
-      "dynamodb:UpdateItem",
-      "dynamodb:Query",
-      "dynamodb:DeleteItem",
-    ]
-    resources = [var.storage.push_table_arn]
   }
 
   # The FCM service-account key and APNs auth key, created by hand at
