@@ -78,6 +78,11 @@ account. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
 
 ## Store listings
 
+- [ ] **The website, carrying the three pages the stores need.**
+      `joinmimoza.com` is registered but has no DNS records, so nothing
+      resolves today. One deploy covers the privacy policy, the support
+      contact and the Play deletion page — the three items below are one
+      piece of work, not three.
 - [ ] Privacy policy, publicly hosted. Required by both, and the App
       Privacy / Data safety answers must match it.
 - [ ] Support contact — URL or email, required by both.

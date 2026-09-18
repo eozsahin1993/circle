@@ -14,6 +14,8 @@ to double as both a map of the code and a design history.
   fanout, on-device composition.
 - [INFRASTRUCTURE.md](INFRASTRUCTURE.md) — accounts, environments, the
   CloudFront front door, blob delivery, deploys, cost.
+- [STAGING_CHECKLIST.md](STAGING_CHECKLIST.md) — cutting an internal
+  build: what to run, and what a wrong-environment build looks like.
 - [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md) — what stands between here
   and both stores, and which items cost waiting rather than work.
 
