@@ -55,10 +55,18 @@ we control before any build ships to a real user.
   `AllViewerExceptHostHeader` — the relay serves per-user encrypted data,
   so nothing here is cached. Blobs are the opposite; see below.
 - DNS at Cloudflare, **"DNS only"**. Proxying would stack two CDNs.
-- **The function URL is locked to the distribution** (origin access
-  control, `AWS_IAM`), so nobody can dial the Lambda directly and bypass
-  the CDN — or the WAF that may sit on it later. It stays unsigned while
-  `api_domain` is empty: there is nothing to sign the requests.
+- **The function URL stays publicly callable** (`lock_function_url =
+  false`). Origin access control is built and can be switched on, but
+  Lambda rejects unsigned payloads: every POST/PUT would have to carry
+  `x-amz-content-sha256` with the body's hash, put there by the client.
+  An edge function can't — it never sees the body. Making the app aware of
+  how its origin is protected is the wrong contract, so the lock is off.
+  The hostname is 32 random characters and isn't in certificate
+  transparency (Lambda serves it under a wildcard), so it is obscurity,
+  not access control — what's behind it is the same bearer-token auth.
+  **If bypass ever matters** (a WAF worth enforcing, say), the fix is API
+  Gateway in place of the function URL: the Lambda stops being publicly
+  reachable and nothing is asked of the client, for ~$1/M requests.
 - Free tier covers it: 1 TB out, 10M requests/month, permanent.
 
 Sync payloads still gain from the nearby TLS handshake and the AWS
