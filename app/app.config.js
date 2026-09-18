@@ -29,7 +29,7 @@ const ENVIRONMENTS = {
   local: {},
   production: {},
   staging: {
-    nameSuffix: ' (Staging)',
+    nameSuffix: ' Staging',
     idSuffix: '.staging',
     scheme: 'mimoza-staging',
   },
@@ -41,6 +41,8 @@ module.exports = ({ config }) => {
   if (!env) {
     throw new Error(`APP_ENV=${name} is not an environment (${Object.keys(ENVIRONMENTS).join(', ')})`);
   }
+  requireEnvironment(name, env);
+
   if (!env.idSuffix) return withGoogleScheme(withEnv(config, name));
 
   const bundleIdentifier = `${config.ios.bundleIdentifier}${env.idSuffix}`;
@@ -50,8 +52,10 @@ module.exports = ({ config }) => {
     ...config,
     name: `${config.name}${env.nameSuffix}`,
     scheme: env.scheme,
+    icon: env.icon,
     ios: {
       ...config.ios,
+      icon: env.icon,
       bundleIdentifier,
       entitlements: {
         ...config.ios.entitlements,
@@ -60,6 +64,7 @@ module.exports = ({ config }) => {
     },
     android: {
       ...config.android,
+      adaptiveIcon: { ...config.android.adaptiveIcon, foregroundImage: env.androidForeground },
       package: `${config.android.package}${env.idSuffix}`,
       // One file per environment, so a build can only ever carry the
       // Firebase config it is meant to — a shared file works (the SDK
@@ -68,6 +73,27 @@ module.exports = ({ config }) => {
     },
   }, name));
 };
+
+/**
+ * Refuses to build an environment against the wrong relay.
+ *
+ * EXPO_PUBLIC_* values are inlined by Metro, so a bundler started without
+ * the environment's own file quietly compiles in whatever .env.local said
+ * — producing a staging app, with staging's bundle id, talking to
+ * localhost. The relay then rejects every token for an audience it
+ * doesn't expect, which reads like a sign-in bug rather than a build one.
+ */
+function requireEnvironment(name, env) {
+  if (!env.idSuffix) return;
+
+  const relay = process.env.EXPO_PUBLIC_RELAY_URL;
+  if (!relay) {
+    throw new Error(`APP_ENV=${name} needs EXPO_PUBLIC_RELAY_URL — run \`npm run start:${name}\` (or ios:${name}), which loads .env.${name}.`);
+  }
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)([:/]|$)/.test(relay)) {
+    throw new Error(`APP_ENV=${name} is pointed at ${relay}. A bundler started without .env.${name} inlines the local relay; stop it and run \`npm run start:${name}\`.`);
+  }
+}
 
 // Readable at runtime through Constants.expoConfig.extra, so the app can
 // say which environment it is — see ui/components/env-badge.tsx. A build

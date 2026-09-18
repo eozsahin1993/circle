@@ -76,6 +76,8 @@
   },
   "scripts": {
     "start": "expo start",
+    "start:staging": "dotenv -e .env.staging -- expo start --clear",
+    "start:prod": "dotenv -e .env.production -- expo start --clear",
     "reset-project": "node ./scripts/reset-project.js",
     "prebuild": "expo prebuild --clean",
     "prebuild:staging": "dotenv -e .env.staging -- expo prebuild --clean",
