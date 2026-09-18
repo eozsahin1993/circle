@@ -12,9 +12,67 @@ function iosUrlScheme() {
   return `com.googleusercontent.apps.${clientId.slice(0, -suffix.length)}`;
 }
 
-module.exports = ({ config }) => ({
-  ...config,
-  plugins: config.plugins.map((plugin) =>
-    plugin === GOOGLE_SIGN_IN ? [GOOGLE_SIGN_IN, { iosUrlScheme: iosUrlScheme() }] : plugin,
-  ),
-});
+/**
+ * Staging is a separate app, not a flag inside one: its own bundle id,
+ * name, scheme and App Group, so both can be installed side by side.
+ *
+ * The App Group is the part that matters most. It backs the shared
+ * Keychain (keystore.ts) and the notification extension's snapshot
+ * (push-snapshot.ts), so one group across both apps would mean staging
+ * reading prod's master seed and circles.
+ *
+ * APNs topics are bundle ids, and Google/Apple OAuth clients are tied to
+ * them too, so an environment's relay config has to match this — see
+ * server/.env.example and docs/INFRASTRUCTURE.md.
+ */
+const ENVIRONMENTS = {
+  production: {},
+  staging: {
+    nameSuffix: ' (Staging)',
+    idSuffix: '.staging',
+    scheme: 'mimoza-staging',
+  },
+};
+
+module.exports = ({ config }) => {
+  const name = process.env.APP_ENV ?? 'production';
+  const env = ENVIRONMENTS[name];
+  if (!env) {
+    throw new Error(`APP_ENV=${name} is not an environment (${Object.keys(ENVIRONMENTS).join(', ')})`);
+  }
+  if (!env.idSuffix) return withGoogleScheme(config);
+
+  const bundleIdentifier = `${config.ios.bundleIdentifier}${env.idSuffix}`;
+  const appGroup = `group.${bundleIdentifier}`;
+
+  return withGoogleScheme({
+    ...config,
+    name: `${config.name}${env.nameSuffix}`,
+    scheme: env.scheme,
+    ios: {
+      ...config.ios,
+      bundleIdentifier,
+      entitlements: {
+        ...config.ios.entitlements,
+        'com.apple.security.application-groups': [appGroup],
+      },
+    },
+    android: {
+      ...config.android,
+      package: `${config.android.package}${env.idSuffix}`,
+      // One file per environment, so a build can only ever carry the
+      // Firebase config it is meant to — a shared file works (the SDK
+      // picks the client matching the running package) but ships both.
+      googleServicesFile: './google-services.staging.json',
+    },
+  });
+};
+
+function withGoogleScheme(config) {
+  return {
+    ...config,
+    plugins: config.plugins.map((plugin) =>
+      plugin === GOOGLE_SIGN_IN ? [GOOGLE_SIGN_IN, { iosUrlScheme: iosUrlScheme() }] : plugin,
+    ),
+  };
+}

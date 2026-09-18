@@ -2,7 +2,11 @@ import Foundation
 import Security
 import UserNotifications
 
-let appGroup = "group.com.eozsahin.mimoza"
+// Written into this extension's Info.plist by expo-target.config.js, so
+// staging and production don't share a container — one group across both
+// would mean each reading the other's Keychain and snapshot. The fallback
+// only matters if that key ever goes missing.
+let appGroup = Bundle.main.object(forInfoDictionaryKey: "MimozaAppGroup") as? String ?? "group.com.eozsahin.mimoza"
 
 /// The extension's copy, from Localizable.xcstrings — keys and wording
 /// mirror push.ts in the app, and push-copy-parity.test.ts holds them
