@@ -92,7 +92,7 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 
 	// Nil unless a Sign in with Apple key is configured — everything
 	// downstream treats that as "revocation is off" (see appleid.NewClient).
-	appleID := appleid.NewClient(awsCfg, cfg.AppleSignInKeyParameter, cfg.AppleSignInKeyFile, cfg.AppleSignInKeyID, cfg.AppleTeamID, cfg.AppleClientIDIOS)
+	appleID := appleid.NewClient(awsCfg, cfg.AppleSignInKeyParameter, cfg.AppleSignInKeyFile, cfg.AppleSignInKeyID, cfg.AppleSignInTeamID, cfg.AppleClientIDIOS)
 	// Said once at startup rather than per deletion: accepting Apple
 	// sign-ins without being able to revoke their grants is what fails
 	// App Store review (Guideline 5.1.1(v)), and the failure is otherwise

@@ -193,7 +193,7 @@ func (c *Client) post(ctx context.Context, path string, form url.Values) ([]byte
 // equivalent of.
 func clientSecret(key Key) (string, error) {
 	if key.KeyID == "" || key.TeamID == "" || key.ClientID == "" {
-		return "", fmt.Errorf("APPLE_SIGNIN_KEY_ID, APPLE_TEAM_ID and APPLE_CLIENT_ID_IOS must all be set")
+		return "", fmt.Errorf("APPLE_SIGNIN_KEY_ID, APPLE_SIGNIN_TEAM_ID and APPLE_CLIENT_ID_IOS must all be set")
 	}
 
 	parsed, err := jwt.ParseECPrivateKeyFromPEM([]byte(key.PrivateKey))

@@ -102,12 +102,12 @@ type Config struct {
 	AppleSignInKeyParameter string
 	// AppleSignInKeyFile is a local path read instead of SSM — for LocalStack.
 	AppleSignInKeyFile string
-	// AppleSignInKeyID identifies that key at Apple. AppleTeamID is the
-	// same team APNS_TEAM_ID names, kept a separate setting so one can be
-	// configured without the other. Both empty means revocation is off:
-	// deleting an account still works, it just leaves the Apple grant.
-	AppleSignInKeyID string
-	AppleTeamID      string
+	// AppleSignInKeyID identifies that key at Apple. AppleSignInTeamID is
+	// the same team APNS_TEAM_ID names, kept a separate setting so one can
+	// be configured without the other. Either empty means revocation is
+	// off: deleting an account still works, it just leaves the Apple grant.
+	AppleSignInKeyID  string
+	AppleSignInTeamID string
 	// BlobCDNSettingsParameter holds where the blob CDN is — base URL, key
 	// pair id, distribution id — as JSON. Written by modules/cdn rather
 	// than set here: the distribution needs the Lambda's function URL, so
@@ -176,6 +176,10 @@ func Load() Config {
 		GoogleClientIDAndroid:      envOr("GOOGLE_CLIENT_ID_ANDROID", ""),
 		GoogleClientIDWeb:          envOr("GOOGLE_CLIENT_ID_WEB", ""),
 		AppleClientIDIOS:           envOr("APPLE_CLIENT_ID_IOS", ""),
+		AppleSignInKeyParameter:    "/" + prefix + "/apple-signin-key",
+		AppleSignInKeyFile:         os.Getenv("APPLE_SIGNIN_KEY_FILE"),
+		AppleSignInKeyID:           envOr("APPLE_SIGNIN_KEY_ID", ""),
+		AppleSignInTeamID:          envOr("APPLE_SIGNIN_TEAM_ID", ""),
 		BlobCDNSettingsParameter:   "/" + prefix + "/cdn",
 		BlobCDNSigningKeyParameter: "/" + prefix + "/cloudfront-signing-key",
 		MaxBlobSize:                intEnv("MAX_BLOB_SIZE_BYTES", 0),
