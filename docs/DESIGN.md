@@ -248,6 +248,38 @@ Reserved for private, per-individual exchanges — not circle content.
   `app/src/domain/usecases/create-circle.ts`), and promoting others later
   is a small, separate, not-yet-built action.
 
+## Account deletion revokes the Apple grant
+
+**Status: built.** App Store Review Guideline 5.1.1(v) makes deleting an
+account also revoke the Sign in with Apple grant behind it — otherwise the
+app keeps listing under Settings › Apple Account › Sign in with Apple for
+an account that no longer exists, and review catches it.
+
+Apple will only revoke a refresh token, and will only issue one in
+exchange for the authorization code the client gets during sign-in. That
+code dies within minutes, so it can't be collected at deletion time, and
+deletion here is resumable across restarts and may finish days later
+(`app/src/features/account/usecases/delete-account.ts`). So `/v1/auth/apple`
+exchanges the code the moment someone signs in and banks the refresh token
+against the account; `DELETE /v1/account` spends it, then drops it.
+
+**This is the second departure from the relay's blindness**, alongside the
+unencrypted membership manifest above, and worth the same honesty. The
+relay now holds real Apple-side authority for its Apple users, not just
+data about them. Three things bound it: the token grants nothing inside a
+circle (the relay can't read those either), it's the only provider
+credential stored anywhere in the system, and it's deleted the moment
+deletion has used it. Revocation failing never blocks a deletion — someone
+asking to delete their account gets that even when Apple is unreachable,
+and the unspent token is kept precisely because it's all a retry would
+have to work from.
+
+Both the revoke call and the key it's signed with are optional per
+environment (`APPLE_SIGNIN_KEY_ID`/`APPLE_TEAM_ID`, plus a `.p8` at
+`/<prefix>/apple-signin-key`). Unconfigured, sign-in and deletion both
+still work — deletion just leaves the grant standing, which is fine
+locally and not fine in production.
+
 ## Email auth (superseded)
 
 **Status update: not what actually shipped.** Auth ended up landing on
