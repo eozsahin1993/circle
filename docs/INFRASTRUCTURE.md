@@ -1,10 +1,12 @@
 # Infrastructure
 
 Status: **staging is built** — its own account, both distributions, the
-relay behind `staging-api.joinmimoza.com`. Blobs are the exception: the
-distribution is up at `cdn.joinmimoza.com` but the relay only signs for it
-once its settings parameter exists (below). Prod is not built. Each
-section marks what is decided, open, or deferred.
+relay behind `api.staging.joinmimoza.com`. Blobs are the exception: the
+distribution is up at `cdn.staging.joinmimoza.com` but the relay only signs
+for it once its settings parameter exists (below). Prod is not built: the
+Terraform is written and its settings decided, but there is no account
+yet, and `env_domain` is unset. Each section marks what is decided, open,
+or deferred.
 
 ---
 
@@ -58,7 +60,8 @@ export TF_VAR_aws_account_id=<account>
 
 ## The front door
 
-**CloudFront over the Lambda function URL, at `api.mimoza.app`.**
+**CloudFront over the Lambda function URL, at `api.<env_domain>`** —
+`api.staging.joinmimoza.com` today, and whatever zone prod is given.
 
 `EXPO_PUBLIC_RELAY_URL` is compiled into each app build
 (`app/src/core/services/relay.ts`), so installed apps dial that hostname
@@ -95,7 +98,7 @@ which the `cdn` output prints for adding at Cloudflare.
 
 ## Blob delivery
 
-**Downloads via CloudFront signed URLs at `cdn.mimoza.app`. Uploads stay
+**Downloads via CloudFront signed URLs at `cdn.<env_domain>`. Uploads stay
 presigned S3 POSTs direct to the bucket.**
 
 Every member of a circle downloads identical ciphertext, so the second
@@ -159,6 +162,36 @@ Consequences worth knowing:
 
 ---
 
+## Backups
+
+**Point-in-time recovery on `sync-log` and `accounts`, in prod only.**
+
+PITR is not snapshots and there is no interval to tune: it captures
+changes continuously and restores to any second in the last 35 days, by
+building a **new table**. It cannot roll one row back and it cannot be
+queried as history — it is disaster recovery, not an audit log, and not a
+debugging tool. It also only covers what happened after it was switched
+on, which is why it goes on before launch rather than after the first
+incident.
+
+Those two tables because they are the ones holding data nobody else can
+reconstruct — the archive itself, and the encrypted recovery manifest.
+`sessions`, `invites` and `rate-limit` are all ephemeral by design
+(expiry, TTL, counters), and `push` self-heals as devices re-register.
+
+This is worth paying for despite the recovery floor in `SYNC_DESIGN.md`
+("every device holds the full archive and all keys locally"), because that
+floor has one hole: it assumes a device survived. Relay data loss *and* a
+dead phone leaves nothing to re-upload from. At $0.20/GB-month against
+tables holding ciphertext and metadata — the photos are in S3, not here —
+this is cents a month for years.
+
+**Open: blobs have no backup at all.** The bucket has neither versioning
+nor replication, so a deleted or corrupted photo is gone, and photos are
+the part of this product users would actually grieve. Versioning plus a
+lifecycle rule expiring old versions is the obvious answer; it is not
+built.
+
 ## Deploys
 
 GitHub Environments (`staging`, `production`), each holding its own
@@ -168,7 +201,7 @@ and environment.
 - Merge to `main` → staging.
 - Tag → prod, with required approval.
 
-Tags pick the release: `relay-v*` deploys the relay, `app-v*` builds and
+Tags pick the release: `server-v*` deploys the relay, `app-v*` builds and
 submits the app.
 
 **Relay first, then the app.** One relay serves every installed version,
@@ -183,7 +216,7 @@ environment is fixed at build time.
 | | Staging | Prod |
 |---|---|---|
 | Bundle ID | `com.eozsahin.mimoza.staging` | `com.eozsahin.mimoza` |
-| Relay URL | `staging-api.mimoza.app` | `api.mimoza.app` |
+| Relay URL | `api.staging.joinmimoza.com` | `api.<prod zone>` |
 | Distribution | TestFlight internal | App Store |
 
 A separate bundle ID means its own Firebase app, its own Google/Apple
@@ -235,7 +268,7 @@ tier. Storage accumulates; nothing deletes photos unless asked.
 **Guardrails, in order:**
 
 1. Billing alarm — free, and the only thing that reports a problem. Built
-   as `modules/billing-alarm`, off until `billing_alert_email` is set.
+   as `modules/alarms`, off until `alert_email` is set.
 2. Lambda reserved concurrency — free, caps how fast money can leave.
    Defaults to 50; every table is `PAY_PER_REQUEST`, so nothing else
    bounds spend.
