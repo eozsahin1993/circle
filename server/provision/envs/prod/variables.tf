@@ -10,44 +10,24 @@ variable "aws_account_id" {
   default     = ""
 }
 
-variable "api_domain" {
-  description = "Hostname app builds point at (api.mimoza.app). Empty leaves the raw function URL in place — set it before shipping a build to anyone, since the URL is compiled in."
-  type        = string
-  default     = ""
-}
-
-variable "blob_domain" {
-  description = "Hostname photo downloads are served from (cdn.mimoza.app). Empty leaves reads on presigned S3 URLs."
-  type        = string
-  default     = ""
-}
-
-variable "blob_signing_public_key" {
-  description = "PEM public key for signing blob download URLs; its private half goes in SSM by hand. Required with blob_domain."
-  type        = string
-  default     = ""
-}
-
 variable "alert_email" {
   description = "Where alarms mail — billing, and the relay's own throttles, errors and latency. Empty creates none of them, which for billing matters: AWS has no spending cap."
   type        = string
   default     = ""
 }
 
-variable "billing_threshold_usd" {
-  description = "Estimated monthly charges that trigger the alarm."
-  type        = number
-  default     = 20
+# --- This environment's identity. Set in env.auto.tfvars, which is
+# committed: CI applies the same configuration, and a value it cannot read
+# is a value it would quietly destroy.
+
+variable "env_domain" {
+  description = "This environment's zone — staging.example.com, or example.com for production. api.<zone> and cdn.<zone> are derived from it, under one wildcard certificate. Empty leaves the raw function URL and presigned S3 URLs."
+  type        = string
+  default     = ""
 }
 
-variable "reserved_concurrency" {
-  description = "Ceiling on concurrent relay executions. -1 leaves it unset, which a new account needs: the default account limit is 10 and AWS refuses to let reservations drop the unreserved pool below 10."
-  type        = number
-  default     = 50
-}
-
-variable "lock_function_url" {
-  description = "Require signed origin requests, so only CloudFront can invoke the relay. Clients must send x-amz-content-sha256 with each body's hash first."
-  type        = bool
-  default     = false
+variable "github_repository" {
+  description = "owner/repo whose Actions may deploy this env, as the GitHub OIDC trust policy's subject. Empty creates no deploy role."
+  type        = string
+  default     = ""
 }

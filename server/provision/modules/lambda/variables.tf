@@ -43,3 +43,9 @@ variable "settings" {
   type        = map(string)
   default     = {}
 }
+
+variable "log_retention_days" {
+  description = "How long the relay's logs are kept. Long enough to investigate something reported late, short enough that nothing accumulates."
+  type        = number
+  default     = 30
+}

@@ -166,7 +166,16 @@ resource "aws_iam_role_policy" "lambda_storage_access" {
   policy = data.aws_iam_policy_document.lambda_storage_access.json
 }
 
+resource "aws_cloudwatch_log_group" "relay" {
+  name              = "/aws/lambda/${var.name_prefix}-relay"
+  retention_in_days = var.log_retention_days
+}
+
 resource "aws_lambda_function" "relay" {
+  # So the group exists with its retention before the function can create
+  # one without.
+  depends_on = [aws_cloudwatch_log_group.relay]
+
   function_name = "${var.name_prefix}-relay"
   role          = aws_iam_role.lambda.arn
 

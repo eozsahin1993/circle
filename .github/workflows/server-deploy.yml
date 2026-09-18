@@ -1,0 +1,88 @@
+name: Deploy Relay
+
+# id-token is what makes the keyless AWS login possible: the job asks
+# GitHub for a signed token describing itself, and AWS trades it for
+# credentials that expire in an hour (see provision/modules/github-deploy).
+# Nothing long-lived is stored on either side.
+permissions:
+  contents: read
+  id-token: write
+
+on:
+  workflow_run:
+    workflows: [Server Tests]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time, and never cancel one midway: Terraform holds a
+# state lock, and a killed apply leaves it held by a run that no longer
+# exists.
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    name: Staging
+    runs-on: ubuntu-latest
+    environment: staging
+    # workflow_dispatch has no triggering run to inspect, so deploying by
+    # hand stays possible.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      # workflow_run checks out the default branch by default, not the
+      # commit that was tested — pinning it keeps the deploy and the tests
+      # describing the same code.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+
+      # Terraform reads the already-built binary; it never invokes the Go
+      # toolchain itself.
+      - name: Build the Lambda binary
+        run: ./provision/build.sh
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+
+      - name: Refuse to apply a half-configured environment
+        run: |
+          for name in AWS_ACCOUNT_ID ENV_DOMAIN; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set on the staging environment"
+              exit 1
+            fi
+          done
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          ENV_DOMAIN: ${{ secrets.ENV_DOMAIN }}
+
+      - name: Apply
+        working-directory: server/provision/envs/staging
+        env:
+          TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+          TF_VAR_env_domain: ${{ secrets.ENV_DOMAIN }}
+          TF_VAR_github_repository: ${{ github.repository }}
+          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+        run: |
+          terraform init -input=false
+          terraform apply -input=false -auto-approve
+
+      - name: Show what it deployed
+        working-directory: server/provision/envs/staging
+        run: terraform output api_endpoint

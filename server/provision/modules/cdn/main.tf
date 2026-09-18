@@ -70,31 +70,6 @@ resource "aws_lambda_permission" "cloudfront_invoke" {
   source_arn    = aws_cloudfront_distribution.relay[0].arn
 }
 
-resource "aws_acm_certificate" "relay" {
-  count             = local.api_enabled
-  provider          = aws.us_east_1
-  domain_name       = var.api_domain_name
-  validation_method = "DNS"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# Blocks until the CNAME below exists at Cloudflare, so the first apply in
-# a new environment stops here: read the validation records output, add
-# them, re-run. Nothing else can be created until the certificate is
-# issued, since CloudFront won't attach a pending one.
-resource "aws_acm_certificate_validation" "relay" {
-  count           = local.api_enabled
-  provider        = aws.us_east_1
-  certificate_arn = aws_acm_certificate.relay[0].arn
-
-  timeouts {
-    create = "30m"
-  }
-}
-
 # CloudFront signs the headers it sends to a Lambda function URL but not
 # the body, so every request carrying one fails with
 # InvalidSignatureException — which is most of this API. Declaring the
@@ -156,7 +131,7 @@ resource "aws_cloudfront_distribution" "relay" {
   }
 
   viewer_certificate {
-    acm_certificate_arn      = aws_acm_certificate_validation.relay[0].certificate_arn
+    acm_certificate_arn      = var.certificate_arn
     ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021"
   }

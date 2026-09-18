@@ -108,7 +108,7 @@ resource "aws_cloudfront_distribution" "blobs" {
   }
 
   viewer_certificate {
-    acm_certificate_arn      = aws_acm_certificate_validation.blobs[0].certificate_arn
+    acm_certificate_arn      = var.certificate_arn
     ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021"
   }
@@ -117,27 +117,6 @@ resource "aws_cloudfront_distribution" "blobs" {
     geo_restriction {
       restriction_type = "none"
     }
-  }
-}
-
-resource "aws_acm_certificate" "blobs" {
-  count             = local.blobs_enabled
-  provider          = aws.us_east_1
-  domain_name       = var.blob_domain_name
-  validation_method = "DNS"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_acm_certificate_validation" "blobs" {
-  count           = local.blobs_enabled
-  provider        = aws.us_east_1
-  certificate_arn = aws_acm_certificate.blobs[0].arn
-
-  timeouts {
-    create = "30m"
   }
 }
 

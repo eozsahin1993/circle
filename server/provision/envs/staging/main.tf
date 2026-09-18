@@ -2,6 +2,10 @@ locals {
   env         = "staging"
   aws_region  = "us-east-1"
   name_prefix = "mimoza-${local.env}"
+  # Every hostname is derived from the environment's own domain, so there
+  # is one value to set and one certificate to validate.
+  api_domain  = var.env_domain == "" ? "" : "api.${var.env_domain}"
+  blob_domain = var.env_domain == "" ? "" : "cdn.${var.env_domain}"
 }
 
 module "storage" {
@@ -20,7 +24,7 @@ module "lambda" {
 
   # Locks the function URL to signed requests once there is a distribution
   # to sign them. Both flip together on the apply that sets api_domain.
-  behind_cloudfront = var.lock_function_url
+  behind_cloudfront = false
 
   # Starting guesses, not measurements — see internal/config. Here rather
   # than in <env>.env so a change to them is a diff someone can review.
@@ -32,7 +36,23 @@ module "lambda" {
     RATE_LIMIT_PUSH_MAX_REQUESTS  = "500"
     RATE_LIMIT_WINDOW_MINUTES     = "10"
   }
-  reserved_concurrency = var.reserved_concurrency
+  # -1 leaves it unset, which a new account needs: the default limit is 10
+  # concurrent executions, and AWS refuses a reservation that drops the
+  # unreserved pool below that.
+  reserved_concurrency = -1
+}
+
+# One certificate for the whole environment; every hostname below lives
+# under it, so adding a service needs no new validation record.
+module "certificate" {
+  count  = var.env_domain == "" ? 0 : 1
+  source = "../../modules/certificate"
+
+  providers = {
+    aws.us_east_1 = aws.us_east_1
+  }
+
+  domain = var.env_domain
 }
 
 module "cdn" {
@@ -47,10 +67,11 @@ module "cdn" {
   origin_url           = module.lambda.api_endpoint
   origin_function_name = module.lambda.function_name
 
-  api_domain_name         = var.api_domain
-  sign_origin_requests    = var.lock_function_url
-  blob_domain_name        = var.blob_domain
-  blob_signing_public_key = var.blob_signing_public_key
+  certificate_arn         = one(module.certificate[*].arn)
+  api_domain_name         = local.api_domain
+  sign_origin_requests    = false
+  blob_domain_name        = local.blob_domain
+  blob_signing_public_key = local.blob_domain == "" ? "" : file("${path.module}/cloudfront-signing-key.pub")
 
   blob_bucket_name                 = module.storage.bucket_name
   blob_bucket_arn                  = module.storage.bucket_arn
@@ -71,5 +92,13 @@ module "alarms" {
   function_name = module.lambda.function_name
   table_names   = module.storage.table_names
 
-  billing_threshold_usd = var.billing_threshold_usd
+  billing_threshold_usd = 10
+}
+
+module "github_deploy" {
+  source = "../../modules/github-deploy"
+
+  name_prefix = local.name_prefix
+  repository  = var.github_repository
+  environment = "staging"
 }

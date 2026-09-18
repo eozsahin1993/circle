@@ -25,6 +25,12 @@ variable "sign_origin_requests" {
   default     = false
 }
 
+variable "certificate_arn" {
+  description = "The environment's wildcard certificate — one per env, covering every hostname in it (modules/certificate)."
+  type        = string
+  default     = ""
+}
+
 variable "blob_domain_name" {
   description = "The hostname photo downloads are served from (cdn.mimoza.app). Empty leaves reads on presigned S3 URLs."
   type        = string

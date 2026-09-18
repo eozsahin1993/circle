@@ -12,13 +12,13 @@ aws_account_id = ""
 # Where alarms mail — billing, throttles, errors, latency. Empty means
 # none, and for billing that matters: AWS has no spending cap.
 alert_email           = ""
-billing_threshold_usd = 20
 
-# Set once the account exists and DNS is ready; empty leaves the raw
-# function URL. See docs/INFRASTRUCTURE.md.
-# api_domain = "staging-api.mimoza.app"
 
-# -1 until the account's Lambda concurrency quota is raised above the
-# new-account default of 10 (Service Quotas → Lambda → Concurrent
-# executions). That cap bounds spend on its own meanwhile.
-reserved_concurrency = -1
+# What this environment is. CI can't read this file, so the deploy
+# workflow passes the same values as TF_VAR_* from its GitHub Environment
+# — keep the two in step.
+# api.<this> and cdn.<this>, under one wildcard certificate.
+env_domain = ""
+
+github_repository = "eozsahin1993/mimoza"
+
