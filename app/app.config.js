@@ -45,13 +45,13 @@ module.exports = ({ config }) => {
   }
   requireEnvironment(name, env);
 
-  if (!env.idSuffix) return withGoogleScheme(withEnv(config, name));
+  if (!env.idSuffix) return withGoogleScheme(withEnv(withPushEnvironment(config, name), name));
 
   const bundleIdentifier = `${config.ios.bundleIdentifier}${env.idSuffix}`;
   const appGroup = `group.${bundleIdentifier}`;
 
   return withGoogleScheme(withEnv({
-    ...config,
+    ...withPushEnvironment(config, name),
     name: `${config.name}${env.nameSuffix}`,
     scheme: env.scheme,
     icon: env.icon ?? config.icon,
@@ -100,6 +100,33 @@ function requireEnvironment(name, env) {
 // Readable at runtime through Constants.expoConfig.extra, so the app can
 // say which environment it is — see ui/components/env-badge.tsx. A build
 // that reaches the wrong relay is otherwise indistinguishable on screen.
+/**
+ * Which APNs environment the build registers against.
+ *
+ * `development` is the sandbox: a build carrying it gets a sandbox device
+ * token, and a push sent to production APNs for that token is rejected as
+ * unregistered. TestFlight and the App Store both run against production,
+ * so a distributed build carrying `development` takes every notification
+ * silently — it registers, the relay accepts the token, and nothing ever
+ * arrives.
+ *
+ * Only `production` flips it. dev and staging are signed with development
+ * profiles, which don't permit the production entitlement, so hardcoding
+ * it everywhere would break local builds instead.
+ */
+function withPushEnvironment(config, name) {
+  return {
+    ...config,
+    ios: {
+      ...config.ios,
+      entitlements: {
+        ...config.ios.entitlements,
+        'aps-environment': name === 'production' ? 'production' : 'development',
+      },
+    },
+  };
+}
+
 function withEnv(config, name) {
   return { ...config, extra: { ...config.extra, appEnv: name } };
 }
