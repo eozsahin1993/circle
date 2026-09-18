@@ -92,6 +92,17 @@ type Config struct {
 	// ID tokens — the app's iOS bundle ID. A Services ID would join this
 	// as a second named field if a web/Android Apple flow is ever added.
 	AppleClientIDIOS string
+	// BlobCDNSettingsParameter holds where the blob CDN is — base URL, key
+	// pair id, distribution id — as JSON. Written by modules/cdn rather
+	// than set here: the distribution needs the Lambda's function URL, so
+	// telling the Lambda about the distribution in its own environment
+	// would close a dependency cycle. Absent until blobs move to
+	// CloudFront, which the relay reads as "keep presigning S3".
+	BlobCDNSettingsParameter string
+	// BlobCDNSigningKeyParameter is the SSM SecureString holding the RSA
+	// private key that signs download URLs. Created by hand, never by
+	// Terraform — same reasoning as FCMCredentialParameter.
+	BlobCDNSigningKeyParameter string
 	// MaxBlobSize is passed straight to s3.NewBlobStore, overriding its
 	// DefaultMaxBlobSize — see .env.example's MAX_BLOB_SIZE_BYTES. 0 means
 	// "use the adapter's own default".
@@ -123,34 +134,36 @@ type Config struct {
 func Load() Config {
 	prefix := mustEnv("RESOURCE_PREFIX")
 	return Config{
-		TableName:                 prefix + "-sync-log",
-		BucketName:                prefix + "-blobs",
-		SessionsTableName:         prefix + "-sessions",
-		AccountsTableName:         prefix + "-accounts",
-		InviteTableName:           prefix + "-invites",
-		RateLimitTableName:        prefix + "-rate-limit",
-		PushTableName:             prefix + "-push",
-		FCMCredentialParameter:    "/" + prefix + "/fcm-service-account",
-		FCMCredentialFile:         os.Getenv("FCM_CREDENTIAL_FILE"),
-		APNSAuthKeyParameter:      "/" + prefix + "/apns-auth-key",
-		APNSAuthKeyFile:           os.Getenv("APNS_AUTH_KEY_FILE"),
-		APNSKeyID:                 envOr("APNS_KEY_ID", ""),
-		APNSTeamID:                envOr("APNS_TEAM_ID", ""),
-		APNSTopic:                 envOr("APNS_TOPIC", ""),
-		APNSProduction:            envOr("APNS_PRODUCTION", "false") == "true",
-		RateLimitWriteMaxRequests: intEnv("RATE_LIMIT_WRITE_MAX_REQUESTS", 500),
-		RateLimitReadMaxRequests:  intEnv("RATE_LIMIT_READ_MAX_REQUESTS", 2000),
-		RateLimitPushMaxRequests:  intEnv("RATE_LIMIT_PUSH_MAX_REQUESTS", 500),
-		RateLimitWindowMinutes:    intEnv("RATE_LIMIT_WINDOW_MINUTES", 10),
-		GoogleClientIDIOS:         envOr("GOOGLE_CLIENT_ID_IOS", ""),
-		GoogleClientIDAndroid:     envOr("GOOGLE_CLIENT_ID_ANDROID", ""),
-		GoogleClientIDWeb:         envOr("GOOGLE_CLIENT_ID_WEB", ""),
-		AppleClientIDIOS:          envOr("APPLE_CLIENT_ID_IOS", ""),
-		MaxBlobSize:               intEnv("MAX_BLOB_SIZE_BYTES", 0),
-		InviteRetentionDays:       intEnv("INVITE_RETENTION_DAYS", 0),
-		Port:                      envOr("PORT", "8080"),
-		S3ForcePathStyle:          envOr("S3_FORCE_PATH_STYLE", "false") == "true",
-		AWSEndpointURL:            os.Getenv("AWS_ENDPOINT_URL"),
+		TableName:                  prefix + "-sync-log",
+		BucketName:                 prefix + "-blobs",
+		SessionsTableName:          prefix + "-sessions",
+		AccountsTableName:          prefix + "-accounts",
+		InviteTableName:            prefix + "-invites",
+		RateLimitTableName:         prefix + "-rate-limit",
+		PushTableName:              prefix + "-push",
+		FCMCredentialParameter:     "/" + prefix + "/fcm-service-account",
+		FCMCredentialFile:          os.Getenv("FCM_CREDENTIAL_FILE"),
+		APNSAuthKeyParameter:       "/" + prefix + "/apns-auth-key",
+		APNSAuthKeyFile:            os.Getenv("APNS_AUTH_KEY_FILE"),
+		APNSKeyID:                  envOr("APNS_KEY_ID", ""),
+		APNSTeamID:                 envOr("APNS_TEAM_ID", ""),
+		APNSTopic:                  envOr("APNS_TOPIC", ""),
+		APNSProduction:             envOr("APNS_PRODUCTION", "false") == "true",
+		RateLimitWriteMaxRequests:  intEnv("RATE_LIMIT_WRITE_MAX_REQUESTS", 500),
+		RateLimitReadMaxRequests:   intEnv("RATE_LIMIT_READ_MAX_REQUESTS", 2000),
+		RateLimitPushMaxRequests:   intEnv("RATE_LIMIT_PUSH_MAX_REQUESTS", 500),
+		RateLimitWindowMinutes:     intEnv("RATE_LIMIT_WINDOW_MINUTES", 10),
+		GoogleClientIDIOS:          envOr("GOOGLE_CLIENT_ID_IOS", ""),
+		GoogleClientIDAndroid:      envOr("GOOGLE_CLIENT_ID_ANDROID", ""),
+		GoogleClientIDWeb:          envOr("GOOGLE_CLIENT_ID_WEB", ""),
+		AppleClientIDIOS:           envOr("APPLE_CLIENT_ID_IOS", ""),
+		BlobCDNSettingsParameter:   "/" + prefix + "/cdn",
+		BlobCDNSigningKeyParameter: "/" + prefix + "/cloudfront-signing-key",
+		MaxBlobSize:                intEnv("MAX_BLOB_SIZE_BYTES", 0),
+		InviteRetentionDays:        intEnv("INVITE_RETENTION_DAYS", 0),
+		Port:                       envOr("PORT", "8080"),
+		S3ForcePathStyle:           envOr("S3_FORCE_PATH_STYLE", "false") == "true",
+		AWSEndpointURL:             os.Getenv("AWS_ENDPOINT_URL"),
 	}
 }
 

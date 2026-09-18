@@ -25,6 +25,7 @@ import (
 	invitedynamodb "mimoza-relay/internal/invite/dynamodb"
 	pushdynamodb "mimoza-relay/internal/push/dynamodb"
 	ratelimitdynamodb "mimoza-relay/internal/ratelimit/dynamodb"
+	"mimoza-relay/internal/synclog/cdn"
 	logdynamodb "mimoza-relay/internal/synclog/dynamodb"
 	blobs3 "mimoza-relay/internal/synclog/s3"
 )
@@ -64,9 +65,17 @@ func Deps(cfg config.Config, awsCfg aws.Config) api.Deps {
 	fcmDispatch := fcm.NewDispatcher(awsCfg, cfg.FCMCredentialParameter, cfg.FCMCredentialFile)
 	apnsDispatch := apns.NewDispatcher(awsCfg, cfg.APNSAuthKeyParameter, cfg.APNSAuthKeyFile, cfg.APNSKeyID, cfg.APNSTeamID, cfg.APNSTopic, cfg.APNSProduction)
 
+	// Whether downloads actually come from CloudFront is decided at
+	// runtime by whether its settings parameter exists — see
+	// internal/synclog/cdn. Nothing to configure per environment.
+	blob := blobs3.New(s3Client, cfg.BucketName, cfg.MaxBlobSize).WithDownloads(cdn.New(cdn.Config{
+		SettingsParameter: cfg.BlobCDNSettingsParameter,
+		KeyParameter:      cfg.BlobCDNSigningKeyParameter,
+	}, awsCfg))
+
 	return api.Deps{
 		Log:        logdynamodb.New(dynamo(), cfg.TableName),
-		Blob:       blobs3.New(s3Client, cfg.BucketName, cfg.MaxBlobSize),
+		Blob:       blob,
 		Auth:       authdynamodb.New(dynamo(), cfg.SessionsTableName),
 		Manifest:   manifestdynamodb.New(dynamo(), cfg.AccountsTableName),
 		Invite:     invitedynamodb.New(dynamo(), cfg.InviteTableName, cfg.InviteRetentionDays),

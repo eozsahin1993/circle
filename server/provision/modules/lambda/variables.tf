@@ -37,3 +37,9 @@ variable "behind_cloudfront" {
   type        = bool
   default     = false
 }
+
+variable "settings" {
+  description = "Tuning the relay reads from its environment — blob size cap, invite retention, rate limits. Terraform's rather than <env>.env's because they are decisions worth reviewing in a diff, and applying them needs no extra step."
+  type        = map(string)
+  default     = {}
+}

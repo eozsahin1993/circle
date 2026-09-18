@@ -21,7 +21,18 @@ module "lambda" {
 
   # Locks the function URL to signed requests once there is a distribution
   # to sign them. Both flip together on the apply that sets api_domain.
-  behind_cloudfront    = var.lock_function_url
+  behind_cloudfront = var.lock_function_url
+
+  # Starting guesses, not measurements — see internal/config. Here rather
+  # than in <env>.env so a change to them is a diff someone can review.
+  settings = {
+    MAX_BLOB_SIZE_BYTES           = "2097152"
+    INVITE_RETENTION_DAYS         = "7"
+    RATE_LIMIT_WRITE_MAX_REQUESTS = "500"
+    RATE_LIMIT_READ_MAX_REQUESTS  = "2000"
+    RATE_LIMIT_PUSH_MAX_REQUESTS  = "500"
+    RATE_LIMIT_WINDOW_MINUTES     = "10"
+  }
   reserved_concurrency = var.reserved_concurrency
 }
 

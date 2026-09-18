@@ -1,8 +1,10 @@
 # Infrastructure
 
-Status: **plan, not built.** Today everything runs in one AWS account
-behind a raw Lambda function URL, with blobs served by presigned S3 URLs.
-Each section below marks what is decided, open, or deferred.
+Status: **staging is built** — its own account, both distributions, the
+relay behind `staging-api.joinmimoza.com`. Blobs are the exception: the
+distribution is up at `cdn.joinmimoza.com` but the relay only signs for it
+once its settings parameter exists (below). Prod is not built. Each
+section marks what is decided, open, or deferred.
 
 ---
 
@@ -23,10 +25,22 @@ when the credentials can't see it.
 domain hands account recovery to whoever registers it next. Never use an
 email whose domain is registered inside the account it recovers.
 
-Per account: Terraform state bucket, deploy role, and the two SSM
-SecureStrings (`/mimoza-<env>/fcm-service-account`,
-`/mimoza-<env>/apns-auth-key`, created by hand — Terraform would put them
-in state as plaintext).
+Per account: Terraform state bucket (`mimoza-terraform-<env>`), deploy
+role, and the SSM SecureStrings created by hand because Terraform would
+put them in state as plaintext — `/mimoza-<env>/fcm-service-account`,
+`/mimoza-<env>/apns-auth-key`, `/mimoza-<env>/cloudfront-signing-key`.
+
+**Where settings live**, now that there are three places they could:
+
+| | |
+|---|---|
+| `envs/*/main.tf` (`settings`) | Tuning — blob size cap, invite retention, rate limits. In git, so a change is a reviewable diff, and applied by `terraform apply` alone. |
+| `<env>.env` → `push-config.sh` → SSM `/config/*` | Values only a human has: Google/Apple client IDs, APNs key/team/topic. |
+| SSM, written by Terraform | Things Terraform created that the Lambda can't be told directly — see *How the relay finds the CDN*. |
+
+The Lambda's environment is those first two merged, prefix last
+(`modules/lambda/lambda.tf`), so nothing can override `RESOURCE_PREFIX` —
+every table, bucket and parameter path derives from it.
 
 Shared across accounts: APNs `.p8` key, Google/Apple sign-in client IDs.
 
@@ -101,6 +115,8 @@ reader onward should be served from the edge.
 - **Invalidate on delete only.** Nothing else ever changes. One path per
   photo; one wildcard (`/<syncId>/*`) per circle for bulk deletion, which
   counts as a single path. First 1,000 paths/month free, account-wide.
+  Best-effort: the bytes are already destroyed by then, so a failed
+  invalidation is logged rather than failing the delete.
 - Invite previews carry no blob — name and avatar ride inline, encrypted
   under the invite key (`INVITE_FLOW.md`). No pre-membership blob access.
 
@@ -108,11 +124,38 @@ Provider portability comes from the domain plus the relay handing out
 URLs at request time; clients never see S3. Signing is CloudFront-specific
 and stays behind the `BlobStore` interface.
 
-The distribution, key group and bucket policy are in `modules/cdn`, inert
-until `blob_domain` is set. **The relay still hands out presigned S3
-URLs** — switching it to CloudFront signing (private key in SSM under
-`/mimoza-<env>/`, key pair id from the `blob_key_pair_id` output) is the
-next step, along with invalidation on delete.
+### How the relay finds the CDN
+
+The distribution needs the Lambda's function URL, so the Lambda can't be
+told about the distribution in its own environment — that closes a
+dependency cycle. **SSM is the handover instead: Terraform writes what it
+created, the relay reads it at runtime.**
+
+| | |
+|---|---|
+| `/mimoza-<env>/cdn` | `{baseUrl, keyPairId, distributionId}` as JSON, written by `modules/cdn`. One parameter, so a read can't see a half-updated set. Not secret. |
+| `/mimoza-<env>/cloudfront-signing-key` | The RSA-2048 private key, **created by hand** — Terraform would put it in state. |
+
+Both paths are derived from `RESOURCE_PREFIX` on each side
+(`internal/config`, `modules/cdn/blobs.tf`), and nothing checks the two
+spellings against each other.
+
+**Whether blobs come from the CDN is a runtime answer, not configuration.**
+`internal/synclog/cdn` reads the settings parameter once per cold start:
+present means sign CloudFront URLs, `ParameterNotFound` means keep
+presigning S3. That is what makes local runs work unchanged — LocalStack
+has SSM but no CloudFront — and it means switching an environment over is
+an apply, with no redeploy.
+
+Consequences worth knowing:
+
+- A warm Lambda keeps what it read. Changes land on the next cold start,
+  or immediately after a deploy.
+- Deploy Terraform before code that needs a new field: old parameter plus
+  new code fails the shape check and falls back to S3, quietly.
+- Generating the key is manual, once per environment:
+  `openssl genrsa 2048` → private half to SSM, public half to
+  `blob_signing_public_key`.
 
 ---
 

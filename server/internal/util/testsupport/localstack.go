@@ -1,7 +1,9 @@
 // Package testsupport wires the real adapters (not fakes) to a LocalStack
-// instance at localhost:4566, so tests exercise actual DynamoDB and S3 wire
-// behavior. Those two services are all LocalStack needs to run (see the
-// workflow's SERVICES list).
+// instance at localhost:4566, so tests exercise actual DynamoDB, S3 and
+// SSM wire behavior. Those three services are all LocalStack needs to run
+// (see the workflow's SERVICES list) — CloudFront is Pro-only, so blob
+// URL signing is exercised against the real signer with a locally
+// generated key, and only invalidation goes untested until staging.
 //
 // Not a _test.go file — a regular package imported by other packages'
 // tests, per Go convention for shared test helpers. Google/Apple
@@ -13,6 +15,10 @@ package testsupport
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -28,6 +34,8 @@ import (
 	awsdynamodb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	awsssm "github.com/aws/aws-sdk-go-v2/service/ssm"
+	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
 	"mimoza-relay/internal/account"
 	manifestdynamodb "mimoza-relay/internal/account/dynamodb"
@@ -40,6 +48,7 @@ import (
 	"mimoza-relay/internal/ratelimit"
 	ratelimitdynamodb "mimoza-relay/internal/ratelimit/dynamodb"
 	"mimoza-relay/internal/synclog"
+	"mimoza-relay/internal/synclog/cdn"
 	logdynamodb "mimoza-relay/internal/synclog/dynamodb"
 	blobs3 "mimoza-relay/internal/synclog/s3"
 	"mimoza-relay/internal/util/localstack"
@@ -204,6 +213,55 @@ func NewBlobStore(t testing.TB) synclog.BlobStore {
 	}
 
 	return blobs3.New(client, bucketName, 0)
+}
+
+// NewBlobStoreWithCDN returns a blob store whose downloads are signed for
+// CloudFront, with the settings and signing key put in LocalStack's SSM
+// exactly as Terraform and the operator would.
+//
+// CloudFront itself isn't emulated, so this proves the parts that live
+// here — that the relay finds its settings, parses the key, and hands out
+// a signed CDN URL instead of an S3 one — not that CloudFront accepts the
+// signature. That only shows up in staging.
+func NewBlobStoreWithCDN(t testing.TB, prefix string) synclog.BlobStore {
+	t.Helper()
+
+	awsCfg := loadConfig(t)
+	ssmClient := awsssm.NewFromConfig(awsCfg, func(o *awsssm.Options) {
+		o.BaseEndpoint = aws.String(localstack.Endpoint())
+	})
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate signing key: %v", err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+
+	put := func(name, value, kind string) {
+		if _, err := ssmClient.PutParameter(context.Background(), &awsssm.PutParameterInput{
+			Name:      aws.String(name),
+			Value:     aws.String(value),
+			Type:      ssmtypes.ParameterType(kind),
+			Overwrite: aws.Bool(true),
+		}); err != nil {
+			unreachable(t, "SSM", err)
+		}
+	}
+	put("/"+prefix+"/cdn", `{"baseUrl":"https://cdn.example.com","keyPairId":"K123","distributionId":"E123"}`, "String")
+	put("/"+prefix+"/cloudfront-signing-key", string(keyPEM), "SecureString")
+
+	store := NewBlobStore(t).(*blobs3.Store)
+	return store.WithDownloads(cdn.New(cdn.Config{
+		SettingsParameter: "/" + prefix + "/cdn",
+		KeyParameter:      "/" + prefix + "/cloudfront-signing-key",
+	}, awsCfgWithEndpoint(awsCfg)))
+}
+
+// The signer builds its own clients from an aws.Config, so LocalStack has
+// to be pointed at there rather than per-client.
+func awsCfgWithEndpoint(cfg aws.Config) aws.Config {
+	cfg.BaseEndpoint = aws.String(localstack.Endpoint())
+	return cfg
 }
 
 // NewAuthStore returns a real dynamodb-backed AuthStore against LocalStack,

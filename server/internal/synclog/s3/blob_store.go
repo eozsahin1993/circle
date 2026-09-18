@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -47,6 +48,22 @@ type Store struct {
 	presignClient *s3.PresignClient
 	bucketName    string
 	maxBlobSize   int64
+	// cdn, when set, serves downloads instead of presigned S3 URLs, and
+	// is told about deletions so edge caches don't outlive the bytes.
+	// Nil locally: LocalStack has no CloudFront.
+	cdn Downloads
+}
+
+// Downloads is what the store needs from the CDN — see internal/synclog/cdn.
+// An interface so the S3 store doesn't depend on CloudFront to compile,
+// and so tests can assert what was invalidated.
+type Downloads interface {
+	// Configured is false where no CDN exists — local runs, and any
+	// environment before its distribution is created. Downloads then stay
+	// on presigned S3 URLs.
+	Configured(ctx context.Context) bool
+	SignedURL(ctx context.Context, key string, ttl time.Duration) (string, error)
+	Invalidate(ctx context.Context, paths ...string) error
 }
 
 func New(client *s3.Client, bucketName string, maxBlobSize int64) *Store {
@@ -54,6 +71,13 @@ func New(client *s3.Client, bucketName string, maxBlobSize int64) *Store {
 		maxBlobSize = DefaultMaxBlobSize
 	}
 	return &Store{client: client, presignClient: s3.NewPresignClient(client), bucketName: bucketName, maxBlobSize: maxBlobSize}
+}
+
+// WithDownloads points reads at the CDN. Uploads are unaffected — they
+// go straight to the bucket either way.
+func (s *Store) WithDownloads(cdn Downloads) *Store {
+	s.cdn = cdn
+	return s
 }
 
 var _ synclog.BlobStore = (*Store)(nil)
@@ -144,7 +168,23 @@ func (s *Store) Delete(ctx context.Context, syncID, entryID string) error {
 		Bucket: aws.String(s.bucketName),
 		Key:    aws.String(blobKey(syncID, entryID)),
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	return s.invalidate(ctx, blobKey(syncID, entryID))
+}
+
+// invalidate is best-effort by design: the bytes are already gone, and
+// failing the delete would tell the caller nothing was destroyed when it
+// was. A cached copy then survives until its TTL.
+func (s *Store) invalidate(ctx context.Context, paths ...string) error {
+	if s.cdn == nil || !s.cdn.Configured(ctx) {
+		return nil
+	}
+	if err := s.cdn.Invalidate(ctx, paths...); err != nil {
+		slog.ErrorContext(ctx, "cdn invalidation failed, cached copies outlive the blobs", "error", err, "paths", paths)
+	}
+	return nil
 }
 
 // DeleteMany batch-deletes in pages of S3's 1000-key cap. Keys that never
@@ -167,7 +207,11 @@ func (s *Store) DeleteMany(ctx context.Context, syncID string, entryIDs []string
 			return fmt.Errorf("deleting %d blobs for %s: %d failed, first: %s", len(objects), syncID, len(out.Errors), aws.ToString(out.Errors[0].Message))
 		}
 	}
-	return nil
+
+	// One wildcard rather than a path per entry: a wildcard counts as a
+	// single invalidation path whatever it matches, and the extra misses
+	// it causes cost nothing but a re-fetch.
+	return s.invalidate(ctx, syncID+"/*")
 }
 
 // DeleteCircle lists and deletes a page at a time rather than collecting
@@ -209,10 +253,14 @@ func (s *Store) DeleteCircle(ctx context.Context, syncID string) error {
 			return fmt.Errorf("deleting blobs for %s: %d of %d objects failed, first: %s", syncID, len(out.Errors), len(objects), aws.ToString(out.Errors[0].Message))
 		}
 	}
-	return nil
+	return s.invalidate(ctx, syncID+"/*")
 }
 
 func (s *Store) GetDownloadURL(ctx context.Context, syncID, entryID string) (string, error) {
+	if s.cdn != nil && s.cdn.Configured(ctx) {
+		return s.cdn.SignedURL(ctx, blobKey(syncID, entryID), downloadURLTTL)
+	}
+
 	req, err := s.presigner(ctx).PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucketName),
 		Key:    aws.String(blobKey(syncID, entryID)),

@@ -167,3 +167,23 @@ resource "aws_s3_bucket_policy" "blobs" {
   bucket = var.blob_bucket_name
   policy = data.aws_iam_policy_document.blobs_bucket[0].json
 }
+
+# What the relay needs to serve blobs from here, handed over through SSM
+# rather than the Lambda's environment: the distribution needs the
+# function's URL, so a Lambda told these in its own environment would
+# close a dependency cycle. Terraform writes what it created; the relay
+# reads it at runtime (internal/synclog/cdn).
+#
+# One parameter rather than three, so the relay reads once and can never
+# see a half-updated set. A plain String — none of this is secret, unlike
+# the signing key beside it.
+resource "aws_ssm_parameter" "blob_cdn" {
+  count = local.blobs_enabled
+  name  = "/${var.name_prefix}/cdn"
+  type  = "String"
+  value = jsonencode({
+    baseUrl        = "https://${var.blob_domain_name}"
+    keyPairId      = aws_cloudfront_public_key.blobs[0].id
+    distributionId = aws_cloudfront_distribution.blobs[0].id
+  })
+}

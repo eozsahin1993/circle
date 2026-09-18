@@ -269,32 +269,45 @@ hardcoded).
 
 ## Deploying (staging, prod)
 
-Every env is the same two modules; `provision/envs/<env>/main.tf` holds only
-its prefix, region and deletion protection. All names come from the prefix
-`mimoza-<env>` — Terraform creates resources under it, and the Lambda gets it
-as `RESOURCE_PREFIX` and derives the rest.
+Each env is its own AWS account, and `provision/envs/<env>` wires the same
+modules together. All names come from the prefix `mimoza-<env>` — Terraform
+creates resources under it, and the Lambda gets it as `RESOURCE_PREFIX` and
+derives the rest. See `docs/INFRASTRUCTURE.md` for the accounts, domains and
+what lives where.
 
-Once per AWS account, create the bucket Terraform state lives in:
+Once per AWS account, create the bucket Terraform state lives in, then copy
+`envs/<env>/<env>.auto.tfvars.example` and fill in the account id:
 
 ```
 (cd provision/bootstrap && terraform init && terraform apply)
 ```
 
-Each env's settings live in `server/<env>.env` (copy `.env.example`; gitignored
-like `local.env`) with `RESOURCE_PREFIX=mimoza-<env>`, the sign-in client IDs,
-APNs IDs, and `FCM_CREDENTIAL_FILE`/`APNS_AUTH_KEY_FILE` pointing at the key
-files. Upload it to SSM — settings under `/mimoza-<env>/config/`, the two
-keys as SecureStrings — whenever it changes:
+Settings reach a deployed relay three ways, and only the first needs a file
+on your machine:
 
-```
-provision/push-config.sh staging
-```
+- **`server/<env>.env`** — the sign-in client IDs and APNs identifiers, plus
+  `FCM_CREDENTIAL_FILE`/`APNS_AUTH_KEY_FILE` pointing at the key files.
+  `push-config.sh` uploads the settings to `/mimoza-<env>/config/` and the two
+  keys as SecureStrings. Re-run it whenever the file changes:
 
-Terraform reads those settings at apply time, so nothing env-specific is
-committed. Then, whenever the Go code or the Terraform changes:
+  ```
+  provision/push-config.sh staging
+  ```
+
+- **`envs/<env>/main.tf`'s `settings`** — tuning (blob size cap, invite
+  retention, rate limits), applied by `terraform apply` alone.
+- **SSM, written by Terraform** — the blob CDN's own settings, which the relay
+  reads at runtime because the Lambda can't be told them directly.
+
+Then, whenever the Go code or the Terraform changes:
 
 ```
 provision/build.sh
 (cd provision/envs/staging && terraform init && terraform apply)
 (cd provision/envs/staging && terraform output api_endpoint)   # the app build's EXPO_PUBLIC_RELAY_URL
+(cd provision/envs/staging && terraform output dns_records)    # CNAMEs to add at Cloudflare
 ```
+
+`terraform apply` needs credentials Terraform understands: an access-key
+profile, or `eval "$(aws configure export-credentials --profile <p> --format env)"`
+if that profile came from `aws login`, which only the AWS CLI can read.

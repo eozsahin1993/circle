@@ -117,7 +117,28 @@ data "aws_iam_policy_document" "lambda_storage_access" {
     resources = [
       "arn:aws:ssm:${var.aws_region}:*:parameter/${var.name_prefix}/fcm-service-account",
       "arn:aws:ssm:${var.aws_region}:*:parameter/${var.name_prefix}/apns-auth-key",
+      # Signs blob download URLs — see internal/synclog/cdn.
+      "arn:aws:ssm:${var.aws_region}:*:parameter/${var.name_prefix}/cloudfront-signing-key",
     ]
+  }
+
+  # Where the blob CDN is, written by modules/cdn because it knows and the
+  # Lambda can't be told without a dependency cycle. Absent until blobs
+  # move to CloudFront, which the relay treats as "keep presigning S3".
+  statement {
+    sid       = "BlobCDNSettings"
+    actions   = ["ssm:GetParameter"]
+    resources = ["arn:aws:ssm:${var.aws_region}:*:parameter/${var.name_prefix}/cdn"]
+  }
+
+  # Deleting a blob has to drop cached copies too, or the bytes outlive
+  # the delete at the edge. Invalidation is the only CloudFront action the
+  # relay ever takes, and it can't name the distribution: the ARN lives in
+  # modules/cdn, which already depends on this module.
+  statement {
+    sid       = "BlobCacheInvalidation"
+    actions   = ["cloudfront:CreateInvalidation"]
+    resources = ["*"]
   }
 
   # SecureStrings under the AWS-managed aws/ssm key: GetParameter's
@@ -169,6 +190,9 @@ resource "aws_lambda_function" "relay" {
   reserved_concurrent_executions = var.reserved_concurrency
 
   environment {
-    variables = merge(local.config, { RESOURCE_PREFIX = var.name_prefix })
+    # Precedence, loosest first: SSM /config (operator-supplied values like
+    # the sign-in client ids), then this env's settings, then the prefix
+    # every name is derived from — which nothing may override.
+    variables = merge(local.config, var.settings, { RESOURCE_PREFIX = var.name_prefix })
   }
 }
