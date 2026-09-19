@@ -169,7 +169,14 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     () => [requests, justJoined, posts, rosterChanges],
     [requests, justJoined, posts, rosterChanges],
   );
-  sourcesRef.current = sources;
+  // Assigned in an effect, not during render: a render can be discarded or
+  // replayed, and a ref written on one that never commits would leave
+  // `reload` calling into sources that aren't on screen. This hook runs
+  // before the screen's own focus effect, so the ref is current by the
+  // time anything calls `reload`.
+  useEffect(() => {
+    sourcesRef.current = sources;
+  }, [sources]);
 
   const rows = useMemo(() => buildFeedRows(sources.flatMap((source) => source.rows)), [sources]);
 
