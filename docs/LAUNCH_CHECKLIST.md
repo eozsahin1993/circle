@@ -27,22 +27,27 @@ so a stale "done" is visible.
 
 ## Production environment
 
-None of this exists yet — staging is account 223057859233, prod has no
-account. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
+Prod has no AWS account yet; staging is 223057859233. See
+[INFRASTRUCTURE.md](INFRASTRUCTURE.md).
 
 - [ ] AWS account for prod, root MFA, billing alarm, `mimoza-prod-admin`
       IAM user, access key profile.
 - [ ] `server/provision/envs/prod` applied — the modules are written and
-      staging-proven, so this is `terraform apply` plus the two DNS CNAMEs
-      for `api.` and `cdn.`.
+      staging-proven, but `envs/prod` has no `cloudfront-signing-key.pub`,
+      and `main.tf` reads that file the moment `env_domain` is set. So:
+      generate the key pair, then apply, then the certificate validation
+      record and the CNAMEs for `api.` and `cdn.`.
 - [ ] Apple: **production** APNs key in SSM (staging's is separate — the
       2-key account limit is why).
-- [ ] Firebase prod project, `google-services.json`, FCM key in SSM.
+- [ ] FCM key in SSM. The prod Firebase project (`mimozaapp-1587f`) and
+      `app/google-services.json` already exist; the upload waits on the
+      account.
 - [ ] Google OAuth clients for the prod bundle id; Apple Services ID.
 - [ ] `.env.production` locally: `APP_ENV=production`, relay URL, three
       Google client IDs.
-- [ ] GitHub `production` environment + OIDC role, deploy workflow
-      extended past staging.
+- [ ] GitHub `production` environment (role ARN, account id, domain,
+      alert email) + OIDC role. The workflow's prod job already exists,
+      on `server-v*` tags — commit 5680ce9.
 
 ## App build
 

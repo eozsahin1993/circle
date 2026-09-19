@@ -3,10 +3,9 @@
 Status: **built on both platforms.** Android: FCM data messages composed
 by the on-device JS handler. iOS: real APNs alert pushes
 (`internal/push/apns`) rewritten by a native Notification Service
-Extension (`app/targets/notification-service`) that reads the shared App
-Group keychain and a circle/member-name snapshot
-(`app/src/domain/usecases/push/push-snapshot.ts`). Not yet verified on a
-physical device.
+Extension (`app/targets/MimozaNotificationService`) that reads the shared
+App Group keychain and a circle/member-name snapshot
+(`app/src/features/push-notifications/usecases/push-snapshot.ts`).
 
 Supersedes `DESIGN.md` section 2, which reached the same broad shape
 (routing IDs, device-side composition) but left the decisive question —
@@ -35,13 +34,17 @@ out of one of them:
 ## Identifiers
 
 All derived client-side, all domain-separated the same way as everything
-in `app/src/services/crypto.ts`:
+in `app/src/core/crypto/`:
 
 ```
-routingId   = HKDF(masterSeed,          "push-routing" || circleId)
+routingId   = HKDF(masterSeed,          "push-enabled" || circleId)
 deviceId    = HKDF(deviceSecret,        "push-device"  || routingId)
 fanoutToken = HKDF(contentKey[current], "push-fanout")
 ```
+
+The routing domain is `"push-enabled"`, not the `"push-routing"` this
+document originally specified. Every shipped device and relay row already
+uses it, so the name is what's wrong, not the string.
 
 `deviceSecret` is 32 random bytes generated once per device and kept in
 SecureStore.
@@ -78,10 +81,10 @@ already uses:
 
 ```
 pk = routingId
-sk = "prefs"            -> { categories, fanoutHash, keyVersion }
-sk = "token#<deviceId>" -> { pushToken (KMS-encrypted), platform, enabled }
+sk = "prefs"             -> { pushFanoutHash, categoryMask, keyVersion, silenced }
+sk = "device#<deviceId>" -> { pushToken, platform, enabled }
 
-fanoutHash = hash(fanoutToken || routingId)
+pushFanoutHash = sha256(fanoutToken || routingId)
 ```
 
 **The hash is salted by `routingId` on purpose.** Storing the bare
@@ -92,23 +95,30 @@ makes each value unique while verification still works, since the relay
 knows which routing ID it is checking.
 
 **Deliberately absent: `accountId`, `circleId`, `syncId`, and any list of
-which routing IDs belong together.** Registration authenticates (for rate
-limiting) but writes no account link. Nothing else needs one: knowing a
+which routing IDs belong together.** Registration requires a session but
+writes no account link — and, unlike the circle routes, consumes no
+per-account budget. Nothing else needs one: knowing a
 `routingId` is itself the authorization to manage that row, since only the
 seed produces it.
 
-Push tokens are KMS-encrypted at rest under a purpose-derived key. That
-buys protection against a leaked backup or an over-broad read role, not
-against a compromised live server — which can call KMS itself. DynamoDB
-SSE already covers the disk.
+Push tokens are **not** encrypted at rest beyond DynamoDB's own SSE. The
+client base64s the platform token and the relay stores those bytes as it
+received them (`putPushDevice` in `services/relay.ts`, `PutDevice` in
+`push/dynamodb`) — it has to hand APNs and FCM the token verbatim, so an
+application-layer key it also holds would buy nothing. Encrypting under a
+key the relay can't use would mean it couldn't send.
 
 ## The flow
 
-**Register** — on join, and again after each key rotation. Authenticated,
+**Register** — on join, and again on every launch, since a push token
+rotates and the fanout hash follows the content key. Authenticated,
 `accountId` not persisted:
 
-- `PUT /v1/push/{routingId}` with `{ fanoutHash, keyVersion, categories }`
-- `PUT /v1/push/{routingId}/devices/{deviceId}` with `{ pushToken, platform }`
+- `PUT /v1/push/{routingId}` with `{ pushFanoutHash, categories, keyVersion }`
+- `PUT /v1/push/{routingId}/devices/{deviceId}` with `{ pushToken, platform, enabled }`
+
+`DELETE` on either undoes it — the device row for this device alone, the
+routing row for the whole circle.
 
 **Publish** — `routingId` rides in the member's roster entry, encrypted,
 syncing through the log like every other roster field. The relay never
@@ -116,16 +126,22 @@ sees a circle-to-routing-ID map.
 
 **Send** — after `appendEntry` succeeds, unauthenticated:
 
-- `POST /v1/push` with `{ routingIds[], fanoutToken, category, payload }`
-- routing IDs come from the sender's own decrypted roster, minus their own
-- `payload` is the entry's existing ciphertext plus a fixed placeholder
-  string
+- `POST /v1/push/send` with
+  `{ pushRoutingIds[], pushFanoutToken, category, keyVersion, payload }`
+- routing IDs come from the sender's own decrypted roster, minus their
+  own, and are shuffled — roster order is stable, so sending in it would
+  leak the ordering across posts
+- `payload` is the entry's existing ciphertext, nothing else. The
+  placeholder is the relay's own constant (`push.Placeholder`), stapled
+  on at dispatch; a sender cannot choose it
 
 **Verify** — per routing ID, the relay recomputes
 `hash(fanoutToken || routingId)` and compares against that row. A mismatch
 is skipped silently. This is a shared-secret comparison, not a signature:
-the relay never verifies signatures anywhere, since entries are ciphertext
-(authorship is checked client-side on replay, by `authoredByMember`).
+there is no key here the relay could verify against — an entry's author
+signature is inside the ciphertext, and is checked client-side on replay
+by `authoredByMember`. (The relay does verify signatures elsewhere, for
+write authority — `synclog/capability.go`. Just not for push.)
 
 The salted hash is what stops a member of circle A targeting circle B's
 routing IDs: they cannot produce B's token. A plain `writeToken` + `syncId`
@@ -143,7 +159,8 @@ delivered reveals the grouping.
 
 **Receive** — the device maps `routingId` to a circle locally, decrypts at
 `keyVersion`, and composes the text itself. iOS uses a Notification Service
-Extension; Android an FCM data message into `onMessageReceived`.
+Extension; Android an FCM data message into an expo-notifications
+background task (`services/task.ts`).
 
 ## What a delivered push contains
 
@@ -151,7 +168,8 @@ One log entry that skipped the line. `payload` is byte-for-byte the
 `encryptedMeta` the sender appended to the sync log — same encryption,
 same signature, the bytes the next sync would deliver anyway — with a
 delivery address stapled on. The iOS shape (Android carries the same
-custom fields in an FCM data message, `keyVersion` as a string):
+three in an FCM data message, `keyVersion` as a string, plus a
+`placeholder` field neither receiver reads):
 
 ```
 {
@@ -194,8 +212,8 @@ until the next rotation, and rate limiting cannot key on an account.
 
 ## Rate limiting
 
-`ratelimitstore.Allow(ctx, key)` takes a key chosen by the *handler* (not
-by the HTTP caller — today the middleware passes the authenticated
+`ratelimit.Store.Allow(ctx, key)` takes a key chosen by the *handler*
+(not by the HTTP caller — `ratelimit.Require` passes the authenticated
 accountID), so this reuses the existing store rather than new
 infrastructure.
 
@@ -221,13 +239,15 @@ session to budget against, that half is pushed out to the edge:
   to be useful.
 
   Note the relay is served by a Lambda Function URL
-  (`provision/lambda_url.tf`), not API Gateway, so there is no gateway
-  throttling to configure and **WAF cannot attach to it**. Two real
-  options: set `reserved_concurrent_executions` on the function, which
-  caps the blast radius and the bill without stopping a flood; or put
-  CloudFront in front via Origin Access Control and attach WAF with a
-  rate-based rule to that. The first is one line and worth doing anyway;
-  the second is what push actually needs before it ships.
+  (`provision/modules/lambda/lambda_url.tf`), not API Gateway, so there is
+  no gateway throttling to configure and **WAF cannot attach to it**.
+  CloudFront is now in front (`provision/modules/cdn`), but neither half
+  of the answer is actually in place: no WAF is attached to the
+  distribution, and `behind_cloudfront` is `false` in both environments,
+  so the function URL still answers direct callers and anything attached
+  to the distribution is bypassable. `reserved_concurrent_executions` is
+  wired to a variable that both environments leave at `-1` — unreserved.
+  Both are still to do before push ships.
 
 **Order matters: verify before consuming any budget.** Cheapest and most
 selective first — the length cap (no I/O at all), then read and verify each
@@ -278,10 +298,12 @@ namespace, ciphertext size, and whether a blob upload accompanied the
 entry. Opaque names (`option1`) are fine if wanted, but they are cosmetic:
 the design must be correct assuming the mapping is public.
 
-Categories live on the `prefs` row, so they are account-wide. The per-device
-switch is the `enabled` flag on the token row. "Silence this circle"
-unregisters or disables that circle's rows; nothing needs to sync, and no
-log entry is written.
+Categories live on the `prefs` row, so they are account-wide. Per device,
+there is an `enabled` flag on the device row, but nothing writes `false`
+to it — turning one device off deletes that device's row instead
+(`unregisterDeviceForCircle`), which is also what signing out does.
+"Silence this circle" deletes the whole routing row, prefs and devices
+together; nothing needs to sync, and no log entry is written.
 
 ## Levels, and Android channels
 
@@ -306,7 +328,11 @@ combination from another device survives being read back — `levelForMask`
 rounds *down* to the nearest level whose categories are a subset, so an
 unknown mask reads as quieter than it is rather than louder.
 
-### Channels and groups (not built)
+### Channels and groups
+
+Built, except the shade grouping below: `services/channels.ts` creates one
+channel per circle under one shared group, and removes a circle's channel
+when it's left.
 
 **One notification channel per circle**, created on join. That is what gives
 Android users per-circle sound, vibration and enable/disable in system
@@ -337,7 +363,8 @@ Three Android mechanisms, easy to conflate, all keyed `circle-<id>`:
   group.
 - **Notification group** (`setGroup` on a posted notification) — bundles a
   circle's notifications in the *shade*, so several photos collapse into one
-  stack with a summary rather than five rows.
+  stack with a summary rather than five rows. Not built: `services/task.ts`
+  schedules each notification on its own.
 
 **The two silences differ, and the UI must not pretend otherwise.** The
 in-app toggle stops *delivery* — the relay has no row to send to. Disabling
@@ -345,8 +372,10 @@ the channel stops *display*; the push still arrives. They drift apart the
 moment someone uses system settings, so on Android the in-app row should
 read the channel's enabled state and reflect it.
 
-iOS has no channel concept: the extension sets `sound` on the notification
-it builds, and vibration follows the sound and the ringer switch.
+iOS has no channel concept, and nothing on that side sets a sound at all
+— the APNs payload omits the key and the extension doesn't add one, so
+cards arrive silently. It groups them instead, by setting
+`threadIdentifier` to the circle id.
 
 ## What this leaks, honestly
 
@@ -376,20 +405,25 @@ default. Retention on whatever remains should be short.
 
 ## How it was built (all landed)
 
-- iOS Notification Service Extension: `app/targets/notification-service`,
-  a Swift target injected by the `@bacons/apple-targets` config plugin.
-  The crypto port (XChaCha20-Poly1305 via swift-sodium; HKDF and Ed25519
-  via CryptoKit) is pinned against the JS side by
-  `app/src/services/__tests__/push-crypto-vectors.test.ts`.
-- The App Group `group.com.eozsahin.mimoza` doubles as the shared
-  Keychain access group and the shared container. `keystore.ts` writes
-  every secret there with `keychainAccessible: AFTER_FIRST_UNLOCK` — the
-  default `WHEN_UNLOCKED` is unreadable from an extension on a locked
-  phone — and migrates pre-App-Group items on first read.
+- iOS Notification Service Extension:
+  `app/targets/MimozaNotificationService`, a Swift target injected by the
+  `@bacons/apple-targets` config plugin. The crypto port
+  (XChaCha20-Poly1305 via swift-sodium; HKDF and Ed25519 via CryptoKit) is
+  pinned against the JS side by
+  `app/src/core/crypto/__tests__/push-crypto-vectors.test.ts`.
+- The App Group doubles as the shared Keychain access group and the shared
+  container. It carries the bundle id, so it differs per environment
+  (`group.com.eozsahin.mimoza`, `.staging`) — staging sharing prod's group
+  would mean each reading the other's seed. `core/services/keystore/store.ts`
+  writes every secret there with `keychainAccessible: AFTER_FIRST_UNLOCK`
+  — the default `WHEN_UNLOCKED` is unreadable from an extension on a
+  locked phone — and migrates pre-App-Group items on first read.
 - The extension can't open the app's SQLite file, so circle and member
   names reach it through a JSON snapshot in the shared container,
-  refreshed on launch and after every sync pass (`push-snapshot.ts`).
-  Stale is benign: the card says "Someone".
+  refreshed on launch and after every sync pass, and deleted on sign-out
+  (`push-snapshot.ts`). It carries the in-app language too, which the
+  extension can't read from AsyncStorage. Stale is benign: the card says
+  "Someone".
 - Android: an FCM data-message path into the JS background task.
 - APNs auth key and FCM service account credentials on the relay,
   KMS-encrypted SSM SecureStrings created by hand. These are the most
