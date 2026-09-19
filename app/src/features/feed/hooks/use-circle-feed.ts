@@ -169,11 +169,8 @@ export function useCircleFeed(circleId: string, options: UseCircleFeedOptions): 
     () => [requests, justJoined, posts, rosterChanges],
     [requests, justJoined, posts, rosterChanges],
   );
-  // Assigned in an effect, not during render: a render can be discarded or
-  // replayed, and a ref written on one that never commits would leave
-  // `reload` calling into sources that aren't on screen. This hook runs
-  // before the screen's own focus effect, so the ref is current by the
-  // time anything calls `reload`.
+  // In an effect, not during render: a discarded render would leave
+  // `reload` fanning out to sources that never mounted.
   useEffect(() => {
     sourcesRef.current = sources;
   }, [sources]);

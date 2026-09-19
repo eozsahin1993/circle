@@ -28,10 +28,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Before the tests: a lint error is cheaper to read than a failing
-      # suite, and this job exists because one sat on main unnoticed.
-      # Errors only — the 500-odd warnings are a separate cleanup, and
-      # failing on them here would just train everyone to skip the job.
+      # Errors only: the 500-odd warnings are a separate cleanup, and
+      # failing on them here would train everyone to skip the job.
       - name: Lint
         run: npm run lint
 
