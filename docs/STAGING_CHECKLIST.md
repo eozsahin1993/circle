@@ -42,8 +42,8 @@ rebuild, not a retry.
       changes nothing the Lambda sees.
 - [ ] `terraform output api_endpoint` in `envs/staging` matches
       `EXPO_PUBLIC_RELAY_URL` in `app/.env.staging`. There is no health
-      endpoint to curl — every route is under `/v1/` and behind a session
-      — so this comparison is the check.
+      endpoint to curl — every route is under `/v1/` and expects a real
+      request, not a probe — so this comparison is the check.
 
 ## Building
 

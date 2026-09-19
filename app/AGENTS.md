@@ -4,31 +4,24 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before 
 
 # Running tests
 
+```bash
+npm test
+```
+
+That runs jest through `fnm exec --using=22.23.2`, matching
+`.node-version` and CI. The pin is the whole point: under any other Node,
 `npx jest` can hang indefinitely (not error — just never return, and the
-stuck process resists even `kill -9`) if the active Node version's ABI
+stuck process resists even `kill -9`) because the active version's ABI
 doesn't match the native SQLite binding (`better-sqlite3`, used by
-`expo-sqlite-mock` in tests) that `node_modules` was installed under. This
-has bitten multiple sessions in sandboxed/restricted shells specifically —
-a plain Homebrew/system `node` on the PATH is a common mismatch. Before
-running any test in this app, switch to the pinned version first:
+`expo-sqlite-mock` in tests) that `node_modules` was installed under. A
+plain Homebrew/system `node` on the PATH is the common mismatch.
 
-```bash
-eval "$(fnm env)" && fnm use   # reads ./.node-version (22.23.2) — matches CI
-```
-
-Then run tests with:
-
-```bash
-npx jest --ci --forceExit --runInBand
-```
-
-`--forceExit` is required in constrained shells to actually get control
-back after tests finish. `--runInBand` hasn't been proven necessary but
-has been reliable where the default worker-process model has not. Real
-CI (`.github/workflows/app-unit-test.yml`) runs plain `npx jest --ci` on
-Node 22.23.2 and passes quickly with no special flags — this workaround
-is specific to constrained local/sandboxed shells, not a sign anything is
-actually wrong with the test suite.
+If a run finishes but never hands control back, add `--forceExit`;
+`--runInBand` hasn't been proven necessary but has been reliable where the
+default worker-process model has not. Real CI
+(`.github/workflows/app-unit-test.yml`) runs plain `npx jest --ci` on Node
+22.23.2 and passes quickly with no special flags — reach for either flag
+as a symptom of the shell, not of the suite.
 
 ## After editing a migration `.sql`, run tests with `--no-cache`
 
@@ -46,7 +39,7 @@ cache, not a broken migration. Re-run with `--no-cache` once after
 touching any migration:
 
 ```bash
-npx jest --ci --forceExit --runInBand --no-cache
+npm test -- --no-cache
 ```
 
 Everyday runs (no migration changes) don't need it.
@@ -56,7 +49,7 @@ Everyday runs (no migration changes) don't need it.
 `jest.moduleNameMapper` sends `lucide-react-native/icons/*` at the package's
 `dist/cjs` copy. Jest resolves that subpath to the ESM `.mjs` otherwise, and
 the preset's transform only matches `.[jt]sx?` — so the icon never gets
-compiled and every test that touches `constants/theme.ts` dies with a
+compiled and every test that touches `ui/theme/tokens.ts` dies with a
 misleading `Cannot use import statement outside a module`. Metro is
 unaffected and takes the ESM build as normal.
 

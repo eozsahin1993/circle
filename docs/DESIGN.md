@@ -1,27 +1,22 @@
 # Relay server design
 
-Status: **partially built**. This documents the architecture decided in
-design discussion, so it survives past a chat transcript. What actually
-exists: the relay server itself (`server/`, Go — append/fetch/blob for a
-generic per-circle log) and the app's outbox + push-to-relay half of sync
-(`app/src/domain/usecases/sync-circle.ts`'s `drainOutbox`, posts only).
-Not built: the pull side (`pullCircle`, a local `circleLog` mirror table),
-roles/kick actually syncing through the relay (today these are local-only
-— see `app/src/domain/usecases/circle/invite-to-circle.ts` etc.), push
-notifications (section 2 below is a full design, zero implementation), and
-account recovery (see that section below — the
-master seed exists and is already framed in the UI as the way back into
-your circles, but nothing today actually makes that true yet). Invites
-are the one exception to "local-only": the full invite/join handshake
-(request, discover, approve, complete) now syncs through the relay's own
-mailbox-style table — see `INVITE_FLOW.md`, status **built**. A
-fresh joiner still sees no history until `pullCircle` exists, since
-getting the secret and pulling content are different problems (see that
-doc's "what this flow depends on" section).
+Status: **built, and superseded in parts**. This documents the
+architecture decided in design discussion, so it survives past a chat
+transcript. Where a mechanism has its own doc — `SYNC_DESIGN.md` (the log
+and key management), `PUSH_DESIGN.md` (section 2 here), `INVITE_FLOW.md`,
+`ACCOUNT_RECOVERY.md` — that one is current and this is the reasoning
+behind it. Everything this paragraph used to list as missing has since
+shipped: the pull side (`app/src/core/sync/pull-log.ts`), roles and kick
+syncing through the log (`change-member-role.ts`, `remove-member.ts` in
+`app/src/features/circle/usecases/`), push notifications
+(`server/internal/push`), and account recovery (`server/internal/account`).
 
-The relay's core property: it is blind. It never sees plaintext content, and
-it's designed so it can infer as little as possible about circle membership,
-identity, or social structure from the traffic it handles.
+The relay's core property: it is blind to content. It never sees plaintext
+— not a post, not a name, not a roster — and is designed to infer as
+little as it can about membership, identity or social structure from the
+traffic around it. It can't infer nothing: every request carries a
+session, so an account id and a circle's syncId always arrive together.
+See section 1's trade-off paragraph.
 
 ## Two separate jobs, two separate mechanisms
 
@@ -42,7 +37,9 @@ separate.
 
 - Every circle-scoped event — a new post, a member joining, a member being
   removed — is an entry appended to **one ordered log per circle**. Not
-  separate mechanisms per event type.
+  separate mechanisms per event type. Since split into two independent
+  sequences per circle, meta and content (`SYNC_DESIGN.md`), so a roster
+  sync doesn't have to page through a year of photos.
 - The relay's job here is dumb and mechanical: accept appends, and answer
   "give me every entry after epoch E" for a circle. It doesn't interpret
   content.
@@ -60,33 +57,43 @@ separate.
   members' copies were long gone (fetched-and-deleted) by the time someone
   new joined.
 - **Log entries should be lightweight, not embed full content.** Actual
-  ciphertext (e.g. a compressed photo) lives once in a separate
-  content-addressed blob store, keyed by an opaque random id unrelated to
-  the circle or any member. A log entry is just a pointer: "new post,
-  content at id X." Devices fetch the blob on demand. This avoids storing
-  the same bytes once per recipient, and keeps log entries cheap to sync.
+  ciphertext (e.g. a compressed photo) lives once in a separate blob
+  store. A log entry is just a pointer: "new post, content at id X."
+  Devices fetch the blob on demand. This avoids storing the same bytes
+  once per recipient, and keeps log entries cheap to sync. Not opaque the
+  way this originally assumed, though: the key is `syncId/entryId`
+  (`blobKey`, `server/internal/synclog/s3/blob_store.go`), and the upload
+  records the uploader's circle identity key on the object, so the relay
+  sees which blobs belong to one circle, how big each is, and which
+  member put it there. All three are per-circle, so none of it links a
+  person across circles.
 - **Kicking a member is just another log entry** (`member_removed`), which
   every remaining device applies on its next sync — same mechanism as
   everything else, not a special case.
 - Kicking must always be bundled with **rotating the circle secret** and
   redistributing it (encrypted individually) to remaining members — removal
-  from the roster alone doesn't necessarily stop a removed device from
-  continuing to compute tags/derive access, depending on whether mailbox/log
-  fetch ends up gated by tag-knowledge alone or by proof of current
-  membership. Decide that protocol detail before building kick.
+  from the roster alone doesn't stop a removed device. The protocol detail
+  this left open was settled the tag-knowledge way: writes are gated on a
+  token derived from the circle's current content key (`synclog.Service`,
+  `deriveWriteToken`), which the rotation invalidates, but **reads are
+  gated on nothing but a valid session and knowing the syncId** — see
+  `getlog`/`getblob`. A removed device keeps fetching ciphertext it can no
+  longer decrypt.
 
 ### Privacy trade-off, named honestly
 
-A shared per-circle log id is something every member (including future new
-ones) can independently derive from the circle secret — which means, unlike
-per-member push tags, it's the *same* identifier for everyone in the circle.
-That is a real, smaller leak: the relay can see "some cluster of connections
-is polling this one opaque log," i.e. activity/cluster-size. It is **not**
-the same as the identity-correlation leak per-member tags exist to prevent
-(linking a specific device's durable push token across circles) — this
-leaks presence/size, not who. Accepted trade-off in exchange for actually
-getting correct replay/history, which the pure-mailbox model couldn't
-provide at all.
+A per-circle log id (`syncId`, a random UUID handed out with the circle —
+not derived from the circle secret, as this section first assumed) is the
+*same* identifier for everyone in the circle, unlike per-member push tags.
+That is a real leak: the relay sees "some cluster of connections is polling
+this one opaque log," i.e. activity/cluster-size. And it sees more than
+presence/size, because every `/circles/` route sits behind
+`auth.RequireSession` — the account id arrives alongside the syncId on
+every fetch and append, so the relay can link who is in which circle in
+flight whether or not it ever writes that down. Accepted trade-off in
+exchange for actually getting correct replay/history, which the
+pure-mailbox model couldn't provide at all; the manifest paragraph under
+"Account recovery" makes the same admission for storage at rest.
 
 The relay can also observe **timing correlation** — related fetches/pushes
 clustered in the same short window can hint that they're connected, even
@@ -180,19 +187,22 @@ Reserved for private, per-individual exchanges — not circle content.
 
 - **Invite join requests**: the requester doesn't have the circle secret
   yet, so they can't derive a normal per-member tag. Instead the invite
-  itself carries its own tag: `hash(invite_code)`. The requester computes
-  this from the link/code alone and delivers their join request there.
+  itself carries its own tag: `hash("invite-tag" || invite_code)`. The
+  requester computes this from the link/code alone and delivers their join
+  request there.
 - **Approval responses**: the creator's device encrypts the circle secret
   directly to the requester's public key and sends it back through the
   relay, which just forwards ciphertext it can't read.
-- Semantics: **fetch, then ack, then delete** — not delete-on-fetch. If a
-  device fetches but crashes before persisting locally, delete-on-fetch
-  would destroy the only copy. Ack only after the item is safely applied
-  locally.
-- Ordering: FIFO by arrival, so a mailbox with several pending items
-  replays in the order they actually happened.
-- Deletion is scoped per-mailbox-entry — acking Alice's copy has no effect
-  on Bob's independent copy of a logically-related delivery.
+- Semantics as built: **read-many, expire on TTL** — no ack step, and
+  nothing is deleted on fetch, so a device that reads a row and crashes
+  before persisting locally just reads it again (`internal/invite`, 7-day
+  TTL matching the client's `INVITE_TTL_MS`). Achieves what ack-then-delete
+  was reached for, with no protocol.
+- No FIFO: rows come back in sort-key order, which is by the requester's
+  random id. Each carries its own `createdAt` for a client that wants
+  arrival order.
+- Deletion is scoped per-row and has one caller — the creator dismissing a
+  join request. Dismissing Alice's has no effect on Bob's.
 
 ## Invites
 
@@ -201,11 +211,12 @@ Reserved for private, per-individual exchanges — not circle content.
   redemptions, every join requires approval. Simplifies to one code path,
   no user-facing choice to make.
 - TTL: 7 days by default (`INVITE_TTL_MS` in
-  `app/src/domain/usecases/invite-to-circle.ts`).
+  `app/src/features/invite/usecases/invite-to-circle.ts`), matched by the
+  relay's own row TTL.
 - Invite code: 12 characters from a 32-symbol confusion-resistant alphabet
-  (`INVITE_CODE_ALPHABET` in `app/src/services/crypto.ts`) — 60 bits of
-  entropy, short enough to type/read aloud, exact power-of-two alphabet
-  size so there's no per-byte modulo bias. The same code backs the
+  (`INVITE_CODE_ALPHABET` in `app/src/core/crypto/primitives.ts`) — 60
+  bits of entropy, short enough to type/read aloud, exact power-of-two
+  alphabet size so there's no per-byte modulo bias. The same code backs the
   shareable link, the QR code, and the manual-entry fallback — one secret,
   multiple presentations, not three different things.
 - **Approval is always the invite's specific creator, never "any admin."**
@@ -245,8 +256,9 @@ Reserved for private, per-individual exchanges — not circle content.
 - No persistent circle "owner." Authority is scoped to what you actually
   did: creating an invite makes you its approver; the founding member gets
   `role: 'admin'` automatically (`createCircle` in
-  `app/src/domain/usecases/create-circle.ts`), and promoting others later
-  is a small, separate, not-yet-built action.
+  `app/src/features/circle/usecases/create-circle.ts`), and promoting
+  others later is its own action (`change-member-role.ts`), which the
+  relay checks as an authority-set change rather than taking on trust.
 
 ## Account deletion revokes the Apple grant
 
@@ -264,18 +276,18 @@ exchanges the code the moment someone signs in and banks the refresh token
 against the account; `DELETE /v1/account` spends it, then drops it.
 
 **This is the second departure from the relay's blindness**, alongside the
-unencrypted membership manifest above, and worth the same honesty. The
-relay now holds real Apple-side authority for its Apple users, not just
-data about them. Three things bound it: the token grants nothing inside a
-circle (the relay can't read those either), it's the only provider
-credential stored anywhere in the system, and it's deleted the moment
-deletion has used it. Revocation failing never blocks a deletion — someone
-asking to delete their account gets that even when Apple is unreachable,
-and the unspent token is kept precisely because it's all a retry would
-have to work from.
+circle membership its own access pattern reveals (see "Account recovery"),
+and worth the same honesty. The relay now holds real Apple-side authority
+for its Apple users, not just data about them. Three things bound it: the
+token grants nothing inside a circle (the relay can't read those either),
+it's the only provider credential stored anywhere in the system, and it's
+deleted the moment deletion has used it. Revocation failing never blocks a
+deletion — someone asking to delete their account gets that even when
+Apple is unreachable, and the unspent token is kept precisely because it's
+all a retry would have to work from.
 
 Both the revoke call and the key it's signed with are optional per
-environment (`APPLE_SIGNIN_KEY_ID`/`APPLE_TEAM_ID`, plus a `.p8` at
+environment (`APPLE_SIGNIN_KEY_ID`/`APPLE_SIGNIN_TEAM_ID`, plus a `.p8` at
 `/<prefix>/apple-signin-key`). Unconfigured, sign-in and deletion both
 still work — deletion just leaves the grant standing, which is fine
 locally and not fine in production.
@@ -289,10 +301,10 @@ the email-OTP flow this section designed — see the git history around
 specific mechanism below (`EmailHMAC`, the KMS-encrypted root secret,
 `internal/crypto`'s HKDF derivation) was removed from the codebase as dead
 code — zero call sites, no `/v1/auth/email`-shaped endpoint ever existed.
-`server/provision/kms.tf`'s KMS key itself was kept (not the root secret it
-used to protect) — reserved for whatever future secret genuinely needs
-KMS-grade protection, push notification provider credentials being the
-likely next case.
+`server/provision/kms.tf` went with it: there is no KMS key in Terraform
+today. The secrets that did turn up — FCM, APNs, the Sign in with Apple
+key, the CDN signing key — are hand-created SSM SecureStrings instead,
+kept out of Terraform state rather than wrapped in a customer-managed key.
 
 Left below as historical reasoning, most of which still has real value
 (the SES-vs-third-party tradeoff, the attestation-gated-enclave discussion,
@@ -307,10 +319,10 @@ as cheap and scriptable to mint as anything email-OTP would have gated on;
 switching identity providers isn't obviously the same thing as imposing
 real registration cost. Worth a fresh look at whether `RequireSession`
 alone (valid Google/Apple session, no other check) actually closes this
-gap, or whether the abuse-mitigation ideas below (concurrency cap, budget
-alert, per-account rate limiting — all **still not provisioned**) are more
-load-bearing than they were assumed to be when phone/email OTP was still
-the plan.
+gap, or whether the abuse-mitigation ideas below are more load-bearing
+than they were assumed to be when phone/email OTP was still the plan. Of
+those, per-account rate limiting has since been built; the concurrency cap
+is wired but turned off, and the budget alert doesn't exist.
 
 Not about content — content stays E2E encrypted regardless. This is about
 closing the one real gap the blind design leaves open: nothing currently
@@ -419,10 +431,11 @@ which is the actual backstop either way.
   stop a scripted attacker here, since minting a new device identity is
   free and instant either way; the concurrency cap + budget alert turns
   "could cost millions" into "costs a bounded, known ceiling and I get
-  paged," regardless of how many fake identities are involved. **Not yet
-  provisioned** — no `reserved_concurrent_executions` is set on the
-  Lambda and no `aws_budgets_budget` exists in Terraform today, so
-  nothing currently bounds a real spend spike. The concurrency cap is a
+  paged," regardless of how many fake identities are involved. **Half
+  provisioned** — `reserved_concurrent_executions` is wired on the Lambda
+  (`modules/lambda`, default 50), but both envs pass `-1`, which removes
+  the ceiling, and no `aws_budgets_budget` exists in Terraform, so nothing
+  currently bounds a real spend spike. The concurrency cap is a
   real-time, self-recovering throttle (AWS rejects new invocations past
   the ceiling, no code involved); the budget piece is an alert only
   unless paired with AWS Budget Actions, which can automatically attach
@@ -430,29 +443,25 @@ which is the actual backstop either way.
   blunt (it can't tell an abusive account from a legitimate traffic
   spike, and takes down the service for everyone either way), but a real
   automated stop if wanted instead of a page.
-- **No per-account rate limiting either** — `RequireSession` only checks
-  "is this a valid signed-in account," not how fast that account is
-  calling. The concurrency cap above bounds aggregate cost but not one
-  account crowding out others. Deferred for the same reason: not worth
-  building before there's real concurrent multi-user traffic for a
-  "noisy neighbor" to actually degrade. When it is built, the window
-  needs to be day-scale, not minute-scale — `drainOutbox` flushes a
-  device's backlog sequentially but as fast as the network allows, so a
-  device back online after two offline weeks can legitimately fire
-  dozens of `appendEntry` calls within a minute or two. A per-minute
-  limiter would mistake normal catch-up sync for abuse; a generous daily
-  cap (sized to plausible worst-case human-paced backlog) still catches
-  sustained scripted abuse without breaking it.
+- **Per-account rate limiting, since built** — `internal/ratelimit` gates
+  each circle route on a fixed-window budget keyed by the account
+  `RequireSession` resolved, with separate write and read limits (500 and
+  2000 per 10 minutes by default) so a read-heavy catch-up can't spend a
+  write budget. It fails open when its own store errors: a rate-limit
+  outage shouldn't become a write outage. The window landed at ten
+  minutes, not the day scale this section argued for, and the argument
+  still stands — `drainOutbox` flushes a backlog as fast as the network
+  allows, so a device back online after two offline weeks can legitimately
+  fire dozens of `appendEntry` calls in a minute or two. The headroom in
+  those limits is what's standing in for a day-scale window today.
 
-## Account recovery (not built)
+## Account recovery
 
-The master seed already exists (`generateSeedPhrase()`/`saveMasterSeed()`)
-and is already framed in the UI as the way back into your circles
-(`account/recovery.tsx`, `signOut()`'s own doc comment) — but nothing today
-actually makes that true. Circle identities and secrets are pure-random
-(`generateIdentity()`, `generateCircleSecret()`), not derived from the seed,
-so having the 12 words back doesn't currently let you regenerate a lost
-circle's keys. This section is what closes that gap.
+**Status: built** — `ACCOUNT_RECOVERY.md` is the mechanism as it shipped;
+this section is the reasoning that chose it. Circle identity, sealing and
+authority keys are all derived from the master seed now
+(`app/src/core/crypto/identity.ts`), not `generateIdentity()`'s pure
+randomness, so the 12 words regenerate them.
 
 **The audience rules out "write down 12 words" as the primary path.** This
 isn't a self-selected crypto-wallet audience opting into self-custody — it's
@@ -492,74 +501,70 @@ this section — regenerating your *keys* from the seed, and knowing *which
 circles* to regenerate keys for — and they have very different answers.
 
 **Regenerating keys needs nothing from the relay.** Circle **identity**
-(the Ed25519 keypair) becomes deterministic: `HKDF(masterSeed,
-"circle-identity" || circleId)` instead of `generateIdentity()`'s pure
-randomness. Recovering the seed regenerates the exact same public key you
-had before — same identity, not a new device asking to be let in. Circle
-**secrets** stay random and rotatable (determinism and rotation are
+(the Ed25519 keypair) is deterministic: `HKDF(masterSeed,
+"circle-identity" || circleId)`. Recovering the seed regenerates the exact
+same public key you had before — same identity, not a new device asking to
+be let in. The relay is neither involved nor aware.
+
+Content **keys** stay random and rotatable (determinism and rotation are
 incompatible, and rotation-on-kick from section 1 above has to keep
-working) — a recovered device gets its secret back the same way any
-returning device would: replay the circle's log from epoch 0, find the
-"secret rotated to me" event already encrypted to your now-recoverable
-public key, decrypt it. This is a pure client-side change; the relay is
-neither involved nor aware.
+working), but this section's original answer for them — replay from epoch
+0 and decrypt the rotation sealed to you — is circular: every entry in the
+log is itself encrypted under a key you don't have yet. So the keys ride
+in the manifest below, which is the only copy a phrase can reach.
 
 **Knowing which circles to even look for is the part that needs somewhere
 durable to live**, and the relay already is that somewhere: it's the one
-party both your old and new device always talk to, present or not. A
-plain per-account table — `accountId → {circleId, ...}` — updated on every
-join/create/leave, kept forever until the account itself is deleted, no
-TTL. New tiny endpoint, `GET/POST/DELETE /v1/account/circles`, behind the
+party both your old and new device always talk to, present or not. One
+blob per account — each circle's `syncId` and content keys, plus the
+profile — updated on every join/create/leave, kept until the account
+itself is deleted, no TTL. `GET`/`PUT /v1/account/manifest`, behind the
 same `auth.RequireSession` middleware the circle-log routes already use.
 
-This is deliberately *not* encrypted, unlike the log content itself, and
-that's a real departure from the relay's stated "infer as little as
-possible about circle membership" property at the top of this doc — worth
-being honest about rather than dressing it up. The mitigating fact: the
-relay already sees the same membership in real time, unencrypted, every
-time an authenticated device calls `fetchentries`/`appendentry` for a
-circleId — a durable table doesn't hand it new information, just persists
-what request logs already reveal moment-to-moment. Encrypting the list
-(the earlier drafts' `HKDF(masterSeed, "recovery-manifest")` idea) would
-protect a data-at-rest snapshot without protecting the exact same fact
-already visible in transit, for meaningfully more code — not worth it
-unless the access-pattern leak itself gets closed first.
+It *is* encrypted, under `HKDF(masterSeed, "recovery-manifest")`
+(`deriveManifestKey`) — this section argued the other way for a while, on
+the grounds that a plain list of circle ids leaks nothing the relay's own
+request pattern doesn't already show. That stopped holding the moment the
+blob had to carry content keys as well as ids: a database dump would then
+hand over the photos, not just the membership.
+
+The leak that argument named is still real and still open. Every
+authenticated fetch or append pairs an account id with a syncId in flight,
+so the relay sees the same membership in real time whatever the blob is
+encrypted with. Encryption at rest protects a dump, not the access
+pattern.
 
 **What this drops from earlier drafts, on purpose**: no Drive/CloudKit
 integration, no per-platform backup blob, no "iCloud/Drive unavailable"
 detection-and-fallback flow. Those solved a problem — automatically
 backing up the *seed itself* — that's still real but is now decoupled and
 optional: the seed remains something only the user's device holds, via the
-manual recovery-phrase screen already built (`account/recovery.tsx`). If
-that phrase is never written down and the device is lost, the seed is
-genuinely gone — same as today — and the plain circleId table can't help
-without it. Automatic seed backup to Drive/CloudKit is still a legitimate
-future enhancement, but it's additive to this design, not required to make
-the seed useful.
+manual recovery-phrase screen already built
+(`app/src/app/account/recovery.tsx`). If that phrase is never written down
+and the device is lost, the seed is genuinely gone, and the manifest can't
+help without it — it's encrypted to that seed. Automatic seed backup to
+Drive/CloudKit is still a legitimate future enhancement, but it's additive
+to this design, not required to make the seed useful.
 
 **Recovery, end to end**: sign in (Apple/Google) → same account, so
-`GET /v1/account/circles` returns the circleId list → enter the recovery
-phrase (manual, for now) → derive each circle's identity from the seed →
-replay each circle's log from epoch 0 → recover each circle's current
-secret from its rotation history → restored. No other circle member's
-help needed.
+`GET /v1/account/manifest` returns the blob → enter the recovery phrase →
+decrypt it for each circle's syncId and content keys → derive each
+circle's identity from the seed → replay each circle's log from epoch 0 →
+restored. No other circle member's help needed.
 
-**Caveat this does *not* solve: content older than the relay's retention
-window.** Recovery restores keys and access, not history. The relay is a
-transient sync cache (`LOG_RETENTION_DAYS`, 14 by default — see the TTL
-eviction design in section 1), not the source of truth for old photos;
-each device's local SQLite is. A lost device's content that's aged out of
-the relay's window is gone unless another member's device still has it
-locally and peer-to-peer backfill exists to pull it from them — which it
-doesn't yet (`pullCircle`, the local `circleLog` mirror table, is listed
-as not built at the top of this doc). Recovering an account today means
-continuity of identity and everything still in the relay's live window,
-not a guaranteed full photo history back.
+**The retention caveat this section used to carry is void.** There is no
+`LOG_RETENTION_DAYS` and no TTL eviction anywhere: the log is permanent
+(`SYNC_DESIGN.md` invariant 1), and prod runs continuous backups of the
+sync-log and accounts tables on top of that. Recovery replays the whole
+history, not a live window. What it can't bring back is a blob someone
+deliberately deleted — blobs have no backup at all, bucket versioning
+being off on purpose so a delete really destroys the bytes
+(`INFRASTRUCTURE.md`).
 
 **If plain email sign-in is ever added** (see "Explicitly rejected" below
-for why it isn't today): the account-circles table works identically —
-it's keyed off whatever the session already resolves to, Apple/Google
-account or otherwise. The seed itself is the only piece that would need a
+for why it isn't today): the manifest works identically — it's keyed off
+whatever the session already resolves to, Apple/Google account or
+otherwise. The seed itself is the only piece that would need a
 different backstop, since there's no platform account to eventually hang
 an automatic backup off of; emailing the phrase to that same address at
 generation time (reusing whatever OTP infra email auth needs anyway) is
@@ -586,9 +591,9 @@ the fallback, weaker than a real backup and should be presented as such.
 - **Plain email/OTP as a user-facing sign-in method.** Distinct from the
   `emailHmac` *mechanism* "Email auth" above already builds for spam
   resistance under phone auth — this is about letting someone sign in with
-  only an email address, no Apple/Google account behind it. The
-  account-circles table in "Account recovery" above works the same either
-  way, but the recovery *phrase* itself loses its only real backstop: with
+  only an email address, no Apple/Google account behind it. The manifest
+  in "Account recovery" above works the same either way, but the recovery
+  *phrase* itself loses its only real backstop: with
   Apple/Google there's at least a path to eventually back the seed up to
   Drive/CloudKit automatically; an email-only account has no platform
   account to ever hang that on, just the strictly weaker "email the phrase

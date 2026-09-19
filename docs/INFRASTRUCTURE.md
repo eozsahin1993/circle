@@ -1,12 +1,13 @@
 # Infrastructure
 
 Status: **staging is built** — its own account, both distributions, the
-relay behind `api.staging.joinmimoza.com`. Blobs are the exception: the
-distribution is up at `cdn.staging.joinmimoza.com` but the relay only signs
-for it once its settings parameter exists (below). Prod is not built: the
-Terraform is written and its settings decided, but there is no account
-yet, and `env_domain` is unset. Each section marks what is decided, open,
-or deferred.
+relay behind `api.staging.joinmimoza.com`. Blobs are the exception:
+Terraform writes the settings parameter with the distribution, so signing
+waits only on the hand-created `cloudfront-signing-key` in SSM — without
+it downloads stay on presigned S3, silently (below). Prod is not built:
+the Terraform is written and its settings decided, but there is no
+account yet, and `env_domain` is unset. Each section marks what is
+decided, open, or deferred.
 
 ---
 
@@ -117,12 +118,13 @@ domain hands account recovery to whoever registers it next. Never use an
 email whose domain is registered inside the account it recovers.
 
 Per account: Terraform state bucket (`mimoza-terraform-<env>`), deploy
-role, and the SSM SecureStrings created by hand because Terraform would
-put them in state as plaintext — `/mimoza-<env>/fcm-service-account`,
-`/mimoza-<env>/apns-auth-key`, `/mimoza-<env>/apple-signin-key`,
-`/mimoza-<env>/cloudfront-signing-key`. The last two differ by one letter
-and are unrelated: `signin` is the Sign in with Apple key, `signing` the
-RSA key that signs blob URLs.
+role, and the SSM SecureStrings kept out of Terraform, which would put
+them in state as plaintext — `/mimoza-<env>/fcm-service-account`,
+`/mimoza-<env>/apns-auth-key` and `/mimoza-<env>/apple-signin-key`, all
+three uploaded by `push-config.sh`, and
+`/mimoza-<env>/cloudfront-signing-key` by hand. The last two differ by one
+letter and are unrelated: `signin` is the Sign in with Apple key,
+`signing` the RSA key that signs blob URLs.
 
 The Lambda's environment merges the tuning block with the `/config/*`
 parameters, prefix last (`modules/lambda/lambda.tf`), so nothing can
@@ -137,8 +139,9 @@ primary App ID is the app it belongs to.
 
 Providers take `aws_profile` and `aws_account_id`, so applying with the
 wrong credentials fails instead of building in the wrong place. Neither is
-committed — locally they come from the environment, in CI from a GitHub
-Environment variable beside the role ARN:
+committed — locally they come from a gitignored `<env>.auto.tfvars` (copy
+the `.example` beside it) or the environment, in CI from GitHub
+Environment secrets beside the role ARN:
 
 ```bash
 export AWS_PROFILE=mimoza-staging
@@ -161,10 +164,11 @@ we control before any build ships to a real user.
   `AllViewerExceptHostHeader` — the relay serves per-user encrypted data,
   so nothing here is cached. Blobs are the opposite; see below.
 - DNS at Cloudflare, **"DNS only"**. Proxying would stack two CDNs.
-- **The function URL stays publicly callable** (`lock_function_url =
-  false`). Origin access control is built and can be switched on, but
-  Lambda rejects unsigned payloads: every POST/PUT would have to carry
-  `x-amz-content-sha256` with the body's hash, put there by the client.
+- **The function URL stays publicly callable** (`behind_cloudfront` and
+  `sign_origin_requests`, both false in every env). Origin access control
+  is built and can be switched on, but Lambda rejects unsigned payloads:
+  every POST/PUT would have to carry `x-amz-content-sha256` with the
+  body's hash, put there by the client.
   An edge function can't — it never sees the body. Making the app aware of
   how its origin is protected is the wrong contract, so the lock is off.
   The hostname is 32 random characters and isn't in certificate
@@ -178,7 +182,7 @@ we control before any build ships to a real user.
 Sync payloads still gain from the nearby TLS handshake and the AWS
 backbone on the long leg.
 
-Built as `modules/cdn`, wired into both envs but inert until `api_domain`
+Built as `modules/cdn`, wired into both envs but inert until `env_domain`
 is set — with it empty, `api_endpoint` stays the raw function URL.
 Certificate validation is manual: the first apply blocks on the record,
 which the `cdn` output prints for adding at Cloudflare.
@@ -286,14 +290,17 @@ versioning cannot. Nothing here is built.
 ## Deploys
 
 GitHub Environments (`staging`, `production`), each holding its own
-`AWS_ROLE_ARN`. OIDC — no stored AWS keys; the trust policy names the repo
-and environment.
+`AWS_ROLE_ARN`, `AWS_ACCOUNT_ID`, `ENV_DOMAIN` and `ALERT_EMAIL` as
+secrets. OIDC — no stored AWS keys; the trust policy names the repo and
+environment.
 
-- Merge to `main` → staging.
-- Tag → prod, with required approval.
+- Server Tests green on `main` → staging, or `workflow_dispatch` by hand.
+  Those tests only run on `server/**`, so a merge touching only `app/`
+  deploys nothing.
+- A `server-v*` tag → prod, through the `production` environment.
 
-Tags pick the release: `server-v*` deploys the relay, `app-v*` builds and
-submits the app.
+The app has no pipeline of its own: `app-unit-test.yml` runs Jest and
+stops there, so builds and submissions are local.
 
 **Relay first, then the app.** One relay serves every installed version,
 and a rollback can't unwrite what new clients appended — older clients
@@ -317,10 +324,11 @@ ID. The APNs `.p8` key is shared. `APNS_PRODUCTION` already selects
 sandbox versus production.
 
 Version is plain semver; the build number is separate
-(`ios.buildNumber`, `android.versionCode`, both auto-incremented — iOS
-needs a unique build per version, Android a strictly increasing integer).
-Neither is set in `app.json` today. Surface `1.0.0 (15) · <commit> · <env>`
-in-app: the SHA is the only identifier that can't drift.
+(`ios.buildNumber`, `android.versionCode` — iOS needs a unique build per
+version, Android a strictly increasing integer). Neither is set in
+`app.json` today, and nothing increments them: there is no EAS config and
+no app build workflow. Surface `1.0.0 (15) · <commit> · <env>` in-app:
+the SHA is the only identifier that can't drift.
 
 ### Verifying an upgrade
 
@@ -358,11 +366,13 @@ tier. Storage accumulates; nothing deletes photos unless asked.
 
 **Guardrails, in order:**
 
-1. Billing alarm — free, and the only thing that reports a problem. Built
-   as `modules/alarms`, off until `alert_email` is set.
+1. Billing alarm — free, and the one that catches a month going wrong.
+   Built as `modules/alarms` beside the relay's throttle, error and
+   latency alarms; all of them off until `alert_email` is set.
 2. Lambda reserved concurrency — free, caps how fast money can leave.
-   Defaults to 50; every table is `PAY_PER_REQUEST`, so nothing else
-   bounds spend.
+   Off in both envs today (`reserved_concurrency = -1`): a new account's
+   10-execution limit refuses a reservation. Every table is
+   `PAY_PER_REQUEST`, so until it goes on nothing bounds spend.
 3. WAF — deferred. ~$6/month per environment, and the account-level rate
    limiter already handles fairness. IP rules are a cost shield, not a
    replacement: shared carrier and household IPs force loose thresholds.

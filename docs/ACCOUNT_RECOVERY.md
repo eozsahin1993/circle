@@ -34,8 +34,8 @@ relay stores it and can never read it.
 2. Enter the phrase. The app derives your seed from it.
 3. It decrypts your manifest and restores your profile straight away, so
    you're not asked to retype your name.
-4. For each circle still listed — tombstones are skipped, there's nothing
-   left of those — it saves the content keys, re-derives your identity, and
+4. For each circle still listed — tombstoned ones are skipped, you're no
+   longer in those — it saves the content keys, re-derives your identity, and
    creates the circle locally with its sync position at zero.
 5. Sync replays each circle's history from the beginning, rebuilding the
    members and posts.
@@ -61,11 +61,15 @@ the merge work out what that changes. Nothing ever subtracts. "In the manifest
 but not on this phone" is genuinely ambiguous — it's equally what your other
 phone's circle looks like — so it can never be read as a removal.
 
-Leaving is recorded rather than deleted: the entry becomes a tombstone holding
-just an id and a timestamp, with the address and keys dropped. That's terminal,
-so a phone that hasn't yet synced its own removal can keep contributing the
-circle and still lose. Tombstones are kept indefinitely; they're about 60 bytes
-and bounded by the circles you've ever left.
+Leaving is recorded rather than deleted: the entry gains a `leftAt`, and
+nothing later ever changes it. That's terminal, so a phone that hasn't yet
+synced its own removal can keep contributing the circle and still lose.
+Tombstones are kept indefinitely, bounded by the circles you've ever left.
+
+Nothing strips a tombstone, though — `mergeCircles` writes it with the
+address and key map it merged, so a left circle's content keys stay in the
+manifest for good. Restore skips those entries; the keys themselves are
+still there. Whether that's intended isn't recorded anywhere.
 
 How each field combines is declared once, in `manifest-merge.ts`, rather than
 decided by each writer:
@@ -96,10 +100,12 @@ remembered.
 
 - **Same account.** Recovery needs the Google or Apple account you signed up
   with. The manifest is stored against it.
-- **Lose the phrase and you can't recover on your own.** Nothing else can
-  decrypt the manifest. Someone in a circle can invite you back and you'll
-  get its history again, but you'll be a new member — your old posts stay
-  under your previous identity.
+- **Lose the phrase and you can't recover on your own** — unless the old
+  phone still works. Device transfer (`device-transfer.ts`) seals the seed
+  from that phone to a new one over the invite mailbox, with no phrase
+  typed. Without either, nothing can decrypt the manifest. Someone in a
+  circle can invite you back and you'll get its history again, but you'll
+  be a new member — your old posts stay under your previous identity.
 - **Recovering is safe to retry.** If it fails partway, running it again
   picks up where it stopped rather than duplicating what it already restored.
 
@@ -107,9 +113,10 @@ remembered.
 
 | | |
 |---|---|
-| Manifest contents, read/write, conflict retries | `app/src/domain/usecases/account/account-manifest.ts` |
-| The restore itself | `app/src/domain/usecases/account/restore-from-phrase.ts` |
-| Key derivation from the seed | `app/src/services/crypto.ts` |
+| Manifest contents, read/write, conflict retries | `app/src/features/account/usecases/account-manifest.ts` |
+| The restore itself | `app/src/features/account/usecases/restore-from-phrase.ts` |
+| Phrase, seed, and the manifest key | `app/src/features/account/crypto.ts` |
+| Per-circle key derivation from the seed | `app/src/core/crypto/identity.ts` |
 | Storage and versioned writes | `server/internal/account/` |
 
 `SYNC_DESIGN.md` describes a larger future replacement for the manifest — a
